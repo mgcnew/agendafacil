@@ -1,26 +1,146 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ============================================================
+   AgendeFácil — sistema de temas por nicho
+   Tokens semânticos trocados via [data-theme] no <body> público
+   ============================================================ */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --radius-xl2: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ---------- Tema padrão / neutro (esmeralda + ardósia) ---------- */
+:root,
+[data-theme="neutro"] {
+  --background: #f6f8f7;
+  --foreground: #112019;
+  --card: #ffffff;
+  --card-foreground: #112019;
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --secondary: #e6efeb;
+  --secondary-foreground: #134e4a;
+  --accent: #14b8a6;
+  --accent-foreground: #04211d;
+  --muted: #eef2f0;
+  --muted-foreground: #5b6b65;
+  --border: #e0e6e3;
+  --ring: #0f766e;
+  --radius: 0.9rem;
+  --font-display: var(--font-hanken), system-ui, sans-serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+}
+
+/* ---------- Salão feminino (luxo: rosé profundo + dourado) ---------- */
+[data-theme="feminino"] {
+  --background: #fbf5f3;
+  --foreground: #2b1820;
+  --card: #fffafb;
+  --card-foreground: #2b1820;
+  --primary: #9d4e6c;
+  --primary-foreground: #fff6f9;
+  --secondary: #f3e3e8;
+  --secondary-foreground: #7a3550;
+  --accent: #c2973f;
+  --accent-foreground: #2b1d05;
+  --muted: #f4e8ec;
+  --muted-foreground: #7d5e69;
+  --border: #ecd9df;
+  --ring: #9d4e6c;
+  --radius: 1.1rem;
+  --font-display: var(--font-playfair), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+}
+
+/* ---------- Barbearia (industrial escuro: grafite + cobre) ---------- */
+[data-theme="barbearia"] {
+  --background: #14110f;
+  --foreground: #ece5db;
+  --card: #1d1916;
+  --card-foreground: #ece5db;
+  --primary: #c8852f;
+  --primary-foreground: #14110f;
+  --secondary: #2a241f;
+  --secondary-foreground: #e7c08a;
+  --accent: #b5651d;
+  --accent-foreground: #fdf2e3;
+  --muted: #221d19;
+  --muted-foreground: #a4968a;
+  --border: #332b25;
+  --ring: #c8852f;
+  --radius: 0.4rem;
+  --font-display: var(--font-oswald), "Arial Narrow", sans-serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+}
+
+/* ---------- Estética / unhas / sobrancelha (spa: sálvia + areia) ---------- */
+[data-theme="estetica"] {
+  --background: #f3f6f3;
+  --foreground: #1e2a25;
+  --card: #ffffff;
+  --card-foreground: #1e2a25;
+  --primary: #5b8a72;
+  --primary-foreground: #f4faf6;
+  --secondary: #e6efe7;
+  --secondary-foreground: #3a5d4b;
+  --accent: #c2a878;
+  --accent-foreground: #2c2310;
+  --muted: #e9efe9;
+  --muted-foreground: #5f706a;
+  --border: #dce6dd;
+  --ring: #5b8a72;
+  --radius: 1rem;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Reveal de entrada com stagger */
+@keyframes af-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.af-rise {
+  animation: af-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes af-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.af-float { animation: af-float 6s ease-in-out infinite; }
+
+.af-grain {
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--foreground) 9%, transparent) 1px, transparent 0);
+  background-size: 22px 22px;
 }

@@ -1,0 +1,316 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Button, Card, Input, Label, Select } from "@/components/ui";
+import type { Tables, Enums } from "@/lib/database.types";
+import {
+  Plus, Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
+} from "lucide-react";
+
+type Role = Enums<"member_role">;
+type Member = Tables<"salon_members"> & {
+  profiles: { full_name: string | null; email: string | null } | null;
+};
+type Permission = Tables<"permissions">;
+type RoleDefault = Tables<"role_permissions">;
+
+const ROLE_LABEL: Record<Role, string> = {
+  owner: "Proprietária",
+  manager: "Gerente",
+  professional: "Profissional",
+  receptionist: "Recepção",
+};
+const ROLE_OPTIONS: Role[] = ["manager", "professional", "receptionist"];
+
+export function TeamManager({
+  salonId,
+  myRole,
+  members: initialMembers,
+  permissions,
+  roleDefaults,
+}: {
+  salonId: string;
+  myRole: Role;
+  members: Member[];
+  permissions: Permission[];
+  roleDefaults: RoleDefault[];
+}) {
+  const supabase = createClient();
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [adding, setAdding] = useState(false);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("professional");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Member | null>(null);
+
+  const canManage = myRole === "owner" || myRole === "manager";
+
+  async function addMember() {
+    setBusy(true); setErr(null);
+    const { data, error } = await supabase.rpc("add_member_by_email", {
+      p_salon: salonId,
+      p_email: email,
+      p_role: role,
+    });
+    setBusy(false);
+    if (error) {
+      setErr(
+        error.message.includes("user_not_found")
+          ? "Não encontramos uma conta com esse e-mail. Peça para a pessoa criar uma conta primeiro."
+          : "Não foi possível adicionar.",
+      );
+      return;
+    }
+    // recarrega para trazer o profile
+    const { data: refreshed } = await supabase
+      .from("salon_members")
+      .select("*, profiles(full_name, email)")
+      .eq("id", (data as Member).id)
+      .single();
+    if (refreshed) setMembers((m) => [...m, refreshed as Member]);
+    setEmail(""); setAdding(false);
+  }
+
+  async function changeRole(member: Member, newRole: Role) {
+    setMembers((m) => m.map((x) => (x.id === member.id ? { ...x, role: newRole } : x)));
+    await supabase.from("salon_members").update({ role: newRole }).eq("id", member.id);
+  }
+
+  async function deactivate(member: Member) {
+    if (!confirm(`Remover ${member.profiles?.full_name ?? "esta pessoa"} da equipe?`)) return;
+    setMembers((m) => m.filter((x) => x.id !== member.id));
+    await supabase.from("salon_members").delete().eq("id", member.id);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Equipe</h1>
+          <p className="text-muted-foreground text-sm">Cargos e permissões de cada pessoa.</p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setAdding((v) => !v)}>
+            <UserPlus className="h-4 w-4" /> Adicionar
+          </Button>
+        )}
+      </div>
+
+      {adding && (
+        <Card className="p-6 space-y-4 af-rise">
+          <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">E-mail da pessoa (precisa ter conta)</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="funcionaria@email.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="role">Cargo</Label>
+              <Select id="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          <div className="flex gap-2">
+            <Button onClick={addMember} disabled={busy || !email}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar à equipe
+            </Button>
+            <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="space-y-2">
+        {members.map((m) => (
+          <div key={m.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
+            <span
+              className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
+              style={{ background: m.color || "var(--primary)" }}
+            >
+              {(m.display_name ?? m.profiles?.full_name ?? "?").charAt(0)}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium flex items-center gap-1.5">
+                {m.display_name ?? m.profiles?.full_name ?? "—"}
+                {m.role === "owner" && <Crown className="h-4 w-4 text-accent" />}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{m.profiles?.email}</p>
+            </div>
+
+            {m.role === "owner" ? (
+              <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-3 py-1 font-medium">
+                {ROLE_LABEL.owner}
+              </span>
+            ) : (
+              <>
+                {canManage ? (
+                  <Select
+                    value={m.role}
+                    onChange={(e) => changeRole(m, e.target.value as Role)}
+                    className="w-auto h-9 text-sm"
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </Select>
+                ) : (
+                  <span className="text-xs text-muted-foreground">{ROLE_LABEL[m.role]}</span>
+                )}
+                {canManage && (
+                  <>
+                    <button
+                      onClick={() => setEditing(m)}
+                      className="p-2 text-muted-foreground hover:text-primary"
+                      title="Permissões"
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => deactivate(m)}
+                      className="p-2 text-muted-foreground hover:text-red-600"
+                      title="Remover"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <PermissionsEditor
+          member={editing}
+          permissions={permissions}
+          roleDefaults={roleDefaults}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PermissionsEditor({
+  member,
+  permissions,
+  roleDefaults,
+  onClose,
+}: {
+  member: Member;
+  permissions: Permission[];
+  roleDefaults: RoleDefault[];
+  onClose: () => void;
+}) {
+  const supabase = createClient();
+  const defaults = new Set(
+    roleDefaults.filter((r) => r.role === member.role && r.allowed).map((r) => r.permission_key),
+  );
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // carrega overrides existentes
+  useEffect(() => {
+    supabase
+      .from("member_permissions")
+      .select("permission_key, allowed")
+      .eq("member_id", member.id)
+      .then(({ data }) => {
+        const o: Record<string, boolean> = {};
+        for (const r of data ?? []) o[r.permission_key] = r.allowed;
+        setOverrides(o);
+        setLoaded(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member.id]);
+
+  function isOn(key: string) {
+    if (key in overrides) return overrides[key];
+    return defaults.has(key);
+  }
+
+  function toggle(key: string) {
+    setOverrides((o) => ({ ...o, [key]: !isOn(key) }));
+  }
+
+  async function save() {
+    setSaving(true);
+    // grava todos como overrides explícitos (allowed conforme estado atual)
+    const rows = permissions.map((p) => ({
+      member_id: member.id,
+      permission_key: p.key,
+      allowed: isOn(p.key),
+    }));
+    await supabase
+      .from("member_permissions")
+      .upsert(rows, { onConflict: "member_id,permission_key" });
+    setSaving(false);
+    onClose();
+  }
+
+  const grouped = permissions.reduce<Record<string, Permission[]>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" /> Permissões
+          </h3>
+          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          {member.display_name ?? member.profiles?.full_name} · cargo {ROLE_LABEL[member.role]}
+        </p>
+
+        {!loaded ? (
+          <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : (
+          <div className="space-y-5">
+            {Object.entries(grouped).map(([cat, perms]) => (
+              <div key={cat}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
+                <div className="space-y-1">
+                  {perms.map((p) => {
+                    const on = isOn(p.key);
+                    const isDefault = !(p.key in overrides);
+                    return (
+                      <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => toggle(p.key)}
+                          className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                        >
+                          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                        </button>
+                        <span className="flex-1 text-sm">{p.label}</span>
+                        {!isDefault && <span className="text-[10px] text-accent font-medium">personalizado</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar permissões
+          </Button>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
