@@ -47,6 +47,24 @@ const ROLE_LABEL: Record<string, string> = {
   receptionist: "Recepção",
 };
 
+/** Tooltip que aparece à direita do ícone no hover */
+function Tip({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50",
+        "whitespace-nowrap rounded-md bg-foreground px-2.5 py-1.5",
+        "text-xs font-medium text-background shadow-lg",
+        "opacity-0 scale-95 origin-left transition-all duration-150",
+        "group-hover:opacity-100 group-hover:scale-100",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function PanelShell({
   salon,
   role,
@@ -70,11 +88,15 @@ export function PanelShell({
     router.refresh();
   }
 
-  const nav = (
+  /** Nav usado no drawer mobile (ícone + label) */
+  const mobileNav = (
     <nav className="flex flex-col gap-1">
       {items.map((it) => {
         const href = base + it.href;
-        const active = it.href === "" ? pathname === base : pathname === href || pathname.startsWith(href + "/");
+        const active =
+          it.href === ""
+            ? pathname === base
+            : pathname === href || pathname.startsWith(href + "/");
         const Icon = ICONS[it.icon];
         return (
           <Link
@@ -88,8 +110,37 @@ export function PanelShell({
                 : "text-foreground/80 hover:bg-muted",
             )}
           >
-            <Icon className="h-4.5 w-4.5" />
+            <Icon className="h-4.5 w-4.5 shrink-0" />
             {it.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  /** Nav usado na sidebar desktop (ícone centrado + tooltip) */
+  const desktopNav = (
+    <nav className="flex flex-col items-center gap-1 w-full">
+      {items.map((it) => {
+        const href = base + it.href;
+        const active =
+          it.href === ""
+            ? pathname === base
+            : pathname === href || pathname.startsWith(href + "/");
+        const Icon = ICONS[it.icon];
+        return (
+          <Link
+            key={it.href}
+            href={href}
+            className={cn(
+              "group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 transition",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-foreground/60 hover:bg-muted hover:text-foreground",
+            )}
+          >
+            <Icon className="h-[18px] w-[18px] shrink-0" />
+            <Tip label={it.label} />
           </Link>
         );
       })}
@@ -98,38 +149,43 @@ export function PanelShell({
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar desktop */}
-      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-card p-4">
-        <Link href={base} className="flex items-center gap-2 font-display font-bold text-lg px-2 mb-6">
-          <span className="grid place-items-center h-8 w-8 rounded-lg bg-primary text-primary-foreground">
-            <Scissors className="h-4 w-4" />
-          </span>
-          AgendeFácil
+      {/* ── Sidebar desktop — recolhida, ícones + tooltip ───────── */}
+      <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-4 overflow-visible">
+        {/* Logo */}
+        <Link
+          href={base}
+          className="group relative flex items-center justify-center h-10 w-10 rounded-[var(--radius)] bg-primary text-primary-foreground mb-2"
+        >
+          <Scissors className="h-[18px] w-[18px]" />
+          <Tip label={salon.name} />
         </Link>
-        <div className="px-2 mb-5">
-          <p className="font-display font-semibold truncate">{salon.name}</p>
-          <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
-        </div>
-        {nav}
-        <div className="mt-auto pt-4 space-y-1">
+
+        {/* Itens de navegação */}
+        {desktopNav}
+
+        {/* Ações do rodapé */}
+        <div className="mt-auto flex flex-col items-center gap-1">
           <a
             href={`/${salon.slug}`}
             target="_blank"
-            className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted"
+            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
           >
-            <ExternalLink className="h-4.5 w-4.5" /> Ver página pública
+            <ExternalLink className="h-[18px] w-[18px]" />
+            <Tip label="Ver página pública" />
           </a>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted"
+            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
           >
-            <LogOut className="h-4.5 w-4.5" /> Sair
+            <LogOut className="h-[18px] w-[18px]" />
+            <Tip label="Sair" />
           </button>
         </div>
       </aside>
 
-      {/* Topbar mobile */}
+      {/* ── Área principal ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Topbar mobile */}
         <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 h-14">
           <Link href={base} className="flex items-center gap-2 font-display font-bold">
             <Scissors className="h-5 w-5 text-primary" /> {salon.name}
@@ -142,20 +198,35 @@ export function PanelShell({
         {/* Drawer mobile */}
         {open && (
           <div className="lg:hidden fixed inset-0 z-50 flex">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setOpen(false)}
+            />
             <aside className="relative w-72 bg-card p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <span className="font-display font-bold">{salon.name}</span>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="font-display font-bold">{salon.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ROLE_LABEL[role] ?? role}
+                  </p>
+                </div>
                 <button onClick={() => setOpen(false)} className="p-2">
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              {nav}
+              {mobileNav}
               <div className="mt-auto pt-4 space-y-1">
-                <a href={`/${salon.slug}`} target="_blank" className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted">
+                <a
+                  href={`/${salon.slug}`}
+                  target="_blank"
+                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
+                >
                   <ExternalLink className="h-4.5 w-4.5" /> Página pública
                 </a>
-                <button onClick={logout} className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted">
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
+                >
                   <LogOut className="h-4.5 w-4.5" /> Sair
                 </button>
               </div>
@@ -163,7 +234,9 @@ export function PanelShell({
           </div>
         )}
 
-        <main className="flex-1 p-5 sm:p-8 max-w-5xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-5 sm:p-8 max-w-5xl w-full mx-auto">
+          {children}
+        </main>
       </div>
     </div>
   );
