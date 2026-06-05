@@ -31,15 +31,15 @@ export interface ColorVariant {
 export const NICHES: Record<Niche, NicheMeta> = {
   feminino: {
     id: "feminino",
-    label: "Salão Feminino",
-    tagline: "Beleza & sofisticação",
+    label: "Salão de Beleza",
+    tagline: "Cabelo, estética & bem-estar",
     description:
-      "Cabelo, coloração, escova, manicure e tratamentos — visual de atelier elegante, com serifa refinada e dourado.",
+      "Corte, coloração, escova, manicure, estética e todos os serviços encontrados num salão completo — visual elegante com serifa refinada.",
     gradient: "linear-gradient(135deg, #8e3b5e 0%, #b98a2e 100%)",
     swatch: "#8e3b5e",
     pattern: "grain",
     fontLabel: "Cormorant · Jost",
-    examples: ["Corte & Escova", "Coloração", "Manicure", "Hidratação"],
+    examples: ["Corte & Escova", "Coloração", "Manicure", "Estética"],
   },
   barbearia: {
     id: "barbearia",
@@ -67,7 +67,7 @@ export const NICHES: Record<Niche, NicheMeta> = {
   },
   neutro: {
     id: "neutro",
-    label: "Neutro / Personalizado",
+    label: "Neutro",
     tagline: "A sua marca",
     description:
       "Tema base moderno e versátil — laranja e quente — para qualquer negócio de beleza.",
@@ -112,6 +112,16 @@ export const NICHE_LIST = [
   NICHES.barbearia,
   NICHES.estetica,
   NICHES.neutro,
+];
+
+/**
+ * Nichos disponíveis para escolha no cadastro/configurações.
+ * Apenas Salão de Beleza (feminino) e Barbearia são expostos como opções.
+ * Os outros nichos (estetica, neutro) existem internamente mas não são selecionáveis.
+ */
+export const CHOOSABLE_NICHES: NicheMeta[] = [
+  NICHES.feminino,
+  NICHES.barbearia,
 ];
 
 export function nicheLabel(n: Niche): string {

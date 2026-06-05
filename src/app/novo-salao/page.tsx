@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Textarea } from "@/components/ui";
-import { NICHE_LIST, NICHE_COLOR_THEMES, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
+import { CHOOSABLE_NICHES, NICHE_COLOR_THEMES, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   Scissors, Loader2, Check, Clock, Upload, Phone, MapPin,
@@ -51,7 +51,7 @@ export default function NovoSalaoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const meta = useMemo(() => NICHE_LIST.find((n) => n.id === niche)!, [niche]);
+  const meta = useMemo(() => CHOOSABLE_NICHES.find((n) => n.id === niche)!, [niche]);
   const effectiveSlug = slugEdited ? slug : slugify(name);
 
   function pickLogo(file: File | null) {
@@ -180,9 +180,9 @@ export default function NovoSalaoPage() {
                   </div>
                 </div>
                 <div className="space-y-2.5">
-                  <Label>Segmento (define o tema visual)</Label>
+                  <Label>Segmento</Label>
                   <div className="grid sm:grid-cols-2 gap-3">
-                    {NICHE_LIST.map((n) => {
+                    {CHOOSABLE_NICHES.map((n) => {
                       const active = n.id === niche;
                       return (
                         <button

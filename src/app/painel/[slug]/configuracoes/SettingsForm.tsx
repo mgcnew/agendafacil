@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
-import { NICHE_LIST, NICHE_COLOR_THEMES, type Niche, type ColorTheme } from "@/lib/themes";
+import { NICHE_COLOR_THEMES, type Niche, type ColorTheme } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { Copy, Check, Loader2, Link2 } from "lucide-react";
 
@@ -17,7 +17,7 @@ export function SettingsForm({
 }) {
   const router = useRouter();
   const [name, setName] = useState(salon.name);
-  const [niche, setNiche] = useState<Niche>(salon.niche);
+  const niche = salon.niche as Niche; // segmento é definido no cadastro e não muda aqui
   const [colorTheme, setColorTheme] = useState<ColorTheme>((salon.color_theme ?? "a") as ColorTheme);
   const [phone, setPhone] = useState(salon.phone ?? "");
   const [address, setAddress] = useState(salon.address ?? "");
@@ -31,12 +31,6 @@ export function SettingsForm({
       ? `${window.location.origin}/${salon.slug}`
       : `/${salon.slug}`;
 
-  // When niche changes, reset color to 'a' (first variant of the new niche)
-  function handleNicheChange(n: Niche) {
-    setNiche(n);
-    setColorTheme("a");
-  }
-
   async function save() {
     setSaving(true);
     setSaved(false);
@@ -45,7 +39,6 @@ export function SettingsForm({
       .from("salons")
       .update({
         name,
-        niche,
         color_theme: colorTheme,
         phone: phone || null,
         address: address || null,
@@ -109,35 +102,7 @@ export function SettingsForm({
         </div>
       </Card>
 
-      {/* Segmento */}
-      <Card className="p-6">
-        <h2 className="font-display font-semibold">Segmento</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Tipografia e personalidade visual do seu app.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-3 mt-4">
-          {NICHE_LIST.map((n) => {
-            const active = n.id === niche;
-            return (
-              <button
-                key={n.id}
-                type="button"
-                disabled={!canEdit}
-                onClick={() => handleNicheChange(n.id)}
-                className={`text-left rounded-[var(--radius)] border p-4 transition disabled:opacity-60 ${
-                  active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"
-                }`}
-              >
-                <span className="inline-block h-4 w-4 rounded-full mb-2" style={{ background: n.swatch }} />
-                <p className="font-semibold text-sm">{n.label}</p>
-                <p className="text-xs text-muted-foreground">{n.tagline}</p>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Paleta de cores — filtra somente as variantes do nicho escolhido */}
+      {/* Paleta de cores — variantes do nicho do salão */}
       <Card className="p-6">
         <h2 className="font-display font-semibold">Paleta de cores</h2>
         <p className="text-sm text-muted-foreground mt-1">
