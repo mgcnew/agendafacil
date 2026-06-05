@@ -234,7 +234,7 @@ export function PanelShell({
           </div>
         )}
 
-        <main className="flex-1 p-5 sm:p-8 max-w-5xl w-full mx-auto">
+        <main className="flex-1 p-4 lg:p-6 w-full">
           {children}
         </main>
       </div>
