@@ -213,14 +213,24 @@ export function BookingApp({ salon }: { salon: Salon }) {
         >
           <div className={`${patternClass(nicheMeta.pattern)} absolute inset-0 opacity-25`} />
           <div className="relative flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">{nicheMeta.tagline}</p>
-              <h1 className="font-display text-3xl sm:text-4xl leading-tight mt-1">{salon.name}</h1>
-              {salon.address && (
-                <p className="text-xs opacity-85 mt-1.5 flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" /> {salon.address}
-                </p>
+            <div className="flex items-center gap-3">
+              {salon.logo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={salon.logo_url}
+                  alt={salon.name}
+                  className="h-14 w-14 rounded-2xl object-cover border border-white/30 shrink-0"
+                />
               )}
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">{nicheMeta.tagline}</p>
+                <h1 className="font-display text-3xl sm:text-4xl leading-tight mt-1">{salon.name}</h1>
+                {salon.address && (
+                  <p className="text-xs opacity-85 mt-1.5 flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" /> {salon.address}
+                  </p>
+                )}
+              </div>
             </div>
             {userId && (
               <button

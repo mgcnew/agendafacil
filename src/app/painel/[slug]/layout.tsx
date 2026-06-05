@@ -37,7 +37,6 @@ export default async function PanelLayout({
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
-        displayName={membership.display_name}
         items={items}
       >
         {children}

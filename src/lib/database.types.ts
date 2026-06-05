@@ -70,6 +70,26 @@ export type Database = {
           },
         ]
       }
+      appointment_segments: {
+        Row: {
+          id: string
+          salon_id: string
+          appointment_id: string
+          member_id: string
+          starts_at: string
+          ends_at: string
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          appointment_id: string
+          member_id: string
+          starts_at: string
+          ends_at: string
+        }
+        Update: Partial<Database["public"]["Tables"]["appointment_segments"]["Insert"]>
+        Relationships: []
+      }
       appointments: {
         Row: {
           client_id: string | null
@@ -760,6 +780,8 @@ export type Database = {
           created_at: string
           description: string | null
           duration_min: number
+          processing_time_min: number
+          finish_time_min: number
           id: string
           is_active: boolean
           name: string
@@ -773,6 +795,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_min?: number
+          processing_time_min?: number
+          finish_time_min?: number
           id?: string
           is_active?: boolean
           name: string
@@ -916,6 +940,18 @@ export type Database = {
           p_theme?: Json
         }
         Returns: Database["public"]["Tables"]["salons"]["Row"]
+      }
+      create_staff_appointment: {
+        Args: {
+          p_salon: string
+          p_member: string
+          p_client: string | null
+          p_service_ids: string[]
+          p_starts_at: string
+          p_status?: Database["public"]["Enums"]["appointment_status"]
+          p_force?: boolean
+        }
+        Returns: Database["public"]["Tables"]["appointments"]["Row"]
       }
       get_availability: {
         Args: { p_date: string; p_duration: number; p_member: string; p_salon: string }

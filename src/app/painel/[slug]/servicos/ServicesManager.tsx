@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Trash2, Clock, Percent, Loader2, Sparkles } from "lucide-react";
+import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer } from "lucide-react";
 
 type Service = Tables<"services">;
 
@@ -22,6 +22,9 @@ export function ServicesManager({
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
   const [commission, setCommission] = useState("");
+  const [hasProcessing, setHasProcessing] = useState(false);
+  const [processing, setProcessing] = useState("30");
+  const [finish, setFinish] = useState("15");
   const [busy, setBusy] = useState(false);
 
   const supabase = createClient();
@@ -37,6 +40,8 @@ export function ServicesManager({
         duration_min: parseInt(duration) || 30,
         price: parseFloat(price.replace(",", ".")) || 0,
         commission_percent: commission ? parseFloat(commission.replace(",", ".")) : null,
+        processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
+        finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
       })
       .select()
       .single();
@@ -44,6 +49,7 @@ export function ServicesManager({
     if (!error && data) {
       setServices((s) => [data, ...s]);
       setName(""); setPrice(""); setDuration("30"); setCommission("");
+      setHasProcessing(false); setProcessing("30"); setFinish("15");
       setAdding(false);
     }
   }
@@ -92,6 +98,49 @@ export function ServicesManager({
               <Input id="scom" value={commission} onChange={(e) => setCommission(e.target.value)} placeholder="Ex: 40" />
             </div>
           </div>
+          {/* Tempo de pausa (química / coloração) */}
+          <div className="rounded-[var(--radius)] border border-border p-4">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => setHasProcessing((v) => !v)}
+                className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${hasProcessing ? "bg-primary" : "bg-muted-foreground/30"}`}
+                aria-pressed={hasProcessing}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${hasProcessing ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Timer className="h-4 w-4 text-primary" /> Tem tempo de pausa?
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Para coloração/química: a profissional fica livre enquanto o produto age e
+                  pode atender outra cliente nesse intervalo.
+                </p>
+              </div>
+            </div>
+            {hasProcessing && (
+              <>
+                <div className="grid sm:grid-cols-2 gap-4 mt-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proc">Pausa — produto agindo (min)</Label>
+                    <Input id="proc" type="number" value={processing} onChange={(e) => setProcessing(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fin">Trabalho final (min)</Label>
+                    <Input id="fin" type="number" value={finish} onChange={(e) => setFinish(e.target.value)} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Tempo total da cliente:{" "}
+                  <b className="text-foreground">{(parseInt(duration) || 0) + (parseInt(processing) || 0) + (parseInt(finish) || 0)} min</b>{" "}
+                  · profissional ocupada apenas{" "}
+                  <b className="text-foreground">{(parseInt(duration) || 0) + (parseInt(finish) || 0)} min</b>.
+                </p>
+              </>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <Button onClick={add} disabled={busy || !name}>
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
@@ -119,6 +168,9 @@ export function ServicesManager({
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
                   {s.commission_percent != null && (
                     <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
+                  )}
+                  {s.processing_time_min > 0 && (
+                    <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
                   )}
                 </div>
               </div>

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
-  Plus, Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
+  Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;

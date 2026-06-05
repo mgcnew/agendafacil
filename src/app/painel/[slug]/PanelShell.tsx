@@ -48,13 +48,11 @@ const ROLE_LABEL: Record<string, string> = {
 export function PanelShell({
   salon,
   role,
-  displayName,
   items,
   children,
 }: {
   salon: { name: string; slug: string; niche: string };
   role: string;
-  displayName: string | null;
   items: NavItem[];
   children: React.ReactNode;
 }) {

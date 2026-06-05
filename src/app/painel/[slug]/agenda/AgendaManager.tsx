@@ -68,6 +68,7 @@ export function AgendaManager({
     setLoading(false);
   }, [supabase, salonId, date]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   async function setStatus(a: Appt, status: Status) {
@@ -173,12 +174,10 @@ function CreateAppointment({
 
   const chosen = services.filter((s) => selected.includes(s.id));
   const totalPrice = chosen.reduce((a, s) => a + Number(s.price), 0);
-  const totalDur = chosen.reduce((a, s) => a + s.duration_min, 0);
 
   async function create() {
     setBusy(true); setErr(null);
     try {
-      const pro = pros.find((p) => p.id === proId)!;
       let clientId = existingClient || null;
 
       if (!clientId) {
@@ -193,40 +192,21 @@ function CreateAppointment({
       }
 
       const startsAt = new Date(`${date}T${time}:00`);
-      const endsAt = new Date(startsAt.getTime() + totalDur * 60000);
-
-      const { data: appt, error: ae } = await supabase
-        .from("appointments")
-        .insert({
-          salon_id: salonId,
-          client_id: clientId,
-          member_id: proId,
-          status: "confirmed",
-          starts_at: startsAt.toISOString(),
-          ends_at: endsAt.toISOString(),
-          total_price: totalPrice,
-          source: "panel",
-        })
-        .select("id")
-        .single();
-      if (ae) throw ae;
-
-      const rows = chosen.map((s) => {
-        const pct = s.commission_percent ?? pro.commission_percent ?? 0;
-        return {
-          salon_id: salonId,
-          appointment_id: appt.id,
-          service_id: s.id,
-          name: s.name,
-          duration_min: s.duration_min,
-          price: Number(s.price),
-          commission_percent: pct,
-          commission_amount: Math.round(Number(s.price) * pct) / 100,
-        };
+      const { error } = await supabase.rpc("create_staff_appointment", {
+        p_salon: salonId,
+        p_member: proId,
+        p_client: clientId,
+        p_service_ids: selected,
+        p_starts_at: startsAt.toISOString(),
       });
-      if (rows.length) {
-        const { error: se } = await supabase.from("appointment_services").insert(rows);
-        if (se) throw se;
+      if (error) {
+        setErr(
+          error.message.includes("slot_taken")
+            ? "A profissional já está ocupada nesse horário. Escolha outro."
+            : "Não foi possível criar o agendamento.",
+        );
+        setBusy(false);
+        return;
       }
       onCreated();
     } catch {
