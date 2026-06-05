@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   CalendarDays,
+  Clock,
   Sparkles,
   Users,
   Contact,
@@ -24,6 +25,7 @@ import {
 const ICONS = {
   LayoutDashboard,
   CalendarDays,
+  Clock,
   Sparkles,
   Users,
   Contact,

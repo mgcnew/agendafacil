@@ -20,6 +20,7 @@ export function SettingsForm({
   const [niche, setNiche] = useState<Niche>(salon.niche);
   const [phone, setPhone] = useState(salon.phone ?? "");
   const [address, setAddress] = useState(salon.address ?? "");
+  const [simultaneous, setSimultaneous] = useState(salon.allow_simultaneous);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -35,7 +36,13 @@ export function SettingsForm({
     const supabase = createClient();
     await supabase
       .from("salons")
-      .update({ name, niche, phone: phone || null, address: address || null })
+      .update({
+        name,
+        niche,
+        phone: phone || null,
+        address: address || null,
+        allow_simultaneous: simultaneous,
+      })
       .eq("id", salon.id);
     setSaving(false);
     setSaved(true);
@@ -115,6 +122,30 @@ export function SettingsForm({
               </button>
             );
           })}
+        </div>
+      </Card>
+
+      {/* Agenda */}
+      <Card className="p-6">
+        <h2 className="font-display font-semibold">Agenda</h2>
+        <div className="flex items-start gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => canEdit && setSimultaneous((v) => !v)}
+            disabled={!canEdit}
+            aria-pressed={simultaneous}
+            className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 disabled:opacity-60 ${simultaneous ? "bg-primary" : "bg-muted-foreground/30"}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${simultaneous ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+          <div>
+            <p className="text-sm font-medium">Permitir atendimentos simultâneos da mesma cliente</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ex.: escova + unha ao mesmo tempo, com profissionais diferentes. A
+              profissional nunca é marcada em dois lugares; isso libera apenas a
+              mesma cliente em mais de um serviço ao mesmo tempo.
+            </p>
+          </div>
         </div>
       </Card>
 

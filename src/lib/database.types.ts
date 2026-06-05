@@ -723,6 +723,7 @@ export type Database = {
           name: string
           niche: Database["public"]["Enums"]["salon_niche"]
           owner_id: string
+          allow_simultaneous: boolean
           phone: string | null
           slug: string
           theme: Json
@@ -739,6 +740,7 @@ export type Database = {
           name: string
           niche?: Database["public"]["Enums"]["salon_niche"]
           owner_id: string
+          allow_simultaneous?: boolean
           phone?: string | null
           slug: string
           theme?: Json
@@ -755,6 +757,7 @@ export type Database = {
           name?: string
           niche?: Database["public"]["Enums"]["salon_niche"]
           owner_id?: string
+          allow_simultaneous?: boolean
           phone?: string | null
           slug?: string
           theme?: Json

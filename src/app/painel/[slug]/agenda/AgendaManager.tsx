@@ -210,10 +210,13 @@ function CreateAppointment({
         p_starts_at: startsAt.toISOString(),
       });
       if (error) {
+        const m = error.message;
         setErr(
-          error.message.includes("slot_taken")
+          m.includes("slot_taken")
             ? "A profissional já está ocupada nesse horário. Escolha outro."
-            : "Não foi possível criar o agendamento.",
+            : m.includes("client_busy")
+              ? "Esta cliente já tem um atendimento nesse horário. Para permitir, ative “atendimentos simultâneos” nas Configurações."
+              : "Não foi possível criar o agendamento.",
         );
         setBusy(false);
         return;

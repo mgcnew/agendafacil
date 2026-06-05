@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 const NAV: { item: NavItem; perm?: string }[] = [
   { item: { href: "", label: "Visão geral", icon: "LayoutDashboard" } },
   { item: { href: "/agenda", label: "Agenda", icon: "CalendarDays" } },
+  { item: { href: "/horarios", label: "Horários", icon: "Clock" }, perm: "schedule.manage" },
   { item: { href: "/servicos", label: "Serviços", icon: "Sparkles" }, perm: "services.manage" },
   { item: { href: "/equipe", label: "Equipe", icon: "Users" }, perm: "team.manage" },
   { item: { href: "/clientes", label: "Clientes", icon: "Contact" }, perm: "clients.view" },
