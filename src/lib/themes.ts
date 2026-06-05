@@ -1,6 +1,7 @@
 import type { Enums } from "@/lib/database.types";
 
 export type Niche = Enums<"salon_niche">;
+export type ColorTheme = "a" | "b" | "c" | "d";
 
 export interface NicheMeta {
   id: Niche;
@@ -16,6 +17,15 @@ export interface NicheMeta {
   /** rótulo da personalidade tipográfica */
   fontLabel: string;
   examples: string[];
+}
+
+export interface ColorVariant {
+  id: ColorTheme;
+  label: string;
+  /** cor primária para preview */
+  primary: string;
+  /** fundo claro para preview */
+  background: string;
 }
 
 export const NICHES: Record<Niche, NicheMeta> = {
@@ -60,13 +70,41 @@ export const NICHES: Record<Niche, NicheMeta> = {
     label: "Neutro / Personalizado",
     tagline: "A sua marca",
     description:
-      "Tema base moderno e versátil — teal e menta, tipografia grotesque — para qualquer negócio de beleza.",
-    gradient: "linear-gradient(135deg, #0e7a6e 0%, #14b8a6 100%)",
-    swatch: "#0e7a6e",
+      "Tema base moderno e versátil — laranja e quente — para qualquer negócio de beleza.",
+    gradient: "linear-gradient(135deg, #ea580c 0%, #fb923c 100%)",
+    swatch: "#ea580c",
     pattern: "grain",
     fontLabel: "Bricolage · Hanken",
     examples: ["Serviços diversos", "Pacotes", "Combos"],
   },
+};
+
+/** 4 variantes de cor para cada nicho — somente paletas que fazem sentido para o segmento */
+export const NICHE_COLOR_THEMES: Record<Niche, ColorVariant[]> = {
+  feminino: [
+    { id: "a", label: "Rosa Gold",    primary: "#8e3b5e", background: "#fbf6f4" },
+    { id: "b", label: "Berry",        primary: "#9c2580", background: "#faf5fb" },
+    { id: "c", label: "Champagne",    primary: "#b5832a", background: "#fdf8f0" },
+    { id: "d", label: "Lilás",        primary: "#7c57b8", background: "#f8f5fc" },
+  ],
+  barbearia: [
+    { id: "a", label: "Cobre",        primary: "#c8852f", background: "#15120f" },
+    { id: "b", label: "Midnight",     primary: "#3b7ab5", background: "#0d1218" },
+    { id: "c", label: "Forest",       primary: "#2e7a50", background: "#0f1410" },
+    { id: "d", label: "Steel",        primary: "#7890b8", background: "#0f1115" },
+  ],
+  estetica: [
+    { id: "a", label: "Sálvia",       primary: "#4f7d63", background: "#f2f5f1" },
+    { id: "b", label: "Oceano",       primary: "#2d6ea0", background: "#f0f5f9" },
+    { id: "c", label: "Lavanda",      primary: "#7c60b0", background: "#f5f2fb" },
+    { id: "d", label: "Argila",       primary: "#b86038", background: "#f7f1eb" },
+  ],
+  neutro: [
+    { id: "a", label: "Laranja",      primary: "#ea580c", background: "#fffbf7" },
+    { id: "b", label: "Teal",         primary: "#0e7a6e", background: "#f0fbfa" },
+    { id: "c", label: "Índigo",       primary: "#4f46e5", background: "#f5f5ff" },
+    { id: "d", label: "Chumbo",       primary: "#374151", background: "#f8f8f7" },
+  ],
 };
 
 export const NICHE_LIST = [
@@ -82,4 +120,8 @@ export function nicheLabel(n: Niche): string {
 
 export function patternClass(p: NicheMeta["pattern"]): string {
   return p === "stripes" ? "af-stripes" : p === "mesh" ? "af-mesh" : "af-grain";
+}
+
+export function colorVariantLabel(niche: Niche, color: ColorTheme): string {
+  return NICHE_COLOR_THEMES[niche].find((v) => v.id === color)?.label ?? color.toUpperCase();
 }

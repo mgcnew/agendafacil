@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
-import { NICHE_LIST, type Niche } from "@/lib/themes";
+import { NICHE_LIST, NICHE_COLOR_THEMES, type Niche, type ColorTheme } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { Copy, Check, Loader2, Link2 } from "lucide-react";
 
@@ -18,6 +18,7 @@ export function SettingsForm({
   const router = useRouter();
   const [name, setName] = useState(salon.name);
   const [niche, setNiche] = useState<Niche>(salon.niche);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>((salon.color_theme ?? "a") as ColorTheme);
   const [phone, setPhone] = useState(salon.phone ?? "");
   const [address, setAddress] = useState(salon.address ?? "");
   const [simultaneous, setSimultaneous] = useState(salon.allow_simultaneous);
@@ -30,6 +31,12 @@ export function SettingsForm({
       ? `${window.location.origin}/${salon.slug}`
       : `/${salon.slug}`;
 
+  // When niche changes, reset color to 'a' (first variant of the new niche)
+  function handleNicheChange(n: Niche) {
+    setNiche(n);
+    setColorTheme("a");
+  }
+
   async function save() {
     setSaving(true);
     setSaved(false);
@@ -39,6 +46,7 @@ export function SettingsForm({
       .update({
         name,
         niche,
+        color_theme: colorTheme,
         phone: phone || null,
         address: address || null,
         allow_simultaneous: simultaneous,
@@ -55,6 +63,8 @@ export function SettingsForm({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const colorVariants = NICHE_COLOR_THEMES[niche];
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -99,10 +109,12 @@ export function SettingsForm({
         </div>
       </Card>
 
-      {/* Tema */}
+      {/* Segmento */}
       <Card className="p-6">
-        <h2 className="font-display font-semibold">Tema visual (segmento)</h2>
-        <p className="text-sm text-muted-foreground mt-1">Muda as cores e a tipografia do app.</p>
+        <h2 className="font-display font-semibold">Segmento</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Tipografia e personalidade visual do seu app.
+        </p>
         <div className="grid sm:grid-cols-2 gap-3 mt-4">
           {NICHE_LIST.map((n) => {
             const active = n.id === niche;
@@ -111,7 +123,7 @@ export function SettingsForm({
                 key={n.id}
                 type="button"
                 disabled={!canEdit}
-                onClick={() => setNiche(n.id)}
+                onClick={() => handleNicheChange(n.id)}
                 className={`text-left rounded-[var(--radius)] border p-4 transition disabled:opacity-60 ${
                   active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"
                 }`}
@@ -119,6 +131,42 @@ export function SettingsForm({
                 <span className="inline-block h-4 w-4 rounded-full mb-2" style={{ background: n.swatch }} />
                 <p className="font-semibold text-sm">{n.label}</p>
                 <p className="text-xs text-muted-foreground">{n.tagline}</p>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Paleta de cores — filtra somente as variantes do nicho escolhido */}
+      <Card className="p-6">
+        <h2 className="font-display font-semibold">Paleta de cores</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Escolha a combinação de cores para o seu segmento.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+          {colorVariants.map((v) => {
+            const active = v.id === colorTheme;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                disabled={!canEdit}
+                onClick={() => setColorTheme(v.id)}
+                className={`flex flex-col items-center gap-2 rounded-[var(--radius)] border p-3 transition disabled:opacity-60 ${
+                  active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"
+                }`}
+              >
+                {/* Mini preview */}
+                <span
+                  className="h-10 w-10 rounded-full shadow-sm ring-1 ring-black/10"
+                  style={{ background: `linear-gradient(135deg, ${v.primary}, ${v.background})` }}
+                />
+                {/* Swatch pill */}
+                <span
+                  className="h-2.5 w-full rounded-full"
+                  style={{ background: v.primary }}
+                />
+                <p className="text-xs font-medium leading-tight">{v.label}</p>
               </button>
             );
           })}

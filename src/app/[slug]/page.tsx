@@ -16,8 +16,14 @@ export default async function SalonBookingPage({
   const salon = data?.[0];
   if (!salon) notFound();
 
+  const colorTheme = (salon.color_theme ?? "a") as string;
+
   return (
-    <div data-theme={salon.niche} className="min-h-full bg-background text-foreground">
+    <div
+      data-niche={salon.niche}
+      data-color={colorTheme}
+      className="min-h-full bg-background text-foreground"
+    >
       <BookingApp salon={salon} />
     </div>
   );

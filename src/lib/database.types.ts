@@ -715,6 +715,7 @@ export type Database = {
       salons: {
         Row: {
           address: string | null
+          color_theme: string
           created_at: string
           email: string | null
           id: string
@@ -732,6 +733,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          color_theme?: string
           created_at?: string
           email?: string | null
           id?: string
@@ -749,6 +751,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          color_theme?: string
           created_at?: string
           email?: string | null
           id?: string
@@ -1041,6 +1044,7 @@ export type Database = {
         Args: { p_slug: string }
         Returns: {
           address: string
+          color_theme: string
           id: string
           logo_url: string
           name: string

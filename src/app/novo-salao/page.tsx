@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Textarea } from "@/components/ui";
-import { NICHE_LIST, patternClass, type Niche } from "@/lib/themes";
+import { NICHE_LIST, NICHE_COLOR_THEMES, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   Scissors, Loader2, Check, Clock, Upload, Phone, MapPin,
@@ -42,6 +42,7 @@ export default function NovoSalaoPage() {
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [niche, setNiche] = useState<Niche>("feminino");
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("a");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -82,8 +83,8 @@ export default function NovoSalaoPage() {
       if (error) throw error;
       const salon = Array.isArray(data) ? data[0] : data;
 
-      // contato / endereço
-      const patch: TablesUpdate<"salons"> = {};
+      // contato / endereço / tema de cor
+      const patch: TablesUpdate<"salons"> = { color_theme: colorTheme };
       if (phone) patch.phone = phone;
       if (address) patch.address = address;
 
@@ -187,13 +188,38 @@ export default function NovoSalaoPage() {
                         <button
                           type="button"
                           key={n.id}
-                          onClick={() => setNiche(n.id)}
+                          onClick={() => { setNiche(n.id); setColorTheme("a"); }}
                           className={`relative text-left rounded-[var(--radius)] border p-4 transition ${active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"}`}
                         >
                           {active && <Check className="absolute top-3 right-3 h-4 w-4 text-primary" />}
                           <span className="inline-block h-4 w-4 rounded-full mb-2" style={{ background: n.swatch }} />
                           <p className="font-semibold text-sm">{n.label}</p>
                           <p className="text-xs text-muted-foreground">{n.tagline}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Paleta de cores — 4 variantes do nicho escolhido */}
+                <div className="space-y-2.5">
+                  <Label>Paleta de cores</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {NICHE_COLOR_THEMES[niche].map((v) => {
+                      const active = v.id === colorTheme;
+                      return (
+                        <button
+                          type="button"
+                          key={v.id}
+                          onClick={() => setColorTheme(v.id)}
+                          className={`flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-2.5 transition ${active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"}`}
+                        >
+                          <span
+                            className="h-8 w-8 rounded-full ring-1 ring-black/10"
+                            style={{ background: `linear-gradient(135deg, ${v.primary}, ${v.background})` }}
+                          />
+                          <span className="h-1.5 w-full rounded-full" style={{ background: v.primary }} />
+                          <span className="text-[10px] font-medium leading-tight text-center">{v.label}</span>
                         </button>
                       );
                     })}

@@ -33,8 +33,14 @@ export default async function PanelLayout({
     (n) => n.item,
   );
 
+  const colorTheme = (membership.salons.color_theme ?? "a") as string;
+
   return (
-    <div data-theme={membership.salons.niche} className="min-h-full bg-background text-foreground">
+    <div
+      data-niche={membership.salons.niche}
+      data-color={colorTheme}
+      className="min-h-full bg-background text-foreground"
+    >
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
