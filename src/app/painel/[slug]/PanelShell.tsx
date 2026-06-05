@@ -148,7 +148,7 @@ export function PanelShell({
   );
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* ── Sidebar desktop — recolhida, ícones + tooltip ───────── */}
       <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-4 overflow-visible">
         {/* Logo */}
@@ -184,7 +184,7 @@ export function PanelShell({
       </aside>
 
       {/* ── Área principal ──────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar mobile */}
         <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 h-14">
           <Link href={base} className="flex items-center gap-2 font-display font-bold">
@@ -234,7 +234,7 @@ export function PanelShell({
           </div>
         )}
 
-        <main className="flex-1 p-4 lg:p-6 w-full">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
           {children}
         </main>
       </div>
