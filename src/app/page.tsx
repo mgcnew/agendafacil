@@ -86,7 +86,7 @@ export default function Home() {
               <Smartphone className="h-3.5 w-3.5" /> App instalável • multiusuário • multi-salão
             </span>
             <h1
-              className="af-rise font-display text-5xl sm:text-7xl font-bold leading-[1.02] mt-6"
+              className="af-rise font-display text-5xl sm:text-7xl lg:text-8xl leading-[0.95] mt-6"
               style={{ animationDelay: "0.05s" }}
             >
               O sistema completo do seu{" "}

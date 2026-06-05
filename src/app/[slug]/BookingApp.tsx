@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL, formatDuration, formatDateLong } from "@/lib/utils";
+import { NICHES, patternClass, type Niche } from "@/lib/themes";
 import {
   Check,
   Clock,
@@ -15,6 +16,7 @@ import {
   Phone,
   CircleCheck,
   History,
+  MapPin,
 } from "lucide-react";
 
 type Salon = {
@@ -65,6 +67,7 @@ function toE164(raw: string) {
 
 export function BookingApp({ salon }: { salon: Salon }) {
   const supabase = useMemo(() => createClient(), []);
+  const nicheMeta = NICHES[(salon.niche as Niche)] ?? NICHES.neutro;
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [pros, setPros] = useState<Professional[]>([]);
@@ -202,25 +205,32 @@ export function BookingApp({ salon }: { salon: Salon }) {
   /* ---------------- render ---------------- */
   return (
     <div className="max-w-xl mx-auto px-4 pb-24">
-      {/* Header do salão */}
-      <header className="pt-8 pb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="grid place-items-center h-12 w-12 rounded-[var(--radius)] bg-primary text-primary-foreground font-display font-bold text-lg">
-              {salon.name.charAt(0)}
-            </span>
+      {/* Hero de marca do salão (gradiente + textura do nicho) */}
+      <header className="pt-6 pb-6">
+        <div
+          className="relative overflow-hidden rounded-[var(--radius)] p-6 text-white shadow-card"
+          style={{ background: nicheMeta.gradient }}
+        >
+          <div className={`${patternClass(nicheMeta.pattern)} absolute inset-0 opacity-25`} />
+          <div className="relative flex items-start justify-between gap-3">
             <div>
-              <h1 className="font-display text-xl font-bold leading-tight">{salon.name}</h1>
+              <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">{nicheMeta.tagline}</p>
+              <h1 className="font-display text-3xl sm:text-4xl leading-tight mt-1">{salon.name}</h1>
               {salon.address && (
-                <p className="text-xs text-muted-foreground">{salon.address}</p>
+                <p className="text-xs opacity-85 mt-1.5 flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" /> {salon.address}
+                </p>
               )}
             </div>
+            {userId && (
+              <button
+                onClick={loadMine}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-1.5 text-xs font-medium transition"
+              >
+                <History className="h-3.5 w-3.5" /> Meus
+              </button>
+            )}
           </div>
-          {userId && (
-            <Button variant="ghost" size="sm" onClick={loadMine}>
-              <History className="h-4 w-4" /> Meus
-            </Button>
-          )}
         </div>
       </header>
 

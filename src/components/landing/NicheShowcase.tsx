@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { NICHE_LIST, type Niche } from "@/lib/themes";
+import { NICHE_LIST, patternClass, type Niche } from "@/lib/themes";
 import { formatBRL } from "@/lib/utils";
-import { Clock, Star } from "lucide-react";
+import { Clock, Star, Type } from "lucide-react";
+
+const DEMO_NAME: Record<Niche, string> = {
+  feminino: "Studio Bella",
+  barbearia: "Navalha & Cia",
+  estetica: "Lótus Estética",
+  neutro: "Seu Espaço",
+};
 
 export function NicheShowcase() {
   const [active, setActive] = useState<Niche>("feminino");
@@ -16,12 +23,12 @@ export function NicheShowcase() {
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Um tema para cada negócio
         </p>
-        <h2 className="font-display text-3xl sm:text-4xl font-bold mt-3 leading-tight">
+        <h2 className="font-display text-3xl sm:text-4xl mt-3 leading-tight">
           A cara do seu salão, automaticamente.
         </h2>
         <p className="text-muted-foreground mt-4 max-w-md">
           Escolha o seu segmento e veja o app de agendamento se transformar — cores,
-          tipografia e clima combinando com o seu público.
+          tipografia, formas e clima combinando com o seu público.
         </p>
 
         <div className="grid sm:grid-cols-2 gap-3 mt-8">
@@ -33,24 +40,22 @@ export function NicheShowcase() {
                 onClick={() => setActive(n.id)}
                 className={`text-left rounded-2xl border p-4 transition-all duration-300 ${
                   isActive
-                    ? "border-transparent shadow-lg scale-[1.02]"
+                    ? "border-transparent shadow-xl scale-[1.02]"
                     : "border-border bg-card hover:border-foreground/20"
                 }`}
-                style={
-                  isActive
-                    ? { background: n.gradient, color: "#fff" }
-                    : undefined
-                }
+                style={isActive ? { background: n.gradient, color: "#fff" } : undefined}
+                aria-pressed={isActive}
               >
                 <span
                   className="inline-block h-3 w-3 rounded-full mb-2"
                   style={{ background: isActive ? "#fff" : n.swatch }}
                 />
                 <p className="font-semibold">{n.label}</p>
-                <p
-                  className={`text-xs mt-0.5 ${isActive ? "text-white/80" : "text-muted-foreground"}`}
-                >
+                <p className={`text-xs mt-0.5 ${isActive ? "text-white/85" : "text-muted-foreground"}`}>
                   {n.tagline}
+                </p>
+                <p className={`text-[11px] mt-2 flex items-center gap-1 ${isActive ? "text-white/70" : "text-muted-foreground/70"}`}>
+                  <Type className="h-3 w-3" /> {n.fontLabel}
                 </p>
               </button>
             );
@@ -61,20 +66,16 @@ export function NicheShowcase() {
       {/* Preview do app no tema selecionado */}
       <div
         data-theme={active}
-        className="rounded-[var(--radius)] border border-border bg-background p-5 sm:p-7 shadow-2xl transition-all duration-500"
+        className="rounded-[var(--radius)] border border-border bg-background p-5 sm:p-7 shadow-card transition-all duration-500"
       >
         <div
           className="rounded-[var(--radius)] p-5 text-white relative overflow-hidden"
           style={{ background: meta.gradient }}
         >
-          <div className="af-grain absolute inset-0 opacity-30" />
+          <div className={`${patternClass(meta.pattern)} absolute inset-0 opacity-30`} />
           <div className="relative">
-            <p className="text-xs uppercase tracking-widest opacity-80">
-              {meta.tagline}
-            </p>
-            <p className="font-display text-2xl font-bold mt-1">
-              Studio {meta.label.split(" ")[0]}
-            </p>
+            <p className="text-xs uppercase tracking-[0.18em] opacity-80">{meta.tagline}</p>
+            <p className="font-display text-3xl mt-1">{DEMO_NAME[active]}</p>
             <div className="flex items-center gap-1 mt-2 text-sm">
               <Star className="h-4 w-4 fill-current" />
               <span>4,9 · agende em segundos</span>
@@ -82,9 +83,7 @@ export function NicheShowcase() {
           </div>
         </div>
 
-        <p className="font-display text-lg font-semibold mt-5 mb-3">
-          Serviços
-        </p>
+        <p className="font-display text-lg mt-5 mb-3">Serviços</p>
         <div className="space-y-2.5">
           {meta.examples.map((svc, i) => (
             <div
@@ -97,9 +96,7 @@ export function NicheShowcase() {
                   <Clock className="h-3 w-3" /> {30 + i * 15} min
                 </p>
               </div>
-              <span className="font-semibold text-primary">
-                {formatBRL(45 + i * 25)}
-              </span>
+              <span className="font-semibold text-primary tabular-nums">{formatBRL(45 + i * 25)}</span>
             </div>
           ))}
         </div>

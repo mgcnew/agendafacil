@@ -7,10 +7,14 @@ export interface NicheMeta {
   label: string;
   tagline: string;
   description: string;
-  /** gradiente usado em cards/hero da landing */
+  /** gradiente usado em cards/hero */
   gradient: string;
   /** cor de destaque para preview (hex) */
   swatch: string;
+  /** textura característica do nicho */
+  pattern: "grain" | "stripes" | "mesh";
+  /** rótulo da personalidade tipográfica */
+  fontLabel: string;
   examples: string[];
 }
 
@@ -20,9 +24,11 @@ export const NICHES: Record<Niche, NicheMeta> = {
     label: "Salão Feminino",
     tagline: "Beleza & sofisticação",
     description:
-      "Cabelo, coloração, escova, manicure e tratamentos — um visual elegante e acolhedor para o seu salão.",
-    gradient: "linear-gradient(135deg, #9d4e6c 0%, #c2973f 100%)",
-    swatch: "#9d4e6c",
+      "Cabelo, coloração, escova, manicure e tratamentos — visual de atelier elegante, com serifa refinada e dourado.",
+    gradient: "linear-gradient(135deg, #8e3b5e 0%, #b98a2e 100%)",
+    swatch: "#8e3b5e",
+    pattern: "grain",
+    fontLabel: "Cormorant · Jost",
     examples: ["Corte & Escova", "Coloração", "Manicure", "Hidratação"],
   },
   barbearia: {
@@ -30,9 +36,11 @@ export const NICHES: Record<Niche, NicheMeta> = {
     label: "Barbearia",
     tagline: "Estilo & atitude",
     description:
-      "Corte, barba, navalha e cuidados masculinos com uma identidade visual forte e industrial.",
-    gradient: "linear-gradient(135deg, #c8852f 0%, #6b3e12 100%)",
+      "Corte, barba e navalha com identidade de oficina industrial: fundo escuro, cobre e tipografia condensada.",
+    gradient: "linear-gradient(135deg, #c8852f 0%, #9e3b2e 100%)",
     swatch: "#c8852f",
+    pattern: "stripes",
+    fontLabel: "Oswald · Hanken",
     examples: ["Corte Masculino", "Barba", "Navalhado", "Pézinho"],
   },
   estetica: {
@@ -40,9 +48,11 @@ export const NICHES: Record<Niche, NicheMeta> = {
     label: "Estética & Unhas",
     tagline: "Cuidado & bem-estar",
     description:
-      "Sobrancelha, cílios, design de unhas, limpeza de pele e estética — um clima clean e relaxante.",
-    gradient: "linear-gradient(135deg, #5b8a72 0%, #c2a878 100%)",
-    swatch: "#5b8a72",
+      "Sobrancelha, cílios, unhas e pele num clima de spa botânico: sálvia, terracota e cantos suaves.",
+    gradient: "linear-gradient(135deg, #4f7d63 0%, #be8a5e 100%)",
+    swatch: "#4f7d63",
+    pattern: "mesh",
+    fontLabel: "Fraunces · Nunito",
     examples: ["Sobrancelha", "Alongamento de unhas", "Limpeza de pele", "Cílios"],
   },
   neutro: {
@@ -50,9 +60,11 @@ export const NICHES: Record<Niche, NicheMeta> = {
     label: "Neutro / Personalizado",
     tagline: "A sua marca",
     description:
-      "Um tema base elegante e versátil para qualquer tipo de negócio de beleza.",
-    gradient: "linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)",
-    swatch: "#0f766e",
+      "Tema base moderno e versátil — teal e menta, tipografia grotesque — para qualquer negócio de beleza.",
+    gradient: "linear-gradient(135deg, #0e7a6e 0%, #14b8a6 100%)",
+    swatch: "#0e7a6e",
+    pattern: "grain",
+    fontLabel: "Bricolage · Hanken",
     examples: ["Serviços diversos", "Pacotes", "Combos"],
   },
 };
@@ -66,4 +78,8 @@ export const NICHE_LIST = [
 
 export function nicheLabel(n: Niche): string {
   return NICHES[n].label;
+}
+
+export function patternClass(p: NicheMeta["pattern"]): string {
+  return p === "stripes" ? "af-stripes" : p === "mesh" ? "af-mesh" : "af-grain";
 }
