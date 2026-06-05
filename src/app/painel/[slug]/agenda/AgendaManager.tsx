@@ -184,6 +184,8 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
 }
 
 // ── Day View ───────────────────────────────────────────────────
+const COL_W_DAY = 160; // min px per professional column
+
 function DayView({ date, appts, pros, activePros, onStatusChange }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onStatusChange: (a: Appt, s: Status) => void;
@@ -193,30 +195,36 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
   const todayLine = isToday(date)
     ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
     : null;
+  const nCols   = Math.max(1, cols.length);
+  const minW    = 56 + nCols * COL_W_DAY;
 
   return (
-    <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden flex flex-col">
-      {/* Pro column headers */}
-      {cols.length > 0 && (
-        <div className="flex shrink-0 border-b border-border">
-          <div className="w-14 shrink-0" />
+    <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
+      {/* Single scroll container — syncs horizontal scroll across headers + grid */}
+      <div className="flex-1 min-h-0 overflow-auto">
+
+        {/* Sticky column headers */}
+        <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
+          {/* Corner */}
+          <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
           {cols.map((p) => {
             const color = getColor(pros, p.id);
             return (
-              <div key={p.id} className="flex-1 py-2.5 text-center border-l border-border">
+              <div key={p.id}
+                className="py-2.5 text-center border-l border-border"
+                style={{ minWidth: COL_W_DAY, flex: 1 }}
+              >
                 <span className="inline-block h-2 w-2 rounded-full mr-1.5 align-middle" style={{ background: color }} />
                 <span className="text-sm font-medium truncate">{p.name}</span>
               </div>
             );
           })}
         </div>
-      )}
 
-      {/* Scrollable time grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-        <div className="flex" style={{ minHeight: TOTAL_H }}>
-          {/* Time gutter */}
-          <div className="w-14 shrink-0 relative border-r border-border" style={{ height: TOTAL_H }}>
+        {/* Time grid */}
+        <div className="flex" style={{ minHeight: TOTAL_H, minWidth: minW }}>
+          {/* Sticky time gutter */}
+          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: TOTAL_H }}>
             {HOURS.map(h => (
               <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
                 <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
@@ -226,60 +234,42 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
             ))}
           </div>
 
-          {/* Columns */}
+          {/* Professional columns */}
           {cols.map((p) => {
-            const color = getColor(pros, p.id);
+            const color    = getColor(pros, p.id);
             const proAppts = appts.filter(a => a.member_id === p.id);
             return (
-              <div key={p.id} className="flex-1 relative border-l border-border" style={{ height: TOTAL_H }}>
-                {/* Grid lines */}
+              <div key={p.id}
+                className="relative border-l border-border"
+                style={{ height: TOTAL_H, minWidth: COL_W_DAY, flex: 1 }}
+              >
                 {HOURS.map(h => (
-                  <div key={h} className="absolute w-full border-t border-border/40"
-                    style={{ top: (h - HOUR_START) * CELL_H }} />
+                  <Fragment key={h}>
+                    <div className="absolute w-full border-t border-border/40"
+                      style={{ top: (h - HOUR_START) * CELL_H }} />
+                    <div className="absolute w-full border-t border-dashed border-border/20"
+                      style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
+                  </Fragment>
                 ))}
-                {/* Half-hour faint lines */}
-                {HOURS.map(h => (
-                  <div key={h + 0.5} className="absolute w-full border-t border-dashed border-border/25"
-                    style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
-                ))}
-                {/* Now line */}
                 {todayLine !== null && todayLine >= 0 && todayLine <= TOTAL_H && (
-                  <div className="absolute w-full z-20 pointer-events-none"
-                    style={{ top: todayLine }}>
-                    <div className="relative">
-                      <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
-                      <div className="border-t-2 border-primary w-full" />
-                    </div>
+                  <div className="absolute w-full z-20 pointer-events-none" style={{ top: todayLine }}>
+                    <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
+                    <div className="border-t-2 border-primary w-full" />
                   </div>
                 )}
-                {/* Appointments */}
                 {proAppts.map(a => {
                   const top = apptTop(a);
                   const h   = apptH(a);
                   if (top < 0 || top >= TOTAL_H) return null;
                   return (
-                    <div key={a.id} className="absolute left-1 right-1 z-10"
-                      style={{ top, height: h }}>
-                      <ApptCard
-                        a={a} color={color}
-                        onStatusChange={(s) => onStatusChange(a, s)}
-                      />
+                    <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}>
+                      <ApptCard a={a} color={color} onStatusChange={s => onStatusChange(a, s)} />
                     </div>
                   );
                 })}
               </div>
             );
           })}
-
-          {/* Fallback: no professionals */}
-          {cols.length === 0 && (
-            <div className="flex-1 relative border-l border-border" style={{ height: TOTAL_H }}>
-              {HOURS.map(h => (
-                <div key={h} className="absolute w-full border-t border-border/40"
-                  style={{ top: (h - HOUR_START) * CELL_H }} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -287,49 +277,55 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
 }
 
 // ── Week View ──────────────────────────────────────────────────
+const COL_W_WEEK = 90; // min px per day column
+
 function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onStatusChange: (a: Appt, s: Status) => void;
   onDayClick: (d: string) => void;
 }) {
-  const days = getWeekDays(date);
-  const now  = new Date();
+  const days     = getWeekDays(date);
+  const now      = new Date();
   const todayStr = toStr(now);
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const minW     = 56 + 7 * COL_W_WEEK;
 
   return (
-    <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden flex flex-col">
-      {/* Day headers */}
-      <div className="flex shrink-0 border-b border-border">
-        <div className="w-14 shrink-0" />
-        {days.map((day) => {
-          const d = parse(day);
-          const today = isToday(day);
-          return (
-            <button
-              key={day}
-              onClick={() => onDayClick(day)}
-              className="flex-1 py-2 text-center border-l border-border hover:bg-muted/50 transition"
-            >
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                {DAY_SHORT[d.getDay()]}
-              </p>
-              <span className={cn(
-                "inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold mt-0.5",
-                today ? "bg-primary text-primary-foreground" : "text-foreground",
-              )}>
-                {d.getDate()}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
+      {/* Single scroll container */}
+      <div className="flex-1 min-h-0 overflow-auto">
 
-      {/* Scrollable grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-        <div className="flex" style={{ minHeight: TOTAL_H }}>
-          {/* Time gutter */}
-          <div className="w-14 shrink-0 relative border-r border-border" style={{ height: TOTAL_H }}>
+        {/* Sticky day headers */}
+        <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
+          {/* Corner */}
+          <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
+          {days.map((day) => {
+            const d     = parse(day);
+            const today = isToday(day);
+            return (
+              <button
+                key={day}
+                onClick={() => onDayClick(day)}
+                className="py-2 text-center border-l border-border hover:bg-muted/50 transition"
+                style={{ minWidth: COL_W_WEEK, flex: 1 }}
+              >
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  {DAY_SHORT[d.getDay()]}
+                </p>
+                <span className={cn(
+                  "inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold mt-0.5",
+                  today ? "bg-primary text-primary-foreground" : "text-foreground",
+                )}>
+                  {d.getDate()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Time grid */}
+        <div className="flex" style={{ minHeight: TOTAL_H, minWidth: minW }}>
+          {/* Sticky time gutter */}
+          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: TOTAL_H }}>
             {HOURS.map(h => (
               <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
                 <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
@@ -341,20 +337,19 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
 
           {/* Day columns */}
           {days.map((day) => {
-            const isT = day === todayStr;
+            const isT      = day === todayStr;
             const dayAppts = (activePros.length > 0
               ? appts.filter(a => activePros.some(p => p.id === a.member_id))
               : appts
             ).filter(a => datePart(a.starts_at) === day);
-
-            const nowLine = isT
+            const nowLine  = isT
               ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
               : null;
 
             return (
               <div key={day}
-                className={cn("flex-1 relative border-l border-border", isT && "bg-primary/[0.03]")}
-                style={{ height: TOTAL_H }}
+                className={cn("relative border-l border-border", isT && "bg-primary/[0.03]")}
+                style={{ height: TOTAL_H, minWidth: COL_W_WEEK, flex: 1 }}
               >
                 {HOURS.map(h => (
                   <Fragment key={h}>
@@ -364,28 +359,21 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
                       style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
                   </Fragment>
                 ))}
-
-                {/* Now indicator */}
                 {nowLine !== null && nowLine >= 0 && nowLine <= TOTAL_H && (
                   <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowLine }}>
                     <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
                     <div className="border-t-2 border-primary w-full" />
                   </div>
                 )}
-
-                {/* Appointments */}
                 {dayAppts.map(a => {
                   const color = getColor(pros, a.member_id);
-                  const top = apptTop(a);
-                  const h   = apptH(a);
+                  const top   = apptTop(a);
+                  const h     = apptH(a);
                   if (top < 0 || top >= TOTAL_H) return null;
                   return (
-                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10"
-                      style={{ top, height: h }}>
-                      <ApptCard
-                        a={a} color={color} compact={h < 40}
-                        onStatusChange={(s) => onStatusChange(a, s)}
-                      />
+                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}>
+                      <ApptCard a={a} color={color} compact={h < 40}
+                        onStatusChange={s => onStatusChange(a, s)} />
                     </div>
                   );
                 })}
@@ -577,7 +565,7 @@ export function AgendaManager({
   }, [view, date]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 h-[calc(100vh-56px)]">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -674,28 +662,30 @@ export function AgendaManager({
       )}
 
       {/* ── Calendar body ────────────────────────────────────── */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : view === "mes" ? (
-        <MonthView
-          date={date} appts={appts} pros={pros} activePros={activePros}
-          onDayClick={d => { setDate(d); setView("dia"); }}
-          onNewAppt={d => { setCreateDate(d); setCreating(true); }}
-        />
-      ) : view === "semana" ? (
-        <WeekView
-          date={date} appts={appts} pros={pros} activePros={activePros}
-          onStatusChange={onStatusChange}
-          onDayClick={d => { setDate(d); setView("dia"); }}
-        />
-      ) : (
-        <DayView
-          date={date} appts={appts} pros={pros} activePros={activePros}
-          onStatusChange={onStatusChange}
-        />
-      )}
+      <div className="flex-1 min-h-0">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : view === "mes" ? (
+          <MonthView
+            date={date} appts={appts} pros={pros} activePros={activePros}
+            onDayClick={d => { setDate(d); setView("dia"); }}
+            onNewAppt={d => { setCreateDate(d); setCreating(true); }}
+          />
+        ) : view === "semana" ? (
+          <WeekView
+            date={date} appts={appts} pros={pros} activePros={activePros}
+            onStatusChange={onStatusChange}
+            onDayClick={d => { setDate(d); setView("dia"); }}
+          />
+        ) : (
+          <DayView
+            date={date} appts={appts} pros={pros} activePros={activePros}
+            onStatusChange={onStatusChange}
+          />
+        )}
+      </div>
 
       {/* ── Create modal ──────────────────────────────────────── */}
       {creating && (
