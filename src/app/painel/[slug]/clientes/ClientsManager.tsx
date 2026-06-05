@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Loader2, Phone, Trash2, Contact, Search } from "lucide-react";
+import {
+  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight,
+} from "lucide-react";
 
 type Client = Tables<"clients">;
 
 export function ClientsManager({
-  salonId,
-  initial,
-  canManage,
+  slug, salonId, initial, canManage,
 }: {
+  slug: string;
   salonId: string;
   initial: Client[];
   canManage: boolean;
@@ -22,12 +24,14 @@ export function ClientsManager({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [birth, setBirth] = useState("");
+  const [referral, setReferral] = useState("");
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
 
   const filtered = clients.filter((c) =>
-    c.full_name.toLowerCase().includes(q.toLowerCase()) ||
-    (c.phone ?? "").includes(q),
+    c.full_name.toLowerCase().includes(q.toLowerCase()) || (c.phone ?? "").includes(q),
   );
 
   async function add() {
@@ -35,13 +39,21 @@ export function ClientsManager({
     setBusy(true);
     const { data, error } = await supabase
       .from("clients")
-      .insert({ salon_id: salonId, full_name: name, phone: phone || null })
+      .insert({
+        salon_id: salonId,
+        full_name: name,
+        phone: phone || null,
+        email: email || null,
+        birth_date: birth || null,
+        referral_source: referral || null,
+      })
       .select()
       .single();
     setBusy(false);
     if (!error && data) {
       setClients((c) => [...c, data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
-      setName(""); setPhone(""); setAdding(false);
+      setName(""); setPhone(""); setEmail(""); setBirth(""); setReferral("");
+      setAdding(false);
     }
   }
 
@@ -76,6 +88,18 @@ export function ClientsManager({
               <Label htmlFor="cp">Celular</Label>
               <Input id="cp" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ce">E-mail</Label>
+              <Input id="ce" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cb">Nascimento</Label>
+              <Input id="cb" type="date" value={birth} onChange={(e) => setBirth(e.target.value)} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="cr">Como conheceu / indicação</Label>
+              <Input id="cr" value={referral} onChange={(e) => setReferral(e.target.value)} placeholder="Instagram, indicação de..." />
+            </div>
           </div>
           <div className="flex gap-2">
             <Button onClick={add} disabled={busy || !name}>
@@ -83,6 +107,9 @@ export function ClientsManager({
             </Button>
             <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            A ficha de anamnese (saúde, alergias) é preenchida ao abrir a cliente.
+          </p>
         </Card>
       )}
 
@@ -99,20 +126,30 @@ export function ClientsManager({
       ) : (
         <div className="space-y-2">
           {filtered.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
-              <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
-                {c.full_name.charAt(0)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{c.full_name}</p>
-                {c.phone && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Phone className="h-3 w-3" /> {c.phone}
+            <div key={c.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card pr-3 hover:border-foreground/20 transition">
+              <Link href={`/painel/${slug}/clientes/${c.id}`} className="flex items-center gap-4 p-4 flex-1 min-w-0">
+                <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
+                  {c.full_name.charAt(0)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate flex items-center gap-2">
+                    {c.full_name}
+                    {c.alert_summary && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium">
+                        <AlertTriangle className="h-3 w-3" /> alerta
+                      </span>
+                    )}
                   </p>
-                )}
-              </div>
+                  {c.phone && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" /> {c.phone}
+                    </p>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </Link>
               {canManage && (
-                <button onClick={() => remove(c.id)} className="p-2 text-muted-foreground hover:text-red-600">
+                <button onClick={() => remove(c.id)} className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
                   <Trash2 className="h-4 w-4" />
                 </button>
               )}

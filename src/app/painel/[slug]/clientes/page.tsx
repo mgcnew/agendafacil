@@ -28,6 +28,7 @@ export default async function ClientesPage({
 
   return (
     <ClientsManager
+      slug={slug}
       salonId={membership.salon_id}
       initial={clients ?? []}
       canManage={canManage}

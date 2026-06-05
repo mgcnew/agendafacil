@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus } from "lucide-react";
+import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export default async function DashboardPage({
     await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, status, total_price, member_id, clients(full_name), salon_members(display_name)")
+        .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
         .eq("salon_id", salonId)
         .gte("starts_at", startDay)
         .lt("starts_at", endDay)
@@ -97,7 +97,8 @@ export default async function DashboardPage({
           <div className="space-y-2">
             {appts.map((a) => {
               const st = STATUS[a.status] ?? STATUS.pending;
-              const client = (a.clients as { full_name?: string } | null)?.full_name ?? "Cliente";
+              const clientObj = a.clients as { full_name?: string; alert_summary?: string | null } | null;
+              const client = clientObj?.full_name ?? "Cliente";
               const prof = (a.salon_members as { display_name?: string } | null)?.display_name ?? "";
               return (
                 <div key={a.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
@@ -105,7 +106,14 @@ export default async function DashboardPage({
                     <p className="font-display font-bold">{formatTime(a.starts_at)}</p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{client}</p>
+                    <p className="font-medium truncate flex items-center gap-2">
+                      {client}
+                      {clientObj?.alert_summary && (
+                        <span title={clientObj.alert_summary} className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium shrink-0">
+                          <AlertTriangle className="h-3 w-3" /> alerta
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">{prof}</p>
                   </div>
                   <span className={`text-xs rounded-full px-2.5 py-1 font-medium ${st.cls}`}>{st.label}</span>

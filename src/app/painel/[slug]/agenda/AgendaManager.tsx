@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL, formatTime } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
-import { Plus, Loader2, ChevronLeft, ChevronRight, X, CalendarDays } from "lucide-react";
+import { Plus, Loader2, ChevronLeft, ChevronRight, X, CalendarDays, AlertTriangle } from "lucide-react";
 
 type Status = Enums<"appointment_status">;
 type Pro = { id: string; name: string; commission_percent: number; color: string | null };
@@ -17,7 +17,7 @@ type Appt = {
   status: Status;
   total_price: number;
   member_id: string;
-  clients: { full_name: string } | null;
+  clients: { full_name: string; alert_summary: string | null } | null;
   salon_members: { display_name: string | null } | null;
 };
 
@@ -59,7 +59,7 @@ export function AgendaManager({
     const end = new Date(date + "T23:59:59").toISOString();
     const { data } = await supabase
       .from("appointments")
-      .select("id, starts_at, status, total_price, member_id, clients(full_name), salon_members(display_name)")
+      .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
       .eq("salon_id", salonId)
       .gte("starts_at", start)
       .lte("starts_at", end)
@@ -117,7 +117,17 @@ export function AgendaManager({
               <div key={a.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
                 <p className="font-display font-bold w-14 shrink-0">{formatTime(a.starts_at)}</p>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{a.clients?.full_name ?? "Cliente"}</p>
+                  <p className="font-medium truncate flex items-center gap-2">
+                    {a.clients?.full_name ?? "Cliente"}
+                    {a.clients?.alert_summary && (
+                      <span
+                        title={a.clients.alert_summary}
+                        className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium shrink-0"
+                      >
+                        <AlertTriangle className="h-3 w-3" /> {a.clients.alert_summary}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">{a.salon_members?.display_name ?? ""}</p>
                 </div>
                 <span className="font-semibold text-primary text-sm hidden sm:inline">{formatBRL(Number(a.total_price))}</span>

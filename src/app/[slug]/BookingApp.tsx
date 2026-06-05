@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL, formatDuration, formatDateLong } from "@/lib/utils";
-import { NICHES, patternClass, type Niche } from "@/lib/themes";
+import { NICHES, type Niche } from "@/lib/themes";
 import {
   Check,
   Clock,
@@ -79,6 +79,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -103,11 +104,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
     });
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserId(data.user.id);
-        setPhone(data.user.phone ?? "");
-      }
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      setUserId(data.user.id);
+      const metaName = (data.user.user_metadata?.full_name as string | undefined) ?? "";
+      const { data: c } = await supabase
+        .from("clients")
+        .select("full_name, phone")
+        .eq("salon_id", salon.id)
+        .eq("profile_id", data.user.id)
+        .maybeSingle();
+      const nm = c?.full_name ?? metaName;
+      const ph = c?.phone ?? data.user.phone ?? "";
+      if (nm) { setName(nm); setClientName(nm); }
+      if (ph) setPhone(ph);
     });
   }, [supabase, salon.id]);
 
@@ -205,43 +215,58 @@ export function BookingApp({ salon }: { salon: Salon }) {
   /* ---------------- render ---------------- */
   return (
     <div className="max-w-xl mx-auto px-4 pb-24">
-      {/* Hero de marca do salão (gradiente + textura do nicho) */}
-      <header className="pt-6 pb-6">
-        <div
-          className="relative overflow-hidden rounded-[var(--radius)] p-6 text-white shadow-card"
-          style={{ background: nicheMeta.gradient }}
-        >
-          <div className={`${patternClass(nicheMeta.pattern)} absolute inset-0 opacity-25`} />
-          <div className="relative flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {salon.logo_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={salon.logo_url}
-                  alt={salon.name}
-                  className="h-14 w-14 rounded-2xl object-cover border border-white/30 shrink-0"
-                />
-              )}
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">{nicheMeta.tagline}</p>
-                <h1 className="font-display text-3xl sm:text-4xl leading-tight mt-1">{salon.name}</h1>
-                {salon.address && (
-                  <p className="text-xs opacity-85 mt-1.5 flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" /> {salon.address}
-                  </p>
-                )}
-              </div>
-            </div>
-            {userId && (
-              <button
-                onClick={loadMine}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-1.5 text-xs font-medium transition"
-              >
-                <History className="h-3.5 w-3.5" /> Meus
-              </button>
+      {/* Cabeçalho do salão — limpo, sem gradiente */}
+      <header className="pt-8 pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {salon.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={salon.logo_url}
+                alt={salon.name}
+                className="h-14 w-14 rounded-2xl object-cover border border-border shrink-0"
+              />
+            ) : (
+              <span className="grid place-items-center h-14 w-14 rounded-2xl bg-secondary text-secondary-foreground font-display text-2xl shrink-0">
+                {salon.name.charAt(0)}
+              </span>
             )}
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{nicheMeta.tagline}</p>
+              <h1 className="font-display text-2xl sm:text-3xl leading-tight">{salon.name}</h1>
+              {salon.address && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" /> {salon.address}
+                </p>
+              )}
+            </div>
           </div>
+          {userId && (
+            <button
+              onClick={loadMine}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
+            >
+              <History className="h-3.5 w-3.5" /> Meus
+            </button>
+          )}
         </div>
+
+        {/* Saudação personalizada (cliente já conhecida) */}
+        {step === "services" && userId && clientName && (
+          <div className="mt-5 rounded-[var(--radius)] border border-border bg-card p-4 af-rise">
+            <p className="font-display text-lg">
+              Olá, {clientName.split(" ")[0]}! <span aria-hidden>👋</span>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Que bom te ver de novo — escolha os serviços e vamos agendar.
+            </p>
+          </div>
+        )}
+        {step === "services" && !userId && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Agende seu horário em poucos toques.
+          </p>
+        )}
       </header>
 
       {/* Stepper */}

@@ -278,6 +278,56 @@ export type Database = {
           },
         ]
       }
+      client_anamnesis: {
+        Row: {
+          client_id: string
+          salon_id: string
+          is_pregnant: boolean
+          is_breastfeeding: boolean
+          has_diabetes: boolean
+          has_hypertension: boolean
+          has_heart_condition: boolean
+          has_epilepsy: boolean
+          has_thyroid: boolean
+          has_coagulation_issue: boolean
+          has_cancer_treatment: boolean
+          allergies: string | null
+          medications: string | null
+          recent_procedures: string | null
+          skin_hair_notes: string | null
+          general_notes: string | null
+          consent_given: boolean
+          consent_name: string | null
+          consent_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_id: string
+          salon_id: string
+          is_pregnant?: boolean
+          is_breastfeeding?: boolean
+          has_diabetes?: boolean
+          has_hypertension?: boolean
+          has_heart_condition?: boolean
+          has_epilepsy?: boolean
+          has_thyroid?: boolean
+          has_coagulation_issue?: boolean
+          has_cancer_treatment?: boolean
+          allergies?: string | null
+          medications?: string | null
+          recent_procedures?: string | null
+          skin_hair_notes?: string | null
+          general_notes?: string | null
+          consent_given?: boolean
+          consent_name?: string | null
+          consent_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: Partial<Database["public"]["Tables"]["client_anamnesis"]["Insert"]>
+        Relationships: []
+      }
       clients: {
         Row: {
           birth_date: string | null
@@ -288,6 +338,8 @@ export type Database = {
           notes: string | null
           phone: string | null
           profile_id: string | null
+          referral_source: string | null
+          alert_summary: string | null
           salon_id: string
         }
         Insert: {
@@ -299,6 +351,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           profile_id?: string | null
+          referral_source?: string | null
+          alert_summary?: string | null
           salon_id: string
         }
         Update: {
@@ -310,6 +364,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           profile_id?: string | null
+          referral_source?: string | null
+          alert_summary?: string | null
           salon_id?: string
         }
         Relationships: [
