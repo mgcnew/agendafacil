@@ -1,19 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
-import { formatBRL, formatTime } from "@/lib/utils";
+import { formatBRL } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
-import { Plus, Loader2, ChevronLeft, ChevronRight, X, CalendarDays, AlertTriangle } from "lucide-react";
+import {
+  Plus, Loader2, ChevronLeft, ChevronRight, X, AlertTriangle,
+} from "lucide-react";
 
+// ── Types ──────────────────────────────────────────────────────
+type View = "dia" | "semana" | "mes";
 type Status = Enums<"appointment_status">;
-type Pro = { id: string; name: string; commission_percent: number; color: string | null };
+type Pro     = { id: string; name: string; commission_percent: number; color: string | null };
 type Service = { id: string; name: string; duration_min: number; price: number; commission_percent: number | null };
-type Client = { id: string; full_name: string; phone: string | null };
-type Appt = {
+type Client  = { id: string; full_name: string; phone: string | null };
+type Appt    = {
   id: string;
   starts_at: string;
+  ends_at: string | null;
   status: Status;
   total_price: number;
   member_id: string;
@@ -21,138 +27,681 @@ type Appt = {
   salon_members: { display_name: string | null } | null;
 };
 
-const STATUS: { value: Status; label: string; cls: string }[] = [
-  { value: "pending", label: "Aguardando", cls: "bg-amber-100 text-amber-800" },
-  { value: "confirmed", label: "Confirmado", cls: "bg-emerald-100 text-emerald-800" },
-  { value: "in_progress", label: "Em andamento", cls: "bg-blue-100 text-blue-800" },
-  { value: "completed", label: "Concluído", cls: "bg-gray-200 text-gray-700" },
-  { value: "cancelled", label: "Cancelado", cls: "bg-red-100 text-red-700" },
-  { value: "no_show", label: "Faltou", cls: "bg-red-100 text-red-700" },
+// ── Constants ──────────────────────────────────────────────────
+const STATUS_META: Record<Status, { label: string; cls: string }> = {
+  pending:     { label: "Aguardando",   cls: "bg-amber-100 text-amber-800" },
+  confirmed:   { label: "Confirmado",   cls: "bg-emerald-100 text-emerald-800" },
+  in_progress: { label: "Em andamento", cls: "bg-blue-100 text-blue-800" },
+  completed:   { label: "Concluído",    cls: "bg-gray-200 text-gray-700" },
+  cancelled:   { label: "Cancelado",    cls: "bg-red-100 text-red-700" },
+  no_show:     { label: "Faltou",       cls: "bg-red-100 text-red-700" },
+};
+
+const STATUS_LIST = Object.entries(STATUS_META) as [Status, { label: string; cls: string }][];
+
+const PALETTE = [
+  "#6366f1","#ec4899","#f59e0b","#10b981",
+  "#3b82f6","#8b5cf6","#ef4444","#14b8a6",
+  "#f97316","#a855f7",
 ];
 
-function addDays(d: string, n: number) {
-  const dt = new Date(d + "T12:00:00");
-  dt.setDate(dt.getDate() + n);
-  return dt.toISOString().slice(0, 10);
+const DAY_SHORT  = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+const MONTH_NAMES = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+
+const HOUR_START = 7;
+const HOUR_END   = 21;
+const CELL_H     = 64; // px per hour
+const TOTAL_H    = (HOUR_END - HOUR_START) * CELL_H;
+const HOURS      = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
+
+// ── Date helpers ───────────────────────────────────────────────
+const toStr   = (d: Date) => d.toISOString().slice(0, 10);
+const parse   = (s: string) => new Date(s + "T12:00:00");
+const isToday = (s: string) => s === toStr(new Date());
+
+function addDays(s: string, n: number) {
+  const d = parse(s); d.setDate(d.getDate() + n); return toStr(d);
+}
+function startOfWeek(s: string) {
+  const d = parse(s);
+  const diff = d.getDay() === 0 ? -6 : 1 - d.getDay();
+  d.setDate(d.getDate() + diff);
+  return toStr(d);
+}
+function getWeekDays(s: string): string[] {
+  const mon = startOfWeek(s);
+  return Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+}
+function getMonthGrid(year: number, month: number): string[][] {
+  const first = new Date(year, month, 1);
+  const startOff = first.getDay() === 0 ? 6 : first.getDay() - 1;
+  const cursor = new Date(year, month, 1 - startOff);
+  return Array.from({ length: 6 }, () =>
+    Array.from({ length: 7 }, () => { const s = toStr(cursor); cursor.setDate(cursor.getDate() + 1); return s; })
+  );
+}
+function datePart(iso: string) { return new Date(iso).toISOString().slice(0, 10); }
+function fmtHM(iso: string) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function inCurrentMonth(s: string, y: number, m: number) {
+  const d = parse(s); return d.getFullYear() === y && d.getMonth() === m;
 }
 
-export function AgendaManager({
-  salonId,
-  pros,
-  services,
-  clients: initialClients,
-}: {
-  salonId: string;
-  pros: Pro[];
-  services: Service[];
-  clients: Client[];
+// ── Appointment layout helpers ─────────────────────────────────
+function apptTop(a: Appt) {
+  const d = new Date(a.starts_at);
+  return Math.max(0, (d.getHours() + d.getMinutes() / 60 - HOUR_START) * CELL_H);
+}
+function apptH(a: Appt) {
+  if (!a.ends_at) return CELL_H;
+  const mins = (new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 60000;
+  return Math.max(28, (mins / 60) * CELL_H);
+}
+function getColor(pros: Pro[], memberId: string) {
+  const idx = pros.findIndex(p => p.id === memberId);
+  return pros[idx]?.color ?? PALETTE[Math.max(0, idx) % PALETTE.length];
+}
+
+// ── Tooltip-style popover for appointment detail ───────────────
+function ApptCard({ a, color, compact = false, onStatusChange }: {
+  a: Appt; color: string; compact?: boolean; onStatusChange?: (s: Status) => void;
 }) {
-  const supabase = createClient();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [appts, setAppts] = useState<Appt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const start = new Date(date + "T00:00:00").toISOString();
-    const end = new Date(date + "T23:59:59").toISOString();
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
-      .eq("salon_id", salonId)
-      .gte("starts_at", start)
-      .lte("starts_at", end)
-      .order("starts_at");
-    setAppts((data as Appt[]) ?? []);
-    setLoading(false);
-  }, [supabase, salonId, date]);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, [load]);
-
-  async function setStatus(a: Appt, status: Status) {
-    setAppts((list) => list.map((x) => (x.id === a.id ? { ...x, status } : x)));
-    await supabase.from("appointments").update({ status }).eq("id", a.id);
-  }
+  const [open, setOpen] = useState(false);
+  const st = STATUS_META[a.status];
+  const h = apptH(a);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Agenda</h1>
-          <p className="text-muted-foreground text-sm">Gerencie os agendamentos do dia.</p>
+    <div className="relative group" onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}>
+      <div
+        className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+        style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
+      >
+        <div className="px-2 py-1.5 h-full overflow-hidden">
+          <p className="text-[11px] font-semibold truncate" style={{ color }}>
+            {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
+          </p>
+          {!compact && (
+            <p className="text-[12px] font-medium text-foreground truncate leading-tight">
+              {a.clients?.full_name ?? "Cliente"}
+            </p>
+          )}
+          {h > 58 && !compact && (
+            <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5", st.cls)}>
+              {st.label}
+            </span>
+          )}
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" /> Novo agendamento
-        </Button>
       </div>
 
-      {/* Navegação de data */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => setDate((d) => addDays(d, -1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-auto" />
-        <Button variant="outline" size="sm" onClick={() => setDate((d) => addDays(d, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>
-          Hoje
-        </Button>
-      </div>
+      {/* Popover */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div
+            className="absolute left-full top-0 ml-2 z-50 w-60 rounded-[var(--radius)] bg-card border border-border shadow-xl p-3 space-y-2"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-sm">{a.clients?.full_name ?? "Cliente"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
+                </p>
+              </div>
+              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {a.clients?.alert_summary && (
+              <div className="flex items-start gap-1.5 rounded-md bg-red-50 text-red-700 px-2 py-1.5 text-[11px]">
+                <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                {a.clients.alert_summary}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground">
+              {a.salon_members?.display_name && <p>Prof.: {a.salon_members.display_name}</p>}
+              <p className="font-semibold text-primary">{formatBRL(Number(a.total_price))}</p>
+            </div>
+            {onStatusChange && (
+              <Select
+                value={a.status}
+                onChange={e => { onStatusChange(e.target.value as Status); setOpen(false); }}
+                className={cn("w-full h-8 text-xs font-medium border-0", st.cls)}
+              >
+                {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+              </Select>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
-      {loading ? (
-        <div className="py-12 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
-      ) : appts.length === 0 ? (
-        <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
-          <CalendarDays className="h-8 w-8 mx-auto text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mt-3">Nenhum agendamento neste dia.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {appts.map((a) => {
-            const st = STATUS.find((s) => s.value === a.status)!;
+// ── Day View ───────────────────────────────────────────────────
+function DayView({ date, appts, pros, activePros, onStatusChange }: {
+  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+  onStatusChange: (a: Appt, s: Status) => void;
+}) {
+  const cols = activePros.length > 0 ? activePros : pros;
+  const now = new Date();
+  const todayLine = isToday(date)
+    ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
+    : null;
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden flex flex-col">
+      {/* Pro column headers */}
+      {cols.length > 0 && (
+        <div className="flex shrink-0 border-b border-border">
+          <div className="w-14 shrink-0" />
+          {cols.map((p) => {
+            const color = getColor(pros, p.id);
             return (
-              <div key={a.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
-                <p className="font-display font-bold w-14 shrink-0">{formatTime(a.starts_at)}</p>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate flex items-center gap-2">
-                    {a.clients?.full_name ?? "Cliente"}
-                    {a.clients?.alert_summary && (
-                      <span
-                        title={a.clients.alert_summary}
-                        className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium shrink-0"
-                      >
-                        <AlertTriangle className="h-3 w-3" /> {a.clients.alert_summary}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{a.salon_members?.display_name ?? ""}</p>
-                </div>
-                <span className="font-semibold text-primary text-sm hidden sm:inline">{formatBRL(Number(a.total_price))}</span>
-                <Select
-                  value={a.status}
-                  onChange={(e) => setStatus(a, e.target.value as Status)}
-                  className={`w-auto h-9 text-xs font-medium border-0 ${st.cls}`}
-                >
-                  {STATUS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </Select>
+              <div key={p.id} className="flex-1 py-2.5 text-center border-l border-border">
+                <span className="inline-block h-2 w-2 rounded-full mr-1.5 align-middle" style={{ background: color }} />
+                <span className="text-sm font-medium truncate">{p.name}</span>
               </div>
             );
           })}
         </div>
       )}
 
+      {/* Scrollable time grid */}
+      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+        <div className="flex" style={{ minHeight: TOTAL_H }}>
+          {/* Time gutter */}
+          <div className="w-14 shrink-0 relative border-r border-border" style={{ height: TOTAL_H }}>
+            {HOURS.map(h => (
+              <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
+                <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
+                  {String(h).padStart(2,"0")}:00
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Columns */}
+          {cols.map((p) => {
+            const color = getColor(pros, p.id);
+            const proAppts = appts.filter(a => a.member_id === p.id);
+            return (
+              <div key={p.id} className="flex-1 relative border-l border-border" style={{ height: TOTAL_H }}>
+                {/* Grid lines */}
+                {HOURS.map(h => (
+                  <div key={h} className="absolute w-full border-t border-border/40"
+                    style={{ top: (h - HOUR_START) * CELL_H }} />
+                ))}
+                {/* Half-hour faint lines */}
+                {HOURS.map(h => (
+                  <div key={h + 0.5} className="absolute w-full border-t border-dashed border-border/25"
+                    style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
+                ))}
+                {/* Now line */}
+                {todayLine !== null && todayLine >= 0 && todayLine <= TOTAL_H && (
+                  <div className="absolute w-full z-20 pointer-events-none"
+                    style={{ top: todayLine }}>
+                    <div className="relative">
+                      <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
+                      <div className="border-t-2 border-primary w-full" />
+                    </div>
+                  </div>
+                )}
+                {/* Appointments */}
+                {proAppts.map(a => {
+                  const top = apptTop(a);
+                  const h   = apptH(a);
+                  if (top < 0 || top >= TOTAL_H) return null;
+                  return (
+                    <div key={a.id} className="absolute left-1 right-1 z-10"
+                      style={{ top, height: h }}>
+                      <ApptCard
+                        a={a} color={color}
+                        onStatusChange={(s) => onStatusChange(a, s)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* Fallback: no professionals */}
+          {cols.length === 0 && (
+            <div className="flex-1 relative border-l border-border" style={{ height: TOTAL_H }}>
+              {HOURS.map(h => (
+                <div key={h} className="absolute w-full border-t border-border/40"
+                  style={{ top: (h - HOUR_START) * CELL_H }} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Week View ──────────────────────────────────────────────────
+function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }: {
+  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+  onStatusChange: (a: Appt, s: Status) => void;
+  onDayClick: (d: string) => void;
+}) {
+  const days = getWeekDays(date);
+  const now  = new Date();
+  const todayStr = toStr(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden flex flex-col">
+      {/* Day headers */}
+      <div className="flex shrink-0 border-b border-border">
+        <div className="w-14 shrink-0" />
+        {days.map((day) => {
+          const d = parse(day);
+          const today = isToday(day);
+          return (
+            <button
+              key={day}
+              onClick={() => onDayClick(day)}
+              className="flex-1 py-2 text-center border-l border-border hover:bg-muted/50 transition"
+            >
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                {DAY_SHORT[d.getDay()]}
+              </p>
+              <span className={cn(
+                "inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-bold mt-0.5",
+                today ? "bg-primary text-primary-foreground" : "text-foreground",
+              )}>
+                {d.getDate()}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Scrollable grid */}
+      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+        <div className="flex" style={{ minHeight: TOTAL_H }}>
+          {/* Time gutter */}
+          <div className="w-14 shrink-0 relative border-r border-border" style={{ height: TOTAL_H }}>
+            {HOURS.map(h => (
+              <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
+                <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
+                  {String(h).padStart(2,"0")}:00
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {days.map((day) => {
+            const isT = day === todayStr;
+            const dayAppts = (activePros.length > 0
+              ? appts.filter(a => activePros.some(p => p.id === a.member_id))
+              : appts
+            ).filter(a => datePart(a.starts_at) === day);
+
+            const nowLine = isT
+              ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
+              : null;
+
+            return (
+              <div key={day}
+                className={cn("flex-1 relative border-l border-border", isT && "bg-primary/[0.03]")}
+                style={{ height: TOTAL_H }}
+              >
+                {HOURS.map(h => (
+                  <Fragment key={h}>
+                    <div className="absolute w-full border-t border-border/40"
+                      style={{ top: (h - HOUR_START) * CELL_H }} />
+                    <div className="absolute w-full border-t border-dashed border-border/20"
+                      style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
+                  </Fragment>
+                ))}
+
+                {/* Now indicator */}
+                {nowLine !== null && nowLine >= 0 && nowLine <= TOTAL_H && (
+                  <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowLine }}>
+                    <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
+                    <div className="border-t-2 border-primary w-full" />
+                  </div>
+                )}
+
+                {/* Appointments */}
+                {dayAppts.map(a => {
+                  const color = getColor(pros, a.member_id);
+                  const top = apptTop(a);
+                  const h   = apptH(a);
+                  if (top < 0 || top >= TOTAL_H) return null;
+                  return (
+                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10"
+                      style={{ top, height: h }}>
+                      <ApptCard
+                        a={a} color={color} compact={h < 40}
+                        onStatusChange={(s) => onStatusChange(a, s)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Month View ─────────────────────────────────────────────────
+function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
+  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+  onDayClick: (d: string) => void;
+  onNewAppt: (d: string) => void;
+}) {
+  const d     = parse(date);
+  const year  = d.getFullYear();
+  const month = d.getMonth();
+  const grid  = getMonthGrid(year, month);
+  const MAX   = 3;
+
+  const filtered = activePros.length > 0
+    ? appts.filter(a => activePros.some(p => p.id === a.member_id))
+    : appts;
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden select-none">
+      {/* Weekday header */}
+      <div className="grid grid-cols-7 border-b border-border">
+        {DAY_SHORT.map(n => (
+          <div key={n} className="py-2 text-center text-xs font-medium text-muted-foreground">
+            {n}
+          </div>
+        ))}
+      </div>
+
+      {/* Weeks */}
+      {grid.map((week, wi) => (
+        <div key={wi} className="grid grid-cols-7">
+          {week.map((day, di) => {
+            const dayAppts = filtered.filter(a => datePart(a.starts_at) === day);
+            const overflow = Math.max(0, dayAppts.length - MAX);
+            const inMonth  = inCurrentMonth(day, year, month);
+            const today    = isToday(day);
+
+            return (
+              <div
+                key={day}
+                onClick={() => onDayClick(day)}
+                className={cn(
+                  "group relative min-h-[90px] p-1.5 border-b border-border cursor-pointer",
+                  "hover:bg-muted/40 transition",
+                  di < 6 && "border-r",
+                  wi === 5 && "border-b-0",
+                  !inMonth && "bg-muted/20",
+                )}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className={cn(
+                    "h-6 w-6 flex items-center justify-center rounded-full text-sm font-medium",
+                    today
+                      ? "bg-primary text-primary-foreground"
+                      : inMonth ? "text-foreground" : "text-muted-foreground",
+                  )}>
+                    {parse(day).getDate()}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onNewAppt(day); }}
+                    className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+
+                <div className="space-y-0.5">
+                  {dayAppts.slice(0, MAX).map(a => {
+                    const color = getColor(pros, a.member_id);
+                    return (
+                      <div
+                        key={a.id}
+                        onClick={e => e.stopPropagation()}
+                        className="truncate text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-white cursor-default"
+                        style={{ background: color }}
+                        title={`${fmtHM(a.starts_at)} · ${a.clients?.full_name ?? "Cliente"} · ${a.salon_members?.display_name ?? ""}`}
+                      >
+                        {fmtHM(a.starts_at)} {a.clients?.full_name ?? "Cliente"}
+                      </div>
+                    );
+                  })}
+                  {overflow > 0 && (
+                    <p className="text-[11px] text-muted-foreground px-1.5">
+                      +{overflow} mais
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────
+export function AgendaManager({
+  salonId, pros, services, clients: initialClients,
+}: {
+  salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
+}) {
+  const supabase = createClient();
+  const [view, setView]             = useState<View>("dia");
+  const [date, setDate]             = useState(() => toStr(new Date()));
+  const [selectedPros, setSelected] = useState<string[]>([]);
+  const [appts, setAppts]           = useState<Appt[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [creating, setCreating]     = useState(false);
+  const [createDate, setCreateDate] = useState(date);
+
+  const activePros = useMemo(
+    () => (selectedPros.length === 0 ? [] : pros.filter(p => selectedPros.includes(p.id))),
+    [pros, selectedPros],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    let start: string, end: string;
+    if (view === "dia") {
+      start = new Date(date + "T00:00:00").toISOString();
+      end   = new Date(date + "T23:59:59").toISOString();
+    } else if (view === "semana") {
+      const days = getWeekDays(date);
+      start = new Date(days[0] + "T00:00:00").toISOString();
+      end   = new Date(days[6] + "T23:59:59").toISOString();
+    } else {
+      const d = parse(date);
+      start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+      end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
+    }
+    const { data } = await supabase
+      .from("appointments")
+      .select("id, starts_at, ends_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
+      .eq("salon_id", salonId)
+      .gte("starts_at", start)
+      .lte("starts_at", end)
+      .order("starts_at");
+    setAppts((data as Appt[]) ?? []);
+    setLoading(false);
+  }, [supabase, salonId, date, view]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function onStatusChange(a: Appt, status: Status) {
+    setAppts(list => list.map(x => x.id === a.id ? { ...x, status } : x));
+    await supabase.from("appointments").update({ status }).eq("id", a.id);
+  }
+
+  function navigate(n: number) {
+    if (view === "dia")    setDate(d => addDays(d, n));
+    if (view === "semana") setDate(d => addDays(d, n * 7));
+    if (view === "mes") {
+      setDate(d => {
+        const dt = parse(d); dt.setMonth(dt.getMonth() + n); return toStr(dt);
+      });
+    }
+  }
+
+  function togglePro(id: string) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
+  const title = useMemo(() => {
+    const d = parse(date);
+    if (view === "dia") {
+      const names = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+      return `${names[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`;
+    }
+    if (view === "semana") {
+      const days = getWeekDays(date);
+      const s = parse(days[0]), e = parse(days[6]);
+      return s.getMonth() === e.getMonth()
+        ? `${s.getDate()}–${e.getDate()} de ${MONTH_NAMES[s.getMonth()]} ${s.getFullYear()}`
+        : `${s.getDate()} ${MONTH_NAMES[s.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTH_NAMES[e.getMonth()].slice(0,3)} ${e.getFullYear()}`;
+    }
+    return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  }, [view, date]);
+
+  return (
+    <div className="space-y-4">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Agenda</h1>
+          <p className="text-sm text-muted-foreground">{title}</p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View switcher */}
+          <div className="flex rounded-[var(--radius)] border border-border overflow-hidden text-sm">
+            {(["dia","semana","mes"] as View[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "px-3 py-1.5 font-medium transition capitalize",
+                  v === view
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/70 hover:bg-muted",
+                )}
+              >
+                {v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}
+              </button>
+            ))}
+          </div>
+
+          {/* Nav */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate(-1)}
+              className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setDate(toStr(new Date()))}
+              className="h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
+            >
+              Hoje
+            </button>
+            <button
+              onClick={() => navigate(1)}
+              className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <Button onClick={() => { setCreateDate(date); setCreating(true); }}>
+            <Plus className="h-4 w-4" /> Novo agendamento
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Professional filter ─────────────────────────────── */}
+      {pros.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">Profissional:</span>
+          <button
+            onClick={() => setSelected([])}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border transition font-medium",
+              selectedPros.length === 0
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:border-foreground/30 text-foreground",
+            )}
+          >
+            Todas
+          </button>
+          {pros.map(p => {
+            const color  = getColor(pros, p.id);
+            const active = selectedPros.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => togglePro(p.id)}
+                className={cn(
+                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition font-medium",
+                  active
+                    ? "text-white border-transparent"
+                    : "border-border hover:border-foreground/30 text-foreground",
+                )}
+                style={active ? { background: color } : {}}
+              >
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ background: active ? "rgba(255,255,255,0.7)" : color }}
+                />
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Calendar body ────────────────────────────────────── */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : view === "mes" ? (
+        <MonthView
+          date={date} appts={appts} pros={pros} activePros={activePros}
+          onDayClick={d => { setDate(d); setView("dia"); }}
+          onNewAppt={d => { setCreateDate(d); setCreating(true); }}
+        />
+      ) : view === "semana" ? (
+        <WeekView
+          date={date} appts={appts} pros={pros} activePros={activePros}
+          onStatusChange={onStatusChange}
+          onDayClick={d => { setDate(d); setView("dia"); }}
+        />
+      ) : (
+        <DayView
+          date={date} appts={appts} pros={pros} activePros={activePros}
+          onStatusChange={onStatusChange}
+        />
+      )}
+
+      {/* ── Create modal ──────────────────────────────────────── */}
       {creating && (
         <CreateAppointment
-          salonId={salonId}
-          pros={pros}
-          services={services}
-          clients={initialClients}
-          date={date}
+          salonId={salonId} pros={pros} services={services} clients={initialClients}
+          date={createDate}
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); load(); }}
         />
@@ -161,65 +710,54 @@ export function AgendaManager({
   );
 }
 
+// ── Create Appointment Modal ───────────────────────────────────
 function CreateAppointment({
   salonId, pros, services, clients, date, onClose, onCreated,
 }: {
-  salonId: string;
-  pros: Pro[];
-  services: Service[];
-  clients: Client[];
-  date: string;
-  onClose: () => void;
-  onCreated: () => void;
+  salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
+  date: string; onClose: () => void; onCreated: () => void;
 }) {
   const supabase = createClient();
-  const [clientName, setClientName] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [existingClient, setExistingClient] = useState("");
-  const [proId, setProId] = useState(pros[0]?.id ?? "");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [time, setTime] = useState("09:00");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [clientName, setClientName]     = useState("");
+  const [clientPhone, setClientPhone]   = useState("");
+  const [existingClient, setExisting]   = useState("");
+  const [proId, setProId]               = useState(pros[0]?.id ?? "");
+  const [selected, setSelected]         = useState<string[]>([]);
+  const [time, setTime]                 = useState("09:00");
+  const [busy, setBusy]                 = useState(false);
+  const [err, setErr]                   = useState<string | null>(null);
 
-  const chosen = services.filter((s) => selected.includes(s.id));
+  const chosen     = services.filter(s => selected.includes(s.id));
   const totalPrice = chosen.reduce((a, s) => a + Number(s.price), 0);
 
   async function create() {
     setBusy(true); setErr(null);
     try {
       let clientId = existingClient || null;
-
       if (!clientId) {
-        if (!clientName) { setErr("Informe o nome da cliente."); setBusy(false); return; }
+        if (!clientName.trim()) { setErr("Informe o nome da cliente."); setBusy(false); return; }
         const { data: c, error: ce } = await supabase
           .from("clients")
-          .insert({ salon_id: salonId, full_name: clientName, phone: clientPhone || null })
-          .select("id")
-          .single();
+          .insert({ salon_id: salonId, full_name: clientName.trim(), phone: clientPhone || null })
+          .select("id").single();
         if (ce) throw ce;
         clientId = c.id;
       }
-
-      const startsAt = new Date(`${date}T${time}:00`);
       const { error } = await supabase.rpc("create_staff_appointment", {
-        p_salon: salonId,
-        p_member: proId,
-        p_client: clientId,
+        p_salon: salonId, p_member: proId, p_client: clientId,
         p_service_ids: selected,
-        p_starts_at: startsAt.toISOString(),
+        p_starts_at: new Date(`${date}T${time}:00`).toISOString(),
       });
       if (error) {
         const m = error.message;
         setErr(
           m.includes("slot_taken")
-            ? "A profissional já está ocupada nesse horário. Escolha outro."
+            ? "A profissional já está ocupada nesse horário."
             : m.includes("client_busy")
-              ? "Esta cliente já tem um atendimento nesse horário. Para permitir, ative “atendimentos simultâneos” nas Configurações."
+              ? "Esta cliente já tem um atendimento nesse horário. Ative simultâneos nas Configurações para permitir."
               : "Não foi possível criar o agendamento.",
         );
-        setBusy(false);
-        return;
+        setBusy(false); return;
       }
       onCreated();
     } catch {
@@ -231,49 +769,47 @@ function CreateAppointment({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[88vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="relative w-full sm:max-w-lg max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
-          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Cliente</Label>
-            <Select value={existingClient} onChange={(e) => setExistingClient(e.target.value)}>
+            <Select value={existingClient} onChange={e => setExisting(e.target.value)}>
               <option value="">+ Nova cliente</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name}</option>
-              ))}
+              {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
             </Select>
           </div>
           {!existingClient && (
             <div className="grid sm:grid-cols-2 gap-3">
-              <Input placeholder="Nome" value={clientName} onChange={(e) => setClientName(e.target.value)} />
-              <Input placeholder="Celular" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
+              <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
+              <Input placeholder="Celular" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
             </div>
           )}
 
           <div className="space-y-1.5">
             <Label>Profissional</Label>
-            <Select value={proId} onChange={(e) => setProId(e.target.value)}>
-              {pros.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+            <Select value={proId} onChange={e => setProId(e.target.value)}>
+              {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </div>
 
           <div className="space-y-1.5">
             <Label>Serviços</Label>
             <div className="space-y-1.5 max-h-44 overflow-auto">
-              {services.map((s) => {
+              {services.map(s => {
                 const on = selected.includes(s.id);
                 return (
                   <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelected((p) => on ? p.filter((x) => x !== s.id) : [...p, s.id])}
-                    className={`w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm ${on ? "border-primary bg-secondary/40" : "border-border"}`}
+                    key={s.id} type="button"
+                    onClick={() => setSelected(p => on ? p.filter(x => x !== s.id) : [...p, s.id])}
+                    className={cn(
+                      "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition",
+                      on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
+                    )}
                   >
                     <span>{s.name}</span>
                     <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
@@ -286,7 +822,7 @@ function CreateAppointment({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Horário</Label>
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              <Input type="time" value={time} onChange={e => setTime(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Total</Label>
