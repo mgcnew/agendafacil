@@ -6,7 +6,26 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
-import { Loader2, MailCheck } from "lucide-react";
+import {
+  Loader2,
+  MailCheck,
+  Check,
+  CalendarCheck,
+  Percent,
+  Boxes,
+} from "lucide-react";
+
+const MOBILE_BENEFITS = [
+  { icon: CalendarCheck, text: "A cliente agenda sozinha pelo seu link" },
+  { icon: Percent, text: "Comissões e caixa no automático" },
+  { icon: Boxes, text: "Estoque com baixa por serviço" },
+];
+
+const TRUST_BADGES = [
+  "Sem cartão de crédito",
+  "Configurado em 2 minutos",
+  "Cancele quando quiser",
+];
 
 export default function CriarSalaoPage() {
   const router = useRouter();
@@ -84,6 +103,20 @@ export default function CriarSalaoPage() {
         </>
       }
     >
+      {/* Benefícios — visíveis no mobile (no desktop ficam no painel lateral) */}
+      <div className="lg:hidden mb-6 rounded-[var(--radius)] border border-border bg-card p-4">
+        <ul className="space-y-2.5">
+          {MOBILE_BENEFITS.map((b) => (
+            <li key={b.text} className="flex items-center gap-2.5 text-sm">
+              <span className="grid place-items-center h-7 w-7 rounded-lg bg-secondary text-primary shrink-0">
+                <b.icon className="h-4 w-4" />
+              </span>
+              {b.text}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Seu nome</Label>
@@ -102,6 +135,19 @@ export default function CriarSalaoPage() {
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           Criar conta
         </Button>
+
+        {/* Selos de confiança — quebra de objeção */}
+        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 pt-1">
+          {TRUST_BADGES.map((t) => (
+            <li
+              key={t}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <Check className="h-3 w-3 text-primary shrink-0" /> {t}
+            </li>
+          ))}
+        </ul>
+
         <p className="text-xs text-muted-foreground text-center">
           Ao criar a conta você concorda com os termos de uso.
         </p>

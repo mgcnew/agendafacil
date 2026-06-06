@@ -1,11 +1,11 @@
 /**
  * DevicesShowcase — representação estilizada do painel em laptop + celular.
- * Cores alinhadas ao tema laranja (#ea580c) da marca AgendeFácil.
+ * Cores alinhadas ao tema laranja (#f23c10) da marca AgendeFácil.
  */
 
-const P = "#ea580c";   // primary orange
+const P = "#f23c10";   // primary orange
 const PS = "#fff1e6";  // secondary (orange-50)
-const PD = "#7c2d12";  // dark orange text
+const PD = "#9a2a08";  // dark orange text
 const FG = "#1a0c04";  // foreground
 
 export function DevicesShowcase() {

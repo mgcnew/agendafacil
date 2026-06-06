@@ -71,8 +71,8 @@ export const NICHES: Record<Niche, NicheMeta> = {
     tagline: "A sua marca",
     description:
       "Tema base moderno e versátil — laranja e quente — para qualquer negócio de beleza.",
-    gradient: "linear-gradient(135deg, #ea580c 0%, #fb923c 100%)",
-    swatch: "#ea580c",
+    gradient: "linear-gradient(135deg, #f23c10 0%, #ffa504 100%)",
+    swatch: "#f23c10",
     pattern: "grain",
     fontLabel: "Bricolage · Hanken",
     examples: ["Serviços diversos", "Pacotes", "Combos"],
@@ -100,7 +100,7 @@ export const NICHE_COLOR_THEMES: Record<Niche, ColorVariant[]> = {
     { id: "d", label: "Argila",       primary: "#b86038", background: "#f7f1eb" },
   ],
   neutro: [
-    { id: "a", label: "Laranja",      primary: "#ea580c", background: "#fffbf7" },
+    { id: "a", label: "Laranja",      primary: "#f23c10", background: "#fffbf7" },
     { id: "b", label: "Teal",         primary: "#0e7a6e", background: "#f0fbfa" },
     { id: "c", label: "Índigo",       primary: "#4f46e5", background: "#f5f5ff" },
     { id: "d", label: "Chumbo",       primary: "#374151", background: "#f8f8f7" },

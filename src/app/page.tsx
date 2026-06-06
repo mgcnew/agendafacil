@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui";
-import { ParallaxHero } from "@/components/landing/ParallaxHero";
+import { Hero } from "@/components/landing/Hero";
+import { LoginButton } from "@/components/auth/LoginButton";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { BenefitsQA } from "@/components/landing/BenefitsQA";
 import {
@@ -121,7 +122,7 @@ function OrangeRing({
       style={{
         width: size,
         height: size,
-        border: "2.5px solid #f97316",
+        border: "2.5px solid #f23c10",
         opacity,
         ...style,
       }}
@@ -146,7 +147,7 @@ function OrangeBlob({
       style={{
         width: size,
         height: size,
-        background: "radial-gradient(circle, #f97316, transparent 70%)",
+        background: "radial-gradient(circle, #f23c10, transparent 70%)",
         opacity,
         ...style,
       }}
@@ -176,7 +177,7 @@ function OrangeTriangle({
       className="absolute pointer-events-none"
       style={{ opacity, transform: `rotate(${rotate}deg)`, ...style }}
     >
-      <polygon points="40,4 76,72 4,72" stroke="#f97316" strokeWidth="3" fill="none" strokeLinejoin="round" />
+      <polygon points="40,4 76,72 4,72" stroke="#f23c10" strokeWidth="3" fill="none" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -212,7 +213,7 @@ function OrangeDots({
             cx={6 + c * gap}
             cy={6 + r * gap}
             r={2.5}
-            fill="#f97316"
+            fill="#f23c10"
           />
         )),
       )}
@@ -249,9 +250,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
-            <Link href="/entrar">
-              <Button variant="ghost" size="sm">Entrar</Button>
-            </Link>
+            <LoginButton />
             <Link href="/criar-salao">
               <Button size="sm">Teste grátis</Button>
             </Link>
@@ -260,7 +259,7 @@ export default function Home() {
       </header>
 
       {/* ── HERO ───────────────────────────────────────────────────────── */}
-      <ParallaxHero />
+      <Hero />
 
       {/* ── COMO FUNCIONA — multi-device ──────────────────────────────── */}
       <section id="como-funciona" className="relative bg-background py-20 sm:py-28 overflow-hidden">
@@ -321,7 +320,7 @@ export default function Home() {
 
         <div className="mx-auto max-w-6xl px-5 relative">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: "#f97316" }}>
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: "#f23c10" }}>
               Benefícios reais
             </p>
             <h2 className="font-display text-3xl sm:text-4xl">
@@ -391,7 +390,7 @@ export default function Home() {
               width: "500px",
               height: "220px",
               borderRadius: "50%",
-              background: "radial-gradient(closest-side, rgba(251,146,60,0.22), transparent)",
+              background: "radial-gradient(closest-side, rgba(255,165,4,0.24), transparent)",
             }}
           />
           {/* Formas laranja no banner */}
@@ -470,7 +469,7 @@ export default function Home() {
                 {/* Aspas laranja */}
                 <p
                   className="font-display text-5xl leading-none select-none"
-                  style={{ color: "#f97316", opacity: 0.35 }}
+                  style={{ color: "#f23c10", opacity: 0.35 }}
                 >
                   &ldquo;
                 </p>
@@ -490,7 +489,7 @@ export default function Home() {
                 <div className="flex items-center gap-3 border-t border-border pt-4">
                   <div
                     className="grid place-items-center h-10 w-10 rounded-full font-display font-bold text-sm shrink-0"
-                    style={{ background: "#f97316", color: "#fff" }}
+                    style={{ background: "#f23c10", color: "#fff" }}
                   >
                     {t.initials}
                   </div>

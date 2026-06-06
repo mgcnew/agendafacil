@@ -128,7 +128,7 @@ export function BenefitsQA() {
           <div
             className="absolute inset-0 transition-all duration-500"
             style={{
-              background: "linear-gradient(90deg, #f97316, #fb923c)",
+              background: "linear-gradient(90deg, #f23c10, #ffa504)",
               width: `${((active + 1) / ITEMS.length) * 100}%`,
             }}
           />
@@ -145,7 +145,7 @@ export function BenefitsQA() {
           </span>
 
           {/* Número do item */}
-          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#f97316" }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#f23c10" }}>
             Benefício {String(active + 1).padStart(2, "0")} / {String(ITEMS.length).padStart(2, "0")}
           </p>
 
@@ -179,7 +179,7 @@ export function BenefitsQA() {
                   style={{
                     width: i === active ? 20 : 6,
                     height: 6,
-                    background: i === active ? "#f97316" : "var(--border)",
+                    background: i === active ? "#f23c10" : "var(--border)",
                   }}
                 />
               ))}

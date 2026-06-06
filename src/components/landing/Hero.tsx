@@ -1,0 +1,112 @@
+import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui";
+import { ArrowRight, Check, Star } from "lucide-react";
+
+/**
+ * Hero da landing — layout dividido: texto/CTA à esquerda, foto do produto
+ * (devices + profissional) à direita. Sem efeito 3D/scroll.
+ */
+export function Hero() {
+  return (
+    <section className="relative overflow-hidden bg-background">
+      {/* Brilho quente no topo */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(100% 60% at 70% 0%, rgba(242,60,16,0.08), transparent 60%)",
+        }}
+      />
+      {/* Blob decorativo */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-24 h-[460px] w-[460px] rounded-full opacity-[0.10]"
+        style={{ background: "radial-gradient(circle, #ffa504, transparent 70%)" }}
+      />
+
+      <div className="relative mx-auto max-w-6xl px-5 py-14 sm:py-20 lg:py-24">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+          {/* ── Coluna de texto ──────────────────────────────────── */}
+          <div className="text-center lg:text-left">
+            {/* Badge */}
+            <div className="flex justify-center lg:justify-start mb-5">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+                <Star className="h-3.5 w-3.5 fill-current text-amber-400" />
+                Feito para salões de beleza e barbearias
+              </span>
+            </div>
+
+            {/* Headline */}
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.75rem] font-bold leading-[1.04] tracking-tight">
+              Menos WhatsApp,{" "}
+              <span className="text-primary">mais clientes na cadeira.</span>
+            </h1>
+
+            {/* Subtítulo */}
+            <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              A cliente agenda pelo seu link, recebe confirmação automática e você
+              só aparece para atender. Sem ligação, sem caderninho, sem dor de
+              cabeça.
+            </p>
+
+            {/* CTAs */}
+            <div className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3">
+              <Link href="/criar-salao">
+                <Button size="lg" className="font-semibold">
+                  Começar grátis — 5 dias <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <a href="#como-funciona">
+                <Button size="lg" variant="outline">
+                  Ver como funciona
+                </Button>
+              </a>
+            </div>
+
+            {/* Selos de confiança */}
+            <ul className="mt-6 flex flex-wrap justify-center lg:justify-start gap-x-6 gap-y-1.5">
+              {[
+                "Sem cartão de crédito",
+                "Configurado em 2 minutos",
+                "Cancele quando quiser",
+              ].map((t) => (
+                <li
+                  key={t}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  <Check className="h-3 w-3 text-primary shrink-0" /> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ── Coluna da imagem ─────────────────────────────────── */}
+          <div className="relative">
+            {/* Halo quente atrás da foto */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10"
+              style={{
+                background:
+                  "radial-gradient(55% 55% at 55% 45%, rgba(255,165,4,0.18), transparent 70%)",
+              }}
+            />
+            <Image
+              src="/hero-device.webp"
+              alt="AgendeFácil em uso — agenda no tablet e app no celular, num salão de beleza"
+              width={2508}
+              height={2508}
+              quality={92}
+              sizes="(max-width: 1024px) 90vw, 560px"
+              className="w-full h-auto max-w-[560px] mx-auto"
+              priority
+              draggable={false}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

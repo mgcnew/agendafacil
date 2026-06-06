@@ -40,20 +40,20 @@
   --foreground: #1a0c04;
   --card: #ffffff;
   --card-foreground: #1a0c04;
-  --primary: #ea580c;
+  --primary: #f23c10;
   --primary-foreground: #ffffff;
   --secondary: #fff1e6;
-  --secondary-foreground: #7c2d12;
-  --accent: #fb923c;
-  --accent-foreground: #431407;
+  --secondary-foreground: #9a2a08;
+  --accent: #ffa504;
+  --accent-foreground: #3d2600;
   --muted: #fef3e8;
   --muted-foreground: #78716c;
   --border: #f0ddd0;
-  --ring: #ea580c;
+  --ring: #f23c10;
 
   /* Shape */
   --radius: 0.85rem;
-  --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(234,88,12,.10);
+  --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(242,60,16,.12);
 
   /* Typography */
   --display-tracking: -0.02em;
@@ -366,17 +366,17 @@
   --foreground: #1a0c04;
   --card: #ffffff;
   --card-foreground: #1a0c04;
-  --primary: #ea580c;
+  --primary: #f23c10;
   --primary-foreground: #ffffff;
   --secondary: #fff1e6;
-  --secondary-foreground: #7c2d12;
-  --accent: #fb923c;
-  --accent-foreground: #431407;
+  --secondary-foreground: #9a2a08;
+  --accent: #ffa504;
+  --accent-foreground: #3d2600;
   --muted: #fef3e8;
   --muted-foreground: #78716c;
   --border: #f0ddd0;
-  --ring: #ea580c;
-  --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(234,88,12,.10);
+  --ring: #f23c10;
+  --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(242,60,16,.12);
 }
 
 /* b) Teal — verde-água clássico */
