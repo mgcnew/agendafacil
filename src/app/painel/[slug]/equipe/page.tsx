@@ -15,7 +15,7 @@ export default async function EquipePage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const [{ data: members }, { data: permissions }, { data: roleDefaults }] =
+  const [{ data: members }, { data: permissions }, { data: roleDefaults }, { data: invites }] =
     await Promise.all([
       supabase
         .from("salon_members")
@@ -24,6 +24,12 @@ export default async function EquipePage({
         .order("created_at"),
       supabase.from("permissions").select("*").order("category"),
       supabase.from("role_permissions").select("*"),
+      supabase
+        .from("salon_invites")
+        .select("*")
+        .eq("salon_id", membership.salon_id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
     ]);
 
   return (
@@ -33,6 +39,7 @@ export default async function EquipePage({
       members={members ?? []}
       permissions={permissions ?? []}
       roleDefaults={roleDefaults ?? []}
+      invites={invites ?? []}
     />
   );
 }

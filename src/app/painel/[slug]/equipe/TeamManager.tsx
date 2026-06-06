@@ -6,12 +6,14 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
+  Copy, Check, Link2, Trash2, Mail,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
 type Member = Tables<"salon_members"> & {
   profiles: { full_name: string | null; email: string | null } | null;
 };
+type Invite = Tables<"salon_invites">;
 type Permission = Tables<"permissions">;
 type RoleDefault = Tables<"role_permissions">;
 
@@ -29,48 +31,70 @@ export function TeamManager({
   members: initialMembers,
   permissions,
   roleDefaults,
+  invites: initialInvites,
 }: {
   salonId: string;
   myRole: Role;
   members: Member[];
   permissions: Permission[];
   roleDefaults: RoleDefault[];
+  invites: Invite[];
 }) {
   const supabase = createClient();
   const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [invites, setInvites] = useState<Invite[]>(initialInvites);
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("professional");
+  const [commission, setCommission] = useState("0");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState<Member | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const canManage = myRole === "owner" || myRole === "manager";
 
-  async function addMember() {
+  const inviteLink = (token: string) =>
+    typeof window !== "undefined"
+      ? `${window.location.origin}/convite/${token}`
+      : `/convite/${token}`;
+
+  function copyLink(inv: Invite) {
+    navigator.clipboard.writeText(inviteLink(inv.token));
+    setCopiedId(inv.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function createInvite() {
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("add_member_by_email", {
+    const { data, error } = await supabase.rpc("create_invite", {
       p_salon: salonId,
       p_email: email,
       p_role: role,
+      p_commission: Number(commission) || 0,
     });
     setBusy(false);
     if (error) {
       setErr(
-        error.message.includes("user_not_found")
-          ? "Não encontramos uma conta com esse e-mail. Peça para a pessoa criar uma conta primeiro."
-          : "Não foi possível adicionar.",
+        error.message.includes("already_member")
+          ? "Essa pessoa já faz parte da equipe."
+          : "Não foi possível criar o convite.",
       );
       return;
     }
-    // recarrega para trazer o profile
-    const { data: refreshed } = await supabase
-      .from("salon_members")
-      .select("*, profiles(full_name, email)")
-      .eq("id", (data as Member).id)
-      .single();
-    if (refreshed) setMembers((m) => [...m, refreshed as Member]);
-    setEmail(""); setAdding(false);
+    const inv = data as Invite;
+    setInvites((x) => [inv, ...x.filter((i) => i.id !== inv.id)]);
+    setEmail(""); setCommission("0"); setAdding(false);
+    // já deixa o link copiado para colar no WhatsApp
+    navigator.clipboard.writeText(inviteLink(inv.token));
+    setCopiedId(inv.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function revokeInvite(inv: Invite) {
+    if (!confirm(`Cancelar o convite de ${inv.email}?`)) return;
+    setInvites((x) => x.filter((i) => i.id !== inv.id));
+    await supabase.rpc("revoke_invite", { p_id: inv.id });
   }
 
   async function changeRole(member: Member, newRole: Role) {
@@ -92,17 +116,17 @@ export function TeamManager({
           <p className="text-muted-foreground text-sm">Cargos e permissões de cada pessoa.</p>
         </div>
         {canManage && (
-          <Button onClick={() => setAdding((v) => !v)}>
-            <UserPlus className="h-4 w-4" /> Adicionar
+          <Button onClick={() => { setAdding((v) => !v); setErr(null); }}>
+            <UserPlus className="h-4 w-4" /> Convidar
           </Button>
         )}
       </div>
 
       {adding && (
         <Card className="p-6 space-y-4 af-rise">
-          <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail da pessoa (precisa ter conta)</Label>
+          <div className="grid sm:grid-cols-3 gap-4 items-end">
+            <div className="space-y-1.5 sm:col-span-1">
+              <Label htmlFor="email">E-mail da pessoa</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="funcionaria@email.com" />
             </div>
             <div className="space-y-1.5">
@@ -113,15 +137,72 @@ export function TeamManager({
                 ))}
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="commission">Comissão (%)</Label>
+              <Input
+                id="commission"
+                type="number"
+                min={0}
+                max={100}
+                value={commission}
+                onChange={(e) => setCommission(e.target.value)}
+                placeholder="0"
+              />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            A pessoa recebe um link, cria a conta e preenche os próprios dados.
+            Comissão e horários ficam sob seu controle.
+          </p>
           {err && <p className="text-sm text-red-600">{err}</p>}
           <div className="flex gap-2">
-            <Button onClick={addMember} disabled={busy || !email}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar à equipe
+            <Button onClick={createInvite} disabled={busy || !email}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Gerar link de convite
             </Button>
             <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
           </div>
         </Card>
+      )}
+
+      {/* Convites pendentes */}
+      {invites.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Convites pendentes
+          </p>
+          {invites.map((inv) => (
+            <div
+              key={inv.id}
+              className="flex items-center gap-3 rounded-[var(--radius)] border border-dashed border-border bg-card p-3.5"
+            >
+              <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground shrink-0">
+                <Mail className="h-4.5 w-4.5" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{inv.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {ROLE_LABEL[inv.role]} · comissão {Number(inv.commission_percent)}% · aguardando aceite
+                </p>
+              </div>
+              {canManage && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => copyLink(inv)}>
+                    {copiedId === inv.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedId === inv.id ? "Copiado" : "Copiar link"}
+                  </Button>
+                  <button
+                    onClick={() => revokeInvite(inv)}
+                    className="p-2 text-muted-foreground hover:text-red-600"
+                    title="Cancelar convite"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="space-y-2">

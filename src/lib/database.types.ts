@@ -658,6 +658,51 @@ export type Database = {
           },
         ]
       }
+      salon_invites: {
+        Row: {
+          accepted_at: string | null
+          commission_percent: number
+          created_at: string
+          display_name: string | null
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          salon_id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          commission_percent?: number
+          created_at?: string
+          display_name?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          salon_id: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          commission_percent?: number
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          salon_id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: []
+      }
       salon_members: {
         Row: {
           bio: string | null
@@ -848,6 +893,7 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          price_type: string
           salon_id: string
         }
         Insert: {
@@ -863,6 +909,7 @@ export type Database = {
           is_active?: boolean
           name: string
           price?: number
+          price_type?: string
           salon_id: string
         }
         Update: {
@@ -872,10 +919,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_min?: number
+          processing_time_min?: number
+          finish_time_min?: number
           id?: string
           is_active?: boolean
           name?: string
           price?: number
+          price_type?: string
           salon_id?: string
         }
         Relationships: [
@@ -982,6 +1032,42 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["salon_members"]["Row"]
       }
+      create_invite: {
+        Args: {
+          p_salon: string
+          p_email: string
+          p_role?: Database["public"]["Enums"]["member_role"]
+          p_commission?: number
+          p_display_name?: string
+        }
+        Returns: Database["public"]["Tables"]["salon_invites"]["Row"]
+      }
+      get_invite: {
+        Args: { p_token: string }
+        Returns: {
+          salon_name: string
+          salon_slug: string
+          email: string
+          role: Database["public"]["Enums"]["member_role"]
+          display_name: string | null
+          status: string
+          expired: boolean
+        }[]
+      }
+      accept_invite: {
+        Args: {
+          p_token: string
+          p_full_name?: string
+          p_phone?: string
+          p_display_name?: string
+          p_bio?: string
+        }
+        Returns: string
+      }
+      revoke_invite: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       book_appointment: {
         Args: {
           p_client_name: string
@@ -1064,6 +1150,7 @@ export type Database = {
           id: string
           name: string
           price: number
+          price_type: string
         }[]
       }
     }

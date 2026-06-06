@@ -24,11 +24,13 @@ function buildDays(rows: WH[], memberId: string | null): DayHours[] {
 }
 
 export function HoursManager({
-  salonId, pros, initialHours,
+  salonId, pros, initialHours, embedded = false,
 }: {
   salonId: string;
   pros: Pro[];
   initialHours: WH[];
+  /** Quando dentro das tabs de Configurações, esconde o cabeçalho próprio e o max-w */
+  embedded?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [allRows, setAllRows] = useState<WH[]>(initialHours);
@@ -88,13 +90,15 @@ export function HoursManager({
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Horários</h1>
-        <p className="text-muted-foreground text-sm">
-          Defina o expediente do salão e, se quiser, horários próprios por profissional.
-        </p>
-      </div>
+    <div className={embedded ? "space-y-6" : "space-y-6 max-w-2xl"}>
+      {!embedded && (
+        <div>
+          <h1 className="font-display text-2xl font-bold">Horários</h1>
+          <p className="text-muted-foreground text-sm">
+            Defina o expediente do salão e, se quiser, horários próprios por profissional.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="target">Editando</Label>

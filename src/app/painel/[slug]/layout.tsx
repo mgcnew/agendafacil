@@ -4,16 +4,16 @@ import { PanelShell, type NavItem } from "./PanelShell";
 
 export const dynamic = "force-dynamic";
 
-const NAV: { item: NavItem; perm?: string }[] = [
+const NAV: { item: NavItem; perms?: string[] }[] = [
   { item: { href: "", label: "Visão geral", icon: "LayoutDashboard" } },
   { item: { href: "/agenda", label: "Agenda", icon: "CalendarDays" } },
-  { item: { href: "/horarios", label: "Horários", icon: "Clock" }, perm: "schedule.manage" },
-  { item: { href: "/servicos", label: "Serviços", icon: "Sparkles" }, perm: "services.manage" },
-  { item: { href: "/equipe", label: "Equipe", icon: "Users" }, perm: "team.manage" },
-  { item: { href: "/clientes", label: "Clientes", icon: "Contact" }, perm: "clients.view" },
-  { item: { href: "/financeiro", label: "Caixa & Comissões", icon: "Wallet" }, perm: "cash.view" },
-  { item: { href: "/estoque", label: "Estoque", icon: "Boxes" }, perm: "inventory.view" },
-  { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perm: "salon.manage" },
+  { item: { href: "/servicos", label: "Serviços", icon: "Sparkles" }, perms: ["services.manage"] },
+  { item: { href: "/equipe", label: "Equipe", icon: "Users" }, perms: ["team.manage"] },
+  { item: { href: "/clientes", label: "Clientes", icon: "Contact" }, perms: ["clients.view"] },
+  { item: { href: "/financeiro", label: "Caixa & Comissões", icon: "Wallet" }, perms: ["cash.view"] },
+  { item: { href: "/estoque", label: "Estoque", icon: "Boxes" }, perms: ["inventory.view"] },
+  // Horários virou tab dentro de Configurações; engrenagem aparece com qualquer perm relevante
+  { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage"] },
 ];
 
 export default async function PanelLayout({
@@ -29,9 +29,9 @@ export default async function PanelLayout({
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
 
-  const items = NAV.filter((n) => !n.perm || perms.has(n.perm)).map(
-    (n) => n.item,
-  );
+  const items = NAV.filter(
+    (n) => !n.perms || n.perms.some((p) => perms.has(p)),
+  ).map((n) => n.item);
 
   const colorTheme = (membership.salons.color_theme ?? "a") as string;
 

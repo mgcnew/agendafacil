@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
-import { formatBRL, formatDuration, formatDateLong } from "@/lib/utils";
+import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import { NICHES, type Niche } from "@/lib/themes";
 import {
   Check,
@@ -34,6 +34,7 @@ type Service = {
   description: string | null;
   duration_min: number;
   price: number;
+  price_type: string | null;
   category_id: string | null;
 };
 type Professional = { id: string; display_name: string; color: string | null; bio: string | null };
@@ -95,6 +96,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const selectedServices = services.filter((s) => selected.includes(s.id));
   const totalPrice = selectedServices.reduce((a, s) => a + Number(s.price), 0);
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
+  // preço total varia se algum serviço é "sob consulta" (a combinar) ou "a partir de"
+  const hasOnRequest = selectedServices.some((s) => s.price_type === "on_request");
+  const hasFrom = selectedServices.some((s) => s.price_type === "from");
+  const totalPriceLabel = hasOnRequest
+    ? "A combinar"
+    : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice);
 
   // carrega serviços e sessão
   useEffect(() => {
@@ -305,7 +312,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                     <Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}
                   </p>
                 </div>
-                <span className="font-semibold text-primary">{formatBRL(Number(s.price))}</span>
+                <span className="font-semibold text-primary text-sm text-right">{formatServicePrice(Number(s.price), s.price_type)}</span>
               </button>
             );
           })}
@@ -458,7 +465,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               {selectedServices.map((s) => (
                 <div key={s.id} className="flex justify-between text-sm">
                   <span>{s.name}</span>
-                  <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
+                  <span className="text-muted-foreground">{formatServicePrice(Number(s.price), s.price_type)}</span>
                 </div>
               ))}
             </div>
@@ -466,7 +473,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               <span className="text-sm text-muted-foreground">
                 Total · {formatDuration(totalDuration)}
               </span>
-              <span className="font-display text-xl font-bold text-primary">{formatBRL(totalPrice)}</span>
+              <span className="font-display text-xl font-bold text-primary">{totalPriceLabel}</span>
             </div>
           </Card>
           {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
@@ -516,7 +523,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {(step === "services" || step === "professional" || step === "time") && (
         <BottomBar
           step={step}
-          totalPrice={totalPrice}
+          priceLabel={totalPriceLabel}
+          hasPrice={selectedServices.length > 0}
           totalDuration={totalDuration}
           canNext={
             (step === "services" && selected.length > 0) ||
@@ -619,14 +627,16 @@ function Stepper({ step }: { step: Step }) {
 
 function BottomBar({
   step,
-  totalPrice,
+  priceLabel,
+  hasPrice,
   totalDuration,
   canNext,
   onBack,
   onNext,
 }: {
   step: Step;
-  totalPrice: number;
+  priceLabel: string;
+  hasPrice: boolean;
   totalDuration: number;
   canNext: boolean;
   onBack: () => void;
@@ -640,13 +650,13 @@ function BottomBar({
             <ChevronLeft className="h-4 w-4" />
           </Button>
         )}
-        {totalPrice > 0 && (
+        {hasPrice && (
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">{formatDuration(totalDuration)}</p>
-            <p className="font-semibold text-primary">{formatBRL(totalPrice)}</p>
+            <p className="font-semibold text-primary">{priceLabel}</p>
           </div>
         )}
-        <Button className={totalPrice > 0 ? "" : "flex-1"} size="lg" onClick={onNext} disabled={!canNext}>
+        <Button className={hasPrice ? "" : "flex-1"} size="lg" onClick={onNext} disabled={!canNext}>
           Continuar
         </Button>
       </div>

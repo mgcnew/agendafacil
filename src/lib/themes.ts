@@ -1,7 +1,10 @@
 import type { Enums } from "@/lib/database.types";
 
 export type Niche = Enums<"salon_niche">;
-export type ColorTheme = "a" | "b" | "c" | "d";
+export type ColorTheme =
+  | "a" | "b" | "c" | "d" // Pastel
+  | "e" | "f" | "g" | "h" // Vibrante
+  | "i" | "j" | "k" | "l"; // Sólido
 
 export interface NicheMeta {
   id: Niche;
@@ -24,8 +27,10 @@ export interface ColorVariant {
   label: string;
   /** cor primária para preview */
   primary: string;
-  /** fundo claro para preview */
+  /** fundo do tema para preview */
   background: string;
+  /** cor de destaque para preview */
+  accent: string;
 }
 
 export const NICHES: Record<Niche, NicheMeta> = {
@@ -79,33 +84,60 @@ export const NICHES: Record<Niche, NicheMeta> = {
   },
 };
 
-/** 4 variantes de cor para cada nicho — somente paletas que fazem sentido para o segmento */
-export const NICHE_COLOR_THEMES: Record<Niche, ColorVariant[]> = {
-  feminino: [
-    { id: "a", label: "Rosa Gold",    primary: "#8e3b5e", background: "#fbf6f4" },
-    { id: "b", label: "Berry",        primary: "#9c2580", background: "#faf5fb" },
-    { id: "c", label: "Champagne",    primary: "#b5832a", background: "#fdf8f0" },
-    { id: "d", label: "Lilás",        primary: "#7c57b8", background: "#f8f5fc" },
-  ],
-  barbearia: [
-    { id: "a", label: "Cobre",        primary: "#c8852f", background: "#15120f" },
-    { id: "b", label: "Midnight",     primary: "#3b7ab5", background: "#0d1218" },
-    { id: "c", label: "Forest",       primary: "#2e7a50", background: "#0f1410" },
-    { id: "d", label: "Steel",        primary: "#7890b8", background: "#0f1115" },
-  ],
-  estetica: [
-    { id: "a", label: "Sálvia",       primary: "#4f7d63", background: "#f2f5f1" },
-    { id: "b", label: "Oceano",       primary: "#2d6ea0", background: "#f0f5f9" },
-    { id: "c", label: "Lavanda",      primary: "#7c60b0", background: "#f5f2fb" },
-    { id: "d", label: "Argila",       primary: "#b86038", background: "#f7f1eb" },
-  ],
-  neutro: [
-    { id: "a", label: "Laranja",      primary: "#f23c10", background: "#fffbf7" },
-    { id: "b", label: "Teal",         primary: "#0e7a6e", background: "#f0fbfa" },
-    { id: "c", label: "Índigo",       primary: "#4f46e5", background: "#f5f5ff" },
-    { id: "d", label: "Chumbo",       primary: "#374151", background: "#f8f8f7" },
-  ],
-};
+/** Grupo de paletas de cor (compartilhado entre todos os nichos). */
+export interface ColorGroup {
+  id: string;
+  label: string;
+  description: string;
+  variants: ColorVariant[];
+}
+
+/**
+ * 12 paletas compartilhadas, em 3 grupos. O nicho define tipografia/forma;
+ * a cor é a mesma opção para qualquer segmento. As paletas trazem só os
+ * valores de preview — os tokens completos vivem em globals.css via
+ * `[data-color="<id>"]`. As cores antigas (a–d) seguem válidas no grupo Pastel.
+ */
+export const COLOR_GROUPS: ColorGroup[] = [
+  {
+    id: "pastel",
+    label: "Pastel",
+    description: "Tons suaves e elegantes, fundo claro.",
+    variants: [
+      { id: "a", label: "Rosa Gold", primary: "#8e3b5e", background: "#fbf6f4", accent: "#b98a2e" },
+      { id: "b", label: "Lilás",     primary: "#7c57b8", background: "#f8f5fc", accent: "#c78ec0" },
+      { id: "c", label: "Sálvia",    primary: "#4f7d63", background: "#f2f5f1", accent: "#be8a5e" },
+      { id: "d", label: "Champagne", primary: "#b5832a", background: "#fdf8f0", accent: "#8e3b5e" },
+    ],
+  },
+  {
+    id: "vibrante",
+    label: "Vibrante",
+    description: "Cores saturadas e cheias de energia.",
+    variants: [
+      { id: "e", label: "Laranja", primary: "#f23c10", background: "#fffbf7", accent: "#ffa504" },
+      { id: "f", label: "Pink",    primary: "#db2777", background: "#fdf2f8", accent: "#f59e0b" },
+      { id: "g", label: "Roxo",    primary: "#7c3aed", background: "#f6f3ff", accent: "#ec4899" },
+      { id: "h", label: "Ciano",   primary: "#0891b2", background: "#eefdfd", accent: "#f97316" },
+    ],
+  },
+  {
+    id: "solido",
+    label: "Sólido",
+    description: "Cores fortes e marcantes, incluindo preto.",
+    variants: [
+      { id: "i", label: "Preto",     primary: "#f5f5f5", background: "#161616", accent: "#e7b96a" },
+      { id: "j", label: "Marinho",   primary: "#1e3a8a", background: "#f4f6fb", accent: "#d4a24e" },
+      { id: "k", label: "Esmeralda", primary: "#047857", background: "#f0faf5", accent: "#ca8a04" },
+      { id: "l", label: "Bordô",     primary: "#9f1239", background: "#fcf3f4", accent: "#b5832a" },
+    ],
+  },
+];
+
+/** Lista plana de todas as variantes (para lookups por id). */
+export const ALL_COLOR_VARIANTS: ColorVariant[] = COLOR_GROUPS.flatMap(
+  (g) => g.variants,
+);
 
 export const NICHE_LIST = [
   NICHES.feminino,
@@ -132,6 +164,6 @@ export function patternClass(p: NicheMeta["pattern"]): string {
   return p === "stripes" ? "af-stripes" : p === "mesh" ? "af-mesh" : "af-grain";
 }
 
-export function colorVariantLabel(niche: Niche, color: ColorTheme): string {
-  return NICHE_COLOR_THEMES[niche].find((v) => v.id === color)?.label ?? color.toUpperCase();
+export function colorVariantLabel(color: ColorTheme): string {
+  return ALL_COLOR_VARIANTS.find((v) => v.id === color)?.label ?? color.toUpperCase();
 }

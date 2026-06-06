@@ -24,6 +24,7 @@ export default async function ServicosPage({
   return (
     <ServicesManager
       salonId={membership.salon_id}
+      niche={membership.salons.niche}
       initial={services ?? []}
     />
   );

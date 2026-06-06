@@ -2,25 +2,39 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Input, Label } from "@/components/ui";
-import { formatBRL, formatDuration } from "@/lib/utils";
+import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { formatServicePrice, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer } from "lucide-react";
+import type { Niche } from "@/lib/themes";
+import { SERVICE_PRESETS } from "@/lib/servicePresets";
+import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil } from "lucide-react";
 
 type Service = Tables<"services">;
+type PriceType = "fixed" | "from" | "on_request";
+
+const PRICE_TYPE_LABEL: Record<PriceType, string> = {
+  fixed: "Valor exato",
+  from: "A partir de",
+  on_request: "Sob consulta",
+};
 
 export function ServicesManager({
   salonId,
+  niche,
   initial,
 }: {
   salonId: string;
+  niche: Niche;
   initial: Service[];
 }) {
   const [services, setServices] = useState<Service[]>(initial);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [presetOpen, setPresetOpen] = useState(false);
   const [name, setName] = useState("");
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
+  const [priceType, setPriceType] = useState<PriceType>("fixed");
   const [commission, setCommission] = useState("");
   const [hasProcessing, setHasProcessing] = useState(false);
   const [processing, setProcessing] = useState("30");
@@ -29,29 +43,86 @@ export function ServicesManager({
 
   const supabase = createClient();
 
-  async function add() {
+  function resetForm() {
+    setName(""); setPrice(""); setDuration("30"); setCommission("");
+    setPriceType("fixed");
+    setHasProcessing(false); setProcessing("30"); setFinish("15");
+    setEditingId(null);
+  }
+
+  function openNew() {
+    resetForm();
+    setAdding(true);
+  }
+
+  function openEdit(svc: Service) {
+    setName(svc.name);
+    setDuration(String(svc.duration_min));
+    setPrice(svc.price ? String(svc.price).replace(".", ",") : "");
+    setPriceType((svc.price_type as PriceType) ?? "fixed");
+    setCommission(svc.commission_percent != null ? String(svc.commission_percent) : "");
+    setHasProcessing(svc.processing_time_min > 0);
+    setProcessing(String(svc.processing_time_min || 30));
+    setFinish(String(svc.finish_time_min || 15));
+    setEditingId(svc.id);
+    setAdding(true);
+  }
+
+  function closeForm() {
+    resetForm();
+    setAdding(false);
+  }
+
+  async function save() {
     if (!name) return;
     setBusy(true);
-    const { data, error } = await supabase
-      .from("services")
-      .insert({
-        salon_id: salonId,
-        name,
-        duration_min: parseInt(duration) || 30,
-        price: parseFloat(price.replace(",", ".")) || 0,
-        commission_percent: commission ? parseFloat(commission.replace(",", ".")) : null,
-        processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
-        finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
-      })
-      .select()
-      .single();
-    setBusy(false);
-    if (!error && data) {
-      setServices((s) => [data, ...s]);
-      setName(""); setPrice(""); setDuration("30"); setCommission("");
-      setHasProcessing(false); setProcessing("30"); setFinish("15");
-      setAdding(false);
+    const payload = {
+      name,
+      duration_min: parseInt(duration) || 30,
+      price: priceType === "on_request" ? 0 : parseFloat(price.replace(",", ".")) || 0,
+      price_type: priceType,
+      commission_percent: commission ? parseFloat(commission.replace(",", ".")) : null,
+      processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
+      finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
+    };
+    if (editingId) {
+      const { data, error } = await supabase
+        .from("services").update(payload).eq("id", editingId).select().single();
+      setBusy(false);
+      if (!error && data) {
+        setServices((s) => s.map((x) => (x.id === editingId ? (data as Service) : x)));
+        closeForm();
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("services").insert({ salon_id: salonId, ...payload }).select().single();
+      setBusy(false);
+      if (!error && data) {
+        setServices((s) => [data as Service, ...s]);
+        closeForm();
+      }
     }
+  }
+
+  async function addPresets(picked: { name: string; duration: number }[]) {
+    if (!picked.length) {
+      setPresetOpen(false);
+      return;
+    }
+    const rows = picked.map((p) => ({
+      salon_id: salonId,
+      name: p.name,
+      duration_min: p.duration,
+      price: 0,
+      commission_percent: null,
+      processing_time_min: 0,
+      finish_time_min: 0,
+    }));
+    const { data, error } = await supabase.from("services").insert(rows).select();
+    if (!error && data) {
+      setServices((s) => [...(data as Service[]), ...s]);
+    }
+    setPresetOpen(false);
   }
 
   async function remove(id: string) {
@@ -73,13 +144,30 @@ export function ServicesManager({
           <h1 className="font-display text-2xl font-bold">Serviços</h1>
           <p className="text-muted-foreground text-sm">Os serviços que aparecem no link de agendamento.</p>
         </div>
-        <Button onClick={() => setAdding((v) => !v)}>
-          <Plus className="h-4 w-4" /> Novo serviço
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setPresetOpen(true)}>
+            <Wand2 className="h-4 w-4" /> Serviços comuns
+          </Button>
+          <Button onClick={openNew}>
+            <Plus className="h-4 w-4" /> Novo serviço
+          </Button>
+        </div>
       </div>
+
+      {presetOpen && (
+        <PresetPicker
+          niche={niche}
+          existing={services.map((s) => s.name.trim().toLowerCase())}
+          onClose={() => setPresetOpen(false)}
+          onConfirm={addPresets}
+        />
+      )}
 
       {adding && (
         <Card className="p-6 space-y-4 af-rise">
+          <h2 className="font-display font-semibold">
+            {editingId ? "Editar serviço" : "Novo serviço"}
+          </h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="sname">Nome do serviço</Label>
@@ -90,12 +178,31 @@ export function ServicesManager({
               <Input id="sdur" type="number" value={duration} onChange={(e) => setDuration(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="sprice">Preço (R$)</Label>
-              <Input id="sprice" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
-            </div>
-            <div className="space-y-1.5">
               <Label htmlFor="scom">Comissão (%) — opcional</Label>
               <Input id="scom" value={commission} onChange={(e) => setCommission(e.target.value)} placeholder="Ex: 40" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sptype">Tipo de preço</Label>
+              <Select id="sptype" value={priceType} onChange={(e) => setPriceType(e.target.value as PriceType)}>
+                {(Object.keys(PRICE_TYPE_LABEL) as PriceType[]).map((t) => (
+                  <option key={t} value={t}>{PRICE_TYPE_LABEL[t]}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sprice">
+                {priceType === "from" ? "Valor inicial (R$)" : "Preço (R$)"}
+              </Label>
+              <Input
+                id="sprice"
+                value={priceType === "on_request" ? "" : price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0,00"
+                disabled={priceType === "on_request"}
+              />
+              {priceType === "on_request" && (
+                <p className="text-xs text-muted-foreground">A cliente vê &ldquo;Sob consulta&rdquo;.</p>
+              )}
             </div>
           </div>
           {/* Tempo de pausa (química / coloração) */}
@@ -142,10 +249,11 @@ export function ServicesManager({
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={add} disabled={busy || !name}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
+            <Button onClick={save} disabled={busy || !name}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editingId ? "Salvar" : "Adicionar"}
             </Button>
-            <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={closeForm}>Cancelar</Button>
           </div>
         </Card>
       )}
@@ -174,20 +282,123 @@ export function ServicesManager({
                   )}
                 </div>
               </div>
-              <span className="font-semibold text-primary">{formatBRL(Number(s.price))}</span>
+              <span className="font-semibold text-primary text-sm text-right">
+                {formatServicePrice(Number(s.price), s.price_type)}
+              </span>
               <button
                 onClick={() => toggleActive(s)}
                 className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
               >
                 {s.is_active ? "Ativo" : "Inativo"}
               </button>
-              <button onClick={() => remove(s.id)} className="p-2 text-muted-foreground hover:text-red-600">
+              <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={() => remove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────── Seletor de serviços comuns ───────────────────── */
+function PresetPicker({
+  niche,
+  existing,
+  onClose,
+  onConfirm,
+}: {
+  niche: Niche;
+  existing: string[];
+  onClose: () => void;
+  onConfirm: (picked: { name: string; duration: number }[]) => Promise<void>;
+}) {
+  const presets = SERVICE_PRESETS[niche] ?? [];
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  const has = (name: string) => existing.includes(name.trim().toLowerCase());
+
+  function toggle(name: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(name)) n.delete(name);
+      else n.add(name);
+      return n;
+    });
+  }
+
+  // agrupa por categoria
+  const grouped = presets.reduce<Record<string, typeof presets>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
+
+  async function confirm() {
+    setBusy(true);
+    await onConfirm(presets.filter((p) => selected.has(p.name)));
+    setBusy(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Wand2 className="h-5 w-5 text-primary" /> Serviços comuns
+          </h3>
+          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Marque os serviços que o seu salão oferece. Depois você ajusta preço e duração.
+        </p>
+
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([cat, items]) => (
+            <div key={cat}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
+              <div className="flex flex-wrap gap-2">
+                {items.map((p) => {
+                  const added = has(p.name);
+                  const on = selected.has(p.name);
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      disabled={added}
+                      onClick={() => toggle(p.name)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                        added
+                          ? "border-border bg-muted text-muted-foreground cursor-default"
+                          : on
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      {added ? <Check className="h-3.5 w-3.5" /> : on ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                      {p.name}
+                      {added && <span className="text-[10px]">já tem</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
+          <Button onClick={confirm} disabled={busy || selected.size === 0}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            Adicionar {selected.size > 0 ? `(${selected.size})` : ""}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        </div>
+      </Card>
     </div>
   );
 }

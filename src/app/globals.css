@@ -4,11 +4,11 @@
    AgendeFácil — sistema de temas por nicho + variante de cor
 
    Estrutura:
-   • :root                          → padrão global (neutro-a / laranja)
-   • [data-niche="X"]               → tipografia, raio e texturas do nicho
-   • [data-niche="X"][data-color="Y"] → paleta de cores da variante
+   • :root              → padrão global (laranja) para landing/sem tema
+   • [data-niche="X"]   → tipografia, raio e texturas do nicho
+   • [data-color="Y"]   → paleta de cores (compartilhada entre nichos)
 
-   16 temas no total: 4 nichos × 4 variantes de cor.
+   Nicho (4) define a forma; cor (12, em 3 grupos) define a paleta.
    ============================================================ */
 
 @theme inline {
@@ -106,13 +106,14 @@
 
 
 /* ============================================================
-   FEMININO — 4 variantes de cor
-   Paleta sempre feminina/luxo: serifas, bordas suaves.
+   PALETAS DE COR — 12 opções compartilhadas (3 grupos)
+   Aplicadas via [data-color]; independentes do nicho.
    ============================================================ */
 
-/* a) Rosa Gold — vinho & dourado (padrão feminino) */
-[data-niche="feminino"],
-[data-niche="feminino"][data-color="a"] {
+/* ---------- GRUPO 1 · PASTEL ---------- */
+
+/* a) Rosa Gold */
+[data-color="a"] {
   --background: #fbf6f4;
   --foreground: #2a1b22;
   --card: #ffffff;
@@ -130,46 +131,8 @@
   --shadow-card: 0 2px 8px rgba(142,59,94,.06), 0 24px 48px -28px rgba(142,59,94,.28);
 }
 
-/* b) Berry — magenta profundo & violeta */
-[data-niche="feminino"][data-color="b"] {
-  --background: #faf5fb;
-  --foreground: #1f0f2a;
-  --card: #ffffff;
-  --card-foreground: #1f0f2a;
-  --primary: #9c2580;
-  --primary-foreground: #fff5fe;
-  --secondary: #f5e0f7;
-  --secondary-foreground: #6b1060;
-  --accent: #c4397a;
-  --accent-foreground: #1f0522;
-  --muted: #f0daf4;
-  --muted-foreground: #8a5e90;
-  --border: #e8cdf0;
-  --ring: #9c2580;
-  --shadow-card: 0 2px 8px rgba(156,37,128,.06), 0 24px 48px -28px rgba(156,37,128,.28);
-}
-
-/* c) Champagne — ouro & creme luxo */
-[data-niche="feminino"][data-color="c"] {
-  --background: #fdf8f0;
-  --foreground: #2c1f08;
-  --card: #ffffff;
-  --card-foreground: #2c1f08;
-  --primary: #b5832a;
-  --primary-foreground: #fffbf0;
-  --secondary: #faefd6;
-  --secondary-foreground: #7a5510;
-  --accent: #8e3b5e;
-  --accent-foreground: #2a1b22;
-  --muted: #f7eed8;
-  --muted-foreground: #8a7555;
-  --border: #eddfc0;
-  --ring: #b5832a;
-  --shadow-card: 0 2px 8px rgba(181,131,42,.06), 0 24px 48px -28px rgba(181,131,42,.28);
-}
-
-/* d) Lilás — lavanda suave */
-[data-niche="feminino"][data-color="d"] {
+/* b) Lilás */
+[data-color="b"] {
   --background: #f8f5fc;
   --foreground: #1e1030;
   --card: #ffffff;
@@ -187,98 +150,8 @@
   --shadow-card: 0 2px 8px rgba(124,87,184,.06), 0 24px 48px -28px rgba(124,87,184,.28);
 }
 
-
-/* ============================================================
-   BARBEARIA — 4 variantes de cor
-   Paleta sempre escura/masculina: fundo dark, tipografia condensada.
-   ============================================================ */
-
-/* a) Cobre — cobre & oxblood (padrão barbearia) */
-[data-niche="barbearia"],
-[data-niche="barbearia"][data-color="a"] {
-  --background: #15120f;
-  --foreground: #ece3d6;
-  --card: #1e1a15;
-  --card-foreground: #ece3d6;
-  --primary: #c8852f;
-  --primary-foreground: #15120f;
-  --secondary: #2a231c;
-  --secondary-foreground: #e7c08a;
-  --accent: #9e3b2e;
-  --accent-foreground: #fdf2e3;
-  --muted: #221c16;
-  --muted-foreground: #ab9c8a;
-  --border: #34291f;
-  --ring: #c8852f;
-  --shadow-card: 0 0 0 1px rgba(200,133,47,.08), 0 12px 28px -16px rgba(0,0,0,.70);
-}
-
-/* b) Midnight — azul aço escuro */
-[data-niche="barbearia"][data-color="b"] {
-  --background: #0d1218;
-  --foreground: #d6e4f0;
-  --card: #141e28;
-  --card-foreground: #d6e4f0;
-  --primary: #3b7ab5;
-  --primary-foreground: #0d1218;
-  --secondary: #1a2534;
-  --secondary-foreground: #88b8e0;
-  --accent: #e0b85a;
-  --accent-foreground: #0d0e10;
-  --muted: #16202e;
-  --muted-foreground: #8aa0b8;
-  --border: #243040;
-  --ring: #3b7ab5;
-  --shadow-card: 0 0 0 1px rgba(59,122,181,.08), 0 12px 28px -16px rgba(0,0,0,.70);
-}
-
-/* c) Forest — verde escuro floresta */
-[data-niche="barbearia"][data-color="c"] {
-  --background: #0f1410;
-  --foreground: #d6ede0;
-  --card: #161e18;
-  --card-foreground: #d6ede0;
-  --primary: #2e7a50;
-  --primary-foreground: #0f1410;
-  --secondary: #1a2a1e;
-  --secondary-foreground: #80c090;
-  --accent: #a0793a;
-  --accent-foreground: #0e0e0c;
-  --muted: #172210;
-  --muted-foreground: #88a890;
-  --border: #28392c;
-  --ring: #2e7a50;
-  --shadow-card: 0 0 0 1px rgba(46,122,80,.08), 0 12px 28px -16px rgba(0,0,0,.70);
-}
-
-/* d) Steel — chumbo & prata fria */
-[data-niche="barbearia"][data-color="d"] {
-  --background: #0f1115;
-  --foreground: #e0e4ee;
-  --card: #161a22;
-  --card-foreground: #e0e4ee;
-  --primary: #7890b8;
-  --primary-foreground: #0f1115;
-  --secondary: #1a1e26;
-  --secondary-foreground: #a8b8d0;
-  --accent: #c8852f;
-  --accent-foreground: #0e0e10;
-  --muted: #141820;
-  --muted-foreground: #8890a8;
-  --border: #242c3a;
-  --ring: #7890b8;
-  --shadow-card: 0 0 0 1px rgba(120,144,184,.08), 0 12px 28px -16px rgba(0,0,0,.70);
-}
-
-
-/* ============================================================
-   ESTÉTICA — 4 variantes de cor
-   Paleta sempre clean/wellness: tons suaves, cantos grandes.
-   ============================================================ */
-
-/* a) Sálvia — verde sálvia & terracota (padrão estética) */
-[data-niche="estetica"],
-[data-niche="estetica"][data-color="a"] {
+/* c) Sálvia */
+[data-color="c"] {
   --background: #f2f5f1;
   --foreground: #1e2a24;
   --card: #ffffff;
@@ -296,72 +169,29 @@
   --shadow-card: 0 2px 10px rgba(79,125,99,.05), 0 30px 60px -36px rgba(79,125,99,.22);
 }
 
-/* b) Oceano — azul coastal limpo */
-[data-niche="estetica"][data-color="b"] {
-  --background: #f0f5f9;
-  --foreground: #0e1e2e;
+/* d) Champagne */
+[data-color="d"] {
+  --background: #fdf8f0;
+  --foreground: #2c1f08;
   --card: #ffffff;
-  --card-foreground: #0e1e2e;
-  --primary: #2d6ea0;
-  --primary-foreground: #f0f7ff;
-  --secondary: #ddeaf5;
-  --secondary-foreground: #1a4870;
-  --accent: #5ea8a8;
-  --accent-foreground: #0c2828;
-  --muted: #e0eaf3;
-  --muted-foreground: #4e6880;
-  --border: #c8dced;
-  --ring: #2d6ea0;
-  --shadow-card: 0 2px 10px rgba(45,110,160,.05), 0 30px 60px -36px rgba(45,110,160,.22);
+  --card-foreground: #2c1f08;
+  --primary: #b5832a;
+  --primary-foreground: #fffbf0;
+  --secondary: #faefd6;
+  --secondary-foreground: #7a5510;
+  --accent: #8e3b5e;
+  --accent-foreground: #2a1b22;
+  --muted: #f7eed8;
+  --muted-foreground: #8a7555;
+  --border: #eddfc0;
+  --ring: #b5832a;
+  --shadow-card: 0 2px 8px rgba(181,131,42,.06), 0 24px 48px -28px rgba(181,131,42,.28);
 }
 
-/* c) Lavanda — lilás bem-estar */
-[data-niche="estetica"][data-color="c"] {
-  --background: #f5f2fb;
-  --foreground: #1a1030;
-  --card: #ffffff;
-  --card-foreground: #1a1030;
-  --primary: #7c60b0;
-  --primary-foreground: #fdfaff;
-  --secondary: #ede0f8;
-  --secondary-foreground: #503880;
-  --accent: #c07090;
-  --accent-foreground: #280a18;
-  --muted: #ead8f2;
-  --muted-foreground: #6a5080;
-  --border: #ddd0f0;
-  --ring: #7c60b0;
-  --shadow-card: 0 2px 10px rgba(124,96,176,.05), 0 30px 60px -36px rgba(124,96,176,.22);
-}
+/* ---------- GRUPO 2 · VIBRANTE ---------- */
 
-/* d) Argila — terracota quente */
-[data-niche="estetica"][data-color="d"] {
-  --background: #f7f1eb;
-  --foreground: #2a1a0c;
-  --card: #ffffff;
-  --card-foreground: #2a1a0c;
-  --primary: #b86038;
-  --primary-foreground: #fff8f4;
-  --secondary: #f0e0d0;
-  --secondary-foreground: #7a3818;
-  --accent: #7a9070;
-  --accent-foreground: #1a2018;
-  --muted: #f0e0d0;
-  --muted-foreground: #806050;
-  --border: #e0c8b0;
-  --ring: #b86038;
-  --shadow-card: 0 2px 10px rgba(184,96,56,.05), 0 30px 60px -36px rgba(184,96,56,.22);
-}
-
-
-/* ============================================================
-   NEUTRO — 4 variantes de cor
-   Paleta versátil para qualquer segmento.
-   ============================================================ */
-
-/* a) Laranja — laranja moderno quente (padrão neutro) */
-[data-niche="neutro"],
-[data-niche="neutro"][data-color="a"] {
+/* e) Laranja */
+[data-color="e"] {
   --background: #fffbf7;
   --foreground: #1a0c04;
   --card: #ffffff;
@@ -379,61 +209,139 @@
   --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(242,60,16,.12);
 }
 
-/* b) Teal — verde-água clássico */
-[data-niche="neutro"][data-color="b"] {
-  --background: #f0fbfa;
-  --foreground: #041c1a;
+/* f) Pink */
+[data-color="f"] {
+  --background: #fdf2f8;
+  --foreground: #2a0a1d;
   --card: #ffffff;
-  --card-foreground: #041c1a;
-  --primary: #0e7a6e;
-  --primary-foreground: #f0fbfa;
-  --secondary: #d6f0ed;
-  --secondary-foreground: #084840;
-  --accent: #14b8a6;
-  --accent-foreground: #041c1a;
-  --muted: #e0f4f2;
-  --muted-foreground: #4a7068;
-  --border: #c0e4e0;
-  --ring: #0e7a6e;
-  --shadow-card: 0 1px 2px rgba(4,28,26,.06), 0 8px 24px -12px rgba(14,122,110,.10);
+  --card-foreground: #2a0a1d;
+  --primary: #db2777;
+  --primary-foreground: #fff0f7;
+  --secondary: #fbe0ee;
+  --secondary-foreground: #9d174d;
+  --accent: #f59e0b;
+  --accent-foreground: #2a1800;
+  --muted: #fbe3ef;
+  --muted-foreground: #9b5a76;
+  --border: #f5cfe1;
+  --ring: #db2777;
+  --shadow-card: 0 1px 2px rgba(42,10,29,.06), 0 8px 24px -12px rgba(219,39,119,.14);
 }
 
-/* c) Índigo — violeta digital */
-[data-niche="neutro"][data-color="c"] {
-  --background: #f5f5ff;
-  --foreground: #0c0c28;
+/* g) Roxo */
+[data-color="g"] {
+  --background: #f6f3ff;
+  --foreground: #1a0c33;
   --card: #ffffff;
-  --card-foreground: #0c0c28;
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --secondary: #ededff;
-  --secondary-foreground: #2e28a8;
-  --accent: #8b5cf6;
-  --accent-foreground: #0c0c28;
-  --muted: #e8e8ff;
-  --muted-foreground: #5c5c90;
-  --border: #d0d0f0;
-  --ring: #4f46e5;
-  --shadow-card: 0 1px 2px rgba(12,12,40,.06), 0 8px 24px -12px rgba(79,70,229,.10);
+  --card-foreground: #1a0c33;
+  --primary: #7c3aed;
+  --primary-foreground: #f6f0ff;
+  --secondary: #ebe2fe;
+  --secondary-foreground: #5b21b6;
+  --accent: #ec4899;
+  --accent-foreground: #2a0a1d;
+  --muted: #ece3fd;
+  --muted-foreground: #6b5a90;
+  --border: #ddd0fa;
+  --ring: #7c3aed;
+  --shadow-card: 0 1px 2px rgba(26,12,51,.06), 0 8px 24px -12px rgba(124,58,237,.14);
 }
 
-/* d) Chumbo — cinza neutro elegante */
-[data-niche="neutro"][data-color="d"] {
-  --background: #f8f8f7;
-  --foreground: #1a1a18;
+/* h) Ciano */
+[data-color="h"] {
+  --background: #eefdfd;
+  --foreground: #042a2e;
   --card: #ffffff;
-  --card-foreground: #1a1a18;
-  --primary: #374151;
-  --primary-foreground: #ffffff;
-  --secondary: #f0f0ee;
-  --secondary-foreground: #1f2a38;
-  --accent: #6b7280;
-  --accent-foreground: #1a1a18;
-  --muted: #ecece8;
-  --muted-foreground: #6b7280;
-  --border: #e0e0dc;
-  --ring: #374151;
-  --shadow-card: 0 1px 2px rgba(26,26,24,.06), 0 8px 24px -12px rgba(55,65,81,.10);
+  --card-foreground: #042a2e;
+  --primary: #0891b2;
+  --primary-foreground: #ecfeff;
+  --secondary: #d4f3f7;
+  --secondary-foreground: #0e5a6b;
+  --accent: #f97316;
+  --accent-foreground: #2a1400;
+  --muted: #dcf4f6;
+  --muted-foreground: #4a7880;
+  --border: #bfe9ee;
+  --ring: #0891b2;
+  --shadow-card: 0 1px 2px rgba(4,42,46,.06), 0 8px 24px -12px rgba(8,145,178,.14);
+}
+
+/* ---------- GRUPO 3 · SÓLIDO ---------- */
+
+/* i) Preto */
+[data-color="i"] {
+  --background: #141414;
+  --foreground: #f0f0f0;
+  --card: #1e1e1e;
+  --card-foreground: #f0f0f0;
+  --primary: #f5f5f5;
+  --primary-foreground: #141414;
+  --secondary: #262626;
+  --secondary-foreground: #e0e0e0;
+  --accent: #e7b96a;
+  --accent-foreground: #141414;
+  --muted: #1f1f1f;
+  --muted-foreground: #a3a3a3;
+  --border: #2e2e2e;
+  --ring: #a3a3a3;
+  --shadow-card: 0 0 0 1px rgba(255,255,255,.05), 0 12px 28px -16px rgba(0,0,0,.70);
+}
+
+/* j) Marinho */
+[data-color="j"] {
+  --background: #f4f6fb;
+  --foreground: #0a1228;
+  --card: #ffffff;
+  --card-foreground: #0a1228;
+  --primary: #1e3a8a;
+  --primary-foreground: #eef2ff;
+  --secondary: #e3e9f7;
+  --secondary-foreground: #1e3a8a;
+  --accent: #d4a24e;
+  --accent-foreground: #2a1d05;
+  --muted: #e6ebf6;
+  --muted-foreground: #56607a;
+  --border: #d2dbf0;
+  --ring: #1e3a8a;
+  --shadow-card: 0 1px 2px rgba(10,18,40,.06), 0 8px 24px -12px rgba(30,58,138,.16);
+}
+
+/* k) Esmeralda */
+[data-color="k"] {
+  --background: #f0faf5;
+  --foreground: #04231a;
+  --card: #ffffff;
+  --card-foreground: #04231a;
+  --primary: #047857;
+  --primary-foreground: #ecfdf5;
+  --secondary: #d5f0e3;
+  --secondary-foreground: #065f46;
+  --accent: #ca8a04;
+  --accent-foreground: #2a1d00;
+  --muted: #ddf2e8;
+  --muted-foreground: #4a7060;
+  --border: #c2e8d5;
+  --ring: #047857;
+  --shadow-card: 0 1px 2px rgba(4,35,26,.06), 0 8px 24px -12px rgba(4,120,87,.16);
+}
+
+/* l) Bordô */
+[data-color="l"] {
+  --background: #fcf3f4;
+  --foreground: #2a0810;
+  --card: #ffffff;
+  --card-foreground: #2a0810;
+  --primary: #9f1239;
+  --primary-foreground: #fff0f3;
+  --secondary: #f7dde2;
+  --secondary-foreground: #811029;
+  --accent: #b5832a;
+  --accent-foreground: #2a1d05;
+  --muted: #f6e1e5;
+  --muted-foreground: #8a5560;
+  --border: #f0ccd3;
+  --ring: #9f1239;
+  --shadow-card: 0 1px 2px rgba(42,8,16,.06), 0 8px 24px -12px rgba(159,18,57,.16);
 }
 
 

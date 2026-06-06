@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Textarea } from "@/components/ui";
-import { CHOOSABLE_NICHES, NICHE_COLOR_THEMES, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
+import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   Scissors, Loader2, Check, Clock, Upload, Phone, MapPin,
@@ -201,29 +201,41 @@ export default function NovoSalaoPage() {
                   </div>
                 </div>
 
-                {/* Paleta de cores — 4 variantes do nicho escolhido */}
-                <div className="space-y-2.5">
+                {/* Paleta de cores — 12 opções em 3 grupos (compartilhadas) */}
+                <div className="space-y-3">
                   <Label>Paleta de cores</Label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {NICHE_COLOR_THEMES[niche].map((v) => {
-                      const active = v.id === colorTheme;
-                      return (
-                        <button
-                          type="button"
-                          key={v.id}
-                          onClick={() => setColorTheme(v.id)}
-                          className={`flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-2.5 transition ${active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"}`}
-                        >
-                          <span
-                            className="h-8 w-8 rounded-full ring-1 ring-black/10"
-                            style={{ background: `linear-gradient(135deg, ${v.primary}, ${v.background})` }}
-                          />
-                          <span className="h-1.5 w-full rounded-full" style={{ background: v.primary }} />
-                          <span className="text-[10px] font-medium leading-tight text-center">{v.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {COLOR_GROUPS.map((group) => (
+                    <div key={group.id} className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {group.variants.map((v) => {
+                          const active = v.id === colorTheme;
+                          return (
+                            <button
+                              type="button"
+                              key={v.id}
+                              onClick={() => setColorTheme(v.id)}
+                              aria-pressed={active}
+                              title={v.label}
+                              className={`group relative overflow-hidden rounded-[var(--radius)] border transition ${active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/25"}`}
+                            >
+                              <div
+                                className="flex h-10 items-center justify-center gap-1.5"
+                                style={{ background: v.background }}
+                              >
+                                <span className="h-5 w-5 rounded-full ring-1 ring-black/10" style={{ background: v.primary }} />
+                                <span className="h-2.5 w-2.5 rounded-full ring-1 ring-black/10" style={{ background: v.accent }} />
+                              </div>
+                              <div className="flex items-center justify-center gap-1 bg-card px-1 py-1">
+                                <span className="text-[10px] font-medium leading-tight text-center truncate">{v.label}</span>
+                                {active && <Check className="h-3 w-3 text-primary shrink-0" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

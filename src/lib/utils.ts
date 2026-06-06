@@ -12,6 +12,13 @@ export function formatBRL(value: number): string {
   }).format(value);
 }
 
+/** Formata o preço de um serviço conforme o tipo (exato, a partir de, sob consulta). */
+export function formatServicePrice(price: number, priceType?: string | null): string {
+  if (priceType === "on_request") return "Sob consulta";
+  if (priceType === "from") return `A partir de ${formatBRL(price)}`;
+  return formatBRL(price);
+}
+
 export function formatDuration(min: number): string {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);

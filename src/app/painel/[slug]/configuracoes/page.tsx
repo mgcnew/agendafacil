@@ -1,27 +1,58 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
-import { SettingsForm } from "./SettingsForm";
+import { SettingsTabs } from "./SettingsTabs";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfigPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug } = await params;
+  const { tab } = await searchParams;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
 
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  const canManageSalon = perms.has("salon.manage");
+  const canManageSchedule = perms.has("schedule.manage");
+  if (!canManageSalon && !canManageSchedule) redirect(`/painel/${slug}`);
+
   const supabase = await createClient();
-  const { data: salon } = await supabase
-    .from("salons")
-    .select("*")
-    .eq("id", membership.salon_id)
-    .single();
+  const [{ data: salon }, { data: pros }, { data: hours }] = await Promise.all([
+    supabase.from("salons").select("*").eq("id", membership.salon_id).single(),
+    supabase
+      .from("salon_members")
+      .select("id, display_name, profiles(full_name)")
+      .eq("salon_id", membership.salon_id)
+      .eq("is_active", true)
+      .order("created_at"),
+    supabase.from("working_hours").select("*").eq("salon_id", membership.salon_id),
+  ]);
 
   if (!salon) redirect("/painel");
 
-  return <SettingsForm salon={salon} canEdit={membership.role === "owner"} />;
+  const proList = (pros ?? []).map((p) => ({
+    id: p.id,
+    name:
+      p.display_name ??
+      (p.profiles as { full_name?: string } | null)?.full_name ??
+      "—",
+  }));
+
+  return (
+    <SettingsTabs
+      salon={salon}
+      canEditSalon={membership.role === "owner"}
+      canManageSalon={canManageSalon}
+      canManageSchedule={canManageSchedule}
+      pros={proList}
+      initialHours={hours ?? []}
+      initialTab={tab}
+    />
+  );
 }
