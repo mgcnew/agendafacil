@@ -34,6 +34,8 @@ export function Select({
 }: SelectProps) {
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
+  // tema do ancestral (o portal fica fora do wrapper [data-niche]/[data-color])
+  const [theme, setTheme] = React.useState<{ niche?: string; color?: string }>({});
   const btnRef = React.useRef<HTMLButtonElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -57,6 +59,8 @@ export function Select({
   function openMenu() {
     if (disabled) return;
     updateRect();
+    const host = btnRef.current?.closest("[data-niche]") as HTMLElement | null;
+    setTheme({ niche: host?.dataset.niche, color: host?.dataset.color });
     setOpen(true);
   }
 
@@ -112,8 +116,10 @@ export function Select({
         <div
           ref={menuRef}
           role="listbox"
+          data-niche={theme.niche}
+          data-color={theme.color}
           style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width }}
-          className="z-[60] max-h-60 overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl"
+          className="z-[60] max-h-60 overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground"
         >
           {options.map((o) => {
             const on = o.value === value;
