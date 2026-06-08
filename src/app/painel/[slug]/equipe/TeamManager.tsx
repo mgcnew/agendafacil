@@ -6,7 +6,7 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
-  Copy, Check, Link2, Trash2, Mail,
+  Copy, Check, Link2, Trash2, Mail, Scissors,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -16,6 +16,7 @@ type Member = Tables<"salon_members"> & {
 type Invite = Tables<"salon_invites">;
 type Permission = Tables<"permissions">;
 type RoleDefault = Tables<"role_permissions">;
+type Svc = { id: string; name: string; commission_percent: number | null };
 
 const ROLE_LABEL: Record<Role, string> = {
   owner: "Proprietária",
@@ -32,6 +33,8 @@ export function TeamManager({
   permissions,
   roleDefaults,
   invites: initialInvites,
+  services,
+  serviceCounts,
 }: {
   salonId: string;
   myRole: Role;
@@ -39,10 +42,14 @@ export function TeamManager({
   permissions: Permission[];
   roleDefaults: RoleDefault[];
   invites: Invite[];
+  services: Svc[];
+  serviceCounts: Record<string, number>;
 }) {
   const supabase = createClient();
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [invites, setInvites] = useState<Invite[]>(initialInvites);
+  const [counts, setCounts] = useState<Record<string, number>>(serviceCounts);
+  const [editingServices, setEditingServices] = useState<Member | null>(null);
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("professional");
@@ -219,7 +226,12 @@ export function TeamManager({
                 {m.display_name ?? m.profiles?.full_name ?? "—"}
                 {m.role === "owner" && <Crown className="h-4 w-4 text-accent" />}
               </p>
-              <p className="text-xs text-muted-foreground truncate">{m.profiles?.email}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {m.profiles?.email}
+                {m.role !== "owner" && (counts[m.id] ?? 0) > 0 && (
+                  <> · {counts[m.id]} serviço{counts[m.id] > 1 ? "s" : ""}</>
+                )}
+              </p>
             </div>
 
             {m.role === "owner" ? (
@@ -243,6 +255,13 @@ export function TeamManager({
                 )}
                 {canManage && (
                   <>
+                    <button
+                      onClick={() => setEditingServices(m)}
+                      className="p-2 text-muted-foreground hover:text-primary"
+                      title="Serviços que faz"
+                    >
+                      <Scissors className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => setEditing(m)}
                       className="p-2 text-muted-foreground hover:text-primary"
@@ -273,6 +292,150 @@ export function TeamManager({
           onClose={() => setEditing(null)}
         />
       )}
+
+      {editingServices && (
+        <ServicesEditor
+          member={editingServices}
+          services={services}
+          salonId={salonId}
+          onClose={() => setEditingServices(null)}
+          onSaved={(count) => {
+            setCounts((c) => ({ ...c, [editingServices.id]: count }));
+            setEditingServices(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Editor de serviços que o profissional faz ────────────────────
+function ServicesEditor({
+  member,
+  services,
+  salonId,
+  onClose,
+  onSaved,
+}: {
+  member: Member;
+  services: Svc[];
+  salonId: string;
+  onClose: () => void;
+  onSaved: (count: number) => void;
+}) {
+  const supabase = createClient();
+  const [state, setState] = useState<Record<string, { on: boolean; commission: string }>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from("professional_services")
+      .select("service_id, commission_percent")
+      .eq("member_id", member.id)
+      .then(({ data }) => {
+        const s: Record<string, { on: boolean; commission: string }> = {};
+        for (const r of data ?? []) {
+          s[r.service_id] = {
+            on: true,
+            commission: r.commission_percent != null ? String(r.commission_percent) : "",
+          };
+        }
+        setState(s);
+        setLoaded(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member.id]);
+
+  function toggle(id: string) {
+    setState((s) => ({ ...s, [id]: { on: !(s[id]?.on), commission: s[id]?.commission ?? "" } }));
+  }
+  function setComm(id: string, v: string) {
+    setState((s) => ({ ...s, [id]: { on: s[id]?.on ?? true, commission: v } }));
+  }
+
+  const selectedCount = services.filter((sv) => state[sv.id]?.on).length;
+
+  async function save() {
+    setSaving(true);
+    // estratégia simples: remove tudo e reinsere os marcados
+    await supabase.from("professional_services").delete().eq("member_id", member.id);
+    const rows = services
+      .filter((sv) => state[sv.id]?.on)
+      .map((sv) => {
+        const c = state[sv.id]?.commission;
+        return {
+          salon_id: salonId,
+          member_id: member.id,
+          service_id: sv.id,
+          commission_percent: c ? parseFloat(c.replace(",", ".")) : null,
+        };
+      });
+    if (rows.length) await supabase.from("professional_services").insert(rows);
+    setSaving(false);
+    onSaved(rows.length);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Scissors className="h-5 w-5 text-primary" /> Serviços
+          </h3>
+          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          {member.display_name ?? member.profiles?.full_name} · marque os serviços que faz.
+          A comissão (%) é opcional e tem prioridade sobre a do serviço.
+        </p>
+
+        {!loaded ? (
+          <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : services.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            Nenhum serviço cadastrado. Crie serviços primeiro.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {services.map((sv) => {
+              const on = state[sv.id]?.on ?? false;
+              return (
+                <div key={sv.id} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted">
+                  <button
+                    type="button"
+                    onClick={() => toggle(sv.id)}
+                    className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                    aria-pressed={on}
+                  >
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
+                  <span className="flex-1 text-sm">{sv.name}</span>
+                  {on && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={state[sv.id]?.commission ?? ""}
+                        onChange={(e) => setComm(sv.id, e.target.value)}
+                        placeholder={sv.commission_percent != null ? String(sv.commission_percent) : "%"}
+                        className="w-16 h-8 text-sm text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        </div>
+      </Card>
     </div>
   );
 }

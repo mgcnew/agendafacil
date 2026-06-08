@@ -15,7 +15,7 @@ export default async function EquipePage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const [{ data: members }, { data: permissions }, { data: roleDefaults }, { data: invites }] =
+  const [{ data: members }, { data: permissions }, { data: roleDefaults }, { data: invites }, { data: services }, { data: profSvc }] =
     await Promise.all([
       supabase
         .from("salon_members")
@@ -30,7 +30,22 @@ export default async function EquipePage({
         .eq("salon_id", membership.salon_id)
         .eq("status", "pending")
         .order("created_at", { ascending: false }),
+      supabase
+        .from("services")
+        .select("id, name, commission_percent")
+        .eq("salon_id", membership.salon_id)
+        .eq("is_active", true)
+        .order("name"),
+      supabase
+        .from("professional_services")
+        .select("member_id")
+        .eq("salon_id", membership.salon_id),
     ]);
+
+  const serviceCounts: Record<string, number> = {};
+  for (const r of profSvc ?? []) {
+    serviceCounts[r.member_id] = (serviceCounts[r.member_id] ?? 0) + 1;
+  }
 
   return (
     <TeamManager
@@ -40,6 +55,8 @@ export default async function EquipePage({
       permissions={permissions ?? []}
       roleDefaults={roleDefaults ?? []}
       invites={invites ?? []}
+      services={services ?? []}
+      serviceCounts={serviceCounts}
     />
   );
 }
