@@ -170,6 +170,45 @@ export type Database = {
           },
         ]
       }
+      commission_payments: {
+        Row: {
+          amount: number
+          cash_transaction_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          member_id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          salon_id: string
+        }
+        Insert: {
+          amount: number
+          cash_transaction_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          salon_id: string
+        }
+        Update: {
+          amount?: number
+          cash_transaction_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          salon_id?: string
+        }
+        Relationships: []
+      }
       cash_sessions: {
         Row: {
           closed_at: string | null
@@ -1053,6 +1092,16 @@ export type Database = {
       }
       finalize_appointment: {
         Args: { p_appointment: string; p_payment_method?: string }
+        Returns: Json
+      }
+      pay_commission: {
+        Args: {
+          p_salon: string
+          p_member: string
+          p_amount: number
+          p_period_start: string
+          p_period_end: string
+        }
         Returns: Json
       }
       get_invite: {

@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL, formatTime } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
-  Banknote, Smartphone, CreditCard, History, X,
+  Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
 } from "lucide-react";
 
 type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
-type Comm = { name: string; total: number };
+type Comm = { member_id: string; name: string; earned: number; paid: number };
+type Period = { label: string; prevCmes: string; nextCmes: string; start: string; end: string };
 
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
   dinheiro: { label: "Dinheiro", icon: Banknote },
@@ -28,6 +30,8 @@ export function FinanceManager({
   transactions,
   commissions,
   closedSessions,
+  initialTab,
+  period,
 }: {
   salonId: string;
   canManage: boolean;
@@ -35,10 +39,28 @@ export function FinanceManager({
   transactions: Tx[];
   commissions: Comm[];
   closedSessions: Session[];
+  initialTab: "caixa" | "comissoes";
+  period: Period;
 }) {
   const supabase = createClient();
   const router = useRouter();
-  const [tab, setTab] = useState<"caixa" | "comissoes">("caixa");
+  const pathname = usePathname();
+  const [tab, setTab] = useState<"caixa" | "comissoes">(initialTab);
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  async function payCommission(c: Comm, outstanding: number) {
+    if (!confirm(`Pagar ${formatBRL(outstanding)} de comissão para ${c.name}?`)) return;
+    setPayingId(c.member_id);
+    await supabase.rpc("pay_commission", {
+      p_salon: salonId,
+      p_member: c.member_id,
+      p_amount: outstanding,
+      p_period_start: period.start,
+      p_period_end: period.end,
+    });
+    setPayingId(null);
+    router.refresh();
+  }
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState("0");
   const [closing, setClosing] = useState(false);
@@ -268,25 +290,70 @@ export function FinanceManager({
       )}
 
       {tab === "comissoes" && (
-        <div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Comissões dos atendimentos concluídos neste mês.
-          </p>
+        <div className="space-y-4">
+          {/* Navegação de período */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Comissões dos atendimentos concluídos no período.
+            </p>
+            <div className="flex items-center gap-1">
+              <Link
+                href={`${pathname}?tab=comissoes&cmes=${period.prevCmes}`}
+                className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Link>
+              <span className="text-sm font-medium px-2 min-w-[120px] text-center capitalize">{period.label}</span>
+              <Link
+                href={`${pathname}?tab=comissoes&cmes=${period.nextCmes}`}
+                className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
           {commissions.length === 0 ? (
             <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
               <Percent className="h-8 w-8 mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mt-3">Nenhuma comissão apurada ainda.</p>
+              <p className="text-sm text-muted-foreground mt-3">Nenhuma comissão apurada no período.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {commissions.map((c) => (
-                <div key={c.name} className="flex items-center justify-between rounded-[var(--radius)] border border-border bg-card p-4">
-                  <span className="font-medium">{c.name}</span>
-                  <span className="font-semibold text-primary">{formatBRL(c.total)}</span>
-                </div>
-              ))}
+              {commissions.map((c) => {
+                const outstanding = Math.max(0, c.earned - c.paid);
+                const settled = outstanding < 0.01;
+                return (
+                  <div key={c.member_id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Apurado {formatBRL(c.earned)}
+                        {c.paid > 0 && <> · Pago {formatBRL(c.paid)}</>}
+                      </p>
+                    </div>
+                    {settled ? (
+                      <span className="text-xs font-medium rounded-full bg-emerald-500/12 text-emerald-600 px-2.5 py-1 flex items-center gap-1">
+                        <Check className="h-3.5 w-3.5" /> Pago
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-semibold text-primary text-sm">{formatBRL(outstanding)}</span>
+                        {canManage && (
+                          <Button size="sm" onClick={() => payCommission(c, outstanding)} disabled={payingId === c.member_id}>
+                            {payingId === c.member_id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pagar"}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
+          <p className="text-[11px] text-muted-foreground">
+            Ao pagar, o valor entra como saída no caixa (se aberto).
+          </p>
         </div>
       )}
     </div>
