@@ -737,15 +737,22 @@ function FinalizeModal({
   const [method, setMethod] = useState("dinheiro");
   const [busy, setBusy]     = useState(false);
   const [err, setErr]       = useState<string | null>(null);
+  const [warn, setWarn]     = useState<string[] | null>(null);
 
   async function finalize() {
     setBusy(true); setErr(null);
-    const { error } = await supabase.rpc("finalize_appointment", {
+    const { data, error } = await supabase.rpc("finalize_appointment", {
       p_appointment: appt.id,
       p_payment_method: method,
     });
     if (error) {
       setErr("Não foi possível finalizar. Tente novamente.");
+      setBusy(false);
+      return;
+    }
+    const warnings = (data as { stock_warnings?: string[] } | null)?.stock_warnings ?? [];
+    if (warnings.length > 0) {
+      setWarn(warnings);
       setBusy(false);
       return;
     }
@@ -764,43 +771,58 @@ function FinalizeModal({
           {appt.clients?.full_name ?? "Cliente"} · {fmtHM(appt.starts_at)}
         </p>
 
-        <div className="flex items-center justify-between rounded-[var(--radius)] bg-muted px-4 py-3 mt-4">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="font-display text-xl font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
-        </div>
-
-        <div className="mt-4">
-          <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
-          <div className="grid grid-cols-3 gap-2 mt-1.5">
-            {PAYMENT_METHODS.map(m => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMethod(m.id)}
-                className={cn(
-                  "rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition",
-                  method === m.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border hover:border-foreground/25",
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
+        {warn ? (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                Atendimento finalizado. O estoque ficou negativo de:{" "}
+                <b>{warn.join(", ")}</b>. Reponha quando puder.
+              </div>
+            </div>
+            <Button className="w-full" onClick={onDone}>Entendi</Button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between rounded-[var(--radius)] bg-muted px-4 py-3 mt-4">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="font-display text-xl font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
+            </div>
 
-        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+            <div className="mt-4">
+              <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
+              <div className="grid grid-cols-3 gap-2 mt-1.5">
+                {PAYMENT_METHODS.map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMethod(m.id)}
+                    className={cn(
+                      "rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition",
+                      method === m.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:border-foreground/25",
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="flex gap-2 mt-5">
-          <Button onClick={finalize} disabled={busy} className="flex-1">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar e receber
-          </Button>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-3 text-center">
-          A receita entra no caixa (se aberto) e a comissão é calculada automaticamente.
-        </p>
+            {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+
+            <div className="flex gap-2 mt-5">
+              <Button onClick={finalize} disabled={busy} className="flex-1">
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar e receber
+              </Button>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3 text-center">
+              A receita entra no caixa (se aberto), comissão e baixa de estoque automáticas.
+            </p>
+          </>
+        )}
       </Card>
     </div>
   );

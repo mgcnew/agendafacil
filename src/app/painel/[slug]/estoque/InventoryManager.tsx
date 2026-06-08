@@ -5,17 +5,27 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Loader2, Boxes, Trash2, Minus, AlertTriangle } from "lucide-react";
+import { Plus, Loader2, Boxes, Trash2, Minus, AlertTriangle, History, ArrowDown, ArrowUp } from "lucide-react";
 
 type Product = Tables<"products">;
+export type Movement = {
+  id: string;
+  type: "in" | "out" | "adjustment";
+  quantity: number;
+  reason: string | null;
+  created_at: string;
+  products: { name: string } | null;
+};
 
 export function InventoryManager({
   salonId,
   initial,
+  movements,
   canManage,
 }: {
   salonId: string;
   initial: Product[];
+  movements: Movement[];
   canManage: boolean;
 }) {
   const supabase = createClient();
@@ -164,6 +174,39 @@ export function InventoryManager({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Movimentações recentes (inclui baixas automáticas por atendimento) */}
+      {movements.length > 0 && (
+        <div>
+          <h2 className="font-display font-semibold mb-3 flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" /> Movimentações recentes
+          </h2>
+          <div className="space-y-1.5">
+            {movements.map((m) => {
+              const out = m.type === "out";
+              return (
+                <div key={m.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3">
+                  <span className={`grid place-items-center h-8 w-8 rounded-full shrink-0 ${
+                    out ? "bg-red-500/12 text-red-600" : "bg-emerald-500/12 text-emerald-600"
+                  }`}>
+                    {out ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{m.products?.name ?? "Produto"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.reason ?? (out ? "Saída" : m.type === "in" ? "Entrada" : "Ajuste")} ·{" "}
+                      {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums ${out ? "text-red-600" : "text-emerald-600"}`}>
+                    {out ? "−" : "+"}{Number(m.quantity)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

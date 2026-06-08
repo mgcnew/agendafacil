@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
-import { InventoryManager } from "./InventoryManager";
+import { InventoryManager, type Movement } from "./InventoryManager";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +15,15 @@ export default async function EstoquePage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("salon_id", membership.salon_id)
-    .order("name");
+  const [{ data: products }, { data: movements }] = await Promise.all([
+    supabase.from("products").select("*").eq("salon_id", membership.salon_id).order("name"),
+    supabase
+      .from("stock_movements")
+      .select("id, type, quantity, reason, created_at, products(name)")
+      .eq("salon_id", membership.salon_id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
 
   const canManage = membership.role === "owner" || membership.role === "manager";
 
@@ -27,6 +31,7 @@ export default async function EstoquePage({
     <InventoryManager
       salonId={membership.salon_id}
       initial={products ?? []}
+      movements={(movements ?? []) as unknown as Movement[]}
       canManage={canManage}
     />
   );

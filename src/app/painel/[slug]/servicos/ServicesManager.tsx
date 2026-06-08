@@ -7,10 +7,13 @@ import { formatServicePrice, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
-import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil } from "lucide-react";
+import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil, Boxes } from "lucide-react";
 
 type Service = Tables<"services">;
 type PriceType = "fixed" | "from" | "on_request";
+type Prod = { id: string; name: string; unit: string | null };
+type SP = { service_id: string; product_id: string; quantity: number };
+type RecipeRow = { product_id: string; quantity: string };
 
 const PRICE_TYPE_LABEL: Record<PriceType, string> = {
   fixed: "Valor exato",
@@ -22,12 +25,17 @@ export function ServicesManager({
   salonId,
   niche,
   initial,
+  products,
+  serviceProducts,
 }: {
   salonId: string;
   niche: Niche;
   initial: Service[];
+  products: Prod[];
+  serviceProducts: SP[];
 }) {
   const [services, setServices] = useState<Service[]>(initial);
+  const [svcProducts, setSvcProducts] = useState<SP[]>(serviceProducts);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [presetOpen, setPresetOpen] = useState(false);
@@ -39,6 +47,7 @@ export function ServicesManager({
   const [hasProcessing, setHasProcessing] = useState(false);
   const [processing, setProcessing] = useState("30");
   const [finish, setFinish] = useState("15");
+  const [recipe, setRecipe] = useState<RecipeRow[]>([]);
   const [busy, setBusy] = useState(false);
 
   const supabase = createClient();
@@ -47,6 +56,7 @@ export function ServicesManager({
     setName(""); setPrice(""); setDuration("30"); setCommission("");
     setPriceType("fixed");
     setHasProcessing(false); setProcessing("30"); setFinish("15");
+    setRecipe([]);
     setEditingId(null);
   }
 
@@ -64,8 +74,17 @@ export function ServicesManager({
     setHasProcessing(svc.processing_time_min > 0);
     setProcessing(String(svc.processing_time_min || 30));
     setFinish(String(svc.finish_time_min || 15));
+    setRecipe(
+      svcProducts
+        .filter((sp) => sp.service_id === svc.id)
+        .map((sp) => ({ product_id: sp.product_id, quantity: String(sp.quantity) })),
+    );
     setEditingId(svc.id);
     setAdding(true);
+  }
+
+  function setRecipeRow(idx: number, patch: Partial<RecipeRow>) {
+    setRecipe((r) => r.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
 
   function closeForm() {
@@ -85,23 +104,44 @@ export function ServicesManager({
       processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
       finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
     };
+    let saved: Service | null = null;
     if (editingId) {
       const { data, error } = await supabase
         .from("services").update(payload).eq("id", editingId).select().single();
-      setBusy(false);
       if (!error && data) {
-        setServices((s) => s.map((x) => (x.id === editingId ? (data as Service) : x)));
-        closeForm();
+        saved = data as Service;
+        setServices((s) => s.map((x) => (x.id === editingId ? saved! : x)));
       }
     } else {
       const { data, error } = await supabase
         .from("services").insert({ salon_id: salonId, ...payload }).select().single();
-      setBusy(false);
       if (!error && data) {
-        setServices((s) => [data as Service, ...s]);
-        closeForm();
+        saved = data as Service;
+        setServices((s) => [saved!, ...s]);
       }
     }
+
+    // sincroniza a receita de insumos (service_products)
+    if (saved) {
+      const svcId = saved.id;
+      await supabase.from("service_products").delete().eq("service_id", svcId);
+      const rows = recipe
+        .filter((r) => r.product_id && (parseFloat(r.quantity.replace(",", ".")) || 0) > 0)
+        .map((r) => ({
+          salon_id: salonId,
+          service_id: svcId,
+          product_id: r.product_id,
+          quantity: parseFloat(r.quantity.replace(",", ".")) || 1,
+        }));
+      if (rows.length) await supabase.from("service_products").insert(rows);
+      setSvcProducts((sp) => [
+        ...sp.filter((x) => x.service_id !== svcId),
+        ...rows.map((r) => ({ service_id: r.service_id, product_id: r.product_id, quantity: r.quantity })),
+      ]);
+    }
+
+    setBusy(false);
+    if (saved) closeForm();
   }
 
   async function addPresets(picked: { name: string; duration: number }[]) {
@@ -245,6 +285,55 @@ export function ServicesManager({
                   <b className="text-foreground">{(parseInt(duration) || 0) + (parseInt(finish) || 0)} min</b>.
                 </p>
               </>
+            )}
+          </div>
+
+          {/* Insumos consumidos por atendimento (estoque inteligente) */}
+          <div className="rounded-[var(--radius)] border border-border p-4">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Boxes className="h-4 w-4 text-primary" /> Insumos consumidos por atendimento
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ao finalizar o atendimento, estes produtos são descontados do estoque automaticamente.
+            </p>
+            {products.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-3">
+                Cadastre produtos no Estoque para vincular insumos.
+              </p>
+            ) : (
+              <div className="space-y-2 mt-3">
+                {recipe.map((r, idx) => {
+                  const prod = products.find((p) => p.id === r.product_id);
+                  return (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <Select value={r.product_id} onValueChange={(v) => setRecipeRow(idx, { product_id: v })} className="flex-1">
+                        <option value="">Selecione o produto</option>
+                        {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </Select>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={r.quantity}
+                        onChange={(e) => setRecipeRow(idx, { quantity: e.target.value })}
+                        className="w-24"
+                        placeholder="Qtd"
+                      />
+                      <span className="text-xs text-muted-foreground w-10 shrink-0">{prod?.unit ?? ""}</span>
+                      <button type="button" onClick={() => setRecipe((a) => a.filter((_, i) => i !== idx))} className="p-2 text-muted-foreground hover:text-red-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setRecipe((a) => [...a, { product_id: "", quantity: "1" }])}
+                  className="text-sm text-primary font-medium flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar insumo
+                </button>
+              </div>
             )}
           </div>
 
