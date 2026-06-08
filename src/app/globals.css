@@ -55,17 +55,19 @@
   --radius: 0.85rem;
   --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(242,60,16,.12);
 
-  /* Typography */
+  /* Typography — fonte única (Plus Jakarta Sans) */
   --display-tracking: -0.02em;
   --display-transform: none;
   --display-weight: 700;
-  --font-display: var(--font-bricolage), system-ui, sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-display: var(--font-jakarta), system-ui, sans-serif;
+  --font-body: var(--font-jakarta), system-ui, sans-serif;
 }
 
 
 /* ============================================================
-   NICHO — tipografia, raio e sombra (independente da cor)
+   NICHO — forma (raio + tracking/peso dos títulos).
+   A fonte é única em todo o produto; o nicho diferencia por
+   forma e cor, não por família tipográfica.
    ============================================================ */
 
 [data-niche="feminino"] {
@@ -73,26 +75,20 @@
   --display-tracking: -0.01em;
   --display-transform: none;
   --display-weight: 600;
-  --font-display: var(--font-cormorant), Georgia, serif;
-  --font-body: var(--font-jost), system-ui, sans-serif;
 }
 
 [data-niche="barbearia"] {
   --radius: 0.25rem;
-  --display-tracking: 0.06em;
+  --display-tracking: 0.04em;
   --display-transform: uppercase;
-  --display-weight: 600;
-  --font-display: var(--font-oswald), "Arial Narrow", sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --display-weight: 700;
 }
 
 [data-niche="estetica"] {
   --radius: 1.5rem;
   --display-tracking: 0;
   --display-transform: none;
-  --display-weight: 500;
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-body: var(--font-nunito), system-ui, sans-serif;
+  --display-weight: 600;
 }
 
 [data-niche="neutro"] {
@@ -100,8 +96,6 @@
   --display-tracking: -0.02em;
   --display-transform: none;
   --display-weight: 700;
-  --font-display: var(--font-bricolage), system-ui, sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
 }
 
 

@@ -7,13 +7,14 @@ import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle } from "lucide-
 
 export const dynamic = "force-dynamic";
 
-const STATUS: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Aguardando", cls: "bg-amber-100 text-amber-800" },
-  confirmed: { label: "Confirmado", cls: "bg-emerald-100 text-emerald-800" },
-  in_progress: { label: "Em andamento", cls: "bg-blue-100 text-blue-800" },
-  completed: { label: "Concluído", cls: "bg-gray-100 text-gray-700" },
-  cancelled: { label: "Cancelado", cls: "bg-red-100 text-red-700" },
-  no_show: { label: "Faltou", cls: "bg-red-100 text-red-700" },
+// Status = ponto colorido + texto em token (legível em qualquer tema).
+const STATUS: Record<string, { label: string; dot: string }> = {
+  pending: { label: "Aguardando", dot: "#f59e0b" },
+  confirmed: { label: "Confirmado", dot: "#10b981" },
+  in_progress: { label: "Em andamento", dot: "#3b82f6" },
+  completed: { label: "Concluído", dot: "#9ca3af" },
+  cancelled: { label: "Cancelado", dot: "#ef4444" },
+  no_show: { label: "Faltou", dot: "#e11d48" },
 };
 
 export default async function DashboardPage({
@@ -109,14 +110,17 @@ export default async function DashboardPage({
                     <p className="font-medium truncate flex items-center gap-2">
                       {client}
                       {clientObj?.alert_summary && (
-                        <span title={clientObj.alert_summary} className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium shrink-0">
+                        <span title={clientObj.alert_summary} className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-600 px-2 py-0.5 text-[10px] font-medium shrink-0">
                           <AlertTriangle className="h-3 w-3" /> alerta
                         </span>
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">{prof}</p>
                   </div>
-                  <span className={`text-xs rounded-full px-2.5 py-1 font-medium ${st.cls}`}>{st.label}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/75">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
+                    {st.label}
+                  </span>
                   <span className="font-semibold text-primary text-sm">{formatBRL(Number(a.total_price))}</span>
                 </div>
               );

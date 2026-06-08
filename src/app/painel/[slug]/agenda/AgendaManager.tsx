@@ -28,21 +28,25 @@ type Appt    = {
 };
 
 // ── Constants ──────────────────────────────────────────────────
-const STATUS_META: Record<Status, { label: string; cls: string }> = {
-  pending:     { label: "Aguardando",   cls: "bg-amber-100 text-amber-800" },
-  confirmed:   { label: "Confirmado",   cls: "bg-emerald-100 text-emerald-800" },
-  in_progress: { label: "Em andamento", cls: "bg-blue-100 text-blue-800" },
-  completed:   { label: "Concluído",    cls: "bg-gray-200 text-gray-700" },
-  cancelled:   { label: "Cancelado",    cls: "bg-red-100 text-red-700" },
-  no_show:     { label: "Faltou",       cls: "bg-red-100 text-red-700" },
+// Cor do status = um ponto colorido; o texto usa token de tema (legível em
+// qualquer um dos 12 temas, claro ou escuro). Mantém a semântica de cor.
+const STATUS_META: Record<Status, { label: string; dot: string }> = {
+  pending:     { label: "Aguardando",   dot: "#f59e0b" },
+  confirmed:   { label: "Confirmado",   dot: "#10b981" },
+  in_progress: { label: "Em andamento", dot: "#3b82f6" },
+  completed:   { label: "Concluído",    dot: "#9ca3af" },
+  cancelled:   { label: "Cancelado",    dot: "#ef4444" },
+  no_show:     { label: "Faltou",       dot: "#e11d48" },
 };
 
-const STATUS_LIST = Object.entries(STATUS_META) as [Status, { label: string; cls: string }][];
+const STATUS_LIST = Object.entries(STATUS_META) as [Status, { label: string; dot: string }][];
 
+// Paleta categórica para profissionais — evita âmbar/laranja/vermelho/verde,
+// que colidem com a semântica dos status (aguardando/cancelado/confirmado).
 const PALETTE = [
-  "#6366f1","#ec4899","#f59e0b","#10b981",
-  "#3b82f6","#8b5cf6","#ef4444","#14b8a6",
-  "#f97316","#a855f7",
+  "#6366f1","#ec4899","#8b5cf6","#3b82f6",
+  "#14b8a6","#a855f7","#0ea5e9","#d946ef",
+  "#06b6d4","#7c3aed",
 ];
 
 const DAY_SHORT  = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -116,13 +120,16 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
   const h = apptH(a);
 
   return (
-    <div className="relative group" onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}>
-      <div
-        className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+        aria-label={`${a.clients?.full_name ?? "Cliente"} às ${fmtHM(a.starts_at)} — ${st.label}`}
+        className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
       >
         <div className="px-2 py-1.5 h-full overflow-hidden">
-          <p className="text-[11px] font-semibold truncate" style={{ color }}>
+          <p className="text-[11px] font-semibold truncate text-foreground/80">
             {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
           </p>
           {!compact && (
@@ -131,12 +138,13 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
             </p>
           )}
           {h > 58 && !compact && (
-            <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5", st.cls)}>
+            <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
               {st.label}
             </span>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Popover */}
       {open && (
@@ -158,7 +166,7 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
               </button>
             </div>
             {a.clients?.alert_summary && (
-              <div className="flex items-start gap-1.5 rounded-md bg-red-50 text-red-700 px-2 py-1.5 text-[11px]">
+              <div className="flex items-start gap-1.5 rounded-md bg-red-500/10 text-red-600 px-2 py-1.5 text-[11px]">
                 <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                 {a.clients.alert_summary}
               </div>
@@ -168,13 +176,16 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
               <p className="font-semibold text-primary">{formatBRL(Number(a.total_price))}</p>
             </div>
             {onStatusChange && (
-              <Select
-                value={a.status}
-                onChange={e => { onStatusChange(e.target.value as Status); setOpen(false); }}
-                className={cn("w-full h-8 text-xs font-medium border-0", st.cls)}
-              >
-                {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
-              </Select>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: st.dot }} />
+                <Select
+                  value={a.status}
+                  onChange={e => { onStatusChange(e.target.value as Status); setOpen(false); }}
+                  className="w-full h-8 text-xs font-medium"
+                >
+                  {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+                </Select>
+              </div>
             )}
           </div>
         </>
@@ -458,8 +469,8 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
                       <div
                         key={a.id}
                         onClick={e => e.stopPropagation()}
-                        className="truncate text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-white cursor-default"
-                        style={{ background: color }}
+                        className="truncate text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-foreground cursor-default"
+                        style={{ background: color + "1f", borderLeft: `2px solid ${color}` }}
                         title={`${fmtHM(a.starts_at)} · ${a.clients?.full_name ?? "Cliente"} · ${a.salon_members?.display_name ?? ""}`}
                       >
                         {fmtHM(a.starts_at)} {a.clients?.full_name ?? "Cliente"}
@@ -643,17 +654,12 @@ export function AgendaManager({
                 key={p.id}
                 onClick={() => togglePro(p.id)}
                 className={cn(
-                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition font-medium",
-                  active
-                    ? "text-white border-transparent"
-                    : "border-border hover:border-foreground/30 text-foreground",
+                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition font-medium text-foreground",
+                  active ? "" : "border-border hover:border-foreground/30",
                 )}
-                style={active ? { background: color } : {}}
+                style={active ? { background: color + "22", borderColor: color } : {}}
               >
-                <span
-                  className="h-2 w-2 rounded-full shrink-0"
-                  style={{ background: active ? "rgba(255,255,255,0.7)" : color }}
-                />
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
                 {p.name}
               </button>
             );
