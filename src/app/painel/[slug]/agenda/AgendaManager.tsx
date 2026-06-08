@@ -212,7 +212,7 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
       {/* Single scroll container — syncs horizontal scroll across headers + grid */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto scroll-thin">
 
         {/* Sticky column headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
@@ -303,7 +303,7 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
       {/* Single scroll container */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto scroll-thin">
 
         {/* Sticky day headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
@@ -582,7 +582,7 @@ export function AgendaManager({
   }, [view, date]);
 
   return (
-    <div className="flex flex-col gap-3 h-[calc(100vh-56px)]">
+    <div className="flex flex-col gap-3 h-full">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

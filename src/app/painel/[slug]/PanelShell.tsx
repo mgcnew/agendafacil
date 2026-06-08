@@ -16,11 +16,14 @@ import {
   Boxes,
   Settings,
   Scissors,
-  Menu,
+  MoreHorizontal,
   X,
   LogOut,
   ExternalLink,
 } from "lucide-react";
+
+/** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
+const PRIMARY_HREFS = ["", "/agenda", "/clientes"];
 
 const ICONS = {
   LayoutDashboard,
@@ -80,6 +83,26 @@ export function PanelShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const base = `/painel/${salon.slug}`;
+  // Agenda (calendário) ocupa toda a largura; demais páginas usam largura padrão
+  const fullBleed = pathname === `${base}/agenda`;
+
+  const isActive = (href: string) =>
+    href === ""
+      ? pathname === base
+      : pathname === base + href || pathname.startsWith(base + href + "/");
+
+  // 3 atalhos principais (preferindo Início/Agenda/Clientes) + restante no "Mais"
+  const primaryItems: NavItem[] = [];
+  const usedHrefs = new Set<string>();
+  for (const h of PRIMARY_HREFS) {
+    const it = items.find((i) => i.href === h);
+    if (it) { primaryItems.push(it); usedHrefs.add(it.href); }
+  }
+  for (const it of items) {
+    if (primaryItems.length >= 3) break;
+    if (!usedHrefs.has(it.href)) { primaryItems.push(it); usedHrefs.add(it.href); }
+  }
+  const moreItems = items.filter((i) => !usedHrefs.has(i.href));
 
   async function logout() {
     const supabase = createClient();
@@ -87,36 +110,6 @@ export function PanelShell({
     router.push("/entrar");
     router.refresh();
   }
-
-  /** Nav usado no drawer mobile (ícone + label) */
-  const mobileNav = (
-    <nav className="flex flex-col gap-1">
-      {items.map((it) => {
-        const href = base + it.href;
-        const active =
-          it.href === ""
-            ? pathname === base
-            : pathname === href || pathname.startsWith(href + "/");
-        const Icon = ICONS[it.icon];
-        return (
-          <Link
-            key={it.href}
-            href={href}
-            onClick={() => setOpen(false)}
-            className={cn(
-              "flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium transition",
-              active
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/80 hover:bg-muted",
-            )}
-          >
-            <Icon className="h-4.5 w-4.5 shrink-0" />
-            {it.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
 
   /** Nav usado na sidebar desktop (ícone centrado + tooltip) */
   const desktopNav = (
@@ -185,59 +178,118 @@ export function PanelShell({
 
       {/* ── Área principal ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar mobile */}
-        <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 h-14">
+        {/* Topbar mobile — apenas marca (sem hambúrguer) */}
+        <header className="lg:hidden shrink-0 flex items-center border-b border-border bg-card px-4 h-14">
           <Link href={base} className="flex items-center gap-2 font-display font-bold">
             <Scissors className="h-5 w-5 text-primary" /> {salon.name}
           </Link>
-          <button onClick={() => setOpen(true)} className="p-2">
-            <Menu className="h-5 w-5" />
-          </button>
         </header>
 
-        {/* Drawer mobile */}
-        {open && (
-          <div className="lg:hidden fixed inset-0 z-50 flex">
-            <div
-              className="absolute inset-0 bg-black/50"
-              onClick={() => setOpen(false)}
-            />
-            <aside className="relative w-72 bg-card p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="font-display font-bold">{salon.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ROLE_LABEL[role] ?? role}
-                  </p>
-                </div>
-                <button onClick={() => setOpen(false)} className="p-2">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              {mobileNav}
-              <div className="mt-auto pt-4 space-y-1">
-                <a
-                  href={`/${salon.slug}`}
-                  target="_blank"
-                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
-                >
-                  <ExternalLink className="h-4.5 w-4.5" /> Página pública
-                </a>
-                <button
-                  onClick={logout}
-                  className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
-                >
-                  <LogOut className="h-4.5 w-4.5" /> Sair
-                </button>
-              </div>
-            </aside>
+        <main className="flex-1 overflow-y-auto">
+          <div
+            className={cn(
+              "w-full",
+              fullBleed
+                ? "h-full p-3 sm:p-4"
+                : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
+            )}
+          >
+            {children}
           </div>
-        )}
-
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 w-full">
-          {children}
         </main>
+
+        {/* ── Bottom navigation (mobile) ─────────────────────────── */}
+        <nav className="lg:hidden shrink-0 border-t border-border bg-card grid grid-cols-4 h-16">
+          {primaryItems.map((it) => {
+            const active = isActive(it.href);
+            const Icon = ICONS[it.icon];
+            const label = it.href === "" ? "Início" : it.label;
+            return (
+              <Link
+                key={it.href}
+                href={base + it.href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-0.5 transition",
+                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="text-[10px] font-medium leading-none truncate max-w-full px-1">{label}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={() => setOpen(true)}
+            className={cn(
+              "flex flex-col items-center justify-center gap-0.5 transition",
+              open ? "text-primary" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="text-[10px] font-medium leading-none">Mais</span>
+          </button>
+        </nav>
       </div>
+
+      {/* ── Bottom sheet "Mais" (mobile) ─────────────────────────── */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[80vh] overflow-auto shadow-2xl">
+            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="font-display font-bold">{salon.name}</p>
+                <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+              </div>
+              <button onClick={() => setOpen(false)} className="p-2 rounded-md hover:bg-muted">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {moreItems.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {moreItems.map((it) => {
+                  const active = isActive(it.href);
+                  const Icon = ICONS[it.icon];
+                  return (
+                    <Link
+                      key={it.href}
+                      href={base + it.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-3 text-center transition",
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:bg-muted text-foreground",
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-[11px] font-medium leading-tight">{it.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="border-t border-border mt-4 pt-3 space-y-1">
+              <a
+                href={`/${salon.slug}`}
+                target="_blank"
+                className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
+              >
+                <ExternalLink className="h-4.5 w-4.5" /> Página pública
+              </a>
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
+              >
+                <LogOut className="h-4.5 w-4.5" /> Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

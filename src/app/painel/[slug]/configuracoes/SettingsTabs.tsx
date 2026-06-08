@@ -65,7 +65,7 @@ export function SettingsTabs({
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Configurações</h1>
         <p className="text-muted-foreground text-sm">
@@ -74,14 +74,14 @@ export function SettingsTabs({
       </div>
 
       {/* Barra de tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b border-border -mx-1 px-1">
+      <div className="flex gap-1 border-b border-border overflow-x-auto no-scrollbar">
         {tabs.map((t) => {
           const on = active === t.id;
           return (
             <button
               key={t.id}
               onClick={() => selectTab(t.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition shrink-0 ${
                 on
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -179,13 +179,13 @@ function EstablishmentPanel({
 
   return (
     <div className="space-y-5">
-      <Card className="p-6 space-y-5">
-        <h2 className="font-display font-semibold">Dados do salão</h2>
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Nome</Label>
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-5 items-start">
+        <Card className="p-6 space-y-5">
+          <h2 className="font-display font-semibold">Dados do salão</h2>
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Nome</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">Telefone</Label>
             <Input
@@ -196,37 +196,37 @@ function EstablishmentPanel({
               placeholder="(11) 99999-9999"
             />
           </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="address">Endereço</Label>
-          <Textarea
-            id="address"
-            rows={2}
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            disabled={!canEdit}
-          />
-        </div>
-      </Card>
+          <div className="space-y-1.5">
+            <Label htmlFor="address">Endereço</Label>
+            <Textarea
+              id="address"
+              rows={2}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+        </Card>
 
-      {/* Logo — placeholder até configurarmos o Storage */}
-      <Card className="p-6">
-        <h2 className="font-display font-semibold flex items-center gap-2">
-          <ImageIcon className="h-5 w-5 text-primary" /> Logo
-        </h2>
-        <div className="mt-4 flex items-center gap-4">
-          <div className="grid place-items-center h-16 w-16 rounded-[var(--radius)] border border-dashed border-border text-muted-foreground">
-            <ImageIcon className="h-6 w-6" />
+        {/* Logo — placeholder até configurarmos o Storage */}
+        <Card className="p-6">
+          <h2 className="font-display font-semibold flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary" /> Logo
+          </h2>
+          <div className="mt-4 flex items-center gap-4">
+            <div className="grid place-items-center h-16 w-16 rounded-[var(--radius)] border border-dashed border-border text-muted-foreground">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Upload de logo</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Em breve — vamos habilitar o envio de imagem para personalizar a sua
+                página de agendamento.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium">Upload de logo</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Em breve — vamos habilitar o envio de imagem para personalizar a sua
-              página de agendamento.
-            </p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
     </div>
@@ -281,6 +281,7 @@ function BookingPanel({
 
   return (
     <div className="space-y-5">
+      <div className="grid lg:grid-cols-2 gap-5 items-start">
       <Card className="p-6">
         <h2 className="font-display font-semibold flex items-center gap-2">
           <Link2 className="h-5 w-5 text-primary" /> Link de agendamento
@@ -327,6 +328,7 @@ function BookingPanel({
           </div>
         </div>
       </Card>
+      </div>
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
     </div>
@@ -371,7 +373,7 @@ function AppearancePanel({
 
   return (
     <div className="space-y-5">
-      <Card className="p-6 space-y-7">
+      <Card className="p-6 space-y-6">
         <div>
           <h2 className="font-display font-semibold">Paleta de cores</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -379,13 +381,14 @@ function AppearancePanel({
           </p>
         </div>
 
+        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-3">
         {COLOR_GROUPS.map((group) => (
           <div key={group.id} className="space-y-3">
-            <div className="flex items-baseline gap-2">
+            <div>
               <p className="text-xs font-semibold uppercase tracking-wider">{group.label}</p>
               <p className="text-xs text-muted-foreground">{group.description}</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
               {group.variants.map((v) => {
                 const activeColor = v.id === colorTheme;
                 return (
@@ -429,6 +432,7 @@ function AppearancePanel({
             </div>
           </div>
         ))}
+        </div>
       </Card>
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}

@@ -181,19 +181,19 @@ export function TeamManager({
           {invites.map((inv) => (
             <div
               key={inv.id}
-              className="flex items-center gap-3 rounded-[var(--radius)] border border-dashed border-border bg-card p-3.5"
+              className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-dashed border-border bg-card p-3.5"
             >
               <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground shrink-0">
                 <Mail className="h-4.5 w-4.5" />
               </span>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-[140px]">
                 <p className="text-sm font-medium truncate">{inv.email}</p>
                 <p className="text-xs text-muted-foreground">
                   {ROLE_LABEL[inv.role]} · comissão {Number(inv.commission_percent)}% · aguardando aceite
                 </p>
               </div>
               {canManage && (
-                <>
+                <div className="flex items-center gap-1 ml-auto shrink-0">
                   <Button variant="outline" size="sm" onClick={() => copyLink(inv)}>
                     {copiedId === inv.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     {copiedId === inv.id ? "Copiado" : "Copiar link"}
@@ -205,7 +205,7 @@ export function TeamManager({
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                </>
+                </div>
               )}
             </div>
           ))}
@@ -214,14 +214,14 @@ export function TeamManager({
 
       <div className="space-y-2">
         {members.map((m) => (
-          <div key={m.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
+          <div key={m.id} className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
             <span
               className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
               style={{ background: m.color || "var(--primary)" }}
             >
               {(m.display_name ?? m.profiles?.full_name ?? "?").charAt(0)}
             </span>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-[140px]">
               <p className="font-medium flex items-center gap-1.5">
                 {m.display_name ?? m.profiles?.full_name ?? "—"}
                 {m.role === "owner" && <Crown className="h-4 w-4 text-accent" />}
@@ -234,52 +234,54 @@ export function TeamManager({
               </p>
             </div>
 
-            {m.role === "owner" ? (
-              <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-3 py-1 font-medium">
-                {ROLE_LABEL.owner}
-              </span>
-            ) : (
-              <>
-                {canManage ? (
-                  <Select
-                    value={m.role}
-                    onValueChange={(v) => changeRole(m, v as Role)}
-                    className="w-auto h-9 text-sm"
-                  >
-                    {ROLE_OPTIONS.map((r) => (
-                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-                    ))}
-                  </Select>
-                ) : (
-                  <span className="text-xs text-muted-foreground">{ROLE_LABEL[m.role]}</span>
-                )}
-                {canManage && (
-                  <>
-                    <button
-                      onClick={() => setEditingServices(m)}
-                      className="p-2 text-muted-foreground hover:text-primary"
-                      title="Serviços que faz"
+            <div className="flex items-center gap-1 ml-auto shrink-0">
+              {m.role === "owner" ? (
+                <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-3 py-1 font-medium">
+                  {ROLE_LABEL.owner}
+                </span>
+              ) : (
+                <>
+                  {canManage ? (
+                    <Select
+                      value={m.role}
+                      onValueChange={(v) => changeRole(m, v as Role)}
+                      className="w-auto h-9 text-sm"
                     >
-                      <Scissors className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setEditing(m)}
-                      className="p-2 text-muted-foreground hover:text-primary"
-                      title="Permissões"
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => deactivate(m)}
-                      className="p-2 text-muted-foreground hover:text-red-600"
-                      title="Remover"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </>
-                )}
-              </>
-            )}
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{ROLE_LABEL[m.role]}</span>
+                  )}
+                  {canManage && (
+                    <>
+                      <button
+                        onClick={() => setEditingServices(m)}
+                        className="p-2 text-muted-foreground hover:text-primary"
+                        title="Serviços que faz"
+                      >
+                        <Scissors className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setEditing(m)}
+                        className="p-2 text-muted-foreground hover:text-primary"
+                        title="Permissões"
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => deactivate(m)}
+                        className="p-2 text-muted-foreground hover:text-red-600"
+                        title="Remover"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ))}
       </div>

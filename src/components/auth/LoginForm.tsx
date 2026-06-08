@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label } from "@/components/ui";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, MailCheck } from "lucide-react";
+
+const REMEMBER_KEY = "agendefacil:lastEmail";
 
 /**
  * Formulário de login compartilhado entre a página /entrar (fallback de
  * deep-link/redirect) e o modal de login da landing page.
- *
- * @param next       Para onde navegar após o login. Default: /painel.
- * @param onSuccess  Callback opcional disparado ao logar com sucesso
- *                   (ex.: fechar o modal antes de navegar).
+ * Inclui "lembrar e-mail" e "esqueci a senha".
  */
 export function LoginForm({
   next = "/painel",
@@ -24,8 +23,20 @@ export function LoginForm({
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  // pré-preenche o e-mail lembrado
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem(REMEMBER_KEY) : null;
+    if (saved) {
+      setEmail(saved);
+      setRemember(true);
+    }
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,9 +49,53 @@ export function LoginForm({
       setLoading(false);
       return;
     }
+    // lembrar e-mail
+    if (remember) localStorage.setItem(REMEMBER_KEY, email);
+    else localStorage.removeItem(REMEMBER_KEY);
+
     onSuccess?.();
     router.push(next);
     router.refresh();
+  }
+
+  async function forgotPassword() {
+    if (!email) {
+      setError("Informe o e-mail para recuperar a senha.");
+      return;
+    }
+    setResetting(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/redefinir-senha`,
+    });
+    setResetting(false);
+    if (error) {
+      setError("Não foi possível enviar o e-mail de recuperação.");
+      return;
+    }
+    setResetSent(true);
+  }
+
+  if (resetSent) {
+    return (
+      <div className="text-center py-2">
+        <span className="grid place-items-center h-12 w-12 rounded-2xl bg-secondary text-primary mx-auto">
+          <MailCheck className="h-6 w-6" />
+        </span>
+        <p className="text-sm text-muted-foreground mt-4">
+          Enviamos um link de redefinição para{" "}
+          <b className="text-foreground">{email}</b>. Abra o e-mail para criar uma nova senha.
+        </p>
+        <button
+          type="button"
+          onClick={() => setResetSent(false)}
+          className="text-sm text-primary font-medium mt-4"
+        >
+          Voltar ao login
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -70,6 +125,33 @@ export function LoginForm({
           placeholder="••••••••"
         />
       </div>
+
+      {/* Lembrar e-mail + esqueci a senha */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setRemember((v) => !v)}
+          className="flex items-center gap-2 text-sm text-foreground/80"
+        >
+          <span
+            className={`grid place-items-center h-4 w-4 rounded border transition ${
+              remember ? "bg-primary border-primary text-primary-foreground" : "border-border"
+            }`}
+          >
+            {remember && <Check className="h-3 w-3" />}
+          </span>
+          Lembrar e-mail
+        </button>
+        <button
+          type="button"
+          onClick={forgotPassword}
+          disabled={resetting}
+          className="text-sm text-primary font-medium hover:underline disabled:opacity-60"
+        >
+          {resetting ? "Enviando…" : "Esqueci a senha"}
+        </button>
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" size="lg" className="w-full" disabled={loading}>
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}

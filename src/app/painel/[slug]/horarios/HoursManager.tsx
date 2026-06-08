@@ -90,7 +90,7 @@ export function HoursManager({
   }
 
   return (
-    <div className={embedded ? "space-y-6" : "space-y-6 max-w-2xl"}>
+    <div className="space-y-6 max-w-2xl">
       {!embedded && (
         <div>
           <h1 className="font-display text-2xl font-bold">Horários</h1>

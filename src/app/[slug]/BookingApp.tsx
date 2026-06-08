@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
+import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import { NICHES, type Niche } from "@/lib/themes";
 import {
@@ -385,13 +386,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <CalendarDays className="h-5 w-5 text-primary" /> Escolha o horário
           </h2>
           <div className="space-y-1.5">
-            <Label htmlFor="date">Data</Label>
-            <Input
-              id="date"
-              type="date"
+            <Label>Data</Label>
+            <Calendar
               value={date}
+              onChange={setDate}
               min={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setDate(e.target.value)}
             />
           </div>
           <p className="text-sm text-muted-foreground capitalize">{formatDateLong(date + "T12:00:00")}</p>
@@ -470,6 +469,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <p className="text-xs text-muted-foreground text-center">
               Usamos seu número só para confirmar o agendamento.
             </p>
+            <button
+              type="button"
+              onClick={() => setStep("time")}
+              className="flex items-center justify-center gap-1 w-full text-sm text-muted-foreground hover:text-foreground transition"
+            >
+              <ChevronLeft className="h-4 w-4" /> Voltar
+            </button>
           </Card>
         </section>
       )}
@@ -503,9 +509,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </div>
           </Card>
           {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
-          <Button className="w-full" size="lg" onClick={confirmBooking} disabled={booking}>
-            {booking && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar agendamento
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" size="lg" onClick={() => setStep("time")} disabled={booking}>
+              <ChevronLeft className="h-4 w-4" /> Voltar
+            </Button>
+            <Button className="flex-1" size="lg" onClick={confirmBooking} disabled={booking}>
+              {booking && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar agendamento
+            </Button>
+          </div>
         </section>
       )}
 

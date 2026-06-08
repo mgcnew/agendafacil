@@ -377,42 +377,44 @@ export default function Home() {
         <div
           className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20"
           style={{
-            background: "linear-gradient(135deg, #431407 0%, #7c2d12 55%, #c2410c 100%)",
+            background: "linear-gradient(120deg, #e8330a 0%, #f23c10 48%, #ff5e1a 100%)",
           }}
         >
-          {/* Brilho laranja */}
-          <div
+          {/* Brilhos suaves — branco + dourado, decorativos */}
+          <span
             aria-hidden
-            className="absolute pointer-events-none"
-            style={{
-              top: "-80px",
-              left: "40%",
-              width: "500px",
-              height: "220px",
-              borderRadius: "50%",
-              background: "radial-gradient(closest-side, rgba(255,165,4,0.24), transparent)",
-            }}
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 440, height: 440, top: -170, right: -120, background: "radial-gradient(closest-side, rgba(255,255,255,0.20), transparent)" }}
           />
-          {/* Formas laranja no banner */}
-          <OrangeRing size={260} opacity={0.18} style={{ bottom: -80, right: -60 }} />
-          <OrangeRing size={160} opacity={0.14} style={{ bottom: 20, right: 80 }} />
-          <OrangeBlob size={200} opacity={0.10} style={{ bottom: -60, right: -30 }} />
-          <OrangeTriangle size={52} opacity={0.20} rotate={15} style={{ top: 24, right: "35%" }} />
-          <OrangeDots cols={4} rows={3} opacity={0.20} style={{ top: 28, right: 28 }} />
-
-          <div className="af-grain absolute inset-0 opacity-[0.07]" aria-hidden />
+          <span
+            aria-hidden
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 320, height: 320, bottom: -150, left: -90, background: "radial-gradient(closest-side, rgba(255,165,4,0.40), transparent)" }}
+          />
+          {/* Anéis brancos sutis */}
+          <span
+            aria-hidden
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 280, height: 280, bottom: -90, right: 50, border: "2px solid rgba(255,255,255,0.18)" }}
+          />
+          <span
+            aria-hidden
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 170, height: 170, bottom: 10, right: 110, border: "2px solid rgba(255,255,255,0.14)" }}
+          />
 
           <div className="relative flex flex-col lg:flex-row items-center justify-between gap-10">
             {/* Texto */}
             <div className="text-center lg:text-left">
-              <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-orange-200/80">
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-white/80">
                 Sem cartão de crédito · Sem compromisso
               </p>
-              <h2 className="font-display text-3xl sm:text-5xl text-white leading-tight">
-                5 dias grátis.<br className="hidden sm:block" />
+              <h2 className="font-display text-3xl sm:text-5xl font-bold text-white leading-tight">
+                5 dias grátis.{" "}
+                <br className="hidden sm:block" />
                 Sem compromisso.
               </h2>
-              <p className="mt-4 text-white/75 max-w-lg leading-relaxed">
+              <p className="mt-4 text-white/90 max-w-lg leading-relaxed">
                 Cadastre agora, configure em 2 minutos e veja sua agenda se
                 organizar sozinha. Depois você decide se continua — sem pressão.
               </p>
@@ -423,15 +425,15 @@ export default function Home() {
               <Link href="/criar-salao">
                 <Button
                   size="lg"
-                  className="bg-white text-neutral-900 hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base"
+                  className="bg-white text-[#e8330a] hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base shadow-lg"
                 >
                   Criar meu salão grátis <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <ul className="flex flex-col sm:flex-row gap-x-4 gap-y-1">
                 {["Configurado em 2 min", "Cancele quando quiser"].map((t) => (
-                  <li key={t} className="flex items-center gap-1.5 text-xs text-white/60">
-                    <Check className="h-3 w-3 text-orange-300 shrink-0" /> {t}
+                  <li key={t} className="flex items-center gap-1.5 text-xs text-white/80">
+                    <Check className="h-3 w-3 text-white shrink-0" /> {t}
                   </li>
                 ))}
               </ul>
