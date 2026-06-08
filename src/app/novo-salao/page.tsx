@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Textarea } from "@/components/ui";
 import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
+import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   Scissors, Loader2, Check, Clock, Upload, Phone, MapPin,
-  ArrowLeft, ArrowRight, Store, Star, X,
+  ArrowLeft, ArrowRight, Store, Star, X, Plus, Sparkles,
 } from "lucide-react";
 
 function slugify(s: string) {
@@ -31,7 +32,7 @@ const DEFAULT_HOURS: DayHours[] = WEEKDAYS.map((_, w) => ({
   end: "18:00",
 }));
 
-const STEPS = ["Seu salão", "Contato", "Sua marca", "Horários"];
+const STEPS = ["Seu salão", "Contato", "Sua marca", "Serviços", "Horários"];
 
 export default function NovoSalaoPage() {
   const router = useRouter();
@@ -48,10 +49,31 @@ export default function NovoSalaoPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [hours, setHours] = useState<DayHours[]>(DEFAULT_HOURS);
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const meta = useMemo(() => CHOOSABLE_NICHES.find((n) => n.id === niche)!, [niche]);
+
+  // presets do nicho agrupados por categoria
+  const presetGroups = useMemo(() => {
+    const acc: Record<string, { name: string; duration: number }[]> = {};
+    for (const p of SERVICE_PRESETS[niche] ?? []) (acc[p.category] ??= []).push(p);
+    return acc;
+  }, [niche]);
+
+  // ao escolher/trocar o nicho, pré-seleciona todos os serviços comuns dele
+  useEffect(() => {
+    setSelectedServices(new Set((SERVICE_PRESETS[niche] ?? []).map((p) => p.name)));
+  }, [niche]);
+
+  function toggleSvc(name: string) {
+    setSelectedServices((s) => {
+      const n = new Set(s);
+      if (n.has(name)) n.delete(name); else n.add(name);
+      return n;
+    });
+  }
   const effectiveSlug = slugEdited ? slug : slugify(name);
 
   function pickLogo(file: File | null) {
@@ -116,6 +138,12 @@ export default function NovoSalaoPage() {
           end_time: d.end,
         }));
       if (rows.length) await supabase.from("working_hours").insert(rows);
+
+      // serviços iniciais (presets escolhidos)
+      const svcRows = (SERVICE_PRESETS[niche] ?? [])
+        .filter((p) => selectedServices.has(p.name))
+        .map((p) => ({ salon_id: salon.id, name: p.name, duration_min: p.duration, price: 0 }));
+      if (svcRows.length) await supabase.from("services").insert(svcRows);
 
       router.push(`/painel/${salon.slug}`);
       router.refresh();
@@ -302,8 +330,47 @@ export default function NovoSalaoPage() {
               </div>
             )}
 
-            {/* STEP 3 — horários */}
+            {/* STEP 3 — serviços */}
             {step === 3 && (
+              <div className="space-y-5 af-rise">
+                <div>
+                  <h1 className="font-display text-2xl flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" /> Serviços que você oferece
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Marque os principais — já deixamos os mais comuns selecionados. Preço e novos serviços você ajusta depois.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  {Object.entries(presetGroups).map(([cat, items]) => (
+                    <div key={cat}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {items.map((p) => {
+                          const on = selectedServices.has(p.name);
+                          return (
+                            <button
+                              key={p.name}
+                              type="button"
+                              onClick={() => toggleSvc(p.name)}
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                                on ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground/30"
+                              }`}
+                            >
+                              {on ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                              {p.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4 — horários */}
+            {step === 4 && (
               <div className="space-y-5 af-rise">
                 <div>
                   <h1 className="font-display text-2xl">Horário de funcionamento</h1>
