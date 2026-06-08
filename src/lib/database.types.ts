@@ -1202,6 +1202,10 @@ export type Database = {
           theme: Json
         }[]
       }
+      public_professional_services: {
+        Args: { p_salon: string }
+        Returns: { member_id: string; service_id: string }[]
+      }
       public_services: {
         Args: { p_salon: string }
         Returns: {

@@ -72,6 +72,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [pros, setPros] = useState<Professional[]>([]);
+  const [proSvc, setProSvc] = useState<{ member_id: string; service_id: string }[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [pro, setPro] = useState<Professional | null>(null);
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -103,6 +104,23 @@ export function BookingApp({ salon }: { salon: Salon }) {
     ? "A combinar"
     : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice);
 
+  // profissionais que fazem TODOS os serviços escolhidos.
+  // Fallback: serviço sem nenhum vínculo = qualquer profissional pode fazer.
+  const eligiblePros = useMemo(() => {
+    if (selected.length === 0) return pros;
+    return pros.filter((p) =>
+      selected.every((sid) => {
+        const linked = proSvc.filter((x) => x.service_id === sid);
+        return linked.length === 0 || linked.some((x) => x.member_id === p.id);
+      }),
+    );
+  }, [pros, proSvc, selected]);
+
+  // se o profissional escolhido deixou de ser elegível, limpa a seleção
+  useEffect(() => {
+    if (pro && !eligiblePros.some((p) => p.id === pro.id)) setPro(null);
+  }, [eligiblePros, pro]);
+
   // carrega serviços e sessão
   useEffect(() => {
     supabase.rpc("public_services", { p_salon: salon.id }).then(({ data }) => {
@@ -110,6 +128,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
     });
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
+    });
+    supabase.rpc("public_professional_services", { p_salon: salon.id }).then(({ data }) => {
+      setProSvc((data as { member_id: string; service_id: string }[]) ?? []);
     });
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
@@ -325,7 +346,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <User className="h-5 w-5 text-primary" /> Escolha o profissional
           </h2>
-          {pros.map((p) => {
+          {eligiblePros.length === 0 && (
+            <p className="text-sm text-muted-foreground rounded-[var(--radius)] border border-dashed border-border p-6 text-center">
+              Nenhum profissional disponível para os serviços escolhidos. Tente ajustar a seleção.
+            </p>
+          )}
+          {eligiblePros.map((p) => {
             const on = pro?.id === p.id;
             return (
               <button
