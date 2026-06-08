@@ -38,6 +38,15 @@ export default async function FinanceiroPage({
     transactions = tx ?? [];
   }
 
+  // últimas sessões fechadas (histórico)
+  const { data: closedSessions } = await supabase
+    .from("cash_sessions")
+    .select("*")
+    .eq("salon_id", salonId)
+    .not("closed_at", "is", null)
+    .order("closed_at", { ascending: false })
+    .limit(8);
+
   // comissões do mês (apenas atendimentos concluídos)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -69,6 +78,7 @@ export default async function FinanceiroPage({
       openSession={openSession}
       transactions={transactions}
       commissions={commissions}
+      closedSessions={closedSessions ?? []}
     />
   );
 }
