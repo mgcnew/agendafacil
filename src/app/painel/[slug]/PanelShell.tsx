@@ -14,6 +14,7 @@ import {
   Contact,
   Wallet,
   Boxes,
+  Package,
   Settings,
   Scissors,
   MoreHorizontal,
@@ -34,6 +35,7 @@ const ICONS = {
   Contact,
   Wallet,
   Boxes,
+  Package,
   Settings,
 } as const;
 

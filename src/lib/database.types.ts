@@ -170,6 +170,171 @@ export type Database = {
           },
         ]
       }
+      package_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          salon_id: string
+          validity_days: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          salon_id: string
+          validity_days?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          salon_id?: string
+          validity_days?: number
+        }
+        Relationships: []
+      }
+      package_template_items: {
+        Row: {
+          id: string
+          quantity: number
+          salon_id: string
+          service_id: string
+          template_id: string
+        }
+        Insert: {
+          id?: string
+          quantity?: number
+          salon_id: string
+          service_id: string
+          template_id: string
+        }
+        Update: {
+          id?: string
+          quantity?: number
+          salon_id?: string
+          service_id?: string
+          template_id?: string
+        }
+        Relationships: []
+      }
+      client_packages: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          name: string
+          price: number
+          purchased_at: string
+          salon_id: string
+          sold_by: string | null
+          status: string
+          template_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          name: string
+          price?: number
+          purchased_at?: string
+          salon_id: string
+          sold_by?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          name?: string
+          price?: number
+          purchased_at?: string
+          salon_id?: string
+          sold_by?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Relationships: []
+      }
+      client_package_items: {
+        Row: {
+          client_package_id: string
+          id: string
+          name: string
+          salon_id: string
+          service_id: string | null
+          total: number
+          unit_price: number
+          used: number
+        }
+        Insert: {
+          client_package_id: string
+          id?: string
+          name: string
+          salon_id: string
+          service_id?: string | null
+          total?: number
+          unit_price?: number
+          used?: number
+        }
+        Update: {
+          client_package_id?: string
+          id?: string
+          name?: string
+          salon_id?: string
+          service_id?: string | null
+          total?: number
+          unit_price?: number
+          used?: number
+        }
+        Relationships: []
+      }
+      package_redemptions: {
+        Row: {
+          appointment_id: string | null
+          client_package_id: string
+          commission_amount: number
+          created_by: string | null
+          id: string
+          item_id: string
+          member_id: string | null
+          salon_id: string
+          used_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_package_id: string
+          commission_amount?: number
+          created_by?: string | null
+          id?: string
+          item_id: string
+          member_id?: string | null
+          salon_id: string
+          used_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          client_package_id?: string
+          commission_amount?: number
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          member_id?: string | null
+          salon_id?: string
+          used_at?: string
+        }
+        Relationships: []
+      }
       commission_payments: {
         Row: {
           amount: number
@@ -1092,6 +1257,19 @@ export type Database = {
       }
       finalize_appointment: {
         Args: { p_appointment: string; p_payment_method?: string }
+        Returns: Json
+      }
+      sell_package: {
+        Args: {
+          p_salon: string
+          p_client: string
+          p_template: string
+          p_payment_method?: string
+        }
+        Returns: Database["public"]["Tables"]["client_packages"]["Row"]
+      }
+      redeem_package: {
+        Args: { p_item: string; p_member?: string }
         Returns: Json
       }
       pay_commission: {

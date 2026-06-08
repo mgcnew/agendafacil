@@ -88,6 +88,22 @@ export default async function FinanceiroPage({
     earnedMap.set(key, cur);
   }
 
+  // ── comissões de uso de pacote no período ──
+  const { data: redRows } = await supabase
+    .from("package_redemptions")
+    .select("commission_amount, member_id, salon_members(display_name)")
+    .eq("salon_id", salonId)
+    .gte("used_at", periodStart.toISOString())
+    .lte("used_at", periodEnd.toISOString())
+    .not("member_id", "is", null);
+  for (const r of redRows ?? []) {
+    if (!r.member_id) continue;
+    const name = (r.salon_members as unknown as { display_name: string | null } | null)?.display_name ?? "Profissional";
+    const cur = earnedMap.get(r.member_id) ?? { name, earned: 0 };
+    cur.earned += Number(r.commission_amount);
+    earnedMap.set(r.member_id, cur);
+  }
+
   // ── já pago no período ──
   const { data: payRows } = await supabase
     .from("commission_payments")

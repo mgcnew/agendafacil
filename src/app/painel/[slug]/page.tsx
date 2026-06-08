@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle } from "lucide-react";
+import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function DashboardPage({
   const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -43,7 +43,33 @@ export default async function DashboardPage({
         .order("starts_at"),
       supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true),
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+      supabase.from("profiles").select("full_name").eq("id", membership.profile_id).maybeSingle(),
+      supabase
+        .from("client_packages")
+        .select("id, name, expires_at, clients(full_name), client_package_items(total, used)")
+        .eq("salon_id", salonId)
+        .eq("status", "active")
+        .order("expires_at", { ascending: true })
+        .limit(6),
     ]);
+
+  const pkgs = (activePkgs ?? []).map((p) => {
+    const items = (p.client_package_items as unknown as { total: number; used: number }[]) ?? [];
+    const total = items.reduce((a, i) => a + i.total, 0);
+    const used = items.reduce((a, i) => a + i.used, 0);
+    const dleft = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000);
+    return {
+      id: p.id,
+      client: (p.clients as { full_name?: string } | null)?.full_name ?? "Cliente",
+      name: p.name,
+      remaining: total - used,
+      dleft,
+    };
+  });
+
+  // primeiro nome de quem está logado (perfil > nome de exibição no salão)
+  const fullName = (profile?.full_name ?? membership.display_name ?? "").trim();
+  const firstName = fullName ? fullName.split(" ")[0] : "";
 
   const appts = todayAppts ?? [];
   const revenue = appts
@@ -62,7 +88,7 @@ export default async function DashboardPage({
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">
-            Olá{membership.display_name ? `, ${membership.display_name.split(" ")[0]}` : ""} 👋
+            Olá{firstName ? `, ${firstName}` : ""} 👋
           </h1>
           <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
         </div>
@@ -84,6 +110,43 @@ export default async function DashboardPage({
           </div>
         ))}
       </div>
+
+      {/* Carnê — pacotes ativos (lembrete) */}
+      {pkgs.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" /> Pacotes ativos
+            </h2>
+            <Link href={`/painel/${slug}/pacotes`} className="text-sm text-primary font-medium">
+              Ver todos
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {pkgs.map((p) => {
+              const soon = p.dleft <= 3;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/painel/${slug}/pacotes`}
+                  className="rounded-[var(--radius)] border border-border bg-card p-3.5 hover:shadow-card transition"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-sm truncate">{p.client}</p>
+                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${
+                      soon ? "bg-red-500/12 text-red-600" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {p.dleft >= 0 ? `${p.dleft}d` : "vencido"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.name}</p>
+                  <p className="text-xs text-primary font-medium mt-1">{p.remaining} restante{p.remaining === 1 ? "" : "s"}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Agenda de hoje */}
       <div>
