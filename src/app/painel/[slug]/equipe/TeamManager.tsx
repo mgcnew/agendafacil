@@ -138,7 +138,7 @@ export function TeamManager({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="role">Cargo</Label>
-              <Select id="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              <Select id="role" value={role} onValueChange={(v) => setRole(v as Role)}>
                 {ROLE_OPTIONS.map((r) => (
                   <option key={r} value={r}>{ROLE_LABEL[r]}</option>
                 ))}
@@ -243,7 +243,7 @@ export function TeamManager({
                 {canManage ? (
                   <Select
                     value={m.role}
-                    onChange={(e) => changeRole(m, e.target.value as Role)}
+                    onValueChange={(v) => changeRole(m, v as Role)}
                     className="w-auto h-9 text-sm"
                   >
                     {ROLE_OPTIONS.map((r) => (

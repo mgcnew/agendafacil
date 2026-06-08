@@ -177,12 +177,12 @@ export function FinanceManager({
                 <Card className="p-6 space-y-4">
                   <h3 className="font-display font-semibold flex items-center gap-2"><Plus className="h-4 w-4" /> Nova movimentação</h3>
                   <div className="grid sm:grid-cols-4 gap-3">
-                    <Select value={type} onChange={(e) => setType(e.target.value as "income" | "expense")}>
+                    <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
                       <option value="income">Entrada</option>
                       <option value="expense">Saída</option>
                     </Select>
                     <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                    <Select value={method} onChange={(e) => setMethod(e.target.value)}>
+                    <Select value={method} onValueChange={setMethod}>
                       <option value="dinheiro">Dinheiro</option>
                       <option value="pix">Pix</option>
                       <option value="cartao">Cartão</option>

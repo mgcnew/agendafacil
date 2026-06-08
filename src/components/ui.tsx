@@ -83,21 +83,8 @@ export function Label({
   );
 }
 
-/* ---------------- Select ---------------- */
-export const Select = React.forwardRef<
-  HTMLSelectElement,
-  React.SelectHTMLAttributes<HTMLSelectElement>
->(({ className, ...props }, ref) => (
-  <select
-    ref={ref}
-    className={cn(
-      "h-11 w-full rounded-[var(--radius)] border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] transition",
-      className,
-    )}
-    {...props}
-  />
-));
-Select.displayName = "Select";
+/* ---------------- Select (UI própria, ver ./Select) ---------------- */
+export { Select, type SelectProps } from "./Select";
 
 /* ---------------- Badge ---------------- */
 export function Badge({

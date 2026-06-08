@@ -102,7 +102,7 @@ export function HoursManager({
 
       <div className="space-y-1.5">
         <Label htmlFor="target">Editando</Label>
-        <Select id="target" value={target} onChange={(e) => changeTarget(e.target.value)}>
+        <Select id="target" value={target} onValueChange={changeTarget}>
           <option value="">Salão (padrão)</option>
           {pros.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>

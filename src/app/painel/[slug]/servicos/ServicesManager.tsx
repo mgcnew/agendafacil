@@ -183,7 +183,7 @@ export function ServicesManager({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sptype">Tipo de preço</Label>
-              <Select id="sptype" value={priceType} onChange={(e) => setPriceType(e.target.value as PriceType)}>
+              <Select id="sptype" value={priceType} onValueChange={(v) => setPriceType(v as PriceType)}>
                 {(Object.keys(PRICE_TYPE_LABEL) as PriceType[]).map((t) => (
                   <option key={t} value={t}>{PRICE_TYPE_LABEL[t]}</option>
                 ))}

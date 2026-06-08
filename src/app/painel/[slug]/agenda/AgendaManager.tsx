@@ -180,7 +180,7 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ background: st.dot }} />
                 <Select
                   value={a.status}
-                  onChange={e => { onStatusChange(e.target.value as Status); setOpen(false); }}
+                  onValueChange={(v) => { onStatusChange(v as Status); setOpen(false); }}
                   className="w-full h-8 text-xs font-medium"
                 >
                   {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
@@ -874,7 +874,7 @@ function CreateAppointment({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Cliente</Label>
-            <Select value={existingClient} onChange={e => setExisting(e.target.value)}>
+            <Select value={existingClient} onValueChange={setExisting}>
               <option value="">+ Nova cliente</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
             </Select>
@@ -888,7 +888,7 @@ function CreateAppointment({
 
           <div className="space-y-1.5">
             <Label>Profissional</Label>
-            <Select value={proId} onChange={e => setProId(e.target.value)}>
+            <Select value={proId} onValueChange={setProId}>
               {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </div>
