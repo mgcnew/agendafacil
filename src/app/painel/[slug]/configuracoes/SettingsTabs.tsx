@@ -16,15 +16,20 @@ import {
   Check,
   Loader2,
   ImageIcon,
+  ShieldCheck,
 } from "lucide-react";
 
 type Pro = { id: string; name: string };
-type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia";
+type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia" | "acessos";
+type Role = "manager" | "professional" | "receptionist";
+type Perm = { key: string; label: string; category: string };
+type RolePerm = { role: string; permission_key: string; allowed: boolean };
 
-const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | "schedule" }[] = [
+const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | "schedule" | "team" }[] = [
   { id: "estabelecimento", label: "Estabelecimento", icon: Store, need: "salon" },
   { id: "horarios", label: "Horários", icon: Clock, need: "schedule" },
   { id: "agendamento", label: "Agendamento", icon: Link2, need: "salon" },
+  { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
 ];
 
@@ -33,17 +38,25 @@ export function SettingsTabs({
   canEditSalon,
   canManageSalon,
   canManageSchedule,
+  canManageTeam,
   pros,
   initialHours,
   initialTab,
+  permissions,
+  roleDefaults,
+  salonRolePerms,
 }: {
   salon: Tables<"salons">;
   canEditSalon: boolean;
   canManageSalon: boolean;
   canManageSchedule: boolean;
+  canManageTeam: boolean;
   pros: Pro[];
   initialHours: Tables<"working_hours">[];
   initialTab?: string;
+  permissions: Perm[];
+  roleDefaults: RolePerm[];
+  salonRolePerms: RolePerm[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -51,9 +64,9 @@ export function SettingsTabs({
   const tabs = useMemo(
     () =>
       TAB_META.filter((t) =>
-        t.need === "schedule" ? canManageSchedule : canManageSalon,
+        t.need === "schedule" ? canManageSchedule : t.need === "team" ? canManageTeam : canManageSalon,
       ),
-    [canManageSalon, canManageSchedule],
+    [canManageSalon, canManageSchedule, canManageTeam],
   );
 
   const validInitial = tabs.find((t) => t.id === initialTab)?.id;
@@ -107,6 +120,140 @@ export function SettingsTabs({
       {active === "aparencia" && (
         <AppearancePanel salon={salon} canEdit={canEditSalon} />
       )}
+      {active === "acessos" && (
+        <AccessPanel
+          salonId={salon.id}
+          permissions={permissions}
+          roleDefaults={roleDefaults}
+          salonRolePerms={salonRolePerms}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────── Acessos (permissões por cargo) ───────────────────────── */
+
+const ROLE_LABELS: Record<Role, string> = {
+  manager: "Gerente",
+  professional: "Profissional",
+  receptionist: "Recepção",
+};
+
+function AccessPanel({
+  salonId,
+  permissions,
+  roleDefaults,
+  salonRolePerms,
+}: {
+  salonId: string;
+  permissions: Perm[];
+  roleDefaults: RolePerm[];
+  salonRolePerms: RolePerm[];
+}) {
+  const router = useRouter();
+  const [role, setRole] = useState<Role>("manager");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // estado efetivo inicial por cargo: default global ⊕ ajuste do salão
+  const initialFor = (r: Role) => {
+    const map: Record<string, boolean> = {};
+    for (const rd of roleDefaults) if (rd.role === r) map[rd.permission_key] = rd.allowed;
+    for (const sr of salonRolePerms) if (sr.role === r) map[sr.permission_key] = sr.allowed;
+    return map;
+  };
+
+  const [state, setState] = useState<Record<Role, Record<string, boolean>>>({
+    manager: initialFor("manager"),
+    professional: initialFor("professional"),
+    receptionist: initialFor("receptionist"),
+  });
+
+  function toggle(key: string) {
+    setState((s) => ({ ...s, [role]: { ...s[role], [key]: !s[role][key] } }));
+    setSaved(false);
+  }
+
+  async function save() {
+    setSaving(true);
+    const supabase = createClient();
+    // grava o cargo atual como overrides explícitos do salão
+    const rows = permissions.map((p) => ({
+      salon_id: salonId,
+      role,
+      permission_key: p.key,
+      allowed: !!state[role][p.key],
+    }));
+    await supabase
+      .from("salon_role_permissions")
+      .upsert(rows, { onConflict: "salon_id,role,permission_key" });
+    setSaving(false);
+    setSaved(true);
+    router.refresh();
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  const grouped = permissions.reduce<Record<string, Perm[]>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-5">
+      <Card className="p-6 space-y-5">
+        <div>
+          <h2 className="font-display font-semibold">Acessos por cargo</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Defina o que cada cargo pode fazer no seu salão. Ajustes por pessoa (exceções) ficam na página Equipe.
+            A proprietária sempre tem acesso total.
+          </p>
+        </div>
+
+        {/* Seletor de cargo */}
+        <div className="flex gap-1 rounded-[var(--radius)] border border-border p-1 w-fit">
+          {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRole(r)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-[calc(var(--radius)-0.25rem)] transition ${
+                role === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {ROLE_LABELS[r]}
+            </button>
+          ))}
+        </div>
+
+        {/* Matriz de permissões do cargo */}
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([cat, perms]) => (
+            <div key={cat}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
+              <div className="space-y-1">
+                {perms.map((p) => {
+                  const on = !!state[role][p.key];
+                  return (
+                    <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
+                      <button
+                        type="button"
+                        onClick={() => toggle(p.key)}
+                        aria-pressed={on}
+                        className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                      >
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                      </button>
+                      <span className="flex-1 text-sm">{p.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <SaveBar onSave={save} saving={saving} saved={saved} />
     </div>
   );
 }

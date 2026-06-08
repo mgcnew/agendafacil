@@ -47,19 +47,24 @@ export async function getEffectivePermissions(
 
   if (member.role === "owner") return new Set(keys);
 
-  const { data: roleDefaults } = await supabase
-    .from("role_permissions")
-    .select("permission_key, allowed")
-    .eq("role", member.role);
-
-  const { data: overrides } = await supabase
-    .from("member_permissions")
-    .select("permission_key, allowed")
-    .eq("member_id", member.id);
+  // 1) defaults globais do cargo  2) ajuste por cargo do salão  3) override por pessoa
+  const [{ data: roleDefaults }, { data: salonRole }, { data: overrides }] = await Promise.all([
+    supabase.from("role_permissions").select("permission_key, allowed").eq("role", member.role),
+    supabase
+      .from("salon_role_permissions")
+      .select("permission_key, allowed")
+      .eq("salon_id", salonId)
+      .eq("role", member.role),
+    supabase.from("member_permissions").select("permission_key, allowed").eq("member_id", member.id),
+  ]);
 
   const effective = new Set<string>();
   for (const rd of roleDefaults ?? []) {
     if (rd.allowed) effective.add(rd.permission_key);
+  }
+  for (const sr of salonRole ?? []) {
+    if (sr.allowed) effective.add(sr.permission_key);
+    else effective.delete(sr.permission_key);
   }
   for (const ov of overrides ?? []) {
     if (ov.allowed) effective.add(ov.permission_key);

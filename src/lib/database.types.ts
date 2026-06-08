@@ -871,6 +871,30 @@ export type Database = {
           },
         ]
       }
+      salon_role_permissions: {
+        Row: {
+          allowed: boolean
+          id: string
+          permission_key: string
+          role: Database["public"]["Enums"]["member_role"]
+          salon_id: string
+        }
+        Insert: {
+          allowed?: boolean
+          id?: string
+          permission_key: string
+          role: Database["public"]["Enums"]["member_role"]
+          salon_id: string
+        }
+        Update: {
+          allowed?: boolean
+          id?: string
+          permission_key?: string
+          role?: Database["public"]["Enums"]["member_role"]
+          salon_id?: string
+        }
+        Relationships: []
+      }
       salon_invites: {
         Row: {
           accepted_at: string | null
