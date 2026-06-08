@@ -99,6 +99,7 @@ export type Database = {
           id: string
           member_id: string
           notes: string | null
+          payment_method: string | null
           salon_id: string
           source: string
           starts_at: string
@@ -114,6 +115,7 @@ export type Database = {
           id?: string
           member_id: string
           notes?: string | null
+          payment_method?: string | null
           salon_id: string
           source?: string
           starts_at: string
@@ -129,6 +131,7 @@ export type Database = {
           id?: string
           member_id?: string
           notes?: string | null
+          payment_method?: string | null
           salon_id?: string
           source?: string
           starts_at?: string
@@ -1041,6 +1044,10 @@ export type Database = {
           p_display_name?: string
         }
         Returns: Database["public"]["Tables"]["salon_invites"]["Row"]
+      }
+      finalize_appointment: {
+        Args: { p_appointment: string; p_payment_method?: string }
+        Returns: Json
       }
       get_invite: {
         Args: { p_token: string }
