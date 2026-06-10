@@ -3,19 +3,10 @@ import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle, Package } from "lucide-react";
+import { CalendarDays, Wallet, Clock, Users, Plus, Package } from "lucide-react";
+import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 
 export const dynamic = "force-dynamic";
-
-// Status = ponto colorido + texto em token (legível em qualquer tema).
-const STATUS: Record<string, { label: string; dot: string }> = {
-  pending: { label: "Aguardando", dot: "#f59e0b" },
-  confirmed: { label: "Confirmado", dot: "#10b981" },
-  in_progress: { label: "Em andamento", dot: "#3b82f6" },
-  completed: { label: "Concluído", dot: "#9ca3af" },
-  cancelled: { label: "Cancelado", dot: "#ef4444" },
-  no_show: { label: "Faltou", dot: "#e11d48" },
-};
 
 export default async function DashboardPage({
   params,
@@ -36,7 +27,7 @@ export default async function DashboardPage({
     await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
+        .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name), appointment_services(name, price, duration_min)")
         .eq("salon_id", salonId)
         .gte("starts_at", startDay)
         .lt("starts_at", endDay)
@@ -75,6 +66,21 @@ export default async function DashboardPage({
   const revenue = appts
     .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
     .reduce((sum, a) => sum + Number(a.total_price), 0);
+
+  const agendaItems: AgendaItem[] = appts.map((a) => {
+    const clientObj = a.clients as { full_name?: string; alert_summary?: string | null } | null;
+    const svcs = (a.appointment_services as { name: string; price: number; duration_min: number }[] | null) ?? [];
+    return {
+      id: a.id,
+      time: formatTime(a.starts_at),
+      client: clientObj?.full_name ?? "Cliente",
+      alert: clientObj?.alert_summary ?? null,
+      prof: (a.salon_members as { display_name?: string } | null)?.display_name ?? "",
+      status: a.status,
+      price: Number(a.total_price),
+      services: svcs.map((s) => ({ name: s.name, price: Number(s.price), duration: s.duration_min })),
+    };
+  });
 
   const stats = [
     { icon: CalendarDays, label: "Agendamentos hoje", value: String(appts.length) },
@@ -158,37 +164,7 @@ export default async function DashboardPage({
             Nenhum agendamento para hoje ainda.
           </div>
         ) : (
-          <div className="space-y-2">
-            {appts.map((a) => {
-              const st = STATUS[a.status] ?? STATUS.pending;
-              const clientObj = a.clients as { full_name?: string; alert_summary?: string | null } | null;
-              const client = clientObj?.full_name ?? "Cliente";
-              const prof = (a.salon_members as { display_name?: string } | null)?.display_name ?? "";
-              return (
-                <div key={a.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
-                  <div className="text-center shrink-0">
-                    <p className="font-display font-bold">{formatTime(a.starts_at)}</p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate flex items-center gap-2">
-                      {client}
-                      {clientObj?.alert_summary && (
-                        <span title={clientObj.alert_summary} className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-600 px-2 py-0.5 text-[10px] font-medium shrink-0">
-                          <AlertTriangle className="h-3 w-3" /> alerta
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{prof}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full bg-muted px-2.5 py-1 font-medium text-foreground/75">
-                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
-                    {st.label}
-                  </span>
-                  <span className="font-semibold text-primary text-sm">{formatBRL(Number(a.total_price))}</span>
-                </div>
-              );
-            })}
-          </div>
+          <TodayAgenda items={agendaItems} />
         )}
       </div>
     </div>
