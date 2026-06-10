@@ -6,19 +6,19 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
+  House,
   CalendarDays,
   Clock,
   Sparkles,
-  Users,
-  Contact,
-  Wallet,
+  UserRoundCog,
+  UsersRound,
+  Banknote,
   Boxes,
   Package,
   Settings,
   Scissors,
-  Tag,
-  MoreHorizontal,
+  BadgePercent,
+  Ellipsis,
   X,
   LogOut,
   ExternalLink,
@@ -28,17 +28,17 @@ import {
 const PRIMARY_HREFS = ["", "/agenda", "/clientes"];
 
 const ICONS = {
-  LayoutDashboard,
+  House,
   CalendarDays,
   Clock,
   Sparkles,
-  Users,
-  Contact,
-  Wallet,
+  UserRoundCog,
+  UsersRound,
+  Banknote,
   Boxes,
   Package,
   Settings,
-  Tag,
+  BadgePercent,
 } as const;
 
 export type NavItem = {
@@ -203,35 +203,62 @@ export function PanelShell({
         </main>
 
         {/* ── Bottom navigation (mobile) ─────────────────────────── */}
-        <nav className="lg:hidden shrink-0 border-t border-border bg-card grid grid-cols-4 h-16">
-          {primaryItems.map((it) => {
-            const active = isActive(it.href);
-            const Icon = ICONS[it.icon];
-            const label = it.href === "" ? "Início" : it.label;
-            return (
-              <Link
-                key={it.href}
-                href={base + it.href}
+        <nav className="lg:hidden shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
+          <div className="grid grid-cols-4 h-16">
+            {primaryItems.map((it) => {
+              const active = isActive(it.href);
+              const Icon = ICONS[it.icon];
+              const label = it.href === "" ? "Início" : it.label;
+              return (
+                <Link
+                  key={it.href}
+                  href={base + it.href}
+                  aria-current={active ? "page" : undefined}
+                  className="flex flex-col items-center justify-center gap-1"
+                >
+                  <span
+                    className={cn(
+                      "flex items-center justify-center rounded-full px-4 py-0.5 transition-colors",
+                      active
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="h-[22px] w-[22px] shrink-0" strokeWidth={active ? 2.4 : 2} />
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] leading-none truncate max-w-full px-1 transition-colors",
+                      active ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+                    )}
+                  >
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
+            <button
+              onClick={() => setOpen(true)}
+              className="flex flex-col items-center justify-center gap-1"
+            >
+              <span
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 transition",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                  "flex items-center justify-center rounded-full px-4 py-0.5 transition-colors",
+                  open ? "bg-primary/15 text-primary" : "text-muted-foreground",
                 )}
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="text-[10px] font-medium leading-none truncate max-w-full px-1">{label}</span>
-              </Link>
-            );
-          })}
-          <button
-            onClick={() => setOpen(true)}
-            className={cn(
-              "flex flex-col items-center justify-center gap-0.5 transition",
-              open ? "text-primary" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[10px] font-medium leading-none">Mais</span>
-          </button>
+                <Ellipsis className="h-[22px] w-[22px]" strokeWidth={open ? 2.4 : 2} />
+              </span>
+              <span
+                className={cn(
+                  "text-[10px] leading-none transition-colors",
+                  open ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+                )}
+              >
+                Mais
+              </span>
+            </button>
+          </div>
         </nav>
       </div>
 

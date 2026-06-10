@@ -22,6 +22,8 @@ export const viewport: Viewport = {
   themeColor: "#f23c10",
   width: "device-width",
   initialScale: 1,
+  // Necessário para env(safe-area-inset-*) funcionar no iOS (barra inferior do painel)
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

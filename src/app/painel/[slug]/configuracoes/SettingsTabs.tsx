@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { COLOR_GROUPS, type ColorTheme } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
@@ -86,22 +87,33 @@ export function SettingsTabs({
         </p>
       </div>
 
-      {/* Barra de tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto no-scrollbar">
+      {/* Barra de tabs — mobile: pílulas com ícone (a ativa expande o rótulo);
+          desktop: abas sublinhadas com ícone + texto */}
+      <div className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
         {tabs.map((t) => {
           const on = active === t.id;
           return (
             <button
               key={t.id}
               onClick={() => selectTab(t.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition shrink-0 ${
+              aria-label={t.label}
+              aria-current={on ? "page" : undefined}
+              className={cn(
+                "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
+                // Mobile (pílula)
+                "rounded-full px-3.5 py-2 text-sm",
+                on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                // Desktop (aba sublinhada) — sobrescreve o visual de pílula
+                "sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-3.5 sm:py-2.5 sm:bg-transparent",
                 on
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
+                  ? "sm:border-primary sm:text-primary"
+                  : "sm:border-transparent sm:hover:bg-transparent sm:hover:text-foreground",
+              )}
             >
-              <t.icon className="h-4 w-4 shrink-0" />
-              {t.label}
+              <t.icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
+              <span className={cn("leading-none", on ? "inline" : "hidden", "sm:inline")}>
+                {t.label}
+              </span>
             </button>
           );
         })}
