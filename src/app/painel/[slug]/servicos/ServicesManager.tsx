@@ -49,6 +49,7 @@ export function ServicesManager({
   const [finish, setFinish] = useState("15");
   const [recipe, setRecipe] = useState<RecipeRow[]>([]);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -89,12 +90,14 @@ export function ServicesManager({
 
   function closeForm() {
     resetForm();
+    setErr(null);
     setAdding(false);
   }
 
   async function save() {
     if (!name) return;
     setBusy(true);
+    setErr(null);
     const payload = {
       name,
       duration_min: parseInt(duration) || 30,
@@ -108,40 +111,55 @@ export function ServicesManager({
     if (editingId) {
       const { data, error } = await supabase
         .from("services").update(payload).eq("id", editingId).select().single();
-      if (!error && data) {
-        saved = data as Service;
-        setServices((s) => s.map((x) => (x.id === editingId ? saved! : x)));
-      }
+      if (error || !data) { setErr("Não foi possível salvar o serviço. Tente novamente."); setBusy(false); return; }
+      saved = data as Service;
+      setServices((s) => s.map((x) => (x.id === editingId ? saved! : x)));
     } else {
       const { data, error } = await supabase
         .from("services").insert({ salon_id: salonId, ...payload }).select().single();
-      if (!error && data) {
-        saved = data as Service;
-        setServices((s) => [saved!, ...s]);
-      }
+      if (error || !data) { setErr("Não foi possível criar o serviço. Tente novamente."); setBusy(false); return; }
+      saved = data as Service;
+      setServices((s) => [saved!, ...s]);
     }
 
     // sincroniza a receita de insumos (service_products)
-    if (saved) {
-      const svcId = saved.id;
-      await supabase.from("service_products").delete().eq("service_id", svcId);
-      const rows = recipe
-        .filter((r) => r.product_id && (parseFloat(r.quantity.replace(",", ".")) || 0) > 0)
-        .map((r) => ({
-          salon_id: salonId,
-          service_id: svcId,
-          product_id: r.product_id,
-          quantity: parseFloat(r.quantity.replace(",", ".")) || 1,
-        }));
-      if (rows.length) await supabase.from("service_products").insert(rows);
-      setSvcProducts((sp) => [
-        ...sp.filter((x) => x.service_id !== svcId),
-        ...rows.map((r) => ({ service_id: r.service_id, product_id: r.product_id, quantity: r.quantity })),
-      ]);
+    const svcId = saved.id;
+    const prevRecipe = svcProducts.filter((x) => x.service_id === svcId);
+    const { error: delErr } = await supabase.from("service_products").delete().eq("service_id", svcId);
+    if (delErr) {
+      setErr("Serviço salvo, mas não foi possível atualizar os insumos. Edite novamente.");
+      setBusy(false);
+      return;
     }
+    const rows = recipe
+      .filter((r) => r.product_id && (parseFloat(r.quantity.replace(",", ".")) || 0) > 0)
+      .map((r) => ({
+        salon_id: salonId,
+        service_id: svcId,
+        product_id: r.product_id,
+        quantity: parseFloat(r.quantity.replace(",", ".")) || 1,
+      }));
+    if (rows.length) {
+      const { error: insErr } = await supabase.from("service_products").insert(rows);
+      if (insErr) {
+        // restaura a receita anterior para não deixar o serviço sem insumos
+        if (prevRecipe.length) {
+          await supabase.from("service_products").insert(
+            prevRecipe.map((r) => ({ salon_id: salonId, service_id: svcId, product_id: r.product_id, quantity: r.quantity })),
+          );
+        }
+        setErr("Serviço salvo, mas não foi possível atualizar os insumos. Edite novamente.");
+        setBusy(false);
+        return;
+      }
+    }
+    setSvcProducts((sp) => [
+      ...sp.filter((x) => x.service_id !== svcId),
+      ...rows.map((r) => ({ service_id: r.service_id, product_id: r.product_id, quantity: r.quantity })),
+    ]);
 
     setBusy(false);
-    if (saved) closeForm();
+    closeForm();
   }
 
   async function addPresets(picked: { name: string; duration: number }[]) {
@@ -173,8 +191,10 @@ export function ServicesManager({
   }
 
   async function toggleActive(svc: Service) {
+    const prev = services;
     setServices((s) => s.map((x) => (x.id === svc.id ? { ...x, is_active: !x.is_active } : x)));
-    await supabase.from("services").update({ is_active: !svc.is_active }).eq("id", svc.id);
+    const { error } = await supabase.from("services").update({ is_active: !svc.is_active }).eq("id", svc.id);
+    if (error) setServices(prev); // desfaz se o banco recusar
   }
 
   return (
@@ -336,6 +356,8 @@ export function ServicesManager({
               </div>
             )}
           </div>
+
+          {err && <p className="text-sm text-red-600">{err}</p>}
 
           <div className="flex gap-2">
             <Button onClick={save} disabled={busy || !name}>

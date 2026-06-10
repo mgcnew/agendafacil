@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Label, Select } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
-import { Clock, Loader2, Check, Copy } from "lucide-react";
+import { Clock, Loader2, Check, Copy, AlertTriangle } from "lucide-react";
 
 type WH = Tables<"working_hours">;
 type Pro = { id: string; name: string };
@@ -38,6 +38,7 @@ export function HoursManager({
   const [days, setDays] = useState<DayHours[]>(() => buildDays(initialHours, null));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const memberId = target || null;
 
@@ -45,6 +46,7 @@ export function HoursManager({
     setTarget(t);
     setDays(buildDays(allRows, t || null));
     setSaved(false);
+    setErr(null);
   }
 
   function setDay(w: number, patch: Partial<DayHours>) {
@@ -55,27 +57,65 @@ export function HoursManager({
     setDays((d) => d.map((x) => (x.enabled ? { ...x, start: from.start, end: from.end } : x)));
   }
 
+  const toRow = (d: DayHours) => ({
+    salon_id: salonId,
+    member_id: memberId,
+    weekday: d.weekday,
+    start_time: d.start,
+    end_time: d.end,
+  });
+
   async function save() {
+    // Valida antes de tocar no banco: avisa em vez de descartar em silêncio.
+    const invalid = days.filter((d) => d.enabled && d.start >= d.end);
+    if (invalid.length) {
+      setErr(
+        `O horário de ${invalid.map((d) => WEEKDAYS[d.weekday]).join(", ")} é inválido: ` +
+        "o fim precisa ser depois do início.",
+      );
+      return;
+    }
+
     setSaving(true);
     setSaved(false);
+    setErr(null);
+
+    // Guarda o estado anterior deste alvo para poder restaurar se algo falhar.
+    const prevForTarget = allRows.filter((r) =>
+      memberId ? r.member_id === memberId : r.member_id === null,
+    );
+    const rows = days.filter((d) => d.enabled).map(toRow);
 
     let del = supabase.from("working_hours").delete().eq("salon_id", salonId);
     del = memberId ? del.eq("member_id", memberId) : del.is("member_id", null);
-    await del;
-
-    const rows = days
-      .filter((d) => d.enabled && d.start < d.end)
-      .map((d) => ({
-        salon_id: salonId,
-        member_id: memberId,
-        weekday: d.weekday,
-        start_time: d.start,
-        end_time: d.end,
-      }));
+    const { error: delErr } = await del;
+    if (delErr) {
+      setErr("Não foi possível salvar. Tente novamente.");
+      setSaving(false);
+      return;
+    }
 
     let inserted: WH[] = [];
     if (rows.length) {
-      const { data } = await supabase.from("working_hours").insert(rows).select();
+      const { data, error: insErr } = await supabase.from("working_hours").insert(rows).select();
+      if (insErr) {
+        // Recuperação: tenta restaurar o que havia antes para não deixar o
+        // profissional sem nenhum horário após o delete já ter ocorrido.
+        if (prevForTarget.length) {
+          await supabase.from("working_hours").insert(
+            prevForTarget.map((r) => ({
+              salon_id: r.salon_id,
+              member_id: r.member_id,
+              weekday: r.weekday,
+              start_time: r.start_time,
+              end_time: r.end_time,
+            })),
+          );
+        }
+        setErr("Não foi possível salvar os horários. Nada foi alterado.");
+        setSaving(false);
+        return;
+      }
       inserted = (data as WH[]) ?? [];
     }
 
@@ -147,6 +187,12 @@ export function HoursManager({
           </div>
         ))}
       </Card>
+
+      {err && (
+        <p className="text-sm text-red-600 flex items-center gap-1.5">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+        </p>
+      )}
 
       <div className="flex items-center gap-3">
         <Button onClick={save} disabled={saving}>

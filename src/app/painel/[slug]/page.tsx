@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
-import { formatBRL, formatTime } from "@/lib/utils";
+import { formatBRL, formatTime, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
 import { CalendarDays, Wallet, Clock, Users, Plus, AlertTriangle, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -28,9 +28,9 @@ export default async function DashboardPage({
   const salonId = membership.salon_id;
 
   const supabase = await createClient();
-  const now = new Date();
-  const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+  // "Hoje" no fuso do Brasil — o servidor roda em UTC em produção.
+  const startDay = startOfTodayBR();
+  const endDay = startOfTomorrowBR();
 
   const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }] =
     await Promise.all([

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
 import {
-  Plus, Loader2, ChevronLeft, ChevronRight, X, AlertTriangle,
+  Plus, Loader2, ChevronLeft, ChevronRight, X, AlertTriangle, CalendarOff,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -55,14 +55,37 @@ const MONTH_NAMES = [
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
 ];
 
-const HOUR_START = 7;
-const HOUR_END   = 21;
-const CELL_H     = 64; // px per hour
-const TOTAL_H    = (HOUR_END - HOUR_START) * CELL_H;
-const HOURS      = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
+// Faixa padrão da grade (7h–21h). Expande automaticamente para englobar
+// agendamentos fora dessa janela, em vez de escondê-los.
+const DEFAULT_START = 7;
+const DEFAULT_END   = 21;
+const CELL_H        = 64; // px per hour
+
+type Bounds = { start: number; end: number };
+
+function hourBounds(appts: Appt[]): Bounds {
+  let start = DEFAULT_START;
+  let end   = DEFAULT_END;
+  for (const a of appts) {
+    const s = new Date(a.starts_at);
+    const e = a.ends_at ? new Date(a.ends_at) : s;
+    start = Math.min(start, s.getHours());
+    // arredonda o fim para cima quando há minutos, para a barra caber inteira
+    end   = Math.max(end, e.getHours() + (e.getMinutes() > 0 ? 1 : 0));
+  }
+  return { start: Math.max(0, start), end: Math.min(24, Math.max(end, start + 1)) };
+}
+
+function hoursOf(b: Bounds) {
+  return Array.from({ length: b.end - b.start }, (_, i) => b.start + i);
+}
+const totalHeight = (b: Bounds) => (b.end - b.start) * CELL_H;
 
 // ── Date helpers ───────────────────────────────────────────────
-const toStr   = (d: Date) => d.toISOString().slice(0, 10);
+// Usa componentes LOCAIS (não toISOString, que é UTC) para evitar que datas
+// caiam no dia errado à noite no fuso do Brasil (UTC-3).
+const toStr   = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const parse   = (s: string) => new Date(s + "T12:00:00");
 const isToday = (s: string) => s === toStr(new Date());
 
@@ -87,7 +110,7 @@ function getMonthGrid(year: number, month: number): string[][] {
     Array.from({ length: 7 }, () => { const s = toStr(cursor); cursor.setDate(cursor.getDate() + 1); return s; })
   );
 }
-function datePart(iso: string) { return new Date(iso).toISOString().slice(0, 10); }
+function datePart(iso: string) { return toStr(new Date(iso)); }
 function fmtHM(iso: string) {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
@@ -97,9 +120,9 @@ function inCurrentMonth(s: string, y: number, m: number) {
 }
 
 // ── Appointment layout helpers ─────────────────────────────────
-function apptTop(a: Appt) {
+function apptTop(a: Appt, hourStart: number) {
   const d = new Date(a.starts_at);
-  return Math.max(0, (d.getHours() + d.getMinutes() / 60 - HOUR_START) * CELL_H);
+  return Math.max(0, (d.getHours() + d.getMinutes() / 60 - hourStart) * CELL_H);
 }
 function apptH(a: Appt) {
   if (!a.ends_at) return CELL_H;
@@ -116,14 +139,27 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
   a: Appt; color: string; compact?: boolean; onStatusChange?: (s: Status) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [side, setSide] = useState<"right" | "left">("right");
+  const btnRef = useRef<HTMLButtonElement>(null);
   const st = STATUS_META[a.status];
   const h = apptH(a);
+
+  // Abre à esquerda quando não há ~272px livres à direita (evita cortar o card).
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setSide(window.innerWidth - r.right < 272 ? "left" : "right");
+    }
+    setOpen(v => !v);
+  }
 
   return (
     <div className="relative group">
       <button
+        ref={btnRef}
         type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+        onClick={toggle}
         aria-label={`${a.clients?.full_name ?? "Cliente"} às ${fmtHM(a.starts_at)} — ${st.label}`}
         className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
@@ -151,7 +187,10 @@ function ApptCard({ a, color, compact = false, onStatusChange }: {
         <>
           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
           <div
-            className="absolute left-full top-0 ml-2 z-50 w-60 rounded-[var(--radius)] bg-card border border-border shadow-xl p-3 space-y-2"
+            className={cn(
+              "absolute top-0 z-50 w-60 rounded-[var(--radius)] bg-card border border-border shadow-xl p-3 space-y-2",
+              side === "right" ? "left-full ml-2" : "right-full mr-2",
+            )}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">
@@ -202,17 +241,21 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
   onStatusChange: (a: Appt, s: Status) => void;
 }) {
   const cols = activePros.length > 0 ? activePros : pros;
+  const bounds  = hourBounds(appts);
+  const hours   = hoursOf(bounds);
+  const totalH  = totalHeight(bounds);
   const now = new Date();
   const todayLine = isToday(date)
-    ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
+    ? ((now.getHours() + now.getMinutes() / 60 - bounds.start) * CELL_H)
     : null;
   const nCols   = Math.max(1, cols.length);
   const minW    = 56 + nCols * COL_W_DAY;
+  const isEmpty = appts.length === 0;
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
       {/* Single scroll container — syncs horizontal scroll across headers + grid */}
-      <div className="flex-1 min-h-0 overflow-auto scroll-thin">
+      <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
 
         {/* Sticky column headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
@@ -233,11 +276,11 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
         </div>
 
         {/* Time grid */}
-        <div className="flex" style={{ minHeight: TOTAL_H, minWidth: minW }}>
+        <div className="flex" style={{ minHeight: totalH, minWidth: minW }}>
           {/* Sticky time gutter */}
-          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: TOTAL_H }}>
-            {HOURS.map(h => (
-              <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
+          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: totalH }}>
+            {hours.map(h => (
+              <div key={h} className="absolute w-full" style={{ top: (h - bounds.start) * CELL_H }}>
                 <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
                   {String(h).padStart(2,"0")}:00
                 </span>
@@ -252,26 +295,25 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
             return (
               <div key={p.id}
                 className="relative border-l border-border"
-                style={{ height: TOTAL_H, minWidth: COL_W_DAY, flex: 1 }}
+                style={{ height: totalH, minWidth: COL_W_DAY, flex: 1 }}
               >
-                {HOURS.map(h => (
+                {hours.map(h => (
                   <Fragment key={h}>
                     <div className="absolute w-full border-t border-border/40"
-                      style={{ top: (h - HOUR_START) * CELL_H }} />
+                      style={{ top: (h - bounds.start) * CELL_H }} />
                     <div className="absolute w-full border-t border-dashed border-border/20"
-                      style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
+                      style={{ top: (h - bounds.start) * CELL_H + CELL_H / 2 }} />
                   </Fragment>
                 ))}
-                {todayLine !== null && todayLine >= 0 && todayLine <= TOTAL_H && (
+                {todayLine !== null && todayLine >= 0 && todayLine <= totalH && (
                   <div className="absolute w-full z-20 pointer-events-none" style={{ top: todayLine }}>
                     <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
                     <div className="border-t-2 border-primary w-full" />
                   </div>
                 )}
                 {proAppts.map(a => {
-                  const top = apptTop(a);
+                  const top = apptTop(a, bounds.start);
                   const h   = apptH(a);
-                  if (top < 0 || top >= TOTAL_H) return null;
                   return (
                     <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}>
                       <ApptCard a={a} color={color} onStatusChange={s => onStatusChange(a, s)} />
@@ -282,7 +324,20 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
             );
           })}
         </div>
+
+        {isEmpty && <EmptyDay />}
       </div>
+    </div>
+  );
+}
+
+// Mensagem central quando o dia/semana não tem agendamentos.
+function EmptyDay() {
+  return (
+    <div className="pointer-events-none absolute inset-0 top-12 flex flex-col items-center justify-center text-center px-6">
+      <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
+      <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
+      <p className="text-xs text-muted-foreground/70">Clique em “Novo agendamento” para começar.</p>
     </div>
   );
 }
@@ -299,11 +354,18 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
   const now      = new Date();
   const todayStr = toStr(now);
   const minW     = 56 + 7 * COL_W_WEEK;
+  const visible  = activePros.length > 0
+    ? appts.filter(a => activePros.some(p => p.id === a.member_id))
+    : appts;
+  const bounds   = hourBounds(visible);
+  const hours    = hoursOf(bounds);
+  const totalH   = totalHeight(bounds);
+  const isEmpty  = visible.length === 0;
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
       {/* Single scroll container */}
-      <div className="flex-1 min-h-0 overflow-auto scroll-thin">
+      <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
 
         {/* Sticky day headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
@@ -334,11 +396,11 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
         </div>
 
         {/* Time grid */}
-        <div className="flex" style={{ minHeight: TOTAL_H, minWidth: minW }}>
+        <div className="flex" style={{ minHeight: totalH, minWidth: minW }}>
           {/* Sticky time gutter */}
-          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: TOTAL_H }}>
-            {HOURS.map(h => (
-              <div key={h} className="absolute w-full" style={{ top: (h - HOUR_START) * CELL_H }}>
+          <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: totalH }}>
+            {hours.map(h => (
+              <div key={h} className="absolute w-full" style={{ top: (h - bounds.start) * CELL_H }}>
                 <span className="absolute -top-2.5 left-1 text-[10px] text-muted-foreground select-none">
                   {String(h).padStart(2,"0")}:00
                 </span>
@@ -349,28 +411,25 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
           {/* Day columns */}
           {days.map((day) => {
             const isT      = day === todayStr;
-            const dayAppts = (activePros.length > 0
-              ? appts.filter(a => activePros.some(p => p.id === a.member_id))
-              : appts
-            ).filter(a => datePart(a.starts_at) === day);
+            const dayAppts = visible.filter(a => datePart(a.starts_at) === day);
             const nowLine  = isT
-              ? ((now.getHours() + now.getMinutes() / 60 - HOUR_START) * CELL_H)
+              ? ((now.getHours() + now.getMinutes() / 60 - bounds.start) * CELL_H)
               : null;
 
             return (
               <div key={day}
                 className={cn("relative border-l border-border", isT && "bg-primary/[0.03]")}
-                style={{ height: TOTAL_H, minWidth: COL_W_WEEK, flex: 1 }}
+                style={{ height: totalH, minWidth: COL_W_WEEK, flex: 1 }}
               >
-                {HOURS.map(h => (
+                {hours.map(h => (
                   <Fragment key={h}>
                     <div className="absolute w-full border-t border-border/40"
-                      style={{ top: (h - HOUR_START) * CELL_H }} />
+                      style={{ top: (h - bounds.start) * CELL_H }} />
                     <div className="absolute w-full border-t border-dashed border-border/20"
-                      style={{ top: (h - HOUR_START) * CELL_H + CELL_H / 2 }} />
+                      style={{ top: (h - bounds.start) * CELL_H + CELL_H / 2 }} />
                   </Fragment>
                 ))}
-                {nowLine !== null && nowLine >= 0 && nowLine <= TOTAL_H && (
+                {nowLine !== null && nowLine >= 0 && nowLine <= totalH && (
                   <div className="absolute w-full z-20 pointer-events-none" style={{ top: nowLine }}>
                     <div className="absolute -left-1 top-[-4px] h-2 w-2 rounded-full bg-primary" />
                     <div className="border-t-2 border-primary w-full" />
@@ -378,9 +437,8 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
                 )}
                 {dayAppts.map(a => {
                   const color = getColor(pros, a.member_id);
-                  const top   = apptTop(a);
+                  const top   = apptTop(a, bounds.start);
                   const h     = apptH(a);
-                  if (top < 0 || top >= TOTAL_H) return null;
                   return (
                     <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}>
                       <ApptCard a={a} color={color} compact={h < 40}
@@ -392,6 +450,8 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
             );
           })}
         </div>
+
+        {isEmpty && <EmptyDay />}
       </div>
     </div>
   );
@@ -494,9 +554,10 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
-  salonId, pros, services, clients: initialClients,
+  salonId, pros, services, clients: initialClients, discounts = {},
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
+  discounts?: Record<string, number>;
 }) {
   const supabase = createClient();
   const [view, setView]             = useState<View>("dia");
@@ -541,14 +602,35 @@ export function AgendaManager({
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime: recarrega quando qualquer agendamento do salão muda (outro
+  // atendente cria/edita). Usa um ref para não reinscrever a cada navegação.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+  useEffect(() => {
+    const channel = supabase
+      .channel(`agenda:${salonId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments", filter: `salon_id=eq.${salonId}` },
+        () => loadRef.current(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase, salonId]);
+
   async function onStatusChange(a: Appt, status: Status) {
     // Concluir abre o fluxo de finalização (forma de pagamento → caixa + comissão)
     if (status === "completed") {
       setFinalizing(a);
       return;
     }
+    const prev = a.status;
     setAppts(list => list.map(x => x.id === a.id ? { ...x, status } : x));
-    await supabase.from("appointments").update({ status }).eq("id", a.id);
+    const { error } = await supabase.from("appointments").update({ status }).eq("id", a.id);
+    if (error) {
+      // desfaz se o banco recusar (realtime, se ativo, também reconcilia)
+      setAppts(list => list.map(x => x.id === a.id ? { ...x, status: prev } : x));
+    }
   }
 
   function navigate(n: number) {
@@ -703,6 +785,7 @@ export function AgendaManager({
       {creating && (
         <CreateAppointment
           salonId={salonId} pros={pros} services={services} clients={initialClients}
+          discounts={discounts}
           date={createDate}
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); load(); }}
@@ -830,9 +913,10 @@ function FinalizeModal({
 
 // ── Create Appointment Modal ───────────────────────────────────
 function CreateAppointment({
-  salonId, pros, services, clients, date, onClose, onCreated,
+  salonId, pros, services, clients, discounts, date, onClose, onCreated,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
+  discounts: Record<string, number>;
   date: string; onClose: () => void; onCreated: () => void;
 }) {
   const supabase = createClient();
@@ -845,8 +929,13 @@ function CreateAppointment({
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
 
+  const discOf     = (s: Service) => discounts[s.id] ?? 0;
+  const effOf      = (s: Service) => {
+    const d = discOf(s);
+    return d > 0 ? Math.round(Number(s.price) * (1 - d / 100) * 100) / 100 : Number(s.price);
+  };
   const chosen     = services.filter(s => selected.includes(s.id));
-  const totalPrice = chosen.reduce((a, s) => a + Number(s.price), 0);
+  const totalPrice = chosen.reduce((a, s) => a + effOf(s), 0);
 
   async function create() {
     setBusy(true); setErr(null);
@@ -929,8 +1018,20 @@ function CreateAppointment({
                       on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
                     )}
                   >
-                    <span>{s.name}</span>
-                    <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
+                    <span className="flex items-center gap-1.5">
+                      {s.name}
+                      {discOf(s) > 0 && (
+                        <span className="rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5">-{discOf(s)}%</span>
+                      )}
+                    </span>
+                    {discOf(s) > 0 ? (
+                      <span>
+                        <span className="text-muted-foreground line-through mr-1.5">{formatBRL(Number(s.price))}</span>
+                        <span className="text-foreground">{formatBRL(effOf(s))}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
+                    )}
                   </button>
                 );
               })}

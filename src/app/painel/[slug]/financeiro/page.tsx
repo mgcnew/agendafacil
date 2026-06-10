@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
+import { currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { FinanceManager } from "./FinanceManager";
 
 export const dynamic = "force-dynamic";
@@ -27,14 +28,13 @@ export default async function FinanceiroPage({
   const salonId = membership.salon_id;
   const supabase = await createClient();
 
-  // ── período de comissões ──
-  const now = new Date();
-  const base = cmes && /^\d{4}-\d{2}$/.test(cmes) ? cmes : cmesOf(now);
+  // ── período de comissões (fuso do Brasil; servidor roda em UTC) ──
+  const base = cmes && /^\d{4}-\d{2}$/.test(cmes) ? cmes : currentMonthBR();
   const [py, pm] = base.split("-").map(Number);
-  const periodStart = new Date(py, pm - 1, 1);
-  const periodEnd = new Date(py, pm, 0, 23, 59, 59);
+  const { start: periodStartIso, end: periodEndIso } = monthRangeBR(base);
+  const lastDay = new Date(py, pm, 0).getDate();
   const periodStartStr = `${py}-${pad(pm)}-01`;
-  const periodEndStr = `${py}-${pad(pm)}-${pad(periodEnd.getDate())}`;
+  const periodEndStr = `${py}-${pad(pm)}-${pad(lastDay)}`;
   const prevCmes = cmesOf(new Date(py, pm - 2, 1));
   const nextCmes = cmesOf(new Date(py, pm, 1));
 
@@ -72,8 +72,8 @@ export default async function FinanceiroPage({
     .select("commission_amount, appointments!inner(member_id, status, starts_at, salon_members(display_name))")
     .eq("salon_id", salonId)
     .eq("appointments.status", "completed")
-    .gte("appointments.starts_at", periodStart.toISOString())
-    .lte("appointments.starts_at", periodEnd.toISOString());
+    .gte("appointments.starts_at", periodStartIso)
+    .lte("appointments.starts_at", periodEndIso);
 
   const earnedMap = new Map<string, { name: string; earned: number }>();
   for (const r of commRows ?? []) {
@@ -93,8 +93,8 @@ export default async function FinanceiroPage({
     .from("package_redemptions")
     .select("commission_amount, member_id, salon_members(display_name)")
     .eq("salon_id", salonId)
-    .gte("used_at", periodStart.toISOString())
-    .lte("used_at", periodEnd.toISOString())
+    .gte("used_at", periodStartIso)
+    .lte("used_at", periodEndIso)
     .not("member_id", "is", null);
   for (const r of redRows ?? []) {
     if (!r.member_id) continue;

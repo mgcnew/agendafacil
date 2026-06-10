@@ -29,6 +29,7 @@ export function ClientsManager({
   const [referral, setReferral] = useState("");
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
+  const [err, setErr] = useState<string | null>(null);
 
   const filtered = clients.filter((c) =>
     c.full_name.toLowerCase().includes(q.toLowerCase()) || (c.phone ?? "").includes(q),
@@ -37,6 +38,7 @@ export function ClientsManager({
   async function add() {
     if (!name) return;
     setBusy(true);
+    setErr(null);
     const { data, error } = await supabase
       .from("clients")
       .insert({
@@ -50,17 +52,25 @@ export function ClientsManager({
       .select()
       .single();
     setBusy(false);
-    if (!error && data) {
-      setClients((c) => [...c, data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
-      setName(""); setPhone(""); setEmail(""); setBirth(""); setReferral("");
-      setAdding(false);
+    if (error || !data) {
+      setErr("Não foi possível cadastrar a cliente. Tente novamente.");
+      return;
     }
+    setClients((c) => [...c, data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+    setName(""); setPhone(""); setEmail(""); setBirth(""); setReferral("");
+    setAdding(false);
   }
 
   async function remove(id: string) {
     if (!confirm("Remover esta cliente?")) return;
+    setErr(null);
+    const prev = clients;
     setClients((c) => c.filter((x) => x.id !== id));
-    await supabase.from("clients").delete().eq("id", id);
+    const { error } = await supabase.from("clients").delete().eq("id", id);
+    if (error) {
+      setClients(prev); // restaura: o banco recusou (provável vínculo com agendamentos)
+      setErr("Não foi possível remover esta cliente — ela pode ter agendamentos vinculados.");
+    }
   }
 
   return (
@@ -111,6 +121,12 @@ export function ClientsManager({
             A ficha de anamnese (saúde, alergias) é preenchida ao abrir a cliente.
           </p>
         </Card>
+      )}
+
+      {err && (
+        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+        </div>
       )}
 
       <div className="relative">

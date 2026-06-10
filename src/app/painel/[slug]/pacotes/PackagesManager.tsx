@@ -217,7 +217,11 @@ function TemplatesList({
 
   async function remove(t: Template) {
     if (!confirm(`Excluir o modelo "${t.name}"?`)) return;
-    await supabase.from("package_templates").delete().eq("id", t.id);
+    const { error } = await supabase.from("package_templates").delete().eq("id", t.id);
+    if (error) {
+      alert("Não foi possível excluir — o modelo pode ter pacotes vendidos vinculados.");
+      return;
+    }
     router.refresh();
   }
 
@@ -281,6 +285,7 @@ function TemplateEditor({
       : [{ service_id: services[0]?.id ?? "", quantity: "4" }],
   );
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   function setItem(idx: number, patch: Partial<DraftItem>) {
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -290,33 +295,57 @@ function TemplateEditor({
     const validItems = items.filter((i) => i.service_id && (parseInt(i.quantity) || 0) > 0);
     if (!name.trim() || validItems.length === 0) return;
     setBusy(true);
+    setErr(null);
     const payload = {
       name: name.trim(),
       validity_days: parseInt(validity) || 30,
       price: parseFloat(price.replace(",", ".")) || 0,
     };
+
     let templateId = template?.id;
     if (template) {
-      await supabase.from("package_templates").update(payload).eq("id", template.id);
-      await supabase.from("package_template_items").delete().eq("template_id", template.id);
+      const { error: upErr } = await supabase.from("package_templates").update(payload).eq("id", template.id);
+      if (upErr) { setErr("Não foi possível salvar. Tente novamente."); setBusy(false); return; }
+      const { error: delErr } = await supabase.from("package_template_items").delete().eq("template_id", template.id);
+      if (delErr) { setErr("Não foi possível salvar os itens. Tente novamente."); setBusy(false); return; }
     } else {
-      const { data } = await supabase
+      const { data, error: insErr } = await supabase
         .from("package_templates")
         .insert({ salon_id: salonId, ...payload })
         .select("id")
         .single();
-      templateId = data?.id;
+      if (insErr || !data) { setErr("Não foi possível criar o pacote. Tente novamente."); setBusy(false); return; }
+      templateId = data.id;
     }
-    if (templateId) {
-      await supabase.from("package_template_items").insert(
-        validItems.map((i) => ({
-          salon_id: salonId,
-          template_id: templateId!,
-          service_id: i.service_id,
-          quantity: parseInt(i.quantity) || 1,
-        })),
-      );
+
+    const { error: itemsErr } = await supabase.from("package_template_items").insert(
+      validItems.map((i) => ({
+        salon_id: salonId,
+        template_id: templateId!,
+        service_id: i.service_id,
+        quantity: parseInt(i.quantity) || 1,
+      })),
+    );
+    if (itemsErr) {
+      // Recuperação: ao editar, re-insere os itens anteriores (já apagados) para
+      // não deixar o pacote vazio. Ao criar, remove o modelo recém-criado.
+      if (template) {
+        await supabase.from("package_template_items").insert(
+          template.package_template_items.map((i) => ({
+            salon_id: salonId,
+            template_id: template.id,
+            service_id: i.service_id,
+            quantity: i.quantity,
+          })),
+        );
+      } else if (templateId) {
+        await supabase.from("package_templates").delete().eq("id", templateId);
+      }
+      setErr("Não foi possível salvar os itens do pacote. Nada foi alterado.");
+      setBusy(false);
+      return;
     }
+
     setBusy(false);
     onClose();
     router.refresh();
@@ -373,6 +402,8 @@ function TemplateEditor({
             <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
           </div>
         </div>
+
+        {err && <p className="text-sm text-red-600">{err}</p>}
 
         <div className="flex gap-2 pt-1">
           <Button onClick={save} disabled={busy || !name.trim()}>

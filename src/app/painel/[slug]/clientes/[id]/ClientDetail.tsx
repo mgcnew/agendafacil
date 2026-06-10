@@ -131,10 +131,11 @@ function DadosTab({
   const [notes, setNotes] = useState(client.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function save() {
-    setSaving(true); setSaved(false);
-    await supabase.from("clients").update({
+    setSaving(true); setSaved(false); setErr(null);
+    const { error } = await supabase.from("clients").update({
       full_name: name,
       phone: phone || null,
       email: email || null,
@@ -142,7 +143,9 @@ function DadosTab({
       referral_source: referral || null,
       notes: notes || null,
     }).eq("id", client.id);
-    setSaving(false); setSaved(true);
+    setSaving(false);
+    if (error) { setErr("Não foi possível salvar. Tente novamente."); return; }
+    setSaved(true);
     onSaved();
     setTimeout(() => setSaved(false), 2500);
   }
@@ -181,6 +184,7 @@ function DadosTab({
             {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
           </Button>
           {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
+          {err && <span className="text-sm text-red-600">{err}</span>}
         </div>
       )}
     </Card>
@@ -201,18 +205,19 @@ function AnamneseTab({
   const [form, setForm] = useState<AnamnesisForm>(anamnesisToForm(anamnesis));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   function setField<K extends keyof AnamnesisForm>(k: K, v: AnamnesisForm[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
   async function save() {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setErr(null);
     const { data: userRes } = await supabase.auth.getUser();
     const alert = computeAlertSummary(form);
     const consentAt = form.consent_given ? (anamnesis?.consent_at ?? new Date().toISOString()) : null;
 
-    await supabase.from("client_anamnesis").upsert({
+    const { error: upErr } = await supabase.from("client_anamnesis").upsert({
       client_id: client.id,
       salon_id: client.salon_id,
       is_pregnant: form.is_pregnant,
@@ -235,8 +240,10 @@ function AnamneseTab({
       updated_at: new Date().toISOString(),
       updated_by: userRes.user?.id ?? null,
     });
+    if (upErr) { setErr("Não foi possível salvar a ficha. Tente novamente."); setSaving(false); return; }
 
-    await supabase.from("clients").update({ alert_summary: alert }).eq("id", client.id);
+    const { error: alErr } = await supabase.from("clients").update({ alert_summary: alert }).eq("id", client.id);
+    if (alErr) { setErr("Ficha salva, mas o alerta não foi atualizado. Tente novamente."); setSaving(false); return; }
 
     onAlertChange(alert);
     setSaving(false); setSaved(true);
@@ -331,6 +338,7 @@ function AnamneseTab({
             {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar anamnese
           </Button>
           {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
+          {err && <span className="text-sm text-red-600">{err}</span>}
         </div>
       )}
     </div>

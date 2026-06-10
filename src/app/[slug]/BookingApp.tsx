@@ -67,6 +67,13 @@ function toE164(raw: string) {
   return "+55" + digits;
 }
 
+// Data de hoje em YYYY-MM-DD usando componentes LOCAIS (não toISOString, que é
+// UTC e à noite no Brasil pularia para o dia seguinte, bloqueando agendar hoje).
+function todayLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function BookingApp({ salon }: { salon: Salon }) {
   const supabase = useMemo(() => createClient(), []);
   const nicheMeta = NICHES[(salon.niche as Niche)] ?? NICHES.neutro;
@@ -76,10 +83,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [proSvc, setProSvc] = useState<{ member_id: string; service_id: string }[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [pro, setPro] = useState<Professional | null>(null);
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState<string>(() => todayLocal());
+  const [loadingServices, setLoadingServices] = useState(true);
   const [slots, setSlots] = useState<string[]>([]);
   const [slot, setSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  // service_id → desconto % ativo hoje (campanhas)
+  const [discounts, setDiscounts] = useState<Record<string, number>>({});
 
   const [userId, setUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState<string | null>(null);
@@ -95,8 +105,15 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [showMine, setShowMine] = useState(false);
   const [mine, setMine] = useState<Appt[]>([]);
 
+  // preço com desconto da campanha (ignora "sob consulta")
+  const discPct = (s: Service) => (s.price_type === "on_request" ? 0 : discounts[s.id] ?? 0);
+  const effPrice = (s: Service) => {
+    const d = discPct(s);
+    return d > 0 ? Math.round(Number(s.price) * (1 - d / 100) * 100) / 100 : Number(s.price);
+  };
+
   const selectedServices = services.filter((s) => selected.includes(s.id));
-  const totalPrice = selectedServices.reduce((a, s) => a + Number(s.price), 0);
+  const totalPrice = selectedServices.reduce((a, s) => a + effPrice(s), 0);
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
   // preço total varia se algum serviço é "sob consulta" (a combinar) ou "a partir de"
   const hasOnRequest = selectedServices.some((s) => s.price_type === "on_request");
@@ -126,12 +143,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
   useEffect(() => {
     supabase.rpc("public_services", { p_salon: salon.id }).then(({ data }) => {
       setServices((data as Service[]) ?? []);
+      setLoadingServices(false);
     });
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
     });
     supabase.rpc("public_professional_services", { p_salon: salon.id }).then(({ data }) => {
       setProSvc((data as { member_id: string; service_id: string }[]) ?? []);
+    });
+    supabase.rpc("public_campaign_discounts", { p_salon: salon.id }).then(({ data }) => {
+      const map: Record<string, number> = {};
+      for (const r of (data as { service_id: string; discount_percent: number }[]) ?? []) {
+        map[r.service_id] = Number(r.discount_percent);
+      }
+      setDiscounts(map);
     });
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
@@ -309,11 +334,15 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
-          {services.length === 0 && (
+          {loadingServices ? (
+            <div className="py-10 grid place-items-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : services.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
               Este salão ainda não cadastrou serviços.
             </Card>
-          )}
+          ) : null}
           {services.map((s) => {
             const on = selected.includes(s.id);
             return (
@@ -334,7 +363,23 @@ export function BookingApp({ salon }: { salon: Salon }) {
                     <Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}
                   </p>
                 </div>
-                <span className="font-semibold text-primary text-sm text-right">{formatServicePrice(Number(s.price), s.price_type)}</span>
+                <div className="text-right shrink-0">
+                  {discPct(s) > 0 ? (
+                    <>
+                      <span className="block text-[11px] text-muted-foreground line-through">
+                        {s.price_type === "from" ? "A partir de " : ""}{formatBRL(Number(s.price))}
+                      </span>
+                      <span className="font-semibold text-primary text-sm">
+                        {s.price_type === "from" ? "A partir de " : ""}{formatBRL(effPrice(s))}
+                      </span>
+                      <span className="ml-1 inline-block rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 align-middle">
+                        -{discPct(s)}%
+                      </span>
+                    </>
+                  ) : (
+                    <span className="font-semibold text-primary text-sm">{formatServicePrice(Number(s.price), s.price_type)}</span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -390,7 +435,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Calendar
               value={date}
               onChange={setDate}
-              min={new Date().toISOString().slice(0, 10)}
+              min={todayLocal()}
             />
           </div>
           <p className="text-sm text-muted-foreground capitalize">{formatDateLong(date + "T12:00:00")}</p>
@@ -496,8 +541,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <div className="border-t border-border pt-4 space-y-2">
               {selectedServices.map((s) => (
                 <div key={s.id} className="flex justify-between text-sm">
-                  <span>{s.name}</span>
-                  <span className="text-muted-foreground">{formatServicePrice(Number(s.price), s.price_type)}</span>
+                  <span>
+                    {s.name}
+                    {discPct(s) > 0 && (
+                      <span className="ml-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5">-{discPct(s)}%</span>
+                    )}
+                  </span>
+                  {discPct(s) > 0 ? (
+                    <span>
+                      <span className="text-muted-foreground line-through mr-1.5">{formatBRL(Number(s.price))}</span>
+                      <span className="text-foreground">{formatBRL(effPrice(s))}</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{formatServicePrice(Number(s.price), s.price_type)}</span>
+                  )}
                 </div>
               ))}
             </div>

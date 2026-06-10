@@ -47,11 +47,13 @@ export function FinanceManager({
   const pathname = usePathname();
   const [tab, setTab] = useState<"caixa" | "comissoes">(initialTab);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   async function payCommission(c: Comm, outstanding: number) {
     if (!confirm(`Pagar ${formatBRL(outstanding)} de comissão para ${c.name}?`)) return;
     setPayingId(c.member_id);
-    await supabase.rpc("pay_commission", {
+    setErr(null);
+    const { error } = await supabase.rpc("pay_commission", {
       p_salon: salonId,
       p_member: c.member_id,
       p_amount: outstanding,
@@ -59,6 +61,7 @@ export function FinanceManager({
       p_period_end: period.end,
     });
     setPayingId(null);
+    if (error) { setErr("Não foi possível registrar o pagamento da comissão. Tente novamente."); return; }
     router.refresh();
   }
   const [busy, setBusy] = useState(false);
@@ -85,18 +88,21 @@ export function FinanceManager({
 
   async function openCash() {
     setBusy(true);
-    await supabase.from("cash_sessions").insert({
+    setErr(null);
+    const { error } = await supabase.from("cash_sessions").insert({
       salon_id: salonId,
       opening_amount: parseFloat(opening.replace(",", ".")) || 0,
     });
     setBusy(false);
+    if (error) { setErr("Não foi possível abrir o caixa. Tente novamente."); return; }
     router.refresh();
   }
 
   async function addTx() {
     if (!openSession || !amount) return;
     setBusy(true);
-    await supabase.from("cash_transactions").insert({
+    setErr(null);
+    const { error } = await supabase.from("cash_transactions").insert({
       salon_id: salonId,
       session_id: openSession.id,
       type,
@@ -105,6 +111,7 @@ export function FinanceManager({
       payment_method: method,
     });
     setBusy(false);
+    if (error) { setErr("Não foi possível registrar o lançamento. Tente novamente."); return; }
     setAmount(""); setDesc("");
     router.refresh();
   }
@@ -115,6 +122,12 @@ export function FinanceManager({
         <h1 className="font-display text-2xl font-bold">Caixa & Comissões</h1>
         <p className="text-muted-foreground text-sm">Controle financeiro do salão.</p>
       </div>
+
+      {err && (
+        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <X className="h-4 w-4 shrink-0" /> {err}
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-border">
         {(["caixa", "comissoes"] as const).map((t) => (
@@ -274,7 +287,7 @@ export function FinanceManager({
           incomeByMethod={incomeByMethod}
           onClose={() => setClosing(false)}
           onConfirm={async (counted) => {
-            await supabase
+            const { error } = await supabase
               .from("cash_sessions")
               .update({
                 closed_at: new Date().toISOString(),
@@ -283,6 +296,7 @@ export function FinanceManager({
                 difference: counted - expectedCash,
               })
               .eq("id", openSession.id);
+            if (error) { setErr("Não foi possível fechar o caixa. Tente novamente."); return; }
             setClosing(false);
             router.refresh();
           }}

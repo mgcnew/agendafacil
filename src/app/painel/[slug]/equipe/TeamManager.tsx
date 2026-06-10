@@ -6,7 +6,7 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
-  Copy, Check, Link2, Trash2, Mail, Scissors,
+  Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -100,19 +100,28 @@ export function TeamManager({
 
   async function revokeInvite(inv: Invite) {
     if (!confirm(`Cancelar o convite de ${inv.email}?`)) return;
+    setErr(null);
+    const prev = invites;
     setInvites((x) => x.filter((i) => i.id !== inv.id));
-    await supabase.rpc("revoke_invite", { p_id: inv.id });
+    const { error } = await supabase.rpc("revoke_invite", { p_id: inv.id });
+    if (error) { setInvites(prev); setErr("Não foi possível cancelar o convite. Tente novamente."); }
   }
 
   async function changeRole(member: Member, newRole: Role) {
+    setErr(null);
+    const prev = members;
     setMembers((m) => m.map((x) => (x.id === member.id ? { ...x, role: newRole } : x)));
-    await supabase.from("salon_members").update({ role: newRole }).eq("id", member.id);
+    const { error } = await supabase.from("salon_members").update({ role: newRole }).eq("id", member.id);
+    if (error) { setMembers(prev); setErr("Não foi possível alterar o cargo. Tente novamente."); }
   }
 
   async function deactivate(member: Member) {
     if (!confirm(`Remover ${member.profiles?.full_name ?? "esta pessoa"} da equipe?`)) return;
+    setErr(null);
+    const prev = members;
     setMembers((m) => m.filter((x) => x.id !== member.id));
-    await supabase.from("salon_members").delete().eq("id", member.id);
+    const { error } = await supabase.from("salon_members").delete().eq("id", member.id);
+    if (error) { setMembers(prev); setErr("Não foi possível remover — a pessoa pode ter agendamentos vinculados."); }
   }
 
   return (
@@ -128,6 +137,13 @@ export function TeamManager({
           </Button>
         )}
       </div>
+
+      {/* Erros de ações fora do formulário (revogar, cargo, remover) */}
+      {err && !adding && (
+        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+        </div>
+      )}
 
       {adding && (
         <Card className="p-6 space-y-4 af-rise">
@@ -329,6 +345,7 @@ function ServicesEditor({
   const [state, setState] = useState<Record<string, { on: boolean; commission: string }>>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -360,8 +377,18 @@ function ServicesEditor({
 
   async function save() {
     setSaving(true);
+    setErr(null);
+
+    // Guarda o estado atual no banco para restaurar se o insert falhar.
+    const { data: prevRows } = await supabase
+      .from("professional_services")
+      .select("salon_id, member_id, service_id, commission_percent")
+      .eq("member_id", member.id);
+
     // estratégia simples: remove tudo e reinsere os marcados
-    await supabase.from("professional_services").delete().eq("member_id", member.id);
+    const { error: delErr } = await supabase.from("professional_services").delete().eq("member_id", member.id);
+    if (delErr) { setErr("Não foi possível salvar. Tente novamente."); setSaving(false); return; }
+
     const rows = services
       .filter((sv) => state[sv.id]?.on)
       .map((sv) => {
@@ -373,7 +400,15 @@ function ServicesEditor({
           commission_percent: c ? parseFloat(c.replace(",", ".")) : null,
         };
       });
-    if (rows.length) await supabase.from("professional_services").insert(rows);
+    if (rows.length) {
+      const { error: insErr } = await supabase.from("professional_services").insert(rows);
+      if (insErr) {
+        if (prevRows?.length) await supabase.from("professional_services").insert(prevRows);
+        setErr("Não foi possível salvar os serviços. Nada foi alterado.");
+        setSaving(false);
+        return;
+      }
+    }
     setSaving(false);
     onSaved(rows.length);
   }
@@ -431,6 +466,8 @@ function ServicesEditor({
           </div>
         )}
 
+        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+
         <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
@@ -460,6 +497,7 @@ function PermissionsEditor({
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   // carrega overrides existentes
   useEffect(() => {
@@ -487,15 +525,17 @@ function PermissionsEditor({
 
   async function save() {
     setSaving(true);
+    setErr(null);
     // grava todos como overrides explícitos (allowed conforme estado atual)
     const rows = permissions.map((p) => ({
       member_id: member.id,
       permission_key: p.key,
       allowed: isOn(p.key),
     }));
-    await supabase
+    const { error } = await supabase
       .from("member_permissions")
       .upsert(rows, { onConflict: "member_id,permission_key" });
+    if (error) { setErr("Não foi possível salvar as permissões. Tente novamente."); setSaving(false); return; }
     setSaving(false);
     onClose();
   }
@@ -549,6 +589,8 @@ function PermissionsEditor({
             ))}
           </div>
         )}
+
+        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
 
         <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
           <Button onClick={save} disabled={saving}>

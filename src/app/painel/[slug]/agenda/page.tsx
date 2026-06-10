@@ -15,7 +15,7 @@ export default async function AgendaPage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const [{ data: pros }, { data: services }, { data: clients }] = await Promise.all([
+  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }] = await Promise.all([
     supabase
       .from("salon_members")
       .select("id, display_name, profiles(full_name), commission_percent, color")
@@ -31,7 +31,13 @@ export default async function AgendaPage({
       .select("id, full_name, phone")
       .eq("salon_id", membership.salon_id)
       .order("full_name"),
+    supabase.rpc("public_campaign_discounts", { p_salon: membership.salon_id }),
   ]);
+
+  const discounts: Record<string, number> = {};
+  for (const r of (discountRows as { service_id: string; discount_percent: number }[] | null) ?? []) {
+    discounts[r.service_id] = Number(r.discount_percent);
+  }
 
   const proList = (pros ?? []).map((p) => ({
     id: p.id,
@@ -46,6 +52,7 @@ export default async function AgendaPage({
       pros={proList}
       services={services ?? []}
       clients={clients ?? []}
+      discounts={discounts}
     />
   );
 }

@@ -155,6 +155,7 @@ function AccessPanel({
   const [role, setRole] = useState<Role>("manager");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // estado efetivo inicial por cargo: default global ⊕ ajuste do salão
   const initialFor = (r: Role) => {
@@ -177,6 +178,8 @@ function AccessPanel({
 
   async function save() {
     setSaving(true);
+    setSaved(false);
+    setError(null);
     const supabase = createClient();
     // grava o cargo atual como overrides explícitos do salão
     const rows = permissions.map((p) => ({
@@ -185,10 +188,14 @@ function AccessPanel({
       permission_key: p.key,
       allowed: !!state[role][p.key],
     }));
-    await supabase
+    const { error: e } = await supabase
       .from("salon_role_permissions")
       .upsert(rows, { onConflict: "salon_id,role,permission_key" });
     setSaving(false);
+    if (e) {
+      setError("Não foi possível salvar as permissões. Tente novamente.");
+      return;
+    }
     setSaved(true);
     router.refresh();
     setTimeout(() => setSaved(false), 2500);
@@ -253,7 +260,7 @@ function AccessPanel({
         </div>
       </Card>
 
-      <SaveBar onSave={save} saving={saving} saved={saved} />
+      <SaveBar onSave={save} saving={saving} saved={saved} error={error} />
     </div>
   );
 }

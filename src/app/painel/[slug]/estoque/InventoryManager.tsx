@@ -37,10 +37,12 @@ export function InventoryManager({
   const [cost, setCost] = useState("");
   const [sale, setSale] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function add() {
     if (!name) return;
     setBusy(true);
+    setErr(null);
     const { data, error } = await supabase
       .from("products")
       .insert({
@@ -54,16 +56,20 @@ export function InventoryManager({
       .select()
       .single();
     setBusy(false);
-    if (!error && data) {
-      setProducts((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setName(""); setQty("0"); setMin("0"); setCost(""); setSale(""); setAdding(false);
+    if (error || !data) {
+      setErr("Não foi possível cadastrar o produto. Tente novamente.");
+      return;
     }
+    setProducts((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setName(""); setQty("0"); setMin("0"); setCost(""); setSale(""); setAdding(false);
   }
 
   async function adjust(p: Product, delta: number) {
+    setErr(null);
+    const prev = products;
     const newQty = Math.max(0, Number(p.quantity) + delta);
     setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, quantity: newQty } : x)));
-    await Promise.all([
+    const [{ error: updErr }, { error: movErr }] = await Promise.all([
       supabase.from("products").update({ quantity: newQty }).eq("id", p.id),
       supabase.from("stock_movements").insert({
         salon_id: salonId,
@@ -72,12 +78,22 @@ export function InventoryManager({
         quantity: Math.abs(delta),
       }),
     ]);
+    if (updErr || movErr) {
+      setProducts(prev); // restaura a quantidade anterior
+      setErr("Não foi possível atualizar o estoque. Tente novamente.");
+    }
   }
 
   async function remove(id: string) {
     if (!confirm("Remover este produto?")) return;
+    setErr(null);
+    const prev = products;
     setProducts((p) => p.filter((x) => x.id !== id));
-    await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      setProducts(prev); // restaura: provável vínculo com movimentações/atendimentos
+      setErr("Não foi possível remover este produto — ele pode ter movimentações vinculadas.");
+    }
   }
 
   const lowStock = products.filter((p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0);
@@ -100,6 +116,12 @@ export function InventoryManager({
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 text-amber-800 p-3 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {lowStock.length} produto(s) no estoque mínimo: {lowStock.map((p) => p.name).join(", ")}
+        </div>
+      )}
+
+      {err && (
+        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -197,7 +219,7 @@ export function InventoryManager({
                     <p className="text-sm font-medium truncate">{m.products?.name ?? "Produto"}</p>
                     <p className="text-xs text-muted-foreground">
                       {m.reason ?? (out ? "Saída" : m.type === "in" ? "Entrada" : "Ajuste")} ·{" "}
-                      {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
                     </p>
                   </div>
                   <span className={`text-sm font-semibold tabular-nums ${out ? "text-red-600" : "text-emerald-600"}`}>
