@@ -86,6 +86,20 @@ export function Select({
     };
   }, [open, updateRect]);
 
+  // Posiciona o menu (portal). Abre para cima quando não há espaço abaixo
+  // (evita cortar no rodapé de modais/da viewport) e limita a altura.
+  function menuStyle(r: DOMRect): React.CSSProperties {
+    const GAP = 4;
+    const MAX = 240;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const spaceAbove = r.top;
+    const flipUp = spaceBelow < Math.min(MAX, 180) && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(120, Math.min(MAX, (flipUp ? spaceAbove : spaceBelow) - GAP - 4));
+    return flipUp
+      ? { position: "fixed", bottom: window.innerHeight - r.top + GAP, left: r.left, width: r.width, maxHeight }
+      : { position: "fixed", top: r.bottom + GAP, left: r.left, width: r.width, maxHeight };
+  }
+
   return (
     <>
       <button
@@ -118,8 +132,8 @@ export function Select({
           role="listbox"
           data-niche={theme.niche}
           data-color={theme.color}
-          style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width }}
-          className="z-[60] max-h-60 overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground"
+          style={menuStyle(rect)}
+          className="z-[60] overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground"
         >
           {options.map((o) => {
             const on = o.value === value;

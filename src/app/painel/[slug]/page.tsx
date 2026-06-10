@@ -99,7 +99,7 @@ export default async function DashboardPage({
           <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
         </div>
         <Link
-          href={`/painel/${slug}/agenda`}
+          href={`/painel/${slug}/agenda?novo=1`}
           className="inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium"
         >
           <Plus className="h-4 w-4" /> Novo agendamento

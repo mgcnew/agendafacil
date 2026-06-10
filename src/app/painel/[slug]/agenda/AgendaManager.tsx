@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { Calendar } from "@/components/Calendar";
 import { formatBRL } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
 import {
-  Plus, Loader2, ChevronLeft, ChevronRight, X, AlertTriangle, CalendarOff,
+  Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, AlertTriangle, CalendarOff,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -560,6 +562,9 @@ export function AgendaManager({
   discounts?: Record<string, number>;
 }) {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [view, setView]             = useState<View>("dia");
   const [date, setDate]             = useState(() => toStr(new Date()));
   const [selectedPros, setSelected] = useState<string[]>([]);
@@ -568,6 +573,19 @@ export function AgendaManager({
   const [creating, setCreating]     = useState(false);
   const [createDate, setCreateDate] = useState(date);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
+
+  // Abre o modal de criação quando chega com ?novo=1 (ex.: botão da Visão geral),
+  // depois limpa o parâmetro para não reabrir em refresh/voltar.
+  const openedFromUrl = useRef(false);
+  useEffect(() => {
+    if (openedFromUrl.current) return;
+    if (searchParams.get("novo") === "1") {
+      openedFromUrl.current = true;
+      setCreateDate(toStr(new Date()));
+      setCreating(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, router, pathname]);
 
   const activePros = useMemo(
     () => (selectedPros.length === 0 ? [] : pros.filter(p => selectedPros.includes(p.id))),
@@ -913,7 +931,7 @@ function FinalizeModal({
 
 // ── Create Appointment Modal ───────────────────────────────────
 function CreateAppointment({
-  salonId, pros, services, clients, discounts, date, onClose, onCreated,
+  salonId, pros, services, clients, discounts, date: initialDate, onClose, onCreated,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts: Record<string, number>;
@@ -925,9 +943,18 @@ function CreateAppointment({
   const [existingClient, setExisting]   = useState("");
   const [proId, setProId]               = useState(pros[0]?.id ?? "");
   const [selected, setSelected]         = useState<string[]>([]);
-  const [time, setTime]                 = useState("09:00");
+  const [date, setDate]                 = useState(initialDate);
+  const [showCal, setShowCal]           = useState(false);
+  const [slot, setSlot]                 = useState<string>("");
+  const [slots, setSlots]               = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
+
+  const dateLabel = (() => {
+    const d = parse(date);
+    return `${DAY_SHORT[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`;
+  })();
 
   const discOf     = (s: Service) => discounts[s.id] ?? 0;
   const effOf      = (s: Service) => {
@@ -936,8 +963,33 @@ function CreateAppointment({
   };
   const chosen     = services.filter(s => selected.includes(s.id));
   const totalPrice = chosen.reduce((a, s) => a + effOf(s), 0);
+  const totalDuration = chosen.reduce((a, s) => a + s.duration_min, 0);
+
+  // Horários livres via RPC: já exclui passados (slot > now) e reservados
+  // (segments_conflict), respeitando o horário de trabalho da profissional.
+  // Recarrega ao trocar profissional, data ou serviços (a duração total
+  // define o tamanho do slot pedido).
+  useEffect(() => {
+    if (!proId || totalDuration <= 0) { setSlots([]); setSlot(""); return; }
+    let cancelled = false;
+    setLoadingSlots(true);
+    supabase
+      .rpc("get_availability", { p_salon: salonId, p_member: proId, p_date: date, p_duration: totalDuration })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const list = (data as string[]) ?? [];
+        setSlots(list);
+        setSlot(cur => (list.includes(cur) ? cur : ""));
+        setLoadingSlots(false);
+      });
+    return () => { cancelled = true; };
+  }, [supabase, salonId, proId, date, totalDuration]);
+
+  const slotLabel = (iso: string) =>
+    new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
   async function create() {
+    if (!slot) { setErr("Escolha um horário disponível."); return; }
     setBusy(true); setErr(null);
     try {
       let clientId = existingClient || null;
@@ -953,7 +1005,7 @@ function CreateAppointment({
       const { error } = await supabase.rpc("create_staff_appointment", {
         p_salon: salonId, p_member: proId, p_client: clientId,
         p_service_ids: selected,
-        p_starts_at: new Date(`${date}T${time}:00`).toISOString(),
+        p_starts_at: slot,
       });
       if (error) {
         const m = error.message;
@@ -1038,10 +1090,45 @@ function CreateAppointment({
             </div>
           </div>
 
+          {/* Data — usa o calendário temático (sem o seletor nativo do navegador) */}
+          <div className="space-y-1.5">
+            <Label>Data</Label>
+            <button
+              type="button"
+              onClick={() => setShowCal(v => !v)}
+              aria-expanded={showCal}
+              className="h-11 w-full flex items-center justify-between rounded-[var(--radius)] border border-border bg-card px-3.5 text-sm text-foreground hover:border-foreground/25 transition"
+            >
+              <span className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                {dateLabel}
+              </span>
+              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
+            </button>
+            {showCal && (
+              <Calendar
+                value={date}
+                onChange={(d) => { setDate(d); setShowCal(false); }}
+                className="mt-1"
+              />
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Horário</Label>
-              <Input type="time" value={time} onChange={e => setTime(e.target.value)} />
+              <Select
+                value={slot}
+                onValueChange={setSlot}
+                disabled={loadingSlots || slots.length === 0}
+                placeholder={
+                  totalDuration <= 0 ? "Escolha serviços"
+                    : loadingSlots ? "Carregando…"
+                      : slots.length === 0 ? "Sem horários" : "Selecione"
+                }
+              >
+                {slots.map(s => <option key={s} value={s}>{slotLabel(s)}</option>)}
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Total</Label>
@@ -1049,8 +1136,14 @@ function CreateAppointment({
             </div>
           </div>
 
+          {proId && totalDuration > 0 && !loadingSlots && slots.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Nenhum horário livre nesta data para esta profissional. Verifique os horários de trabalho em Configurações.
+            </p>
+          )}
+
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <Button className="w-full" onClick={create} disabled={busy || selected.length === 0}>
+          <Button className="w-full" onClick={create} disabled={busy || selected.length === 0 || !slot}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Criar agendamento
           </Button>
         </div>
