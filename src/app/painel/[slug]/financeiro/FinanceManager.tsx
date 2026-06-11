@@ -16,6 +16,7 @@ type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
 type Comm = { member_id: string; name: string; earned: number; paid: number };
 type Period = { label: string; prevCmes: string; nextCmes: string; start: string; end: string };
+export type Receivable = { id: string; client: string; member_id: string; total: number; time: string; services: string[] };
 
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
   dinheiro: { label: "Dinheiro", icon: Banknote },
@@ -30,6 +31,7 @@ export function FinanceManager({
   transactions,
   commissions,
   closedSessions,
+  receivable,
   initialTab,
   period,
 }: {
@@ -39,6 +41,7 @@ export function FinanceManager({
   transactions: Tx[];
   commissions: Comm[];
   closedSessions: Session[];
+  receivable: Receivable[];
   initialTab: "caixa" | "comissoes";
   period: Period;
 }) {
@@ -73,6 +76,7 @@ export function FinanceManager({
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
   const [method, setMethod] = useState("dinheiro");
+  const [selectedAppt, setSelectedAppt] = useState(""); // recebimento vinculado a um atendimento
 
   const income = transactions.filter((t) => t.type === "income").reduce((a, t) => a + Number(t.amount), 0);
   const expense = transactions.filter((t) => t.type === "expense").reduce((a, t) => a + Number(t.amount), 0);
@@ -99,9 +103,24 @@ export function FinanceManager({
   }
 
   async function addTx() {
-    if (!openSession || !amount) return;
+    if (!openSession) return;
     setBusy(true);
     setErr(null);
+
+    // Recebimento de um atendimento → finaliza (lança entrada + comissão + estoque)
+    if (type === "income" && selectedAppt) {
+      const { error } = await supabase.rpc("finalize_appointment", {
+        p_appointment: selectedAppt,
+        p_payment_method: method,
+      });
+      setBusy(false);
+      if (error) { setErr("Não foi possível registrar o recebimento. Tente novamente."); return; }
+      setSelectedAppt(""); setAmount(""); setDesc("");
+      router.refresh();
+      return;
+    }
+
+    if (!amount) { setBusy(false); return; }
     const { error } = await supabase.from("cash_transactions").insert({
       salon_id: salonId,
       session_id: openSession.id,
@@ -189,22 +208,56 @@ export function FinanceManager({
               {canManage && (
                 <Card className="p-6 space-y-4">
                   <h3 className="font-display font-semibold flex items-center gap-2"><Plus className="h-4 w-4" /> Nova movimentação</h3>
+
+                  {/* Receber de uma cliente (atendimentos a receber hoje) */}
+                  {type === "income" && receivable.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="receber">Receber de uma cliente ({receivable.length} a receber)</Label>
+                      <Select
+                        id="receber"
+                        value={selectedAppt}
+                        onValueChange={(v) => {
+                          setSelectedAppt(v);
+                          const r = receivable.find((x) => x.id === v);
+                          if (r) {
+                            setAmount(String(Number(r.total)).replace(".", ","));
+                            setDesc(`Atendimento · ${r.client}`);
+                          } else {
+                            setAmount(""); setDesc("");
+                          }
+                        }}
+                      >
+                        <option value="">Lançamento avulso</option>
+                        {receivable.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.time} · {r.client} · {formatBRL(Number(r.total))}
+                          </option>
+                        ))}
+                      </Select>
+                      {selectedAppt && (
+                        <p className="text-xs text-muted-foreground">
+                          Ao lançar, o atendimento é finalizado — comissão e baixa de estoque são lançadas automaticamente.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid sm:grid-cols-4 gap-3">
-                    <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+                    <Select value={type} onValueChange={(v) => { setType(v as "income" | "expense"); if (v === "expense") { setSelectedAppt(""); } }}>
                       <option value="income">Entrada</option>
                       <option value="expense">Saída</option>
                     </Select>
-                    <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                    <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!!selectedAppt} />
                     <Select value={method} onValueChange={setMethod}>
                       <option value="dinheiro">Dinheiro</option>
                       <option value="pix">Pix</option>
                       <option value="cartao">Cartão</option>
                     </Select>
-                    <Input placeholder="Descrição" value={desc} onChange={(e) => setDesc(e.target.value)} />
+                    <Input placeholder="Descrição" value={desc} onChange={(e) => setDesc(e.target.value)} disabled={!!selectedAppt} />
                   </div>
                   <div className="flex justify-between items-center">
-                    <Button onClick={addTx} disabled={busy || !amount}>
-                      {busy && <Loader2 className="h-4 w-4 animate-spin" />} Lançar
+                    <Button onClick={addTx} disabled={busy || (!amount && !selectedAppt)}>
+                      {busy && <Loader2 className="h-4 w-4 animate-spin" />} {selectedAppt ? "Receber" : "Lançar"}
                     </Button>
                     <Button variant="outline" onClick={() => setClosing(true)}>
                       <Lock className="h-4 w-4" /> Fechar caixa

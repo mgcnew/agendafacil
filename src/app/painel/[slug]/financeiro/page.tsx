@@ -3,7 +3,7 @@ import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
-import { FinanceManager } from "./FinanceManager";
+import { FinanceManager, type Receivable } from "./FinanceManager";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +119,12 @@ export default async function FinanceiroPage({
     .map(([member_id, v]) => ({ member_id, name: v.name, earned: v.earned, paid: paidMap.get(member_id) ?? 0 }))
     .sort((a, b) => b.earned - a.earned);
 
+  // Atendimentos de hoje ainda não pagos (para "Receber de uma cliente")
+  const { data: receivableRaw } = await supabase.rpc("receivable_today" as never, {
+    p_salon: salonId,
+  } as never);
+  const receivable = (Array.isArray(receivableRaw) ? receivableRaw : []) as Receivable[];
+
   return (
     <FinanceManager
       salonId={salonId}
@@ -127,6 +133,7 @@ export default async function FinanceiroPage({
       transactions={transactions}
       commissions={commissions}
       closedSessions={closedSessions ?? []}
+      receivable={receivable}
       initialTab={tab === "comissoes" ? "comissoes" : "caixa"}
       period={{
         label: `${MONTHS[pm - 1]} ${py}`,
