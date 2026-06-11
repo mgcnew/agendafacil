@@ -18,6 +18,7 @@ import {
   Settings,
   Scissors,
   BadgePercent,
+  BarChart3,
   Ellipsis,
   X,
   LogOut,
@@ -39,6 +40,7 @@ const ICONS = {
   Package,
   Settings,
   BadgePercent,
+  BarChart3,
 } as const;
 
 export type NavItem = {

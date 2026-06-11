@@ -13,6 +13,7 @@ const NAV: { item: NavItem; perms?: string[] }[] = [
   { item: { href: "/clientes", label: "Clientes", icon: "UsersRound" }, perms: ["clients.view"] },
   { item: { href: "/pacotes", label: "Pacotes", icon: "Package" }, perms: ["packages.view"] },
   { item: { href: "/financeiro", label: "Caixa & Comissões", icon: "Banknote" }, perms: ["cash.view"] },
+  { item: { href: "/relatorios", label: "Relatórios", icon: "BarChart3" }, perms: ["reports.view"] },
   { item: { href: "/estoque", label: "Estoque", icon: "Boxes" }, perms: ["inventory.view"] },
   // Horários virou tab dentro de Configurações; engrenagem aparece com qualquer perm relevante
   { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage", "team.manage"] },
