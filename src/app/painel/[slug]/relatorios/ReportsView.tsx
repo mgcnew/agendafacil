@@ -21,7 +21,12 @@ import {
   FileSpreadsheet,
   UserRoundCheck,
   MessageCircle,
+  Thermometer,
+  Flame,
+  Snowflake,
+  BadgePercent,
 } from "lucide-react";
+import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
 
 export type ReportData = {
@@ -51,7 +56,11 @@ const monthLabel = (cmes: string) => {
   return `${MONTHS[m - 1]} ${y}`;
 };
 
-type Tab = "financeiro" | "operacional" | "reativacao";
+type Tab = "financeiro" | "operacional" | "reativacao" | "temperatura";
+
+export type HeatCell = { weekday: number; hour: number; revenue: number; count: number };
+export type HeatWeekday = { weekday: number; revenue: number; count: number; occupation: number | null };
+export type HeatmapData = { cells: HeatCell[]; weekdays: HeatWeekday[] };
 
 export type ReactClient = {
   id: string;
@@ -94,7 +103,9 @@ export function ReportsView({
   const [data, setData] = useState<ReportData | null>(initialData);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>(
-    initialTab === "operacional" || initialTab === "reativacao" ? initialTab : "financeiro",
+    initialTab === "operacional" || initialTab === "reativacao" || initialTab === "temperatura"
+      ? initialTab
+      : "financeiro",
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -102,6 +113,32 @@ export function ReportsView({
   // Reativação carrega sob demanda (não depende do período)
   const [react, setReact] = useState<ReactClient[] | null>(null);
   const [reactLoading, setReactLoading] = useState(false);
+
+  // Temperatura (heatmap) — depende do período; recarrega ao abrir a aba ou trocar de mês
+  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
+  const [heatLoading, setHeatLoading] = useState(false);
+  const [heatCmes, setHeatCmes] = useState<string | null>(null);
+
+  const loadHeatmap = useCallback(
+    async (target: string) => {
+      setHeatLoading(true);
+      setHeatCmes(target);
+      const { start, end } = monthRangeBR(target);
+      const res = await supabase.rpc("report_heatmap" as never, {
+        p_salon: salonId,
+        p_from: start,
+        p_to: end,
+      } as never);
+      setHeatmap(((res as { data: HeatmapData | null }).data) ?? null);
+      setHeatLoading(false);
+    },
+    [supabase, salonId],
+  );
+
+  useEffect(() => {
+    if (tab === "temperatura" && heatCmes !== cmes && !heatLoading) loadHeatmap(cmes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, cmes]);
 
   const loadReact = useCallback(async () => {
     setReactLoading(true);
@@ -234,6 +271,7 @@ export function ReportsView({
         {([
           { id: "financeiro", label: "Financeiro", icon: Wallet },
           { id: "operacional", label: "Serviços & Profissionais", icon: Sparkles },
+          { id: "temperatura", label: "Temperatura", icon: Thermometer },
           { id: "reativacao", label: "Reativação", icon: UserRoundCheck },
         ] as const).map((t) => {
           const on = tab === t.id;
@@ -259,7 +297,9 @@ export function ReportsView({
         })}
       </div>
 
-      {tab === "reativacao" ? (
+      {tab === "temperatura" ? (
+        <TemperaturaTab data={heatmap} loading={heatLoading} slug={slug} />
+      ) : tab === "reativacao" ? (
         <ReativacaoTab clients={react} loading={reactLoading} salonName={salonName} slug={slug} />
       ) : loading ? (
         <div className="grid place-items-center py-20 text-muted-foreground">
@@ -449,6 +489,160 @@ function ReativacaoTab({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── Temperatura ───────────────────────── */
+
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const WEEKDAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+type Temp = "quente" | "morno" | "frio";
+
+function TempBadge({ t }: { t: Temp | null }) {
+  if (t === null)
+    return <span className="text-xs text-muted-foreground">Fechado</span>;
+  const map = {
+    quente: { icon: Flame, label: "Quente", cls: "bg-orange-500/15 text-orange-600" },
+    morno: { icon: Thermometer, label: "Morno", cls: "bg-amber-500/15 text-amber-600" },
+    frio: { icon: Snowflake, label: "Frio", cls: "bg-sky-500/15 text-sky-600" },
+  }[t];
+  const Icon = map.icon;
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", map.cls)}>
+      <Icon className="h-3.5 w-3.5" /> {map.label}
+    </span>
+  );
+}
+
+function TemperaturaTab({
+  data,
+  loading,
+  slug,
+}: {
+  data: HeatmapData | null;
+  loading: boolean;
+  slug: string;
+}) {
+  if (loading || data === null) {
+    return (
+      <div className="grid place-items-center py-20 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  const totalCount = data.weekdays.reduce((s, w) => s + w.count, 0);
+  if (totalCount === 0) {
+    return (
+      <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
+        <Thermometer className="mx-auto h-8 w-8 text-muted-foreground/50" />
+        <p className="mt-3 font-medium">Sem movimento neste período</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Conforme os atendimentos acontecem, mostramos seus dias e horários quentes e frios.
+        </p>
+      </div>
+    );
+  }
+
+  const maxRev = Math.max(...data.weekdays.map((w) => w.revenue), 1);
+  const temp = (w: HeatWeekday): Temp | null => {
+    if (w.occupation === null) return null; // fechado
+    const r = w.revenue / maxRev;
+    if (r >= 0.66) return "quente";
+    if (r >= 0.33) return "morno";
+    return "frio";
+  };
+
+  // Heatmap dia × hora
+  const cellMap = new Map<string, HeatCell>();
+  for (const c of data.cells) cellMap.set(`${c.weekday}-${c.hour}`, c);
+  const maxCell = Math.max(...data.cells.map((c) => c.revenue), 1);
+  const hoursWithData = data.cells.map((c) => c.hour);
+  const minH = hoursWithData.length ? Math.min(...hoursWithData) : 9;
+  const maxH = hoursWithData.length ? Math.max(...hoursWithData) : 18;
+  const hourRange: number[] = [];
+  for (let h = minH; h <= maxH; h++) hourRange.push(h);
+
+  return (
+    <div className="space-y-6">
+      {/* Termômetro por dia da semana */}
+      <Card className="p-5 min-w-0">
+        <h2 className="font-display font-semibold">Termômetro por dia da semana</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Quente = mais movimento e faturamento; frio = oportunidade de aquecer com uma promoção.
+        </p>
+        <div className="mt-4 space-y-2">
+          {data.weekdays.map((w) => {
+            const t = temp(w);
+            return (
+              <div key={w.weekday} className="rounded-[var(--radius)] border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm">{WEEKDAYS[w.weekday]}</span>
+                  <TempBadge t={t} />
+                </div>
+                {t !== null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ocupação <span className="font-medium text-foreground">{w.occupation}%</span>
+                    {" · "}{formatBRL(w.revenue)}{" · "}{w.count} atend.
+                  </p>
+                )}
+                {t === "frio" && (
+                  <Link
+                    href={`/painel/${slug}/campanhas`}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                  >
+                    <BadgePercent className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Heatmap dia × hora */}
+      {data.cells.length > 0 && (
+        <Card className="p-5 min-w-0">
+          <h2 className="font-display font-semibold">Movimento por dia e horário</h2>
+          <p className="text-sm text-muted-foreground mt-1">Mais escuro = mais faturamento naquele horário.</p>
+          <div className="mt-4 overflow-x-auto no-scrollbar">
+            <div className="min-w-[16rem]">
+              {/* Cabeçalho */}
+              <div className="grid" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
+                <div />
+                {WEEKDAYS_SHORT.map((d) => (
+                  <div key={d} className="text-center text-[11px] font-medium text-muted-foreground pb-1">{d}</div>
+                ))}
+              </div>
+              {/* Linhas por hora */}
+              {hourRange.map((h) => (
+                <div key={h} className="grid items-center" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
+                  <div className="text-[10px] text-muted-foreground tabular-nums pr-1 text-right">{String(h).padStart(2, "0")}h</div>
+                  {Array.from({ length: 7 }, (_, wd) => {
+                    const cell = cellMap.get(`${wd}-${h}`);
+                    const intensity = cell ? cell.revenue / maxCell : 0;
+                    return (
+                      <div key={wd} className="px-0.5 py-0.5">
+                        <div
+                          className="h-6 rounded-sm border border-border/40"
+                          style={{
+                            backgroundColor: intensity > 0
+                              ? `color-mix(in srgb, var(--primary) ${Math.round(15 + intensity * 85)}%, transparent)`
+                              : "transparent",
+                          }}
+                          title={cell ? `${WEEKDAYS_SHORT[wd]} ${h}h · ${formatBRL(cell.revenue)} · ${cell.count} atend.` : `${WEEKDAYS_SHORT[wd]} ${h}h · sem movimento`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
