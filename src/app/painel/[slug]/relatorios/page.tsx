@@ -8,10 +8,13 @@ export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug } = await params;
+  const { tab } = await searchParams;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
 
@@ -34,6 +37,13 @@ export default async function RelatoriosPage({
   const initial = (res.data ?? null) as ReportData | null;
 
   return (
-    <ReportsView salonId={membership.salon_id} initialCmes={cmes} initialData={initial} />
+    <ReportsView
+      salonId={membership.salon_id}
+      salonName={membership.salons.name}
+      slug={slug}
+      initialCmes={cmes}
+      initialData={initial}
+      initialTab={tab}
+    />
   );
 }

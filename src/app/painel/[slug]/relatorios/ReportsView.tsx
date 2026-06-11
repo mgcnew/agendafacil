@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui";
 import { cn, formatBRL, monthRangeBR } from "@/lib/utils";
@@ -19,6 +19,8 @@ import {
   ChevronDown,
   FileText,
   FileSpreadsheet,
+  UserRoundCheck,
+  MessageCircle,
 } from "lucide-react";
 import { exportReportCsv, exportReportPdf } from "./export";
 
@@ -49,7 +51,19 @@ const monthLabel = (cmes: string) => {
   return `${MONTHS[m - 1]} ${y}`;
 };
 
-type Tab = "financeiro" | "operacional";
+type Tab = "financeiro" | "operacional" | "reativacao";
+
+export type ReactClient = {
+  id: string;
+  name: string;
+  phone: string | null;
+  visits: number;
+  total_spent: number;
+  expected_interval: number;
+  days_since: number;
+  last_visit: string;
+  overdue_by: number;
+};
 
 const PAYMENT_LABELS: Record<string, string> = {
   dinheiro: "Dinheiro",
@@ -62,20 +76,56 @@ const payLabel = (m: string) => PAYMENT_LABELS[m] ?? m;
 
 export function ReportsView({
   salonId,
+  salonName,
+  slug,
   initialCmes,
   initialData,
+  initialTab,
 }: {
   salonId: string;
+  salonName: string;
+  slug: string;
   initialCmes: string;
   initialData: ReportData | null;
+  initialTab?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [cmes, setCmes] = useState(initialCmes);
   const [data, setData] = useState<ReportData | null>(initialData);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<Tab>("financeiro");
+  const [tab, setTab] = useState<Tab>(
+    initialTab === "operacional" || initialTab === "reativacao" ? initialTab : "financeiro",
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Reativação carrega sob demanda (não depende do período)
+  const [react, setReact] = useState<ReactClient[] | null>(null);
+  const [reactLoading, setReactLoading] = useState(false);
+
+  const loadReact = useCallback(async () => {
+    setReactLoading(true);
+    const res = await supabase.rpc("report_reactivation" as never, {
+      p_salon: salonId,
+      p_min_days: 14,
+    } as never);
+    setReact((((res as { data: ReactClient[] | null }).data) ?? []));
+    setReactLoading(false);
+  }, [supabase, salonId]);
+
+  const selectTab = useCallback(
+    (t: Tab) => {
+      setTab(t);
+      if (t === "reativacao" && react === null && !reactLoading) loadReact();
+    },
+    [react, reactLoading, loadReact],
+  );
+
+  // Se a aba inicial for reativação (deep-link do dashboard), já carrega
+  useEffect(() => {
+    if (tab === "reativacao" && react === null && !reactLoading) loadReact();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const now = useMemo(() => {
     const d = new Date();
@@ -184,12 +234,13 @@ export function ReportsView({
         {([
           { id: "financeiro", label: "Financeiro", icon: Wallet },
           { id: "operacional", label: "Serviços & Profissionais", icon: Sparkles },
+          { id: "reativacao", label: "Reativação", icon: UserRoundCheck },
         ] as const).map((t) => {
           const on = tab === t.id;
           return (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
               aria-current={on ? "page" : undefined}
               className={cn(
                 "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
@@ -208,7 +259,9 @@ export function ReportsView({
         })}
       </div>
 
-      {loading ? (
+      {tab === "reativacao" ? (
+        <ReativacaoTab clients={react} loading={reactLoading} salonName={salonName} slug={slug} />
+      ) : loading ? (
         <div className="grid place-items-center py-20 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
@@ -307,6 +360,95 @@ function DailyBars({ daily }: { daily: { day: string; total: number }[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ───────────────────────── Reativação ───────────────────────── */
+
+const firstName = (n: string) => (n || "").trim().split(" ")[0] || "tudo bem";
+
+function ReativacaoTab({
+  clients,
+  loading,
+  salonName,
+  slug,
+}: {
+  clients: ReactClient[] | null;
+  loading: boolean;
+  salonName: string;
+  slug: string;
+}) {
+  // origin só fica disponível no cliente — definir via efeito evita
+  // divergência de hidratação no href do WhatsApp.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  if (loading || clients === null) {
+    return (
+      <div className="grid place-items-center py-20 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+  if (clients.length === 0) {
+    return (
+      <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
+        <UserRoundCheck className="mx-auto h-8 w-8 text-muted-foreground/50" />
+        <p className="mt-3 font-medium">Ninguém para reativar 🎉</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Suas clientes estão em dia com o ritmo habitual de retorno.
+        </p>
+      </div>
+    );
+  }
+
+  const bookingLink = `${origin}/${slug}`;
+  const waHref = (c: ReactClient) => {
+    const digits = (c.phone ?? "").replace(/\D/g, "");
+    if (!digits) return null;
+    const full = digits.length <= 11 ? `55${digits}` : digits;
+    const msg = `Oi, ${firstName(c.name)}! 💜 Sentimos sua falta aqui no ${salonName}. Que tal agendar um horário? ${bookingLink}`;
+    return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Clientes que passaram do próprio ritmo de retorno — ordenados por urgência e valor.
+        Mande um oi pelo WhatsApp e traga ela de volta. 💬
+      </p>
+      <div className="space-y-2">
+        {clients.map((c) => {
+          const href = waHref(c);
+          return (
+            <Card key={c.id} className="p-4 min-w-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <div className="min-w-0 sm:flex-1">
+                <p className="font-medium truncate">{c.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Há <span className="font-medium text-foreground">{c.days_since} dias</span> sem vir
+                  {" · "}costuma a cada ~{c.expected_interval}d{" · "}{c.visits} visita{c.visits === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:justify-end sm:ml-auto">
+                <span className="text-sm font-medium tabular-nums">{formatBRL(c.total_spent)}</span>
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    <MessageCircle className="h-4 w-4" /> WhatsApp
+                  </a>
+                ) : (
+                  <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
