@@ -15,7 +15,12 @@ import {
   Loader2,
   Sparkles,
   UsersRound,
+  Download,
+  ChevronDown,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-react";
+import { exportReportCsv, exportReportPdf } from "./export";
 
 export type ReportData = {
   faturamento: number;
@@ -69,6 +74,8 @@ export function ReportsView({
   const [data, setData] = useState<ReportData | null>(initialData);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("financeiro");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const now = useMemo(() => {
     const d = new Date();
@@ -95,6 +102,21 @@ export function ReportsView({
   const d = data;
   const isEmpty = !d || d.atendimentos === 0;
 
+  function handleCsv() {
+    if (d) exportReportCsv(d, monthLabel(cmes), `relatorio-${cmes}`);
+    setMenuOpen(false);
+  }
+  async function handlePdf() {
+    if (!d) return;
+    setExporting(true);
+    try {
+      await exportReportPdf(d, monthLabel(cmes), `relatorio-${cmes}`);
+    } finally {
+      setExporting(false);
+      setMenuOpen(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -103,6 +125,34 @@ export function ReportsView({
             <BarChart3 className="h-6 w-6 text-primary" /> Relatórios
           </h1>
           <p className="text-muted-foreground text-sm">Desempenho do seu salão no período.</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+        {/* Exportar */}
+        <div className="relative">
+          <button
+            type="button"
+            disabled={isEmpty || loading}
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-40"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <span className="hidden sm:inline">Exportar</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          {menuOpen && (
+            <>
+              <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setMenuOpen(false)} />
+              <div className="absolute left-0 mt-1 z-20 w-44 rounded-[var(--radius)] border border-border bg-card p-1 shadow-lg">
+                <button onClick={handlePdf} className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted">
+                  <FileText className="h-4 w-4 text-red-600" /> PDF
+                </button>
+                <button onClick={handleCsv} className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel (CSV)
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Navegação de mês */}
@@ -125,6 +175,7 @@ export function ReportsView({
           >
             <ChevronRight className="h-4 w-4" />
           </button>
+        </div>
         </div>
       </div>
 
