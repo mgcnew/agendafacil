@@ -590,7 +590,7 @@ function TemperaturaTab({
                 )}
                 {t === "frio" && (
                   <Link
-                    href={`/painel/${slug}/campanhas`}
+                    href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent(`Esquenta ${WEEKDAYS[w.weekday]}`)}&desconto=15`}
                     className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                   >
                     <BadgePercent className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia

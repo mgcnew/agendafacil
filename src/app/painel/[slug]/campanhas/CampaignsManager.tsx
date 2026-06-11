@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL, cn } from "@/lib/utils";
@@ -51,9 +51,25 @@ export function CampaignsManager({
 }) {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [creating, setCreating] = useState(false);
+  const [prefill, setPrefill] = useState<{ name: string; discount: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // Abre o editor já preenchido quando vem da sugestão de "dia frio" (Temperatura)
+  useEffect(() => {
+    if (searchParams.get("nova")) {
+      setPrefill({
+        name: searchParams.get("nome") ?? "",
+        discount: searchParams.get("desconto") ?? "",
+      });
+      setCreating(true);
+      router.replace(pathname, { scroll: false }); // limpa a URL
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const svcCount = (id: string) => campaignServices.filter((cs) => cs.campaign_id === id).length;
 
@@ -148,9 +164,11 @@ export function CampaignsManager({
           salonId={salonId}
           services={services}
           campaign={editing}
+          prefillName={prefill?.name}
+          prefillDiscount={prefill?.discount}
           initialServiceIds={editing ? campaignServices.filter((cs) => cs.campaign_id === editing.id).map((cs) => cs.service_id) : []}
-          onClose={() => { setCreating(false); setEditing(null); }}
-          onSaved={() => { setCreating(false); setEditing(null); router.refresh(); }}
+          onClose={() => { setCreating(false); setEditing(null); setPrefill(null); }}
+          onSaved={() => { setCreating(false); setEditing(null); setPrefill(null); router.refresh(); }}
         />
       )}
     </div>
@@ -159,7 +177,7 @@ export function CampaignsManager({
 
 /* ───────────────────────── Editor ───────────────────────── */
 function CampaignEditor({
-  salonId, services, campaign, initialServiceIds, onClose, onSaved,
+  salonId, services, campaign, initialServiceIds, onClose, onSaved, prefillName, prefillDiscount,
 }: {
   salonId: string;
   services: Svc[];
@@ -167,10 +185,14 @@ function CampaignEditor({
   initialServiceIds: string[];
   onClose: () => void;
   onSaved: () => void;
+  prefillName?: string;
+  prefillDiscount?: string;
 }) {
   const supabase = createClient();
-  const [name, setName] = useState(campaign?.name ?? "");
-  const [discount, setDiscount] = useState(campaign ? String(campaign.discount_percent).replace(".", ",") : "");
+  const [name, setName] = useState(campaign?.name ?? prefillName ?? "");
+  const [discount, setDiscount] = useState(
+    campaign ? String(campaign.discount_percent).replace(".", ",") : (prefillDiscount ?? ""),
+  );
   const [scope, setScope] = useState<"all" | "services">(campaign?.scope === "services" ? "services" : "all");
   const [selected, setSelected] = useState<string[]>(initialServiceIds);
   const [startsOn, setStartsOn] = useState(campaign?.starts_on ?? "");
