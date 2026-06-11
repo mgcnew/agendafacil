@@ -134,6 +134,12 @@ export default async function FinanceiroPage({
       commissions={commissions}
       closedSessions={closedSessions ?? []}
       receivable={receivable}
+      salon={{
+        name: membership.salons.name,
+        phone: membership.salons.phone,
+        address: membership.salons.address,
+        logo_url: membership.salons.logo_url,
+      }}
       initialTab={tab === "comissoes" ? "comissoes" : "caixa"}
       period={{
         label: `${MONTHS[pm - 1]} ${py}`,

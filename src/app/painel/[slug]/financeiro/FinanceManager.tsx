@@ -1,16 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
-import { formatBRL, formatTime } from "@/lib/utils";
+import { formatBRL, formatTime, formatDate } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
+  Receipt, MessageCircle, Download,
 } from "lucide-react";
+import {
+  generateReceiptPdf, buildReceiptText, payLabel,
+  type ReceiptData, type SalonInfo,
+} from "./receipt";
 
 type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
@@ -32,6 +37,7 @@ export function FinanceManager({
   commissions,
   closedSessions,
   receivable,
+  salon,
   initialTab,
   period,
 }: {
@@ -42,6 +48,7 @@ export function FinanceManager({
   commissions: Comm[];
   closedSessions: Session[];
   receivable: Receivable[];
+  salon: SalonInfo;
   initialTab: "caixa" | "comissoes";
   period: Period;
 }) {
@@ -77,6 +84,7 @@ export function FinanceManager({
   const [desc, setDesc] = useState("");
   const [method, setMethod] = useState("dinheiro");
   const [selectedAppt, setSelectedAppt] = useState(""); // recebimento vinculado a um atendimento
+  const [receiptTx, setReceiptTx] = useState<Tx | null>(null); // cupom não fiscal aberto
 
   const income = transactions.filter((t) => t.type === "income").reduce((a, t) => a + Number(t.amount), 0);
   const expense = transactions.filter((t) => t.type === "expense").reduce((a, t) => a + Number(t.amount), 0);
@@ -286,6 +294,15 @@ export function FinanceManager({
                         <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
                           {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
                         </span>
+                        {t.type === "income" && (
+                          <button
+                            onClick={() => setReceiptTx(t)}
+                            title="Emitir cupom"
+                            className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            <Receipt className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -354,6 +371,11 @@ export function FinanceManager({
             router.refresh();
           }}
         />
+      )}
+
+      {/* Cupom não fiscal */}
+      {receiptTx && (
+        <ReceiptModal tx={receiptTx} salon={salon} onClose={() => setReceiptTx(null)} />
       )}
 
       {tab === "comissoes" && (
@@ -438,6 +460,115 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
 }
 
 // ── Fechamento de caixa com conferência ──────────────────────────
+/* ─────────────────── Cupom não fiscal ─────────────────── */
+function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClose: () => void }) {
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReceiptData | null>(null);
+  const [clientPhone, setClientPhone] = useState<string | null>(null);
+  const [busyPdf, setBusyPdf] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      let items: { name: string; price: number }[] = [];
+      let client: string | null = null;
+      let phone: string | null = null;
+      if (tx.appointment_id) {
+        const [{ data: svcs }, { data: appt }] = await Promise.all([
+          supabase.from("appointment_services").select("name, price").eq("appointment_id", tx.appointment_id),
+          supabase.from("appointments").select("clients(full_name, phone)").eq("id", tx.appointment_id).maybeSingle(),
+        ]);
+        items = (svcs ?? []).map((s) => ({ name: s.name, price: Number(s.price) }));
+        const c = appt?.clients as { full_name?: string; phone?: string | null } | null;
+        client = c?.full_name ?? null;
+        phone = c?.phone ?? null;
+      }
+      setClientPhone(phone);
+      setData({
+        client,
+        dateTime: `${formatDate(tx.created_at)} ${formatTime(tx.created_at)}`,
+        items,
+        total: Number(tx.amount),
+        paymentMethod: tx.payment_method ?? "dinheiro",
+        fileBase: `comprovante-${(client ?? "cliente").toLowerCase().replace(/\s+/g, "-")}-${tx.id.slice(0, 8)}`,
+      });
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function downloadPdf() {
+    if (!data) return;
+    setBusyPdf(true);
+    try { await generateReceiptPdf(data, salon); } finally { setBusyPdf(false); }
+  }
+
+  const waHref = (() => {
+    if (!data || !clientPhone) return null;
+    const digits = clientPhone.replace(/\D/g, "");
+    if (!digits) return null;
+    const full = digits.length <= 11 ? `55${digits}` : digits;
+    return `https://wa.me/${full}?text=${encodeURIComponent(buildReceiptText(data, salon))}`;
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <Card className="relative w-full sm:max-w-md max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" /> Cupom não fiscal
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        {loading || !data ? (
+          <div className="grid place-items-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <>
+            <div className="rounded-[var(--radius)] border border-border p-4 text-sm space-y-1">
+              <p className="font-display font-bold">{salon.name}</p>
+              {(salon.phone || salon.address) && (
+                <p className="text-xs text-muted-foreground">{[salon.phone, salon.address].filter(Boolean).join(" · ")}</p>
+              )}
+              <p className="text-xs text-muted-foreground pt-1">{data.dateTime}{data.client ? ` · ${data.client}` : ""}</p>
+              <div className="border-t border-border my-2" />
+              {data.items.length ? data.items.map((i, idx) => (
+                <div key={idx} className="flex justify-between gap-3"><span className="min-w-0 truncate">{i.name}</span><span className="shrink-0">{formatBRL(i.price)}</span></div>
+              )) : (
+                <div className="flex justify-between gap-3"><span className="min-w-0 truncate">{tx.description || "Recebimento"}</span><span className="shrink-0">{formatBRL(data.total)}</span></div>
+              )}
+              <div className="border-t border-border my-2" />
+              <div className="flex justify-between font-semibold"><span>Total</span><span>{formatBRL(data.total)}</span></div>
+              <p className="text-xs text-muted-foreground">Pagamento: {payLabel(data.paymentMethod)}</p>
+              <p className="text-[10px] text-muted-foreground pt-2">Documento sem valor fiscal</p>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={downloadPdf} disabled={busyPdf} className="flex-1">
+                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+              </Button>
+              {waHref && (
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                </a>
+              )}
+            </div>
+            {!clientPhone && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Sem telefone da cliente para o WhatsApp — baixe o PDF e anexe na conversa.
+              </p>
+            )}
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function CloseModal({
   expectedCash,
   incomeByMethod,
