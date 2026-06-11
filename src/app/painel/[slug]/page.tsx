@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
-import { formatBRL, formatTime, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
+import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
 import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight } from "lucide-react";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { BirthdayCard, type BirthdayClient } from "./BirthdayCard";
+import { TomorrowReminders } from "./TomorrowReminders";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,14 @@ export default async function DashboardPage({
   // "Hoje" no fuso do Brasil — o servidor roda em UTC em produção.
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
+  // Janela de "amanhã" (para os lembretes): [início de amanhã, início de depois de amanhã)
+  const tomorrowEnd = (() => {
+    const d = new Date(endDay);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString();
+  })();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -47,11 +54,29 @@ export default async function DashboardPage({
       supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
       // Aniversários próximos — null p/ quem não tem clients.view
       supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 7 } as never),
+      // Agendamentos de amanhã (para lembrar) — só os que ainda vão acontecer
+      supabase
+        .from("appointments")
+        .select("id, starts_at, clients(full_name, phone), appointment_services(name)")
+        .eq("salon_id", salonId)
+        .gte("starts_at", endDay)
+        .lt("starts_at", tomorrowEnd)
+        .in("status", ["pending", "confirmed"])
+        .order("starts_at"),
     ]);
 
   const reactArr = reactRaw as unknown[] | null;
   const reactCount = Array.isArray(reactArr) ? reactArr.length : 0;
   const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as BirthdayClient[];
+
+  const reminderItems = (tomorrowAppts ?? []).map((a) => ({
+    id: a.id,
+    time: formatTime(a.starts_at),
+    client: (a.clients as { full_name?: string } | null)?.full_name ?? "Cliente",
+    phone: (a.clients as { phone?: string | null } | null)?.phone ?? null,
+    services: ((a.appointment_services as { name: string }[] | null) ?? []).map((s) => s.name),
+  }));
+  const tomorrowLabel = formatDate(endDay);
 
   const pkgs = (activePkgs ?? []).map((p) => {
     const items = (p.client_package_items as unknown as { total: number; used: number }[]) ?? [];
@@ -149,6 +174,9 @@ export default async function DashboardPage({
           </div>
         ))}
       </div>
+
+      {/* Lembretes de amanhã (anti-falta) */}
+      <TomorrowReminders items={reminderItems} dateLabel={tomorrowLabel} salonName={membership.salons.name} />
 
       {/* Carnê — pacotes ativos (lembrete) */}
       {pkgs.length > 0 && (
