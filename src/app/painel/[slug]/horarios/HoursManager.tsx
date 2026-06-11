@@ -157,7 +157,7 @@ export function HoursManager({
 
       <Card className="p-4 sm:p-6 space-y-2">
         {days.map((d) => (
-          <div key={d.weekday} className="flex items-center gap-3 rounded-[var(--radius)] border border-border p-2.5">
+          <div key={d.weekday} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[var(--radius)] border border-border p-2.5">
             <button
               type="button"
               onClick={() => setDay(d.weekday, { enabled: !d.enabled })}
@@ -166,17 +166,17 @@ export function HoursManager({
             >
               <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${d.enabled ? "left-[22px]" : "left-0.5"}`} />
             </button>
-            <span className="w-20 text-sm font-medium">{WEEKDAYS[d.weekday]}</span>
+            <span className="w-20 shrink-0 text-sm font-medium">{WEEKDAYS[d.weekday]}</span>
             {d.enabled ? (
-              <div className="flex items-center gap-2 ml-auto">
-                <input type="time" value={d.start} onChange={(e) => setDay(d.weekday, { start: e.target.value })} className="h-9 rounded-[var(--radius)] border border-border bg-card px-2 text-sm" />
-                <span className="text-muted-foreground text-sm">às</span>
-                <input type="time" value={d.end} onChange={(e) => setDay(d.weekday, { end: e.target.value })} className="h-9 rounded-[var(--radius)] border border-border bg-card px-2 text-sm" />
+              <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+                <input type="time" value={d.start} onChange={(e) => setDay(d.weekday, { start: e.target.value })} className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm sm:flex-none" />
+                <span className="text-muted-foreground text-sm shrink-0">às</span>
+                <input type="time" value={d.end} onChange={(e) => setDay(d.weekday, { end: e.target.value })} className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm sm:flex-none" />
                 <button
                   type="button"
                   title="Copiar este horário para os outros dias ativos"
                   onClick={() => copyToAll(d)}
-                  className="p-1.5 text-muted-foreground hover:text-primary"
+                  className="p-1.5 shrink-0 text-muted-foreground hover:text-primary"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
