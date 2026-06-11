@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
 import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight } from "lucide-react";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
+import { BirthdayCard, type BirthdayClient } from "./BirthdayCard";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function DashboardPage({
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -44,10 +45,13 @@ export default async function DashboardPage({
         .limit(6),
       // Clientes para reativar — retorna erro (null) p/ quem não tem reports.view
       supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
+      // Aniversários próximos — null p/ quem não tem clients.view
+      supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 7 } as never),
     ]);
 
   const reactArr = reactRaw as unknown[] | null;
   const reactCount = Array.isArray(reactArr) ? reactArr.length : 0;
+  const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as BirthdayClient[];
 
   const pkgs = (activePkgs ?? []).map((p) => {
     const items = (p.client_package_items as unknown as { total: number; used: number }[]) ?? [];
@@ -131,6 +135,9 @@ export default async function DashboardPage({
           <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
         </Link>
       )}
+
+      {/* Aniversários da semana */}
+      <BirthdayCard clients={birthdays} salonName={membership.salons.name} slug={slug} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
