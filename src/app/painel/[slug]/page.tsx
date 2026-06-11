@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus, Package } from "lucide-react";
+import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight } from "lucide-react";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function DashboardPage({
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -42,7 +42,12 @@ export default async function DashboardPage({
         .eq("status", "active")
         .order("expires_at", { ascending: true })
         .limit(6),
+      // Clientes para reativar — retorna erro (null) p/ quem não tem reports.view
+      supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
     ]);
+
+  const reactArr = reactRaw as unknown[] | null;
+  const reactCount = Array.isArray(reactArr) ? reactArr.length : 0;
 
   const pkgs = (activePkgs ?? []).map((p) => {
     const items = (p.client_package_items as unknown as { total: number; used: number }[]) ?? [];
@@ -105,6 +110,27 @@ export default async function DashboardPage({
           <Plus className="h-4 w-4" /> Novo agendamento
         </Link>
       </div>
+
+      {/* Alerta: clientes para reativar */}
+      {reactCount > 0 && (
+        <Link
+          href={`/painel/${slug}/relatorios?tab=reativacao`}
+          className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
+            <UserRoundCheck className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm">
+              {reactCount} cliente{reactCount === 1 ? "" : "s"} para reativar
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno — mande um oi pelo WhatsApp.
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
