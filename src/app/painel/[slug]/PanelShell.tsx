@@ -145,7 +145,7 @@ export function PanelShell({
   );
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* ── Sidebar desktop — recolhida, ícones + tooltip ───────── */}
       <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-4 overflow-visible">
         {/* Logo */}
