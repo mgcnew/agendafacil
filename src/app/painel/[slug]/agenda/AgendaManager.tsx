@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
+import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
 import {
-  Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X, AlertTriangle, CalendarOff,
+  Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X,
+  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors, ChevronRight as ChevRight,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -25,13 +28,39 @@ type Appt    = {
   status: Status;
   total_price: number;
   member_id: string;
-  clients: { full_name: string; alert_summary: string | null } | null;
+  client_id: string | null;
+  notes: string | null;
+  clients: { full_name: string; phone: string | null; alert_summary: string | null } | null;
   salon_members: { display_name: string | null } | null;
+};
+type ApptService = { id: string; name: string; price: number; duration_min: number };
+type HistoryAppt = {
+  id: string;
+  starts_at: string;
+  status: string;
+  total_price: number;
+  salon_members: { display_name: string | null } | null;
+  appointment_services: { name: string }[];
+};
+type ClientAnamnesis = {
+  [key: string]: unknown;
+  is_pregnant: boolean;
+  is_breastfeeding: boolean;
+  has_diabetes: boolean;
+  has_hypertension: boolean;
+  has_heart_condition: boolean;
+  has_coagulation_issue: boolean;
+  has_epilepsy: boolean;
+  has_cancer_treatment: boolean;
+  has_thyroid: boolean;
+  allergies: string | null;
+  medications: string | null;
+  recent_procedures: string | null;
+  skin_hair_notes: string | null;
+  general_notes: string | null;
 };
 
 // ── Constants ──────────────────────────────────────────────────
-// Cor do status = um ponto colorido; o texto usa token de tema (legível em
-// qualquer um dos 12 temas, claro ou escuro). Mantém a semântica de cor.
 const STATUS_META: Record<Status, { label: string; dot: string }> = {
   pending:     { label: "Aguardando",   dot: "#f59e0b" },
   confirmed:   { label: "Confirmado",   dot: "#10b981" },
@@ -43,8 +72,6 @@ const STATUS_META: Record<Status, { label: string; dot: string }> = {
 
 const STATUS_LIST = Object.entries(STATUS_META) as [Status, { label: string; dot: string }][];
 
-// Paleta categórica para profissionais — evita âmbar/laranja/vermelho/verde,
-// que colidem com a semântica dos status (aguardando/cancelado/confirmado).
 const PALETTE = [
   "#6366f1","#ec4899","#8b5cf6","#3b82f6",
   "#14b8a6","#a855f7","#0ea5e9","#d946ef",
@@ -52,16 +79,15 @@ const PALETTE = [
 ];
 
 const DAY_SHORT  = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+const DAY_LONG   = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 const MONTH_NAMES = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
 ];
 
-// Faixa padrão da grade (7h–21h). Expande automaticamente para englobar
-// agendamentos fora dessa janela, em vez de escondê-los.
 const DEFAULT_START = 7;
 const DEFAULT_END   = 21;
-const CELL_H        = 64; // px per hour
+const CELL_H        = 64;
 
 type Bounds = { start: number; end: number };
 
@@ -72,7 +98,6 @@ function hourBounds(appts: Appt[]): Bounds {
     const s = new Date(a.starts_at);
     const e = a.ends_at ? new Date(a.ends_at) : s;
     start = Math.min(start, s.getHours());
-    // arredonda o fim para cima quando há minutos, para a barra caber inteira
     end   = Math.max(end, e.getHours() + (e.getMinutes() > 0 ? 1 : 0));
   }
   return { start: Math.max(0, start), end: Math.min(24, Math.max(end, start + 1)) };
@@ -84,8 +109,6 @@ function hoursOf(b: Bounds) {
 const totalHeight = (b: Bounds) => (b.end - b.start) * CELL_H;
 
 // ── Date helpers ───────────────────────────────────────────────
-// Usa componentes LOCAIS (não toISOString, que é UTC) para evitar que datas
-// caiam no dia errado à noite no fuso do Brasil (UTC-3).
 const toStr   = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const parse   = (s: string) => new Date(s + "T12:00:00");
@@ -117,6 +140,10 @@ function fmtHM(iso: string) {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  return `${DAY_SHORT[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]}`;
+}
 function inCurrentMonth(s: string, y: number, m: number) {
   const d = parse(s); return d.getFullYear() === y && d.getMonth() === m;
 }
@@ -136,111 +163,350 @@ function getColor(pros: Pro[], memberId: string) {
   return pros[idx]?.color ?? PALETTE[Math.max(0, idx) % PALETTE.length];
 }
 
-// ── Tooltip-style popover for appointment detail ───────────────
-function ApptCard({ a, color, compact = false, onStatusChange }: {
-  a: Appt; color: string; compact?: boolean; onStatusChange?: (s: Status) => void;
+// ── Appointment card (grid block, opens detail modal on click) ─
+function ApptCard({ a, color, compact = false, onOpen }: {
+  a: Appt; color: string; compact?: boolean; onOpen: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [side, setSide] = useState<"right" | "left">("right");
-  const btnRef = useRef<HTMLButtonElement>(null);
   const st = STATUS_META[a.status];
   const h = apptH(a);
 
-  // Abre à esquerda quando não há ~272px livres à direita (evita cortar o card).
-  function toggle(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setSide(window.innerWidth - r.right < 272 ? "left" : "right");
-    }
-    setOpen(v => !v);
-  }
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${a.clients?.full_name ?? "Cliente"} às ${fmtHM(a.starts_at)} — ${st.label}`}
+      className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
+    >
+      <div className="px-2 py-1.5 h-full overflow-hidden">
+        <p className="text-[11px] font-semibold truncate text-foreground/80">
+          {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
+        </p>
+        {!compact && (
+          <p className="text-[12px] font-medium text-foreground truncate leading-tight">
+            {a.clients?.full_name ?? "Cliente"}
+          </p>
+        )}
+        {h > 58 && !compact && (
+          <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
+            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
+            {st.label}
+          </span>
+        )}
+        {a.clients?.alert_summary && (
+          <AlertTriangle className="h-2.5 w-2.5 text-red-500 mt-0.5 shrink-0" aria-label="Restrição" />
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ── Appointment detail modal ───────────────────────────────────
+function ApptDetailModal({
+  appt, color, salonId, slug, onClose, onStatusChange, onFinalize,
+}: {
+  appt: Appt; color: string; salonId: string; slug: string;
+  onClose: () => void;
+  onStatusChange: (s: Status) => void;
+  onFinalize: () => void;
+}) {
+  const supabase = createClient();
+  const st = STATUS_META[appt.status];
+
+  const [services, setServices]       = useState<ApptService[] | null>(null);
+  const [history, setHistory]         = useState<HistoryAppt[] | null>(null);
+  const [anamnesis, setAnamnesis]     = useState<ClientAnamnesis | null | "empty">(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showAnam, setShowAnam]       = useState(false);
+
+  // Fetch services on mount
+  useEffect(() => {
+    supabase
+      .from("appointment_services")
+      .select("id, name, price, duration_min")
+      .eq("appointment_id", appt.id)
+      .then(({ data }) => setServices((data as ApptService[]) ?? []));
+  }, [appt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch history when expanded
+  useEffect(() => {
+    if (!showHistory || !appt.client_id || history !== null) return;
+    supabase
+      .from("appointments")
+      .select("id, starts_at, status, total_price, salon_members(display_name), appointment_services(name)")
+      .eq("salon_id", salonId)
+      .eq("client_id", appt.client_id)
+      .neq("id", appt.id)
+      .order("starts_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => setHistory((data as unknown as HistoryAppt[]) ?? []));
+  }, [showHistory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch anamnesis when expanded
+  useEffect(() => {
+    if (!showAnam || !appt.client_id || anamnesis !== null) return;
+    supabase
+      .from("client_anamnesis")
+      .select("*")
+      .eq("client_id", appt.client_id)
+      .maybeSingle()
+      .then(({ data }) => setAnamnesis(data ? (data as unknown as ClientAnamnesis) : "empty"));
+  }, [showAnam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clientInitial = (appt.clients?.full_name ?? "?").charAt(0).toUpperCase();
+  const isFinished    = appt.status === "completed" || appt.status === "cancelled" || appt.status === "no_show";
 
   return (
-    <div className="relative group">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={toggle}
-        aria-label={`${a.clients?.full_name ?? "Cliente"} às ${fmtHM(a.starts_at)} — ${st.label}`}
-        className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
-      >
-        <div className="px-2 py-1.5 h-full overflow-hidden">
-          <p className="text-[11px] font-semibold truncate text-foreground/80">
-            {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
-          </p>
-          {!compact && (
-            <p className="text-[12px] font-medium text-foreground truncate leading-tight">
-              {a.clients?.full_name ?? "Cliente"}
-            </p>
-          )}
-          {h > 58 && !compact && (
-            <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
-              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
-              {st.label}
-            </span>
-          )}
-        </div>
-      </button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      {/* Popover */}
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div
-            className={cn(
-              "absolute top-0 z-50 w-60 rounded-[var(--radius)] bg-card border border-border shadow-xl p-3 space-y-2",
-              side === "right" ? "left-full ml-2" : "right-full mr-2",
-            )}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-semibold text-sm">{a.clients?.full_name ?? "Cliente"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
-                </p>
-              </div>
-              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {a.clients?.alert_summary && (
-              <div className="flex items-start gap-1.5 rounded-md bg-red-500/10 text-red-600 px-2 py-1.5 text-[11px]">
-                <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
-                {a.clients.alert_summary}
-              </div>
-            )}
-            <div className="text-xs text-muted-foreground">
-              {a.salon_members?.display_name && <p>Prof.: {a.salon_members.display_name}</p>}
-              <p className="font-semibold text-primary">{formatBRL(Number(a.total_price))}</p>
-            </div>
-            {onStatusChange && (
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: st.dot }} />
-                <Select
-                  value={a.status}
-                  onValueChange={(v) => { onStatusChange(v as Status); setOpen(false); }}
-                  className="w-full h-8 text-xs font-medium"
+      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-card rounded-t-2xl sm:rounded-[var(--radius)] shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-card flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+          <h3 className="font-display text-lg font-bold">Agendamento</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* ── Cliente ─────────────────────────────────────── */}
+          <div className="flex items-center gap-3">
+            <span
+              className="grid place-items-center h-11 w-11 rounded-full text-white font-display text-lg font-bold shrink-0"
+              style={{ background: color }}
+            >
+              {clientInitial}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm truncate">{appt.clients?.full_name ?? "Cliente"}</p>
+              {appt.clients?.phone && (
+                <a
+                  href={`tel:${appt.clients.phone}`}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
-                </Select>
+                  <Phone className="h-3 w-3" /> {appt.clients.phone}
+                </a>
+              )}
+            </div>
+            {appt.client_id && (
+              <Link
+                href={`/painel/${slug}/clientes/${appt.client_id}`}
+                className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                onClick={onClose}
+              >
+                Ver ficha <ExternalLink className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
+
+          {/* ── Alerta de anamnese ──────────────────────────── */}
+          {appt.clients?.alert_summary && (
+            <div className="flex items-start gap-2 rounded-[var(--radius)] bg-red-500/10 border border-red-300/40 text-red-700 px-3 py-2.5">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold mb-0.5">Atenção — restrições</p>
+                <p className="text-xs">{appt.clients.alert_summary}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Data / horário / profissional ───────────────── */}
+          <div className="rounded-[var(--radius)] bg-muted px-3.5 py-3 space-y-1 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-xs">Data</span>
+              <span className="font-medium">
+                {fmtDate(appt.starts_at)}
+                {" · "}{fmtHM(appt.starts_at)}{appt.ends_at ? ` – ${fmtHM(appt.ends_at)}` : ""}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-xs">Profissional</span>
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                {appt.salon_members?.display_name ?? "—"}
+              </span>
+            </div>
+            {appt.notes && (
+              <div className="flex items-start justify-between gap-2 pt-0.5">
+                <span className="text-muted-foreground text-xs shrink-0">Obs.</span>
+                <span className="text-xs text-right">{appt.notes}</span>
               </div>
             )}
           </div>
-        </>
-      )}
+
+          {/* ── Serviços ────────────────────────────────────── */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Serviços</p>
+            {services === null ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando…
+              </div>
+            ) : services.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">Sem serviços registrados.</p>
+            ) : (
+              <div className="space-y-1">
+                {services.map(s => (
+                  <div key={s.id} className="flex items-center justify-between text-sm">
+                    <span className="flex-1 min-w-0 truncate">{s.name}</span>
+                    <span className="text-xs text-muted-foreground mx-2 shrink-0">{s.duration_min} min</span>
+                    <span className="font-medium shrink-0">{formatBRL(Number(s.price))}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-border pt-2 mt-2">
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="font-display font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Status e ações ──────────────────────────────── */}
+          <div className="space-y-2.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: st.dot }} />
+              <Select
+                value={appt.status}
+                onValueChange={(v) => onStatusChange(v as Status)}
+                className="flex-1 h-8 text-xs font-medium"
+              >
+                {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+              </Select>
+            </div>
+
+            {!isFinished && (
+              <Button
+                onClick={onFinalize}
+                className="w-full"
+              >
+                <Scissors className="h-4 w-4" /> Finalizar atendimento
+              </Button>
+            )}
+          </div>
+
+          {/* ── Histórico da cliente ────────────────────────── */}
+          {appt.client_id && (
+            <div className="border-t border-border pt-3">
+              <button
+                type="button"
+                onClick={() => setShowHistory(v => !v)}
+                className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
+              >
+                <span>Histórico da cliente</span>
+                <ChevRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showHistory && "rotate-90")} />
+              </button>
+
+              {showHistory && (
+                <div className="mt-3 space-y-1.5">
+                  {history === null ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
+                    </div>
+                  ) : history.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Sem atendimentos anteriores.</p>
+                  ) : (
+                    history.map(h => {
+                      const hst = STATUS_META[h.status as Status] ?? { dot: "#9ca3af", label: h.status };
+                      const names = (h.appointment_services ?? []).map(s => s.name).join(", ");
+                      return (
+                        <div key={h.id} className="flex items-start gap-2 text-xs py-1.5 border-b border-border/50 last:border-0">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0 mt-1.5" style={{ background: hst.dot }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium">{fmtDate(h.starts_at)} · {fmtHM(h.starts_at)}</p>
+                            {names && <p className="text-muted-foreground truncate">{names}</p>}
+                            {h.salon_members?.display_name && (
+                              <p className="text-muted-foreground">{h.salon_members.display_name}</p>
+                            )}
+                          </div>
+                          <span className="font-medium shrink-0">{formatBRL(Number(h.total_price))}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Anamnese ────────────────────────────────────── */}
+          {appt.client_id && (
+            <div className="border-t border-border pt-3">
+              <button
+                type="button"
+                onClick={() => setShowAnam(v => !v)}
+                className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
+              >
+                <span>Anamnese</span>
+                <ChevRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showAnam && "rotate-90")} />
+              </button>
+
+              {showAnam && (
+                <div className="mt-3 space-y-3">
+                  {anamnesis === null ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
+                    </div>
+                  ) : anamnesis === "empty" ? (
+                    <p className="text-xs text-muted-foreground">Anamnese não preenchida.</p>
+                  ) : (
+                    <>
+                      {/* Condições de saúde */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {HEALTH_CONDITIONS.map(c => {
+                          const active = !!anamnesis[c.key as keyof ClientAnamnesis];
+                          if (!active) return null;
+                          return (
+                            <span
+                              key={c.key}
+                              className={cn(
+                                "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full",
+                                c.critical
+                                  ? "bg-red-500/10 text-red-700 border border-red-300/40"
+                                  : "bg-amber-500/10 text-amber-700 border border-amber-300/40",
+                              )}
+                            >
+                              {c.critical && <AlertTriangle className="h-2.5 w-2.5" />}
+                              {c.label}
+                            </span>
+                          );
+                        })}
+                        {!HEALTH_CONDITIONS.some(c => !!anamnesis[c.key as keyof ClientAnamnesis]) && (
+                          <span className="text-xs text-muted-foreground">Sem condições registradas.</span>
+                        )}
+                      </div>
+
+                      {/* Campos de texto */}
+                      {[
+                        { label: "Alergias", value: anamnesis.allergies },
+                        { label: "Medicamentos", value: anamnesis.medications },
+                        { label: "Procedimentos recentes", value: anamnesis.recent_procedures },
+                        { label: "Cabelo / pele", value: anamnesis.skin_hair_notes },
+                        { label: "Observações gerais", value: anamnesis.general_notes },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label}>
+                          <p className="text-[11px] font-semibold text-muted-foreground mb-0.5">{f.label}</p>
+                          <p className="text-xs">{f.value}</p>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Day View ───────────────────────────────────────────────────
-const COL_W_DAY = 160; // min px per professional column
+const COL_W_DAY = 160;
 
-function DayView({ date, appts, pros, activePros, onStatusChange }: {
+function DayView({ date, appts, pros, activePros, onApptClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
-  onStatusChange: (a: Appt, s: Status) => void;
+  onApptClick: (a: Appt) => void;
 }) {
   const cols = activePros.length > 0 ? activePros : pros;
   const bounds  = hourBounds(appts);
@@ -256,12 +522,9 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
-      {/* Single scroll container — syncs horizontal scroll across headers + grid */}
       <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
-
         {/* Sticky column headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
-          {/* Corner */}
           <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
           {cols.map((p) => {
             const color = getColor(pros, p.id);
@@ -279,7 +542,6 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
 
         {/* Time grid */}
         <div className="flex" style={{ minHeight: totalH, minWidth: minW }}>
-          {/* Sticky time gutter */}
           <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: totalH }}>
             {hours.map(h => (
               <div key={h} className="absolute w-full" style={{ top: (h - bounds.start) * CELL_H }}>
@@ -290,7 +552,6 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
             ))}
           </div>
 
-          {/* Professional columns */}
           {cols.map((p) => {
             const color    = getColor(pros, p.id);
             const proAppts = appts.filter(a => a.member_id === p.id);
@@ -318,7 +579,7 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
                   const h   = apptH(a);
                   return (
                     <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}>
-                      <ApptCard a={a} color={color} onStatusChange={s => onStatusChange(a, s)} />
+                      <ApptCard a={a} color={color} onOpen={() => onApptClick(a)} />
                     </div>
                   );
                 })}
@@ -333,23 +594,22 @@ function DayView({ date, appts, pros, activePros, onStatusChange }: {
   );
 }
 
-// Mensagem central quando o dia/semana não tem agendamentos.
 function EmptyDay() {
   return (
     <div className="pointer-events-none absolute inset-0 top-12 flex flex-col items-center justify-center text-center px-6">
       <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
       <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
-      <p className="text-xs text-muted-foreground/70">Clique em “Novo agendamento” para começar.</p>
+      <p className="text-xs text-muted-foreground/70">Clique em "Novo agendamento" para começar.</p>
     </div>
   );
 }
 
 // ── Week View ──────────────────────────────────────────────────
-const COL_W_WEEK = 90; // min px per day column
+const COL_W_WEEK = 90;
 
-function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }: {
+function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
-  onStatusChange: (a: Appt, s: Status) => void;
+  onApptClick: (a: Appt) => void;
   onDayClick: (d: string) => void;
 }) {
   const days     = getWeekDays(date);
@@ -366,12 +626,9 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
-      {/* Single scroll container */}
       <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
-
         {/* Sticky day headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
-          {/* Corner */}
           <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
           {days.map((day) => {
             const d     = parse(day);
@@ -399,7 +656,6 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
 
         {/* Time grid */}
         <div className="flex" style={{ minHeight: totalH, minWidth: minW }}>
-          {/* Sticky time gutter */}
           <div className="w-14 shrink-0 sticky left-0 z-10 bg-card border-r border-border" style={{ height: totalH }}>
             {hours.map(h => (
               <div key={h} className="absolute w-full" style={{ top: (h - bounds.start) * CELL_H }}>
@@ -410,7 +666,6 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
             ))}
           </div>
 
-          {/* Day columns */}
           {days.map((day) => {
             const isT      = day === todayStr;
             const dayAppts = visible.filter(a => datePart(a.starts_at) === day);
@@ -444,7 +699,7 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
                   return (
                     <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}>
                       <ApptCard a={a} color={color} compact={h < 40}
-                        onStatusChange={s => onStatusChange(a, s)} />
+                        onOpen={() => onApptClick(a)} />
                     </div>
                   );
                 })}
@@ -460,10 +715,11 @@ function WeekView({ date, appts, pros, activePros, onStatusChange, onDayClick }:
 }
 
 // ── Month View ─────────────────────────────────────────────────
-function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
+function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, onApptClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onDayClick: (d: string) => void;
   onNewAppt: (d: string) => void;
+  onApptClick: (a: Appt) => void;
 }) {
   const d     = parse(date);
   const year  = d.getFullYear();
@@ -528,15 +784,19 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
                   {dayAppts.slice(0, MAX).map(a => {
                     const color = getColor(pros, a.member_id);
                     return (
-                      <div
+                      <button
                         key={a.id}
-                        onClick={e => e.stopPropagation()}
-                        className="truncate text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-foreground cursor-default"
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onApptClick(a); }}
+                        className="w-full truncate text-left text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-foreground hover:brightness-95 transition"
                         style={{ background: color + "1f", borderLeft: `2px solid ${color}` }}
                         title={`${fmtHM(a.starts_at)} · ${a.clients?.full_name ?? "Cliente"} · ${a.salon_members?.display_name ?? ""}`}
                       >
+                        {a.clients?.alert_summary && (
+                          <AlertTriangle className="inline h-2.5 w-2.5 text-red-500 mr-0.5 -mt-0.5" />
+                        )}
                         {fmtHM(a.starts_at)} {a.clients?.full_name ?? "Cliente"}
-                      </div>
+                      </button>
                     );
                   })}
                   {overflow > 0 && (
@@ -556,9 +816,9 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
-  salonId, pros, services, clients: initialClients, discounts = {},
+  salonId, slug, pros, services, clients: initialClients, discounts = {},
 }: {
-  salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
+  salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
 }) {
   const supabase = createClient();
@@ -572,10 +832,9 @@ export function AgendaManager({
   const [loading, setLoading]       = useState(true);
   const [creating, setCreating]     = useState(false);
   const [createDate, setCreateDate] = useState(date);
+  const [detailAppt, setDetailAppt] = useState<Appt | null>(null);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
 
-  // Abre o modal de criação quando chega com ?novo=1 (ex.: botão da Visão geral),
-  // depois limpa o parâmetro para não reabrir em refresh/voltar.
   const openedFromUrl = useRef(false);
   useEffect(() => {
     if (openedFromUrl.current) return;
@@ -609,7 +868,7 @@ export function AgendaManager({
     }
     const { data } = await supabase
       .from("appointments")
-      .select("id, starts_at, ends_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name)")
+      .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name)")
       .eq("salon_id", salonId)
       .gte("starts_at", start)
       .lte("starts_at", end)
@@ -620,8 +879,6 @@ export function AgendaManager({
 
   useEffect(() => { load(); }, [load]);
 
-  // Realtime: recarrega quando qualquer agendamento do salão muda (outro
-  // atendente cria/edita). Usa um ref para não reinscrever a cada navegação.
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; }, [load]);
   useEffect(() => {
@@ -637,17 +894,19 @@ export function AgendaManager({
   }, [supabase, salonId]);
 
   async function onStatusChange(a: Appt, status: Status) {
-    // Concluir abre o fluxo de finalização (forma de pagamento → caixa + comissão)
     if (status === "completed") {
+      setDetailAppt(null);
       setFinalizing(a);
       return;
     }
     const prev = a.status;
+    // Optimistic update
     setAppts(list => list.map(x => x.id === a.id ? { ...x, status } : x));
+    if (detailAppt?.id === a.id) setDetailAppt(d => d ? { ...d, status } : d);
     const { error } = await supabase.from("appointments").update({ status }).eq("id", a.id);
     if (error) {
-      // desfaz se o banco recusar (realtime, se ativo, também reconcilia)
       setAppts(list => list.map(x => x.id === a.id ? { ...x, status: prev } : x));
+      if (detailAppt?.id === a.id) setDetailAppt(d => d ? { ...d, status: prev } : d);
     }
   }
 
@@ -668,8 +927,7 @@ export function AgendaManager({
   const title = useMemo(() => {
     const d = parse(date);
     if (view === "dia") {
-      const names = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
-      return `${names[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`;
+      return `${DAY_LONG[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`;
     }
     if (view === "semana") {
       const days = getWeekDays(date);
@@ -681,9 +939,11 @@ export function AgendaManager({
     return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
   }, [view, date]);
 
+  const detailColor = detailAppt ? getColor(pros, detailAppt.member_id) : "#6366f1";
+
   return (
     <div className="flex flex-col gap-3 h-full">
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Agenda</h1>
@@ -691,7 +951,6 @@ export function AgendaManager({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* View switcher */}
           <div className="flex rounded-[var(--radius)] border border-border overflow-hidden text-sm">
             {(["dia","semana","mes"] as View[]).map(v => (
               <button
@@ -709,7 +968,6 @@ export function AgendaManager({
             ))}
           </div>
 
-          {/* Nav */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => navigate(-1)}
@@ -737,7 +995,7 @@ export function AgendaManager({
         </div>
       </div>
 
-      {/* ── Professional filter ─────────────────────────────── */}
+      {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground shrink-0">Profissional:</span>
@@ -773,7 +1031,7 @@ export function AgendaManager({
         </div>
       )}
 
-      {/* ── Calendar body ────────────────────────────────────── */}
+      {/* ── Calendar body ────────────────────────────────── */}
       <div className="flex-1 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -784,22 +1042,36 @@ export function AgendaManager({
             date={date} appts={appts} pros={pros} activePros={activePros}
             onDayClick={d => { setDate(d); setView("dia"); }}
             onNewAppt={d => { setCreateDate(d); setCreating(true); }}
+            onApptClick={a => setDetailAppt(a)}
           />
         ) : view === "semana" ? (
           <WeekView
             date={date} appts={appts} pros={pros} activePros={activePros}
-            onStatusChange={onStatusChange}
+            onApptClick={a => setDetailAppt(a)}
             onDayClick={d => { setDate(d); setView("dia"); }}
           />
         ) : (
           <DayView
             date={date} appts={appts} pros={pros} activePros={activePros}
-            onStatusChange={onStatusChange}
+            onApptClick={a => setDetailAppt(a)}
           />
         )}
       </div>
 
-      {/* ── Create modal ──────────────────────────────────────── */}
+      {/* ── Appointment detail modal ──────────────────────── */}
+      {detailAppt && (
+        <ApptDetailModal
+          appt={detailAppt}
+          color={detailColor}
+          salonId={salonId}
+          slug={slug}
+          onClose={() => setDetailAppt(null)}
+          onStatusChange={s => onStatusChange(detailAppt, s)}
+          onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
+        />
+      )}
+
+      {/* ── Create modal ──────────────────────────────────── */}
       {creating && (
         <CreateAppointment
           salonId={salonId} pros={pros} services={services} clients={initialClients}
@@ -810,7 +1082,7 @@ export function AgendaManager({
         />
       )}
 
-      {/* ── Finalizar atendimento ─────────────────────────────── */}
+      {/* ── Finalizar atendimento ─────────────────────────── */}
       {finalizing && (
         <FinalizeModal
           appt={finalizing}
@@ -822,7 +1094,7 @@ export function AgendaManager({
   );
 }
 
-// ── Finalizar atendimento (forma de pagamento → caixa + comissão) ──
+// ── Finalizar atendimento ──────────────────────────────────────
 const PAYMENT_METHODS = [
   { id: "dinheiro", label: "Dinheiro" },
   { id: "pix", label: "Pix" },
@@ -965,10 +1237,6 @@ function CreateAppointment({
   const totalPrice = chosen.reduce((a, s) => a + effOf(s), 0);
   const totalDuration = chosen.reduce((a, s) => a + s.duration_min, 0);
 
-  // Horários livres via RPC: já exclui passados (slot > now) e reservados
-  // (segments_conflict), respeitando o horário de trabalho da profissional.
-  // Recarrega ao trocar profissional, data ou serviços (a duração total
-  // define o tamanho do slot pedido).
   useEffect(() => {
     if (!proId || totalDuration <= 0) { setSlots([]); setSlot(""); return; }
     let cancelled = false;
@@ -1090,7 +1358,6 @@ function CreateAppointment({
             </div>
           </div>
 
-          {/* Data — usa o calendário temático (sem o seletor nativo do navegador) */}
           <div className="space-y-1.5">
             <Label>Data</Label>
             <button

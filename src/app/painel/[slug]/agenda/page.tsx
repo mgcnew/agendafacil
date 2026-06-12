@@ -49,6 +49,7 @@ export default async function AgendaPage({
   return (
     <AgendaManager
       salonId={membership.salon_id}
+      slug={slug}
       pros={proList}
       services={services ?? []}
       clients={clients ?? []}
