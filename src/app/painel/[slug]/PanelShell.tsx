@@ -23,6 +23,7 @@ import {
   X,
   LogOut,
   ExternalLink,
+  Share2,
 } from "lucide-react";
 
 /** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
@@ -110,6 +111,20 @@ export function PanelShell({
   }
   const moreItems = items.filter((i) => !usedHrefs.has(i.href));
 
+  function sharePublic() {
+    const url = `${window.location.origin}/${salon.slug}`;
+    // Celular (https): menu nativo do sistema — WhatsApp, Instagram, copiar, etc.
+    if (typeof navigator !== "undefined" && navigator.share && window.isSecureContext) {
+      navigator
+        .share({ title: salon.name, text: `Agende seu horário no ${salon.name} 💈`, url })
+        .catch(() => { /* cancelado */ });
+      return;
+    }
+    // Fallback universal (desktop ou http): abre o WhatsApp com o link pronto.
+    const msg = `Agende seu horário no ${salon.name} 💈\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+  }
+
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -164,6 +179,13 @@ export function PanelShell({
 
         {/* Ações do rodapé */}
         <div className="mt-auto flex flex-col items-center gap-1">
+          <button
+            onClick={sharePublic}
+            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-primary hover:bg-primary/10 transition"
+          >
+            <Share2 className="h-[18px] w-[18px]" />
+            <Tip label="Compartilhar link" />
+          </button>
           <a
             href={`/${salon.slug}`}
             target="_blank"
@@ -306,6 +328,12 @@ export function PanelShell({
             )}
 
             <div className="border-t border-border mt-4 pt-3 space-y-1">
+              <button
+                onClick={() => { setOpen(false); sharePublic(); }}
+                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/10"
+              >
+                <Share2 className="h-4.5 w-4.5" /> Compartilhar link
+              </button>
               <a
                 href={`/${salon.slug}`}
                 target="_blank"
