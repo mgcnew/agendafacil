@@ -106,6 +106,7 @@ export default async function DashboardPage({
     const svcs = (a.appointment_services as { name: string; price: number; duration_min: number }[] | null) ?? [];
     return {
       id: a.id,
+      starts_at: a.starts_at,
       time: formatTime(a.starts_at),
       client: clientObj?.full_name ?? "Cliente",
       alert: clientObj?.alert_summary ?? null,
@@ -225,7 +226,7 @@ export default async function DashboardPage({
             Nenhum agendamento para hoje ainda.
           </div>
         ) : (
-          <TodayAgenda items={agendaItems} />
+          <TodayAgenda items={agendaItems} salonId={salonId} />
         )}
       </div>
     </div>
