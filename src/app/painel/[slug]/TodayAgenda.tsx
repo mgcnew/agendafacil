@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card } from "@/components/ui";
@@ -251,6 +251,9 @@ export function TodayAgenda({
   const supabase = createClient();
   const [items, setItems]       = useState(initialItems);
   const [open, setOpen]         = useState<Set<string>>(new Set());
+
+  // Sync when server re-renders with fresh data (e.g. navigation back to dashboard)
+  useEffect(() => { setItems(initialItems); }, [initialItems]);
   const [showPast, setShowPast] = useState(false);
   const [finalizing, setFinalizing] = useState<AgendaItem | null>(null);
 

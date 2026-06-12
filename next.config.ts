@@ -2,8 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // qualidades usadas via next/image (ex.: hero com quality={92})
     qualities: [75, 92],
+  },
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 300,
+    },
   },
 };
 
