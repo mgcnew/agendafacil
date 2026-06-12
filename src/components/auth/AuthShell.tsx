@@ -135,6 +135,17 @@ export function AuthShell({
       {/* Coluna do formulário */}
       <div className="flex flex-col justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-md mx-auto">
+          {/* Link de volta ao site — topo da coluna */}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition mb-8"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            Página inicial
+          </Link>
+
           <Link
             href="/"
             className="lg:hidden flex items-center justify-center gap-2 font-display font-bold text-xl mb-8"
