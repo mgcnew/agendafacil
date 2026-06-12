@@ -38,6 +38,7 @@ type Service = {
   price_type: string | null;
   category_id: string | null;
 };
+type Category = { id: string; name: string; sort_order: number };
 type Professional = { id: string; display_name: string; color: string | null; bio: string | null };
 type Appt = {
   id: string;
@@ -84,6 +85,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [pro, setPro] = useState<Professional | null>(null);
   const [date, setDate] = useState<string>(() => todayLocal());
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loadingServices, setLoadingServices] = useState(true);
   const [slots, setSlots] = useState<string[]>([]);
   const [slot, setSlot] = useState<string | null>(null);
@@ -144,6 +147,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
     supabase.rpc("public_services", { p_salon: salon.id }).then(({ data }) => {
       setServices((data as Service[]) ?? []);
       setLoadingServices(false);
+    });
+    supabase.rpc("public_service_categories" as never, { p_salon: salon.id } as never).then(({ data }) => {
+      setCategories((data as Category[]) ?? []);
     });
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
@@ -334,6 +340,38 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
+
+          {/* Pills de categoria — só aparece se o salão tem categorias */}
+          {categories.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setActiveCategory(null)}
+                className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium border transition ${
+                  activeCategory === null
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border bg-card hover:border-foreground/25"
+                }`}
+              >
+                Todos
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setActiveCategory(c.id)}
+                  className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium border transition ${
+                    activeCategory === c.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border bg-card hover:border-foreground/25"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loadingServices ? (
             <div className="py-10 grid place-items-center text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -343,7 +381,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               Este salão ainda não cadastrou serviços.
             </Card>
           ) : null}
-          {services.map((s) => {
+          {services.filter((s) => activeCategory === null || s.category_id === activeCategory).map((s) => {
             const on = selected.includes(s.id);
             return (
               <button

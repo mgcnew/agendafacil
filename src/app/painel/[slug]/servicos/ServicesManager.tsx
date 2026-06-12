@@ -7,13 +7,14 @@ import { formatServicePrice, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
-import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil, Boxes } from "lucide-react";
+import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil, Boxes, Tag, ChevronDown } from "lucide-react";
 
 type Service = Tables<"services">;
 type PriceType = "fixed" | "from" | "on_request";
 type Prod = { id: string; name: string; unit: string | null };
 type SP = { service_id: string; product_id: string; quantity: number };
 type RecipeRow = { product_id: string; quantity: string };
+type Category = { id: string; name: string; sort_order: number };
 
 const PRICE_TYPE_LABEL: Record<PriceType, string> = {
   fixed: "Valor exato",
@@ -27,19 +28,26 @@ export function ServicesManager({
   initial,
   products,
   serviceProducts,
+  initialCategories,
 }: {
   salonId: string;
   niche: Niche;
   initial: Service[];
   products: Prod[];
   serviceProducts: SP[];
+  initialCategories: Category[];
 }) {
   const [services, setServices] = useState<Service[]>(initial);
   const [svcProducts, setSvcProducts] = useState<SP[]>(serviceProducts);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [presetOpen, setPresetOpen] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
   const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
   const [priceType, setPriceType] = useState<PriceType>("fixed");
@@ -55,7 +63,7 @@ export function ServicesManager({
 
   function resetForm() {
     setName(""); setPrice(""); setDuration("30"); setCommission("");
-    setPriceType("fixed");
+    setPriceType("fixed"); setCategoryId(null);
     setHasProcessing(false); setProcessing("30"); setFinish("15");
     setRecipe([]);
     setEditingId(null);
@@ -68,6 +76,7 @@ export function ServicesManager({
 
   function openEdit(svc: Service) {
     setName(svc.name);
+    setCategoryId(svc.category_id ?? null);
     setDuration(String(svc.duration_min));
     setPrice(svc.price ? String(svc.price).replace(".", ",") : "");
     setPriceType((svc.price_type as PriceType) ?? "fixed");
@@ -100,6 +109,7 @@ export function ServicesManager({
     setErr(null);
     const payload = {
       name,
+      category_id: categoryId,
       duration_min: parseInt(duration) || 30,
       price: priceType === "on_request" ? 0 : parseFloat(price.replace(",", ".")) || 0,
       price_type: priceType,
@@ -190,6 +200,30 @@ export function ServicesManager({
     if (error) setServices(prev);
   }
 
+  async function addCategory() {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    setCatBusy(true);
+    const { data, error } = await supabase
+      .from("service_categories")
+      .insert({ salon_id: salonId, name: trimmed, sort_order: categories.length })
+      .select("id, name, sort_order")
+      .single();
+    if (!error && data) {
+      setCategories((c) => [...c, data as Category]);
+      setNewCatName("");
+    }
+    setCatBusy(false);
+  }
+
+  async function deleteCategory(id: string) {
+    const { error } = await supabase.from("service_categories").delete().eq("id", id);
+    if (!error) {
+      setCategories((c) => c.filter((x) => x.id !== id));
+      setServices((s) => s.map((x) => x.category_id === id ? { ...x, category_id: null } : x));
+    }
+  }
+
   async function toggleActive(svc: Service) {
     const prev = services;
     setServices((s) => s.map((x) => (x.id === svc.id ? { ...x, is_active: !x.is_active } : x)));
@@ -214,6 +248,60 @@ export function ServicesManager({
         </div>
       </div>
 
+      {/* Gerenciar categorias */}
+      <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setCatOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition"
+        >
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <Tag className="h-4 w-4 text-primary" /> Categorias de serviço
+            {categories.length > 0 && (
+              <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">{categories.length}</span>
+            )}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${catOpen ? "rotate-180" : ""}`} />
+        </button>
+        {catOpen && (
+          <div className="border-t border-border p-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Crie categorias para organizar seus serviços (ex: Cortes, Coloração, Manicure). Elas aparecem como filtros no link de agendamento.
+            </p>
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => (
+                  <span key={c.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-sm">
+                    {c.name}
+                    <button
+                      type="button"
+                      onClick={() => deleteCategory(c.id)}
+                      className="text-muted-foreground hover:text-red-600 transition"
+                      title="Excluir categoria"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="Nome da categoria"
+                onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                className="flex-1"
+              />
+              <Button onClick={addCategory} disabled={catBusy || !newCatName.trim()} variant="outline">
+                {catBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Adicionar
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {presetOpen && (
         <PresetPicker
           niche={niche}
@@ -233,6 +321,15 @@ export function ServicesManager({
               <Label htmlFor="sname">Nome do serviço</Label>
               <Input id="sname" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Corte feminino" />
             </div>
+            {categories.length > 0 && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="scat">Categoria — opcional</Label>
+                <Select id="scat" value={categoryId ?? ""} onValueChange={(v) => setCategoryId(v || null)}>
+                  <option value="">Sem categoria</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="sdur">Duração (min)</Label>
               <Input id="sdur" type="number" value={duration} onChange={(e) => setDuration(e.target.value)} />
@@ -374,44 +471,78 @@ export function ServicesManager({
           <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhum serviço cadastrado ainda.</p>
         </div>
+      ) : categories.length === 0 ? (
+        <ServiceList services={services} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
       ) : (
-        <div className="space-y-2">
-          {services.map((s) => (
-            <div
-              key={s.id}
-              className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${!s.is_active ? "opacity-60" : ""}`}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">{s.name}</p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
-                  {s.commission_percent != null && (
-                    <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
-                  )}
-                  {s.processing_time_min > 0 && (
-                    <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
-                  )}
-                </div>
+        <div className="space-y-4">
+          {[...categories, { id: "__none__", name: "Sem categoria", sort_order: 9999 }].map((cat) => {
+            const group = services.filter((s) =>
+              cat.id === "__none__" ? !s.category_id : s.category_id === cat.id,
+            );
+            if (group.length === 0) return null;
+            return (
+              <div key={cat.id}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Tag className="h-3 w-3" /> {cat.name}
+                </p>
+                <ServiceList services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
               </div>
-              <span className="font-semibold text-primary text-sm text-right">
-                {formatServicePrice(Number(s.price), s.price_type)}
-              </span>
-              <button
-                onClick={() => toggleActive(s)}
-                className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
-              >
-                {s.is_active ? "Ativo" : "Inativo"}
-              </button>
-              <button onClick={() => openEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button onClick={() => remove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────── Lista de serviços (reutilizável) ───────────────────── */
+function ServiceList({
+  services,
+  onEdit,
+  onRemove,
+  onToggle,
+}: {
+  services: Tables<"services">[];
+  onEdit: (s: Tables<"services">) => void;
+  onRemove: (id: string) => void;
+  onToggle: (s: Tables<"services">) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {services.map((s) => (
+        <div
+          key={s.id}
+          className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${!s.is_active ? "opacity-60" : ""}`}
+        >
+          <div className="flex-1 min-w-0">
+            <p className="font-medium">{s.name}</p>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+              <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
+              {s.commission_percent != null && (
+                <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
+              )}
+              {s.processing_time_min > 0 && (
+                <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
+              )}
+            </div>
+          </div>
+          <span className="font-semibold text-primary text-sm text-right">
+            {formatServicePrice(Number(s.price), s.price_type)}
+          </span>
+          <button
+            onClick={() => onToggle(s)}
+            className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
+          >
+            {s.is_active ? "Ativo" : "Inativo"}
+          </button>
+          <button onClick={() => onEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button onClick={() => onRemove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

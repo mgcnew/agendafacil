@@ -15,7 +15,7 @@ export default async function ServicosPage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const [{ data: services }, { data: products }, { data: serviceProducts }] = await Promise.all([
+  const [{ data: services }, { data: products }, { data: serviceProducts }, { data: categories }] = await Promise.all([
     supabase
       .from("services")
       .select("*")
@@ -31,6 +31,11 @@ export default async function ServicosPage({
       .from("service_products")
       .select("service_id, product_id, quantity")
       .eq("salon_id", membership.salon_id),
+    supabase
+      .from("service_categories")
+      .select("id, name, sort_order")
+      .eq("salon_id", membership.salon_id)
+      .order("sort_order"),
   ]);
 
   return (
@@ -40,6 +45,7 @@ export default async function ServicosPage({
       initial={services ?? []}
       products={products ?? []}
       serviceProducts={serviceProducts ?? []}
+      initialCategories={(categories ?? []) as { id: string; name: string; sort_order: number }[]}
     />
   );
 }
