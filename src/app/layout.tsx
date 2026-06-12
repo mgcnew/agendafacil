@@ -1,12 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Oswald } from "next/font/google";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
 
-// Fonte única do produto — moderna, levemente arredondada e familiar.
+// Fonte padrão do produto — moderna, levemente arredondada e familiar.
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Fonte condensada para títulos — identidade de barbearia (placa/oficina).
+const oswald = Oswald({
+  variable: "--font-oswald",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
   display: "swap",
 });
 
@@ -30,7 +38,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={`${jakarta.variable} h-full`}>
+    <html lang="pt-BR" className={`${jakarta.variable} ${oswald.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-body">
         {children}
         <PWARegister />

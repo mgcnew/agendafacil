@@ -79,9 +79,11 @@
 
 [data-niche="barbearia"] {
   --radius: 0.25rem;
-  --display-tracking: 0.04em;
+  --display-tracking: 0.05em;
   --display-transform: uppercase;
-  --display-weight: 700;
+  --display-weight: 600;
+  /* Títulos condensados estilo placa de barbearia */
+  --font-display: var(--font-oswald), "Oswald", system-ui, sans-serif;
 }
 
 [data-niche="estetica"] {
@@ -336,6 +338,30 @@
   --border: #f0ccd3;
   --ring: #9f1239;
   --shadow-card: 0 1px 2px rgba(42,8,16,.06), 0 8px 24px -12px rgba(159,18,57,.16);
+}
+
+
+/* ============================================================
+   BARBEARIA — identidade própria (grafite + cobre).
+   Vem depois dos [data-color] de propósito: o nicho barbearia
+   tem paleta escura fixa, independente da cor escolhida.
+   ============================================================ */
+[data-niche="barbearia"] {
+  --background: #1a1613;
+  --foreground: #f2ede4;
+  --card: #221c16;
+  --card-foreground: #f2ede4;
+  --primary: #c8852f;
+  --primary-foreground: #1a1613;
+  --secondary: #2a2118;
+  --secondary-foreground: #e7d6bf;
+  --accent: #e7b96a;
+  --accent-foreground: #1a1613;
+  --muted: #221c16;
+  --muted-foreground: #a8997f;
+  --border: #34291f;
+  --ring: #c8852f;
+  --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 14px 30px -18px rgba(0,0,0,.75);
 }
 
 
