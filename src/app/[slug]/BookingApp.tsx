@@ -149,7 +149,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       setLoadingServices(false);
     });
     supabase.rpc("public_service_categories" as never, { p_salon: salon.id } as never).then(({ data }) => {
-      setCategories((data as Category[]) ?? []);
+      setCategories((data as unknown as Category[]) ?? []);
     });
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
