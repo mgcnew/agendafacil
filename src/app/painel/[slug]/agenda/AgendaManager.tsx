@@ -12,7 +12,7 @@ import type { Enums } from "@/lib/database.types";
 import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
 import {
   Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X,
-  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors, ChevronRight as ChevRight,
+  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -394,7 +394,7 @@ function ApptDetailModal({
                 className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
               >
                 <span>Histórico da cliente</span>
-                <ChevRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showHistory && "rotate-90")} />
+                <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showHistory && "rotate-90")} />
               </button>
 
               {showHistory && (
@@ -438,7 +438,7 @@ function ApptDetailModal({
                 className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
               >
                 <span>Anamnese</span>
-                <ChevRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showAnam && "rotate-90")} />
+                <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showAnam && "rotate-90")} />
               </button>
 
               {showAnam && (
