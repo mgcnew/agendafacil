@@ -100,6 +100,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [clientName, setClientName] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [savedPhone, setSavedPhone] = useState("");
 
   const [booking, setBooking] = useState(false);
   const [bookErr, setBookErr] = useState<string | null>(null);
@@ -163,7 +164,18 @@ export function BookingApp({ salon }: { salon: Salon }) {
       setDiscounts(map);
     });
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
+      if (!data.user) {
+        // sem sessão: restaura dados salvos localmente
+        try {
+          const saved = localStorage.getItem(`af_client_${salon.slug}`);
+          if (saved) {
+            const { name: n, phone: p } = JSON.parse(saved) as { name: string; phone: string };
+            if (n) { setName(n); setClientName(n); }
+            if (p) { setPhone(p); setSavedPhone(p); }
+          }
+        } catch { /* ignore */ }
+        return;
+      }
       setUserId(data.user.id);
       const metaName = (data.user.user_metadata?.full_name as string | undefined) ?? "";
       const { data: c } = await supabase
@@ -177,7 +189,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       if (nm) { setName(nm); setClientName(nm); }
       if (ph) setPhone(ph);
     });
-  }, [supabase, salon.id]);
+  }, [supabase, salon.id, salon.slug]);
 
   const loadSlots = useCallback(async () => {
     if (!pro || !totalDuration) return;
@@ -198,8 +210,17 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }, [step, date, loadSlots]);
 
   async function loadMine() {
-    const { data } = await supabase.rpc("my_appointments", { p_salon: salon.id });
-    setMine((data as Appt[]) ?? []);
+    if (userId) {
+      const { data } = await supabase.rpc("my_appointments", { p_salon: salon.id });
+      setMine((data as Appt[]) ?? []);
+    } else {
+      const ph = savedPhone || phone;
+      const { data } = await supabase.rpc("public_appointments_by_phone" as never, {
+        p_salon: salon.id,
+        p_phone: ph,
+      } as never);
+      setMine((data as Appt[]) ?? []);
+    }
     setShowMine(true);
   }
 
@@ -235,7 +256,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }
 
   function goAfterTime() {
-    if (userId) setStep("confirm");
+    if (userId || savedPhone) setStep("confirm");
     else setStep("auth");
   }
 
@@ -268,7 +289,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               )}
             </div>
           </div>
-          {userId && (
+          {(userId || savedPhone) && (
             <button
               onClick={loadMine}
               className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
@@ -279,7 +300,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         </div>
 
         {/* Saudação personalizada (cliente já conhecida) */}
-        {step === "services" && userId && clientName && (
+        {step === "services" && (userId || savedPhone) && clientName && (
           <div className="mt-5 rounded-[var(--radius)] border border-border bg-card p-4 af-rise">
             <p className="font-display text-lg">
               Olá, {clientName.split(" ")[0]}! <span aria-hidden>👋</span>
@@ -289,7 +310,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </p>
           </div>
         )}
-        {step === "services" && !userId && (
+        {step === "services" && !userId && !savedPhone && (
           <p className="mt-3 text-sm text-muted-foreground">
             Agende seu horário em poucos toques.
           </p>
@@ -499,7 +520,17 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 placeholder="(11) 99999-9999"
               />
             </div>
-            <Button className="w-full" onClick={() => setStep("confirm")} disabled={!name || !phone}>
+            <Button
+              className="w-full"
+              onClick={() => {
+                try {
+                  localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ name, phone }));
+                } catch { /* ignore */ }
+                setSavedPhone(phone);
+                setStep("confirm");
+              }}
+              disabled={!name || !phone}
+            >
               Continuar
             </Button>
             <p className="text-xs text-muted-foreground text-center">
