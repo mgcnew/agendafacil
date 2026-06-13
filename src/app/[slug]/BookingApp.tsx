@@ -219,7 +219,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         p_salon: salon.id,
         p_phone: ph,
       } as never);
-      setMine((data as Appt[]) ?? []);
+      setMine((data as unknown as Appt[]) ?? []);
     }
     setShowMine(true);
   }
