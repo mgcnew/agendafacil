@@ -100,10 +100,6 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [clientName, setClientName] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authErr, setAuthErr] = useState<string | null>(null);
 
   const [booking, setBooking] = useState(false);
   const [bookErr, setBookErr] = useState<string | null>(null);
@@ -211,37 +207,6 @@ export function BookingApp({ salon }: { salon: Salon }) {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
-  }
-
-  async function sendOtp() {
-    setAuthBusy(true);
-    setAuthErr(null);
-    const { error } = await supabase.auth.signInWithOtp({ phone: toE164(phone) });
-    if (error) {
-      setAuthErr("Não foi possível enviar o código. Verifique o número.");
-      setAuthBusy(false);
-      return;
-    }
-    setOtpSent(true);
-    setAuthBusy(false);
-  }
-
-  async function verifyOtp() {
-    setAuthBusy(true);
-    setAuthErr(null);
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone: toE164(phone),
-      token: otp,
-      type: "sms",
-    });
-    if (error || !data.user) {
-      setAuthErr("Código inválido. Tente novamente.");
-      setAuthBusy(false);
-      return;
-    }
-    setUserId(data.user.id);
-    setAuthBusy(false);
-    setStep("confirm");
   }
 
   async function confirmBooking() {
@@ -513,7 +478,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         </section>
       )}
 
-      {/* STEP: autenticação por telefone */}
+      {/* STEP: identificação (sem verificação OTP) */}
       {step === "auth" && (
         <section className="space-y-4 af-rise">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
@@ -532,25 +497,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(11) 99999-9999"
-                disabled={otpSent}
               />
             </div>
-            {otpSent && (
-              <div className="space-y-1.5">
-                <Label htmlFor="otp">Código recebido por SMS</Label>
-                <Input id="otp" inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="000000" />
-              </div>
-            )}
-            {authErr && <p className="text-sm text-red-600">{authErr}</p>}
-            {!otpSent ? (
-              <Button className="w-full" onClick={sendOtp} disabled={authBusy || !phone || !name}>
-                {authBusy && <Loader2 className="h-4 w-4 animate-spin" />} Enviar código
-              </Button>
-            ) : (
-              <Button className="w-full" onClick={verifyOtp} disabled={authBusy || otp.length < 4}>
-                {authBusy && <Loader2 className="h-4 w-4 animate-spin" />} Validar e continuar
-              </Button>
-            )}
+            <Button className="w-full" onClick={() => setStep("confirm")} disabled={!name || !phone}>
+              Continuar
+            </Button>
             <p className="text-xs text-muted-foreground text-center">
               Usamos seu número só para confirmar o agendamento.
             </p>
