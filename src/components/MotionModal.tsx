@@ -28,7 +28,7 @@ export function MotionModal({
     <div
       data-niche={attrs.niche}
       data-color={attrs.color}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center text-foreground bg-transparent"
     >
       <motion.div
         className="absolute inset-0 bg-black/50"
