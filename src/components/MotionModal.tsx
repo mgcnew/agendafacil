@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 
 export function MotionModal({
@@ -8,7 +10,11 @@ export function MotionModal({
   onClose?: () => void;
   children: React.ReactNode;
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <motion.div
         className="absolute inset-0 bg-black/50"
@@ -28,6 +34,7 @@ export function MotionModal({
       >
         {children}
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }
