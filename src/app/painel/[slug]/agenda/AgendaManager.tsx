@@ -312,7 +312,7 @@ function ApptDetailModal({
           )}
 
           {/* ── Data / horário / profissional ───────────────── */}
-          <div className="rounded-[var(--radius)] bg-muted px-3.5 py-3 space-y-1 text-sm">
+          <div className="rounded-[var(--radius)] bg-secondary border border-border px-3.5 py-3 space-y-1.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground text-xs">Data</span>
               <span className="font-medium">
@@ -328,8 +328,8 @@ function ApptDetailModal({
               </span>
             </div>
             {appt.notes && (
-              <div className="flex items-start justify-between gap-2 pt-0.5">
-                <span className="text-muted-foreground text-xs shrink-0">Obs.</span>
+              <div className="flex items-start justify-between gap-2 pt-0.5 border-t border-border/60 mt-1">
+                <span className="text-muted-foreground text-xs shrink-0 mt-0.5">Obs.</span>
                 <span className="text-xs text-right">{appt.notes}</span>
               </div>
             )}
@@ -345,7 +345,7 @@ function ApptDetailModal({
             ) : services.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">Sem serviços registrados.</p>
             ) : (
-              <div className="space-y-1">
+              <div className="rounded-[var(--radius)] bg-secondary border border-border px-3.5 py-3 space-y-1.5">
                 {services.map(s => (
                   <div key={s.id} className="flex items-center justify-between text-sm">
                     <span className="flex-1 min-w-0 truncate">{s.name}</span>
@@ -353,7 +353,7 @@ function ApptDetailModal({
                     <span className="font-medium shrink-0">{formatBRL(Number(s.price))}</span>
                   </div>
                 ))}
-                <div className="flex items-center justify-between border-t border-border pt-2 mt-2">
+                <div className="flex items-center justify-between border-t border-border pt-2 mt-0.5">
                   <span className="text-xs text-muted-foreground">Total</span>
                   <span className="font-display font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
                 </div>
@@ -364,22 +364,19 @@ function ApptDetailModal({
           {/* ── Status e ações ──────────────────────────────── */}
           <div className="space-y-2.5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 rounded-[var(--radius)] bg-secondary border border-border px-3 h-9">
               <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: st.dot }} />
               <Select
                 value={appt.status}
                 onValueChange={(v) => onStatusChange(v as Status)}
-                className="flex-1 h-8 text-xs font-medium"
+                className="flex-1 bg-transparent border-0 h-full text-xs font-medium shadow-none outline-none"
               >
                 {STATUS_LIST.map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
               </Select>
             </div>
 
             {!isFinished && (
-              <Button
-                onClick={onFinalize}
-                className="w-full"
-              >
+              <Button onClick={onFinalize} className="w-full">
                 <Scissors className="h-4 w-4" /> Finalizar atendimento
               </Button>
             )}
@@ -1165,7 +1162,7 @@ function FinalizeModal({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between rounded-[var(--radius)] bg-muted px-4 py-3 mt-4">
+            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
               <span className="text-sm text-muted-foreground">Total</span>
               <span className="font-display text-xl font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
             </div>

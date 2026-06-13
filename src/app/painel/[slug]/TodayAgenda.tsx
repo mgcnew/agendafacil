@@ -90,7 +90,7 @@ function FinalizeModal({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between rounded-[var(--radius)] bg-muted px-4 py-3 mt-4">
+            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
               <span className="text-sm text-muted-foreground">Total</span>
               <span className="font-display text-xl font-bold text-primary">{formatBRL(item.price)}</span>
             </div>

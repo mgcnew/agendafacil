@@ -623,7 +623,7 @@ function CloseModal({
           })}
         </div>
 
-        <div className="flex items-center justify-between rounded-[var(--radius)] bg-muted px-4 py-3 mt-4">
+        <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
           <span className="text-sm text-muted-foreground">Esperado na gaveta</span>
           <span className="font-display text-lg font-bold">{formatBRL(expectedCash)}</span>
         </div>

@@ -479,7 +479,7 @@ function SellModal({
         </div>
 
         {tpl && (
-          <div className="rounded-[var(--radius)] bg-muted p-3 text-sm space-y-1">
+          <div className="rounded-[var(--radius)] bg-secondary border border-border p-3 text-sm space-y-1">
             <p className="text-muted-foreground text-xs">
               {tpl.package_template_items.map((i) => `${i.quantity}× ${i.services?.name ?? "serviço"}`).join(" · ")}
             </p>
