@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
@@ -125,7 +127,7 @@ export function TeamManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Equipe</h1>
@@ -302,27 +304,33 @@ export function TeamManager({
         ))}
       </div>
 
-      {editing && (
-        <PermissionsEditor
-          member={editing}
-          permissions={permissions}
-          roleDefaults={roleDefaults}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      <AnimatePresence>
+        {editing && (
+          <PermissionsEditor
+            key="permissions"
+            member={editing}
+            permissions={permissions}
+            roleDefaults={roleDefaults}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
 
-      {editingServices && (
-        <ServicesEditor
-          member={editingServices}
-          services={services}
-          salonId={salonId}
-          onClose={() => setEditingServices(null)}
-          onSaved={(count) => {
-            setCounts((c) => ({ ...c, [editingServices.id]: count }));
-            setEditingServices(null);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {editingServices && (
+          <ServicesEditor
+            key="services"
+            member={editingServices}
+            services={services}
+            salonId={salonId}
+            onClose={() => setEditingServices(null)}
+            onSaved={(count) => {
+              setCounts((c) => ({ ...c, [editingServices.id]: count }));
+              setEditingServices(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -414,9 +422,8 @@ function ServicesEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <Scissors className="h-5 w-5 text-primary" /> Serviços
@@ -475,7 +482,7 @@ function ServicesEditor({
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }
 
@@ -546,9 +553,8 @@ function PermissionsEditor({
   }, {});
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" /> Permissões
@@ -599,6 +605,6 @@ function PermissionsEditor({
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }

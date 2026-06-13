@@ -5,6 +5,8 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -257,10 +259,8 @@ function ApptDetailModal({
   const isFinished    = appt.status === "completed" || appt.status === "cancelled" || appt.status === "no_show";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
-      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-card rounded-t-2xl sm:rounded-[var(--radius)] shadow-2xl flex flex-col">
+    <MotionModal onClose={onClose}>
+      <div className="w-full sm:max-w-md mx-auto max-h-[90vh] overflow-y-auto bg-card rounded-t-2xl sm:rounded-[var(--radius)] shadow-2xl flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-card flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
           <h3 className="font-display text-lg font-bold">Agendamento</h3>
@@ -497,7 +497,7 @@ function ApptDetailModal({
           )}
         </div>
       </div>
-    </div>
+    </MotionModal>
   );
 }
 
@@ -942,7 +942,7 @@ export function AgendaManager({
   const detailColor = detailAppt ? getColor(pros, detailAppt.member_id) : "#6366f1";
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex flex-col gap-3 h-full af-rise">
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -1059,37 +1059,46 @@ export function AgendaManager({
       </div>
 
       {/* ── Appointment detail modal ──────────────────────── */}
-      {detailAppt && (
-        <ApptDetailModal
-          appt={detailAppt}
-          color={detailColor}
-          salonId={salonId}
-          slug={slug}
-          onClose={() => setDetailAppt(null)}
-          onStatusChange={s => onStatusChange(detailAppt, s)}
-          onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
-        />
-      )}
+      <AnimatePresence>
+        {detailAppt && (
+          <ApptDetailModal
+            key="detail"
+            appt={detailAppt}
+            color={detailColor}
+            salonId={salonId}
+            slug={slug}
+            onClose={() => setDetailAppt(null)}
+            onStatusChange={s => onStatusChange(detailAppt, s)}
+            onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Create modal ──────────────────────────────────── */}
-      {creating && (
-        <CreateAppointment
-          salonId={salonId} pros={pros} services={services} clients={initialClients}
-          discounts={discounts}
-          date={createDate}
-          onClose={() => setCreating(false)}
-          onCreated={() => { setCreating(false); load(); }}
-        />
-      )}
+      <AnimatePresence>
+        {creating && (
+          <CreateAppointment
+            key="create"
+            salonId={salonId} pros={pros} services={services} clients={initialClients}
+            discounts={discounts}
+            date={createDate}
+            onClose={() => setCreating(false)}
+            onCreated={() => { setCreating(false); load(); }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Finalizar atendimento ─────────────────────────── */}
-      {finalizing && (
-        <FinalizeModal
-          appt={finalizing}
-          onClose={() => setFinalizing(null)}
-          onDone={() => { setFinalizing(null); load(); }}
-        />
-      )}
+      <AnimatePresence>
+        {finalizing && (
+          <FinalizeModal
+            key="finalize"
+            appt={finalizing}
+            onClose={() => setFinalizing(null)}
+            onDone={() => { setFinalizing(null); load(); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1133,9 +1142,8 @@ function FinalizeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-sm p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold">Finalizar atendimento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
@@ -1197,7 +1205,7 @@ function FinalizeModal({
           </>
         )}
       </Card>
-    </div>
+    </MotionModal>
   );
 }
 
@@ -1294,9 +1302,8 @@ function CreateAppointment({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
@@ -1415,6 +1422,6 @@ function CreateAppointment({
           </Button>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }

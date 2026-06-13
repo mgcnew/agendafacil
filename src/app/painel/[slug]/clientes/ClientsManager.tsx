@@ -74,7 +74,7 @@ export function ClientsManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Clientes</h1>

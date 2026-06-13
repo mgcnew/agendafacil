@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import { formatServicePrice, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
@@ -232,7 +234,7 @@ export function ServicesManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Serviços</h1>
@@ -302,14 +304,17 @@ export function ServicesManager({
         )}
       </div>
 
-      {presetOpen && (
-        <PresetPicker
-          niche={niche}
-          existing={services.map((s) => s.name.trim().toLowerCase())}
-          onClose={() => setPresetOpen(false)}
-          onConfirm={addPresets}
-        />
-      )}
+      <AnimatePresence>
+        {presetOpen && (
+          <PresetPicker
+            key="presets"
+            niche={niche}
+            existing={services.map((s) => s.name.trim().toLowerCase())}
+            onClose={() => setPresetOpen(false)}
+            onConfirm={addPresets}
+          />
+        )}
+      </AnimatePresence>
 
       {adding && (
         <Card className="p-6 space-y-4 af-rise">
@@ -587,9 +592,8 @@ function PresetPicker({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <Wand2 className="h-5 w-5 text-primary" /> Serviços comuns
@@ -641,6 +645,6 @@ function PresetPicker({
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }

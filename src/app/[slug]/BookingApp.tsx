@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import { NICHES, type Niche } from "@/lib/themes";
@@ -685,9 +687,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
       )}
 
       {/* Drawer: meus agendamentos */}
-      {showMine && (
-        <MineDrawer mine={mine} onClose={() => setShowMine(false)} />
-      )}
+      <AnimatePresence>
+        {showMine && (
+          <MineDrawer key="mine" mine={mine} onClose={() => setShowMine(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 
@@ -702,9 +706,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   function MineDrawer({ mine, onClose }: { mine: Appt[]; onClose: () => void }) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <Card className="relative w-full sm:max-w-md max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+      <MotionModal onClose={onClose}>
+        <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-lg font-bold">Meus agendamentos</h3>
             <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
@@ -734,7 +737,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </div>
           )}
         </Card>
-      </div>
+      </MotionModal>
     );
   }
 }

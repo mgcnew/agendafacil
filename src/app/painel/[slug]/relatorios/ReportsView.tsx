@@ -205,7 +205,7 @@ export function ReportsView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">

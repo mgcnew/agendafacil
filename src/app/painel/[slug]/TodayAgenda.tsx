@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -67,9 +69,8 @@ function FinalizeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-sm p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold">Finalizar atendimento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
@@ -121,7 +122,7 @@ function FinalizeModal({
           </>
         )}
       </Card>
-    </div>
+    </MotionModal>
   );
 }
 
@@ -362,13 +363,16 @@ export function TodayAgenda({
       )}
 
       {/* ── Modal de finalização ──────────────────────────── */}
-      {finalizing && (
-        <FinalizeModal
-          item={finalizing}
-          onClose={() => setFinalizing(null)}
-          onDone={() => onFinalizeSuccess(finalizing)}
-        />
-      )}
+      <AnimatePresence>
+        {finalizing && (
+          <FinalizeModal
+            key="finalize"
+            item={finalizing}
+            onClose={() => setFinalizing(null)}
+            onDone={() => onFinalizeSuccess(finalizing)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

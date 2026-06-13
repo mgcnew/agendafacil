@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
@@ -144,7 +146,7 @@ export function FinanceManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div>
         <h1 className="font-display text-2xl font-bold">Caixa & Comissões</h1>
         <p className="text-muted-foreground text-sm">Controle financeiro do salão.</p>
@@ -351,32 +353,37 @@ export function FinanceManager({
       )}
 
       {/* Modal de fechamento com conferência */}
-      {closing && openSession && (
-        <CloseModal
-          expectedCash={expectedCash}
-          incomeByMethod={incomeByMethod}
-          onClose={() => setClosing(false)}
-          onConfirm={async (counted) => {
-            const { error } = await supabase
-              .from("cash_sessions")
-              .update({
-                closed_at: new Date().toISOString(),
-                closing_amount: counted,
-                expected_amount: expectedCash,
-                difference: counted - expectedCash,
-              })
-              .eq("id", openSession.id);
-            if (error) { setErr("Não foi possível fechar o caixa. Tente novamente."); return; }
-            setClosing(false);
-            router.refresh();
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {closing && openSession && (
+          <CloseModal
+            key="close"
+            expectedCash={expectedCash}
+            incomeByMethod={incomeByMethod}
+            onClose={() => setClosing(false)}
+            onConfirm={async (counted) => {
+              const { error } = await supabase
+                .from("cash_sessions")
+                .update({
+                  closed_at: new Date().toISOString(),
+                  closing_amount: counted,
+                  expected_amount: expectedCash,
+                  difference: counted - expectedCash,
+                })
+                .eq("id", openSession.id);
+              if (error) { setErr("Não foi possível fechar o caixa. Tente novamente."); return; }
+              setClosing(false);
+              router.refresh();
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Cupom não fiscal */}
-      {receiptTx && (
-        <ReceiptModal tx={receiptTx} salon={salon} onClose={() => setReceiptTx(null)} />
-      )}
+      <AnimatePresence>
+        {receiptTx && (
+          <ReceiptModal key="receipt" tx={receiptTx} salon={salon} onClose={() => setReceiptTx(null)} />
+        )}
+      </AnimatePresence>
 
       {tab === "comissoes" && (
         <div className="space-y-4">
@@ -512,9 +519,8 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
   })();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-md max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <Receipt className="h-5 w-5 text-primary" /> Cupom não fiscal
@@ -565,7 +571,7 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
           </>
         )}
       </Card>
-    </div>
+    </MotionModal>
   );
 }
 
@@ -592,9 +598,8 @@ function CloseModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-md p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <Lock className="h-5 w-5 text-primary" /> Fechar caixa
@@ -646,6 +651,6 @@ function CloseModal({
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }

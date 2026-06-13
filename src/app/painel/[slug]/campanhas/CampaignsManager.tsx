@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
@@ -89,7 +91,7 @@ export function CampaignsManager({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 af-rise">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Campanhas</h1>
@@ -159,18 +161,21 @@ export function CampaignsManager({
         </div>
       )}
 
-      {(creating || editing) && (
-        <CampaignEditor
-          salonId={salonId}
-          services={services}
-          campaign={editing}
-          prefillName={prefill?.name}
-          prefillDiscount={prefill?.discount}
-          initialServiceIds={editing ? campaignServices.filter((cs) => cs.campaign_id === editing.id).map((cs) => cs.service_id) : []}
-          onClose={() => { setCreating(false); setEditing(null); setPrefill(null); }}
-          onSaved={() => { setCreating(false); setEditing(null); setPrefill(null); router.refresh(); }}
-        />
-      )}
+      <AnimatePresence>
+        {(creating || editing) && (
+          <CampaignEditor
+            key="editor"
+            salonId={salonId}
+            services={services}
+            campaign={editing}
+            prefillName={prefill?.name}
+            prefillDiscount={prefill?.discount}
+            initialServiceIds={editing ? campaignServices.filter((cs) => cs.campaign_id === editing.id).map((cs) => cs.service_id) : []}
+            onClose={() => { setCreating(false); setEditing(null); setPrefill(null); }}
+            onSaved={() => { setCreating(false); setEditing(null); setPrefill(null); router.refresh(); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -249,9 +254,8 @@ function CampaignEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <Card className="relative w-full sm:max-w-lg max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">{campaign ? "Editar campanha" : "Nova campanha"}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
@@ -362,6 +366,6 @@ function CampaignEditor({
           </div>
         </div>
       </Card>
-    </div>
+    </MotionModal>
   );
 }

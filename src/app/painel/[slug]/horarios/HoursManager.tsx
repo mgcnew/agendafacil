@@ -130,7 +130,7 @@ export function HoursManager({
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl af-rise">
       {!embedded && (
         <div>
           <h1 className="font-display text-2xl font-bold">Horários</h1>
