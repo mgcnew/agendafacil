@@ -6,8 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
 import {
-  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight,
+  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight, X,
 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 
 type Client = Tables<"clients">;
 
@@ -87,41 +89,51 @@ export function ClientsManager({
         )}
       </div>
 
-      {adding && (
-        <Card className="p-6 space-y-4 af-rise">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="cn">Nome</Label>
-              <Input id="cn" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cp">Celular</Label>
-              <Input id="cp" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ce">E-mail</Label>
-              <Input id="ce" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cb">Nascimento</Label>
-              <Input id="cb" type="date" value={birth} onChange={(e) => setBirth(e.target.value)} />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="cr">Como conheceu / indicação</Label>
-              <Input id="cr" value={referral} onChange={(e) => setReferral(e.target.value)} placeholder="Instagram, indicação de..." />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={add} disabled={busy || !name}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
-            </Button>
-            <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            A ficha de anamnese (saúde, alergias) é preenchida ao abrir a cliente.
-          </p>
-        </Card>
-      )}
+      <AnimatePresence>
+        {adding && (
+          <MotionModal key="add-client" onClose={() => setAdding(false)}>
+            <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-display text-lg font-bold">Nova cliente</h3>
+                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cn">Nome</Label>
+                  <Input id="cn" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cp">Celular</Label>
+                  <Input id="cp" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ce">E-mail</Label>
+                  <Input id="ce" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cb">Nascimento</Label>
+                  <Input id="cb" type="date" value={birth} onChange={(e) => setBirth(e.target.value)} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="cr">Como conheceu / indicação</Label>
+                  <Input id="cr" value={referral} onChange={(e) => setReferral(e.target.value)} placeholder="Instagram, indicação de..." />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                A ficha de anamnese (saúde, alergias) é preenchida ao abrir a cliente.
+              </p>
+              <div className="flex gap-2 mt-5">
+                <Button onClick={add} disabled={busy || !name} className="flex-1">
+                  {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
+                </Button>
+                <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+              </div>
+            </Card>
+          </MotionModal>
+        )}
+      </AnimatePresence>
 
       {err && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">

@@ -316,11 +316,18 @@ export function ServicesManager({
         )}
       </AnimatePresence>
 
-      {adding && (
-        <Card className="p-6 space-y-4 af-rise">
-          <h2 className="font-display font-semibold">
-            {editingId ? "Editar serviço" : "Novo serviço"}
-          </h2>
+      <AnimatePresence>
+        {adding && (
+          <MotionModal key="add-service" onClose={closeForm}>
+            <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-display font-semibold">
+              {editingId ? "Editar serviço" : "Novo serviço"}
+            </h2>
+            <button onClick={closeForm} className="p-1 rounded hover:bg-muted">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="sname">Nome do serviço</Label>
@@ -461,15 +468,17 @@ export function ServicesManager({
 
           {err && <p className="text-sm text-red-600">{err}</p>}
 
-          <div className="flex gap-2">
-            <Button onClick={save} disabled={busy || !name}>
+          <div className="flex gap-2 mt-2">
+            <Button onClick={save} disabled={busy || !name} className="flex-1">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {editingId ? "Salvar" : "Adicionar"}
             </Button>
             <Button variant="ghost" onClick={closeForm}>Cancelar</Button>
           </div>
-        </Card>
-      )}
+            </Card>
+          </MotionModal>
+        )}
+      </AnimatePresence>
 
       {services.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">

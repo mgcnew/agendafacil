@@ -147,48 +147,58 @@ export function TeamManager({
         </div>
       )}
 
-      {adding && (
-        <Card className="p-6 space-y-4 af-rise">
-          <div className="grid sm:grid-cols-3 gap-4 items-end">
-            <div className="space-y-1.5 sm:col-span-1">
-              <Label htmlFor="email">E-mail da pessoa</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="funcionaria@email.com" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="role">Cargo</Label>
-              <Select id="role" value={role} onValueChange={(v) => setRole(v as Role)}>
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="commission">Comissão (%)</Label>
-              <Input
-                id="commission"
-                type="number"
-                min={0}
-                max={100}
-                value={commission}
-                onChange={(e) => setCommission(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            A pessoa recebe um link, cria a conta e preenche os próprios dados.
-            Comissão e horários ficam sob seu controle.
-          </p>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <div className="flex gap-2">
-            <Button onClick={createInvite} disabled={busy || !email}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-              Gerar link de convite
-            </Button>
-            <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
-          </div>
-        </Card>
-      )}
+      <AnimatePresence>
+        {adding && (
+          <MotionModal key="invite" onClose={() => setAdding(false)}>
+            <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-display text-lg font-bold">Convidar pessoa</h3>
+                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-4 items-end">
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label htmlFor="email">E-mail da pessoa</Label>
+                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="funcionaria@email.com" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="role">Cargo</Label>
+                  <Select id="role" value={role} onValueChange={(v) => setRole(v as Role)}>
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="commission">Comissão (%)</Label>
+                  <Input
+                    id="commission"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={commission}
+                    onChange={(e) => setCommission(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                A pessoa recebe um link, cria a conta e preenche os próprios dados.
+                Comissão e horários ficam sob seu controle.
+              </p>
+              {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
+              <div className="flex gap-2 mt-5">
+                <Button onClick={createInvite} disabled={busy || !email} className="flex-1">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                  Gerar link de convite
+                </Button>
+                <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+              </div>
+            </Card>
+          </MotionModal>
+        )}
+      </AnimatePresence>
 
       {/* Convites pendentes */}
       {invites.length > 0 && (

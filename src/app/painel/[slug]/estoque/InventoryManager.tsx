@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Loader2, Boxes, Trash2, Minus, AlertTriangle, History, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, Loader2, Boxes, Trash2, Minus, AlertTriangle, History, ArrowDown, ArrowUp, X } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { MotionModal } from "@/components/MotionModal";
 
 type Product = Tables<"products">;
 export type Movement = {
@@ -125,38 +127,48 @@ export function InventoryManager({
         </div>
       )}
 
-      {adding && (
-        <Card className="p-6 space-y-4 af-rise">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="pn">Produto</Label>
-              <Input id="pn" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Shampoo profissional" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pq">Quantidade</Label>
-              <Input id="pq" value={qty} onChange={(e) => setQty(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pm">Estoque mínimo</Label>
-              <Input id="pm" value={min} onChange={(e) => setMin(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pc">Custo (R$)</Label>
-              <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ps">Venda (R$)</Label>
-              <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={add} disabled={busy || !name}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
-            </Button>
-            <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
-          </div>
-        </Card>
-      )}
+      <AnimatePresence>
+        {adding && (
+          <MotionModal key="add-product" onClose={() => setAdding(false)}>
+            <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-display text-lg font-bold">Novo produto</h3>
+                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="pn">Produto</Label>
+                  <Input id="pn" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Shampoo profissional" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pq">Quantidade</Label>
+                  <Input id="pq" value={qty} onChange={(e) => setQty(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pm">Estoque mínimo</Label>
+                  <Input id="pm" value={min} onChange={(e) => setMin(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pc">Custo (R$)</Label>
+                  <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ps">Venda (R$)</Label>
+                  <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-5">
+                <Button onClick={add} disabled={busy || !name} className="flex-1">
+                  {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
+                </Button>
+                <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+              </div>
+            </Card>
+          </MotionModal>
+        )}
+      </AnimatePresence>
 
       {products.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
