@@ -62,7 +62,7 @@ export default async function SalonBookingPage({
     <div
       data-niche={salon.niche}
       data-color={colorTheme}
-      className="min-h-full bg-background text-foreground"
+      className="min-h-dvh bg-background text-foreground"
     >
       <BookingApp salon={salon} />
     </div>
