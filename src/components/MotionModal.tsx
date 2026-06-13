@@ -10,12 +10,26 @@ export function MotionModal({
   onClose?: () => void;
   children: React.ReactNode;
 }) {
+  const [attrs, setAttrs] = useState<{ niche?: string; color?: string }>({});
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    const el = document.querySelector("[data-niche]");
+    setAttrs({
+      niche: el?.getAttribute("data-niche") ?? undefined,
+      color: el?.getAttribute("data-color") ?? undefined,
+    });
+  }, []);
+
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div
+      data-niche={attrs.niche}
+      data-color={attrs.color}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+    >
       <motion.div
         className="absolute inset-0 bg-black/50"
         initial={{ opacity: 0 }}
