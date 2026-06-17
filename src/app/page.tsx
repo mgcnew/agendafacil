@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { PLANS, priceLabel } from "@/lib/plans";
 import { Hero } from "@/components/landing/Hero";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
@@ -18,6 +19,47 @@ import {
 } from "lucide-react";
 
 // ── Dados ──────────────────────────────────────────────────────────────────
+
+const PLAN_CARDS: {
+  id: "basic" | "pro" | "max";
+  highlight?: boolean;
+  pitch: string;
+  features: string[];
+}[] = [
+  {
+    id: "basic",
+    pitch: "Para organizar a agenda e parar de perder horário.",
+    features: [
+      "Agenda online ilimitada",
+      "Link de agendamento para clientes",
+      "Cadastro de clientes",
+      "Serviços e equipe",
+      "Lembretes via WhatsApp",
+    ],
+  },
+  {
+    id: "pro",
+    highlight: true,
+    pitch: "O salão completo: financeiro, estoque e relatórios.",
+    features: [
+      "Tudo do Básico",
+      "Caixa e comissões",
+      "Controle de estoque",
+      "Pacotes de sessões",
+      "Campanhas e promoções",
+      "Relatórios e reativação",
+    ],
+  },
+  {
+    id: "max",
+    pitch: "Tudo do Pro com automação no WhatsApp.",
+    features: [
+      "Tudo do Pro",
+      "Integração com WhatsApp",
+      "Mensagens automáticas",
+    ],
+  },
+];
 
 const OBJECTIONS = [
   {
@@ -377,8 +419,90 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── PLANOS / PREÇOS ──────────────────────────────────────────── */}
+      <section id="planos" className="px-5 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center">
+            <h2 className="font-display text-3xl sm:text-4xl font-bold">
+              Planos que cabem no seu salão
+            </h2>
+            <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
+              Comece com 5 dias grátis. Sem cartão, sem fidelidade — cancele
+              quando quiser.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+            {PLAN_CARDS.map((card) => {
+              const plan = PLANS[card.id];
+              const highlight = card.highlight;
+              const soon = !!plan.comingSoon;
+              return (
+                <div
+                  key={plan.id}
+                  className={[
+                    "relative flex flex-col rounded-[var(--radius)] border bg-card p-6 shadow-card",
+                    highlight ? "border-primary ring-2 ring-primary/30" : "border-border",
+                    soon ? "opacity-80" : "",
+                  ].join(" ")}
+                >
+                  {highlight && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-primary-foreground">
+                      Mais popular
+                    </span>
+                  )}
+                  {soon && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-foreground">
+                      Em breve
+                    </span>
+                  )}
+
+                  <h3 className="font-display text-xl font-bold">{plan.name}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground min-h-[2.5rem]">
+                    {card.pitch}
+                  </p>
+
+                  <div className="mt-4 flex items-end gap-1">
+                    <span className="font-display text-3xl font-bold">
+                      {priceLabel(plan.value)}
+                    </span>
+                    <span className="mb-1 text-sm text-muted-foreground">/mês</span>
+                  </div>
+
+                  <ul className="mt-5 space-y-2.5 flex-1">
+                    {card.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-6">
+                    {soon ? (
+                      <Button variant="outline" className="w-full" disabled>
+                        Em breve
+                      </Button>
+                    ) : (
+                      <Link href="/criar-salao" className="block">
+                        <Button
+                          variant={highlight ? "primary" : "outline"}
+                          className="w-full"
+                        >
+                          Começar grátis
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ── BANNER TRIAL ─────────────────────────────────────────────── */}
-      <section id="planos" className="px-5 py-6">
+      <section className="px-5 py-6">
         <div
           className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20"
           style={{
