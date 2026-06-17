@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
+import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { ReportsView, type ReportData } from "./ReportsView";
@@ -17,6 +18,7 @@ export default async function RelatoriosPage({
   const { tab } = await searchParams;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+  await guardFeature(slug, "/relatorios");
 
   // Relatórios são restritos: dona sempre; demais só com permissão reports.view
   const perms = await getEffectivePermissions(membership.salon_id, membership);

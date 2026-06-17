@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug } from "@/lib/salon";
+import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { InventoryManager, type Movement } from "./InventoryManager";
 
@@ -13,6 +14,7 @@ export default async function EstoquePage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+  await guardFeature(slug, "/estoque");
 
   const supabase = await createClient();
   const [{ data: products }, { data: movements }] = await Promise.all([

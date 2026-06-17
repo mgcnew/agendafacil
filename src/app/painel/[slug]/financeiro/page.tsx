@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug } from "@/lib/salon";
+import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
@@ -25,6 +26,7 @@ export default async function FinanceiroPage({
   const { tab, cmes } = await searchParams;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+  await guardFeature(slug, "/financeiro");
   const salonId = membership.salon_id;
   const supabase = await createClient();
 

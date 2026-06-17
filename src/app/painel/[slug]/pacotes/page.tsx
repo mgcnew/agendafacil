@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
+import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { PackagesManager, type Template, type Sold } from "./PackagesManager";
 
@@ -13,6 +14,7 @@ export default async function PacotesPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+  await guardFeature(slug, "/pacotes");
   const salonId = membership.salon_id;
 
   const perms = await getEffectivePermissions(salonId, membership);

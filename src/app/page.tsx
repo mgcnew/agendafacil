@@ -99,7 +99,12 @@ const FOOTER_COLS = [
   },
   {
     title: "Legal",
-    links: ["Política de privacidade", "Termos de uso", "LGPD", "Cookies"],
+    links: [
+      { label: "Política de privacidade", href: "/privacidade" },
+      { label: "Termos de uso", href: "/termos" },
+      { label: "LGPD", href: "/privacidade" },
+      { label: "Cookies", href: "/cookies" },
+    ],
   },
 ];
 
@@ -541,13 +546,17 @@ export default function Home() {
               <div key={col.title}>
                 <p className="font-semibold text-sm mb-4">{col.title}</p>
                 <ul className="space-y-2.5">
-                  {col.links.map((l) => (
-                    <li key={l}>
-                      <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        {l}
-                      </a>
-                    </li>
-                  ))}
+                  {col.links.map((l) => {
+                    const label = typeof l === "string" ? l : l.label;
+                    const href = typeof l === "string" ? "#" : l.href;
+                    return (
+                      <li key={label}>
+                        <a href={href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                          {label}
+                        </a>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))}

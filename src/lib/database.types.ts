@@ -1457,6 +1457,50 @@ export type Database = {
           },
         ]
       }
+      salon_subscriptions: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
+          current_period_end: string | null
+          plan: string
+          salon_id: string
+          status: string
+          trial_ends_at: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          current_period_end?: string | null
+          plan?: string
+          salon_id: string
+          status?: string
+          trial_ends_at?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          current_period_end?: string | null
+          plan?: string
+          salon_id?: string
+          status?: string
+          trial_ends_at?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salon_subscriptions_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: true
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salons: {
         Row: {
           address: string | null
@@ -2081,6 +2125,20 @@ export type Database = {
         }
         Returns: Json
       }
+      public_appointments_by_phone: {
+        Args: { p_phone: string; p_salon: string }
+        Returns: {
+          ends_at: string
+          id: string
+          member_name: string
+          salon_id: string
+          salon_name: string
+          services: string[]
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          total_price: number
+        }[]
+      }
       public_campaign_discounts: {
         Args: { p_salon: string }
         Returns: {
@@ -2118,6 +2176,14 @@ export type Database = {
           theme: Json
         }[]
       }
+      public_service_categories: {
+        Args: { p_salon: string }
+        Returns: {
+          id: string
+          name: string
+          sort_order: number
+        }[]
+      }
       public_services: {
         Args: { p_salon: string }
         Returns: {
@@ -2131,11 +2197,35 @@ export type Database = {
           price_type: string
         }[]
       }
+      receivable_today: { Args: { p_salon: string }; Returns: Json }
       redeem_package: {
         Args: { p_item: string; p_member?: string }
         Returns: Json
       }
+      report_heatmap: {
+        Args: { p_from: string; p_salon: string; p_to: string }
+        Returns: Json
+      }
+      report_overview: {
+        Args: { p_from: string; p_salon: string; p_to: string }
+        Returns: Json
+      }
+      report_reactivation: {
+        Args: { p_min_days?: number; p_salon: string }
+        Returns: Json
+      }
       revoke_invite: { Args: { p_id: string }; Returns: undefined }
+      salon_access_status: {
+        Args: { p_slug: string }
+        Returns: {
+          current_period_end: string
+          effective_plan: string
+          has_access: boolean
+          plan: string
+          status: string
+          trial_ends_at: string
+        }[]
+      }
       segments_conflict: {
         Args: { p_end: string; p_member: string; p_start: string }
         Returns: boolean
@@ -2166,6 +2256,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upcoming_birthdays: {
+        Args: { p_days?: number; p_salon: string }
+        Returns: Json
       }
     }
     Enums: {

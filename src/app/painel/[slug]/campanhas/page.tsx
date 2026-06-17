@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
+import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { CampaignsManager } from "./CampaignsManager";
 
@@ -13,6 +14,7 @@ export default async function CampanhasPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+  await guardFeature(slug, "/campanhas");
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
   if (!perms.has("services.manage")) redirect(`/painel/${slug}`);

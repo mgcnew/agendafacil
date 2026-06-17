@@ -1,0 +1,93 @@
+<!--
+  AgendeFácil — Template de e-mail: Confirmação de cadastro
+  Cole em: Supabase → Authentication → Email Templates → Confirm signup → (Message body / Source)
+  Assunto sugerido: Confirme seu e-mail — AgendeFácil
+  Variável usada: {{ .ConfirmationURL }}
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <title>Confirme seu e-mail</title>
+</head>
+<body style="margin:0; padding:0; background-color:#fbf3ef; -webkit-font-smoothing:antialiased;">
+  <!-- preheader (oculto) -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
+    Confirme seu e-mail para ativar sua conta no AgendeFácil.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fbf3ef;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#f23c10; border-radius:10px; padding:8px 10px; vertical-align:middle;">
+                    <span style="font-size:18px; line-height:1;">✂</span>
+                  </td>
+                  <td style="padding-left:10px; vertical-align:middle;">
+                    <span style="font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:20px; font-weight:700; color:#1a0c04;">AgendeFácil</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#ffffff; border:1px solid #f0ddd0; border-radius:16px; padding:36px 32px;">
+              <h1 style="margin:0 0 12px; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:22px; font-weight:700; color:#1a0c04;">
+                Bem-vinda ao AgendeFácil!
+              </h1>
+              <p style="margin:0 0 24px; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:15px; line-height:1.6; color:#57534e;">
+                Falta só um passo para ativar sua conta. Clique no botão abaixo para confirmar seu e-mail e começar a usar seu salão.
+              </p>
+
+              <!-- Botão -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding:4px 0 8px;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block; background-color:#f23c10; color:#ffffff; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:15px; font-weight:700; text-decoration:none; padding:14px 28px; border-radius:12px;">
+                      Confirmar meu e-mail
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:20px 0 0; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:13px; line-height:1.6; color:#78716c;">
+                Se o botão não funcionar, copie e cole este endereço no navegador:
+              </p>
+              <p style="margin:6px 0 0; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:12px; line-height:1.5; word-break:break-all;">
+                <a href="{{ .ConfirmationURL }}" style="color:#f23c10; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+              </p>
+
+              <hr style="border:none; border-top:1px solid #f0ddd0; margin:24px 0;" />
+
+              <p style="margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:13px; line-height:1.6; color:#a8a29e;">
+                Não criou esta conta? Pode ignorar este e-mail com segurança.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Rodapé -->
+          <tr>
+            <td align="center" style="padding:24px 16px 0;">
+              <p style="margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; font-size:12px; color:#a8a29e;">
+                AgendeFácil · Agendamento para salões e barbearias
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

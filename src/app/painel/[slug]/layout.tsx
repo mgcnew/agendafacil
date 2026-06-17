@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
+import { getAccessStatus } from "@/lib/subscription";
+import { planAllowsHref } from "@/lib/plans";
+import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem } from "./PanelShell";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +20,7 @@ const NAV: { item: NavItem; perms?: string[] }[] = [
   { item: { href: "/estoque", label: "Estoque", icon: "Boxes" }, perms: ["inventory.view"] },
   // Horários virou tab dentro de Configurações; engrenagem aparece com qualquer perm relevante
   { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage", "team.manage"] },
+  { item: { href: "/assinatura", label: "Assinatura", icon: "CreditCard" }, perms: ["salon.manage"] },
 ];
 
 export default async function PanelLayout({
@@ -32,9 +36,32 @@ export default async function PanelLayout({
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
 
+  // Gate de assinatura: bloqueia o painel se o trial venceu e não há assinatura ativa.
+  // Fail-open: se o status não puder ser lido (RPC nulo), libera para não travar por engano.
+  const access = await getAccessStatus(slug);
+  if (access && !access.has_access) {
+    return (
+      <div
+        data-niche={membership.salons.niche}
+        data-color={(membership.salons.color_theme ?? "a") as string}
+      >
+        <SubscriptionGate
+          slug={slug}
+          salonName={membership.salons.name}
+          access={access}
+        />
+      </div>
+    );
+  }
+
+  // Filtra o menu por permissão e, quando o plano é conhecido, pelo tier do plano.
+  // Fail-open: se effective_plan vier nulo, não filtra por plano (mostra tudo).
+  const effectivePlan = access?.effective_plan ?? null;
   const items = NAV.filter(
     (n) => !n.perms || n.perms.some((p) => perms.has(p)),
-  ).map((n) => n.item);
+  )
+    .map((n) => n.item)
+    .filter((it) => !effectivePlan || planAllowsHref(effectivePlan, it.href));
 
   const colorTheme = (membership.salons.color_theme ?? "a") as string;
 
