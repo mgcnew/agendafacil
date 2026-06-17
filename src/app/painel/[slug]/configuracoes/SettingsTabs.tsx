@@ -517,7 +517,52 @@ function LinkCard({
 
 /* ───────────────────────────── Logo ──────────────────────────── */
 
-const MAX_LOGO_BYTES = 3 * 1024 * 1024; // 3 MB
+const MAX_LOGO_BYTES = 15 * 1024 * 1024; // 15 MB (arquivo original; comprimimos antes de enviar)
+
+/**
+ * Redimensiona (lado máx. 512px, sem upscale) e recomprime a imagem no navegador
+ * para WebP — reduz fotos de celular de vários MB para dezenas de KB, preservando
+ * a transparência da logo. Se algo falhar, devolve o arquivo original.
+ */
+async function compressImage(file: File, maxDim = 512, quality = 0.9): Promise<File> {
+  try {
+    const dataUrl: string = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result as string);
+      r.onerror = () => rej(new Error("read"));
+      r.readAsDataURL(file);
+    });
+    const img: HTMLImageElement = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error("decode"));
+      i.src = dataUrl;
+    });
+
+    let { width, height } = img;
+    if (width > maxDim || height > maxDim) {
+      const scale = Math.min(maxDim / width, maxDim / height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const blob: Blob | null = await new Promise((res) =>
+      canvas.toBlob(res, "image/webp", quality),
+    );
+    if (!blob) return file; // navegador sem WebP no canvas → usa o original
+    const base = file.name.replace(/\.[^.]+$/, "");
+    return new File([blob], `${base}.webp`, { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
 
 function LogoCard({
   salon,
@@ -542,22 +587,28 @@ function LogoCard({
       return;
     }
     if (file.size > MAX_LOGO_BYTES) {
-      setError("Imagem muito grande. Máximo 3 MB.");
+      setError("Imagem muito grande. Máximo 15 MB.");
       return;
     }
 
     setBusy(true);
     setError(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await uploadLogo(salon.slug, fd);
-    setBusy(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const compressed = await compressImage(file);
+      const fd = new FormData();
+      fd.append("file", compressed);
+      const res = await uploadLogo(salon.slug, fd);
+      setBusy(false);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setLogoUrl(res.url);
+      router.refresh();
+    } catch {
+      setBusy(false);
+      setError("Não foi possível processar a imagem. Tente outra.");
     }
-    setLogoUrl(res.url);
-    router.refresh();
   }
 
   async function remove() {
@@ -579,7 +630,7 @@ function LogoCard({
         <ImageIcon className="h-5 w-5 text-primary" /> Logo
       </h2>
       <p className="text-xs text-muted-foreground mt-1">
-        Aparece no seu link de agendamento. PNG ou JPG, até 3 MB.
+        Aparece no seu link de agendamento. Otimizamos a imagem automaticamente.
       </p>
 
       <div className="mt-4 flex items-center gap-4">
