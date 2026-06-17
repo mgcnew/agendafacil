@@ -47,26 +47,30 @@ export async function uploadLogo(
     return { error: "Imagem muito grande. Máximo 3 MB." };
   }
 
-  const admin = createAdminClient();
-  const ext = (file.name.split(".").pop() || "png").toLowerCase();
-  const path = `${auth.salonId}.${ext}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
+  try {
+    const admin = createAdminClient();
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `${auth.salonId}.${ext}`;
+    const bytes = Buffer.from(await file.arrayBuffer());
 
-  const up = await admin.storage
-    .from("logos")
-    .upload(path, bytes, { upsert: true, contentType: file.type });
-  if (up.error) return { error: up.error.message };
+    const up = await admin.storage
+      .from("logos")
+      .upload(path, bytes, { upsert: true, contentType: file.type });
+    if (up.error) return { error: up.error.message };
 
-  const { data: pub } = admin.storage.from("logos").getPublicUrl(path);
-  const url = `${pub.publicUrl}?v=${Date.now()}`;
+    const { data: pub } = admin.storage.from("logos").getPublicUrl(path);
+    const url = `${pub.publicUrl}?v=${Date.now()}`;
 
-  const { error } = await admin
-    .from("salons")
-    .update({ logo_url: url })
-    .eq("id", auth.salonId);
-  if (error) return { error: error.message };
+    const { error } = await admin
+      .from("salons")
+      .update({ logo_url: url })
+      .eq("id", auth.salonId);
+    if (error) return { error: error.message };
 
-  return { url };
+    return { url };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro no envio da logo." };
+  }
 }
 
 /** Remove a logo (zera logo_url). */
@@ -74,12 +78,15 @@ export async function removeLogo(slug: string): Promise<LogoResult> {
   const auth = await assertOwner(slug);
   if ("error" in auth) return auth;
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("salons")
-    .update({ logo_url: null })
-    .eq("id", auth.salonId);
-  if (error) return { error: error.message };
-
-  return { url: "" };
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("salons")
+      .update({ logo_url: null })
+      .eq("id", auth.salonId);
+    if (error) return { error: error.message };
+    return { url: "" };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro ao remover a logo." };
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
@@ -440,8 +440,9 @@ function LinkCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
   const effective = slugify(slug);
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const changed = effective !== salon.slug;
 
   async function save() {
