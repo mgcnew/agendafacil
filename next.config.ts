@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
       dynamic: 0,
       static: 300,
     },
+    // Upload de logo via server action — padrão é 1 MB; permite imagens maiores.
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
 };
 
