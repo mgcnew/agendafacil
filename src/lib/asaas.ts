@@ -60,6 +60,17 @@ export async function asaasCreateSubscription(input: {
   });
 }
 
+/** Atualiza o valor da assinatura (troca de plano). Reflete nas próximas cobranças. */
+export async function asaasUpdateSubscription(
+  subscriptionId: string,
+  value: number,
+): Promise<void> {
+  await asaasFetch<unknown>(`/subscriptions/${subscriptionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ value, updatePendingPayments: true }),
+  });
+}
+
 /** URL da página de pagamento (checkout hospedado) da primeira cobrança da assinatura. */
 export async function asaasSubscriptionCheckoutUrl(
   subscriptionId: string,

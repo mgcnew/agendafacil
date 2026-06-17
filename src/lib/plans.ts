@@ -57,6 +57,13 @@ export function planAllowsHref(
   return effectivePlan === "pro" || effectivePlan === "max";
 }
 
+const RANK: Record<PlanId, number> = { basic: 1, pro: 2, max: 3 };
+
+/** Posição do plano (basic < pro < max). Use para decidir upgrade vs downgrade. */
+export function planRank(p: PlanId): number {
+  return RANK[p];
+}
+
 export function priceLabel(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }

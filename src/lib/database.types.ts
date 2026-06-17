@@ -1462,6 +1462,7 @@ export type Database = {
           asaas_customer_id: string | null
           asaas_subscription_id: string | null
           current_period_end: string | null
+          pending_plan: string | null
           plan: string
           salon_id: string
           status: string
@@ -1473,6 +1474,7 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
           current_period_end?: string | null
+          pending_plan?: string | null
           plan?: string
           salon_id: string
           status?: string
@@ -1484,6 +1486,7 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
           current_period_end?: string | null
+          pending_plan?: string | null
           plan?: string
           salon_id?: string
           status?: string
@@ -2221,6 +2224,7 @@ export type Database = {
           current_period_end: string
           effective_plan: string
           has_access: boolean
+          pending_plan: string
           plan: string
           status: string
           trial_ends_at: string

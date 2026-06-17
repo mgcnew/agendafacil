@@ -12,6 +12,7 @@ export type AccessStatus = {
   has_access: boolean;
   plan: PlanId;
   effective_plan: PlanId | null;
+  pending_plan: PlanId | null;
 };
 
 /**

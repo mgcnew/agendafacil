@@ -27,6 +27,7 @@ export default async function AssinaturaPage({
           trialEndsAt={access.trial_ends_at}
           currentPeriodEnd={access.current_period_end}
           plan={access.plan}
+          pendingPlan={access.pending_plan}
         />
       </div>
     </div>

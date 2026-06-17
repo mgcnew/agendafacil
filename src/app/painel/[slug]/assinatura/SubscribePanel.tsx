@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CreditCard, Loader2, AlertCircle, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CreditCard, Loader2, AlertCircle, Check, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Button, Card, Input } from "@/components/ui";
-import { createCheckout } from "./actions";
+import { createCheckout, changePlan } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
-import { PLANS, priceLabel, type PlanId } from "@/lib/plans";
+import { PLANS, planRank, priceLabel, type PlanId } from "@/lib/plans";
 
 const STATUS_LABEL: Record<SubStatus, { text: string; cls: string }> = {
   trialing: { text: "Período de teste", cls: "bg-accent/15 text-accent" },
@@ -29,15 +30,19 @@ export function SubscribePanel({
   trialEndsAt,
   currentPeriodEnd,
   plan,
+  pendingPlan,
 }: {
   slug: string;
   status: SubStatus;
   trialEndsAt: string;
   currentPeriodEnd: string | null;
   plan: PlanId;
+  pendingPlan: PlanId | null;
 }) {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [doc, setDoc] = useState("");
   const [selected, setSelected] = useState<PlanId>("pro");
   const badge = STATUS_LABEL[status];
@@ -56,7 +61,23 @@ export function SubscribePanel({
     });
   }
 
-  // Assinatura ativa: só mostra o plano atual e a renovação.
+  function doChange(target: PlanId) {
+    setError(null);
+    setInfo(null);
+    start(async () => {
+      const res = await changePlan(slug, target);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      if (res.mode === "upgrade") setInfo(`Plano atualizado para ${PLANS[target].name}. Já está valendo!`);
+      else if (res.mode === "downgrade") setInfo(`Mudança para ${PLANS[target].name} agendada para a próxima renovação (${fmtDate(currentPeriodEnd)}). Até lá você continua no ${PLANS[plan].name}.`);
+      else setInfo("Mudança de plano cancelada.");
+      router.refresh();
+    });
+  }
+
+  // Assinatura ativa: mostra o plano atual e permite upgrade/downgrade.
   if (status === "active") {
     return (
       <Card className="w-full max-w-md p-6">
@@ -71,9 +92,91 @@ export function SubscribePanel({
         <p className="mt-1 text-sm text-muted-foreground">
           {priceLabel(PLANS[plan].value)} por mês · cancele quando quiser
         </p>
-        <p className="mt-4 text-sm text-foreground">
+        <p className="mt-3 text-sm text-foreground">
           Próxima renovação em <strong>{fmtDate(currentPeriodEnd)}</strong>.
         </p>
+
+        {pendingPlan && pendingPlan !== plan && (
+          <div className="mt-3 rounded-[var(--radius)] border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            ⏳ A partir da próxima renovação, seu plano passa a ser{" "}
+            <strong>{PLANS[pendingPlan].name}</strong> ({priceLabel(PLANS[pendingPlan].value)}/mês).
+            <button
+              type="button"
+              onClick={() => doChange(plan)}
+              disabled={pending}
+              className="ml-1 underline hover:no-underline disabled:opacity-50"
+            >
+              Cancelar mudança
+            </button>
+          </div>
+        )}
+
+        <div className="mt-5 border-t border-border pt-4">
+          <p className="text-sm font-medium text-foreground">Mudar de plano</p>
+          <div className="mt-3 space-y-2.5">
+            {Object.values(PLANS).map((p) => {
+              const isCurrent = p.id === plan;
+              const soon = !!p.comingSoon;
+              const isUpgrade = planRank(p.id) > planRank(plan);
+              return (
+                <div
+                  key={p.id}
+                  className={[
+                    "rounded-[var(--radius)] border p-3",
+                    isCurrent ? "border-primary bg-primary/5" : "border-border",
+                    soon ? "opacity-70" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-foreground">{p.name}</span>
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        {priceLabel(p.value)}/mês
+                      </span>
+                    </div>
+                    {isCurrent ? (
+                      <span className="text-xs font-semibold text-primary shrink-0">Plano atual</span>
+                    ) : soon ? (
+                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent shrink-0">
+                        Em breve
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant={isUpgrade ? "primary" : "outline"}
+                        onClick={() => doChange(p.id)}
+                        disabled={pending}
+                        className="shrink-0"
+                      >
+                        {isUpgrade ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                        {isUpgrade ? "Subir" : "Descer"}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isCurrent
+                      ? p.tagline
+                      : isUpgrade
+                        ? "Vale na hora."
+                        : "Vale no fim do ciclo (você não perde o que já pagou)."}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {info && (
+          <div className="mt-4 rounded-[var(--radius)] border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {info}
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
       </Card>
     );
   }

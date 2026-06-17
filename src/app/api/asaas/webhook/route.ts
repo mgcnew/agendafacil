@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TablesUpdate } from "@/lib/database.types";
+import { PLANS, type PlanId } from "@/lib/plans";
 
 /**
  * Webhook do Asaas — recebe eventos de cobrança e atualiza salon_subscriptions.
@@ -42,9 +43,23 @@ export async function POST(req: NextRequest) {
     status: next,
     updated_at: new Date().toISOString(),
   };
-  // Quando confirma/recebe, estende o período pago até o vencimento da cobrança.
-  if (next === "active" && payment?.dueDate) {
-    update.current_period_end = new Date(payment.dueDate).toISOString();
+  if (next === "active") {
+    // Estende o período pago até o vencimento da cobrança.
+    if (payment?.dueDate) {
+      update.current_period_end = new Date(payment.dueDate).toISOString();
+    }
+    // Aplica o downgrade agendado na renovação (pending_plan -> plan).
+    const { data: row } = await admin
+      .from("salon_subscriptions")
+      .select("pending_plan")
+      .eq("asaas_subscription_id", subscriptionId)
+      .maybeSingle();
+    if (row?.pending_plan) {
+      const pp = row.pending_plan as PlanId;
+      update.plan = pp;
+      update.value = PLANS[pp]?.value ?? null;
+      update.pending_plan = null;
+    }
   }
 
   const { error } = await admin
