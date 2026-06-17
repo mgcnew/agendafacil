@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
@@ -18,6 +18,8 @@ import {
   Loader2,
   ImageIcon,
   ShieldCheck,
+  Upload,
+  Trash2,
 } from "lucide-react";
 
 type Pro = { id: string; name: string };
@@ -374,28 +376,151 @@ function EstablishmentPanel({
           </div>
         </Card>
 
-        {/* Logo — placeholder até configurarmos o Storage */}
-        <Card className="p-6">
-          <h2 className="font-display font-semibold flex items-center gap-2">
-            <ImageIcon className="h-5 w-5 text-primary" /> Logo
-          </h2>
-          <div className="mt-4 flex items-center gap-4">
-            <div className="grid place-items-center h-16 w-16 rounded-[var(--radius)] border border-dashed border-border text-muted-foreground">
-              <ImageIcon className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Upload de logo</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Em breve — vamos habilitar o envio de imagem para personalizar a sua
-                página de agendamento.
-              </p>
-            </div>
-          </div>
-        </Card>
+        <LogoCard salon={salon} canEdit={canEdit} />
       </div>
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
     </div>
+  );
+}
+
+/* ───────────────────────────── Logo ──────────────────────────── */
+
+const MAX_LOGO_BYTES = 3 * 1024 * 1024; // 3 MB
+
+function LogoCard({
+  salon,
+  canEdit,
+}: {
+  salon: Tables<"salons">;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(salon.logo_url);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reenviar o mesmo arquivo depois
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Selecione um arquivo de imagem (PNG, JPG…).");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setError("Imagem muito grande. Máximo 3 MB.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `${salon.id}.${ext}`;
+
+    const up = await supabase.storage
+      .from("logos")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) {
+      setBusy(false);
+      setError("Não foi possível enviar a imagem. Tente novamente.");
+      return;
+    }
+
+    const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
+    // cache-buster para a nova logo aparecer na hora (painel e link público)
+    const url = `${pub.publicUrl}?v=${Date.now()}`;
+
+    const { error: upErr } = await supabase
+      .from("salons")
+      .update({ logo_url: url })
+      .eq("id", salon.id);
+    setBusy(false);
+    if (upErr) {
+      setError("Imagem enviada, mas não foi possível salvar. Tente novamente.");
+      return;
+    }
+    setLogoUrl(url);
+    router.refresh();
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: delErr } = await supabase
+      .from("salons")
+      .update({ logo_url: null })
+      .eq("id", salon.id);
+    setBusy(false);
+    if (delErr) {
+      setError("Não foi possível remover. Tente novamente.");
+      return;
+    }
+    setLogoUrl(null);
+    router.refresh();
+  }
+
+  return (
+    <Card className="p-6">
+      <h2 className="font-display font-semibold flex items-center gap-2">
+        <ImageIcon className="h-5 w-5 text-primary" /> Logo
+      </h2>
+      <p className="text-xs text-muted-foreground mt-1">
+        Aparece no seu link de agendamento. PNG ou JPG, até 3 MB.
+      </p>
+
+      <div className="mt-4 flex items-center gap-4">
+        <div className="grid place-items-center h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius)] border border-border bg-secondary">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Logo do salão" className="h-full w-full object-cover" />
+          ) : (
+            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+          )}
+        </div>
+
+        {canEdit && (
+          <div className="flex flex-col gap-2">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPick}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {logoUrl ? "Trocar logo" : "Enviar logo"}
+            </Button>
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={remove}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Remover
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </Card>
   );
 }
 
