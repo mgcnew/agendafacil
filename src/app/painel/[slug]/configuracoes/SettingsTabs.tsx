@@ -4,8 +4,9 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
+import { Select } from "@/components/Select";
 import { cn } from "@/lib/utils";
-import { COLOR_GROUPS, type ColorTheme } from "@/lib/themes";
+import { COLOR_GROUPS, CHOOSABLE_NICHES, type ColorTheme, type Niche } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
 import {
@@ -320,6 +321,8 @@ function EstablishmentPanel({
 }) {
   const router = useRouter();
   const [name, setName] = useState(salon.name);
+  const [niche, setNiche] = useState<Niche>(salon.niche);
+  const [email, setEmail] = useState(salon.email ?? "");
   const [phone, setPhone] = useState(salon.phone ?? "");
   const [address, setAddress] = useState(salon.address ?? "");
   const [saving, setSaving] = useState(false);
@@ -333,7 +336,13 @@ function EstablishmentPanel({
     const supabase = createClient();
     const { error: e } = await supabase
       .from("salons")
-      .update({ name, phone: phone || null, address: address || null })
+      .update({
+        name,
+        niche,
+        email: email.trim() || null,
+        phone: phone || null,
+        address: address || null,
+      })
       .eq("id", salon.id);
     setSaving(false);
     if (e) {
@@ -353,6 +362,26 @@ function EstablishmentPanel({
           <div className="space-y-1.5">
             <Label htmlFor="name">Nome</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="niche">Segmento</Label>
+            <Select id="niche" value={niche} onValueChange={(v) => setNiche(v as Niche)} disabled={!canEdit}>
+              {CHOOSABLE_NICHES.map((n) => (
+                <option key={n.id} value={n.id}>{n.label}</option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted-foreground">Define a tipografia e os serviços sugeridos.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!canEdit}
+              placeholder="contato@seusalao.com"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">Telefone</Label>
@@ -379,8 +408,108 @@ function EstablishmentPanel({
         <LogoCard salon={salon} canEdit={canEdit} />
       </div>
 
+      <LinkCard salon={salon} canEdit={canEdit} />
+
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
     </div>
+  );
+}
+
+/* ───────────────────────── Link (slug) ───────────────────────── */
+
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+function LinkCard({
+  salon,
+  canEdit,
+}: {
+  salon: Tables<"salons">;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [slug, setSlug] = useState(salon.slug);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const effective = slugify(slug);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const changed = effective !== salon.slug;
+
+  async function save() {
+    if (!effective) {
+      setError("O link não pode ficar vazio.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: e } = await supabase
+      .from("salons")
+      .update({ slug: effective })
+      .eq("id", salon.id);
+    setSaving(false);
+    if (e) {
+      // 23505 = violação de unicidade (link já usado por outro salão)
+      setError(
+        e.code === "23505"
+          ? "Esse link já está em uso. Escolha outro."
+          : "Não foi possível salvar o link. Tente novamente.",
+      );
+      return;
+    }
+    // o slug faz parte da URL do painel — redireciona para o novo endereço
+    router.push(`/painel/${effective}/configuracoes?tab=estabelecimento`);
+    router.refresh();
+  }
+
+  return (
+    <Card className="p-6">
+      <h2 className="font-display font-semibold flex items-center gap-2">
+        <Link2 className="h-5 w-5 text-primary" /> Link de agendamento
+      </h2>
+      <p className="text-xs text-muted-foreground mt-1">
+        É o endereço que suas clientes usam para agendar.
+      </p>
+
+      <div className="mt-4 flex items-center gap-1 rounded-[var(--radius)] border border-border bg-secondary/40 px-3 py-2 text-sm">
+        <span className="text-muted-foreground shrink-0">{origin}/</span>
+        <input
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          disabled={!canEdit}
+          className="min-w-0 flex-1 bg-transparent outline-none disabled:opacity-60"
+        />
+      </div>
+      {effective !== slug && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ficará: <strong>{origin}/{effective || "…"}</strong>
+        </p>
+      )}
+
+      {canEdit && changed && (
+        <div className="mt-3 rounded-[var(--radius)] border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          ⚠️ Ao mudar o link, o endereço antigo <strong>para de funcionar</strong> —
+          QR codes e links já compartilhados deixam de abrir. Avise suas clientes.
+        </div>
+      )}
+
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+      {canEdit && (
+        <Button onClick={save} disabled={saving || !changed} className="mt-4">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Salvar link
+        </Button>
+      )}
+    </Card>
   );
 }
 
