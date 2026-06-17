@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { COLOR_GROUPS, CHOOSABLE_NICHES, type ColorTheme, type Niche } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
+import { uploadLogo, removeLogo } from "./actions";
 import {
   Store,
   Clock,
@@ -546,47 +547,25 @@ function LogoCard({
 
     setBusy(true);
     setError(null);
-    const supabase = createClient();
-    const ext = (file.name.split(".").pop() || "png").toLowerCase();
-    const path = `${salon.id}.${ext}`;
-
-    const up = await supabase.storage
-      .from("logos")
-      .upload(path, file, { upsert: true, contentType: file.type });
-    if (up.error) {
-      setBusy(false);
-      setError("Não foi possível enviar a imagem. Tente novamente.");
-      return;
-    }
-
-    const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
-    // cache-buster para a nova logo aparecer na hora (painel e link público)
-    const url = `${pub.publicUrl}?v=${Date.now()}`;
-
-    const { error: upErr } = await supabase
-      .from("salons")
-      .update({ logo_url: url })
-      .eq("id", salon.id);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await uploadLogo(salon.slug, fd);
     setBusy(false);
-    if (upErr) {
-      setError("Imagem enviada, mas não foi possível salvar. Tente novamente.");
+    if ("error" in res) {
+      setError(res.error);
       return;
     }
-    setLogoUrl(url);
+    setLogoUrl(res.url);
     router.refresh();
   }
 
   async function remove() {
     setBusy(true);
     setError(null);
-    const supabase = createClient();
-    const { error: delErr } = await supabase
-      .from("salons")
-      .update({ logo_url: null })
-      .eq("id", salon.id);
+    const res = await removeLogo(salon.slug);
     setBusy(false);
-    if (delErr) {
-      setError("Não foi possível remover. Tente novamente.");
+    if ("error" in res) {
+      setError(res.error);
       return;
     }
     setLogoUrl(null);
