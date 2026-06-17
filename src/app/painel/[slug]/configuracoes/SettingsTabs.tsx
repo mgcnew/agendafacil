@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 type Pro = { id: string; name: string };
+type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
 type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia" | "acessos";
 type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
@@ -40,6 +41,7 @@ const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | 
 
 export function SettingsTabs({
   salon,
+  owner,
   canEditSalon,
   canManageSalon,
   canManageSchedule,
@@ -52,6 +54,7 @@ export function SettingsTabs({
   salonRolePerms,
 }: {
   salon: Tables<"salons">;
+  owner: OwnerInfo | null;
   canEditSalon: boolean;
   canManageSalon: boolean;
   canManageSchedule: boolean;
@@ -125,7 +128,7 @@ export function SettingsTabs({
 
       {/* Painel ativo */}
       {active === "estabelecimento" && (
-        <EstablishmentPanel salon={salon} canEdit={canEditSalon} />
+        <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
       )}
       {active === "horarios" && (
         <HoursManager salonId={salon.id} pros={pros} initialHours={initialHours} embedded />
@@ -315,9 +318,11 @@ function SaveBar({
 
 function EstablishmentPanel({
   salon,
+  owner,
   canEdit,
 }: {
   salon: Tables<"salons">;
+  owner: OwnerInfo | null;
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -326,6 +331,7 @@ function EstablishmentPanel({
   const [email, setEmail] = useState(salon.email ?? "");
   const [phone, setPhone] = useState(salon.phone ?? "");
   const [address, setAddress] = useState(salon.address ?? "");
+  const [ownerName, setOwnerName] = useState(owner?.display_name ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -345,6 +351,17 @@ function EstablishmentPanel({
         address: address || null,
       })
       .eq("id", salon.id);
+    if (!e && owner && ownerName.trim() !== (owner.display_name ?? "")) {
+      const { error: oe } = await supabase
+        .from("salon_members")
+        .update({ display_name: ownerName.trim() || null })
+        .eq("id", owner.id);
+      if (oe) {
+        setSaving(false);
+        setError("Salvei os dados, mas não consegui salvar o nome do dono.");
+        return;
+      }
+    }
     setSaving(false);
     if (e) {
       setError("Não foi possível salvar. Tente novamente.");
@@ -404,6 +421,22 @@ function EstablishmentPanel({
               disabled={!canEdit}
             />
           </div>
+          {owner && (
+            <div className="space-y-1.5">
+              <Label htmlFor="ownerName">Nome do dono</Label>
+              <Input
+                id="ownerName"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                disabled={!canEdit}
+                placeholder={owner.full_name ?? "Como você quer ser chamado"}
+              />
+              <p className="text-xs text-muted-foreground">
+                Como você aparece no salão — pode ser um apelido/vulgo.
+                {owner.full_name ? ` Cadastro: ${owner.full_name}.` : ""}
+              </p>
+            </div>
+          )}
         </Card>
 
         <LogoCard salon={salon} canEdit={canEdit} />
