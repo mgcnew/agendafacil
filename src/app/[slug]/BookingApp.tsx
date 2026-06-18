@@ -92,6 +92,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [loadingServices, setLoadingServices] = useState(true);
   const [slots, setSlots] = useState<string[]>([]);
   const [slot, setSlot] = useState<string | null>(null);
+  const [anyPro, setAnyPro] = useState(false);
+  const [slotProMap, setSlotProMap] = useState<Record<string, Professional>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   // service_id → desconto % ativo hoje (campanhas)
   const [discounts, setDiscounts] = useState<Record<string, number>>({});
@@ -138,7 +140,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   // se o profissional escolhido deixou de ser elegível, limpa a seleção
   useEffect(() => {
-    if (pro && !eligiblePros.some((p) => p.id === pro.id)) setPro(null);
+    if (pro && !eligiblePros.some((p) => p.id === pro.id)) {
+      setPro(null);
+      setAnyPro(false);
+    }
   }, [eligiblePros, pro]);
 
   // carrega serviços e sessão
@@ -192,18 +197,29 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }, [supabase, salon.id, salon.slug]);
 
   const loadSlots = useCallback(async () => {
-    if (!pro || !totalDuration) return;
+    if (!totalDuration || (!pro && !anyPro)) return;
     setLoadingSlots(true);
     setSlot(null);
-    const { data } = await supabase.rpc("get_availability", {
-      p_salon: salon.id,
-      p_member: pro.id,
-      p_date: date,
-      p_duration: totalDuration,
-    });
-    setSlots((data as string[]) ?? []);
+    if (anyPro) {
+      const map: Record<string, Professional> = {};
+      for (const p of eligiblePros) {
+        const { data } = await supabase.rpc("get_availability", {
+          p_salon: salon.id, p_member: p.id, p_date: date, p_duration: totalDuration,
+        });
+        for (const s of (data as string[]) ?? []) {
+          if (!map[s]) map[s] = p;
+        }
+      }
+      setSlotProMap(map);
+      setSlots(Object.keys(map).sort());
+    } else {
+      const { data } = await supabase.rpc("get_availability", {
+        p_salon: salon.id, p_member: pro!.id, p_date: date, p_duration: totalDuration,
+      });
+      setSlots((data as string[]) ?? []);
+    }
     setLoadingSlots(false);
-  }, [supabase, salon.id, pro, date, totalDuration]);
+  }, [supabase, salon.id, pro, date, totalDuration, anyPro, eligiblePros]);
 
   useEffect(() => {
     if (step === "time") loadSlots();
@@ -423,14 +439,32 @@ export function BookingApp({ salon }: { salon: Salon }) {
               Nenhum profissional disponível para os serviços escolhidos. Tente ajustar a seleção.
             </p>
           )}
+          {/* Opção "sem preferência" — agrega horários de todos */}
+          {eligiblePros.length > 1 && (
+            <button
+              onClick={() => { setAnyPro(true); setPro(null); setTimeout(() => setStep("time"), 280); }}
+              className={`w-full text-left rounded-[var(--radius)] border p-4 transition flex items-center gap-3 ${
+                anyPro ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+              }`}
+            >
+              <span className="grid place-items-center h-11 w-11 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0 text-lg">
+                ✦
+              </span>
+              <div className="flex-1">
+                <p className="font-medium">Sem preferência</p>
+                <p className="text-xs text-muted-foreground">Ver todos os horários disponíveis</p>
+              </div>
+              {anyPro && <Check className="h-5 w-5 text-primary" />}
+            </button>
+          )}
           {eligiblePros.map((p) => {
-            const on = pro?.id === p.id;
+            const on = !anyPro && pro?.id === p.id;
             return (
               <button
                 key={p.id}
-                onClick={() => setPro(p)}
+                onClick={() => { setAnyPro(false); setPro(p); setTimeout(() => setStep("time"), 280); }}
                 className={`w-full text-left rounded-[var(--radius)] border p-4 transition flex items-center gap-3 ${
-                  on ? "border-primary ring-2 ring-primary/25" : "border-border bg-card hover:border-foreground/20"
+                  on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
                 }`}
               >
                 <span
@@ -471,30 +505,28 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </div>
           ) : slots.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
-              Sem horários livres nesse dia. Tente outra data.
+              <p>Sem horários livres nesse dia.</p>
+              <button
+                className="mt-2 text-primary text-sm font-medium hover:underline"
+                onClick={() => {
+                  const next = new Date(date + "T12:00:00");
+                  next.setDate(next.getDate() + 1);
+                  setDate(`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,"0")}-${String(next.getDate()).padStart(2,"0")}`);
+                }}
+              >
+                Ver próximo dia →
+              </button>
             </Card>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {slots.map((s) => {
-                const t = new Date(s).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "America/Sao_Paulo",
-                });
-                const on = slot === s;
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setSlot(s)}
-                    className={`h-11 rounded-[var(--radius)] border text-sm font-medium transition ${
-                      on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:border-primary"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
+            <SlotGrid
+              slots={slots}
+              selected={slot}
+              onSelect={(s) => {
+                setSlot(s);
+                if (anyPro) setPro(slotProMap[s]);
+                setTimeout(() => goAfterTime(), 300);
+              }}
+            />
           )}
         </section>
       )}
@@ -639,12 +671,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {(step === "services" || step === "professional" || step === "time") && (
         <BottomBar
           step={step}
+          services={selectedServices}
           priceLabel={totalPriceLabel}
           hasPrice={selectedServices.length > 0}
           totalDuration={totalDuration}
           canNext={
             (step === "services" && selected.length > 0) ||
-            (step === "professional" && !!pro) ||
+            (step === "professional" && (!!pro || anyPro)) ||
             (step === "time" && !!slot)
           }
           onBack={() => {
@@ -744,6 +777,7 @@ function Stepper({ step }: { step: Step }) {
 
 function BottomBar({
   step,
+  services,
   priceLabel,
   hasPrice,
   totalDuration,
@@ -752,6 +786,7 @@ function BottomBar({
   onNext,
 }: {
   step: Step;
+  services: { name: string }[];
   priceLabel: string;
   hasPrice: boolean;
   totalDuration: number;
@@ -759,24 +794,80 @@ function BottomBar({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const serviceLabel = services.map((s) => s.name).join(" + ");
   return (
-    <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur p-4">
-      <div className="max-w-xl mx-auto flex items-center gap-3">
+    <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur safe-bottom">
+      {hasPrice && (
+        <div className="border-b border-border/50 px-4 py-2 max-w-xl mx-auto flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground truncate flex-1">{serviceLabel}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground">{formatDuration(totalDuration)}</span>
+            <span className="font-semibold text-primary text-sm">{priceLabel}</span>
+          </div>
+        </div>
+      )}
+      <div className="p-4 max-w-xl mx-auto flex items-center gap-3">
         {step !== "services" && (
           <Button variant="outline" size="md" onClick={onBack}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
         )}
-        {hasPrice && (
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">{formatDuration(totalDuration)}</p>
-            <p className="font-semibold text-primary">{priceLabel}</p>
-          </div>
-        )}
-        <Button className={hasPrice ? "" : "flex-1"} size="lg" onClick={onNext} disabled={!canNext}>
+        <Button className="flex-1" size="lg" onClick={onNext} disabled={!canNext}>
           Continuar
         </Button>
       </div>
+    </div>
+  );
+}
+
+function SlotGrid({
+  slots,
+  selected,
+  onSelect,
+}: {
+  slots: string[];
+  selected: string | null;
+  onSelect: (s: string) => void;
+}) {
+  const slotHour = (s: string) =>
+    parseInt(new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", timeZone: "America/Sao_Paulo" }));
+
+  const groups = [
+    { label: "Manhã", icon: "🌤", slots: slots.filter((s) => slotHour(s) < 12) },
+    { label: "Tarde", icon: "☀️", slots: slots.filter((s) => slotHour(s) >= 12 && slotHour(s) < 18) },
+    { label: "Noite", icon: "🌙", slots: slots.filter((s) => slotHour(s) >= 18) },
+  ].filter((g) => g.slots.length > 0);
+
+  return (
+    <div className="space-y-4">
+      {groups.map((g) => (
+        <div key={g.label}>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            {g.icon} {g.label}
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {g.slots.map((s) => {
+              const t = new Date(s).toLocaleTimeString("pt-BR", {
+                hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
+              });
+              const on = selected === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => onSelect(s)}
+                  className={`h-11 rounded-[var(--radius)] border text-sm font-medium transition ${
+                    on
+                      ? "bg-primary text-primary-foreground border-primary scale-[0.97]"
+                      : "border-border bg-card hover:border-primary"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
