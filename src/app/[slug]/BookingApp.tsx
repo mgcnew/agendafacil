@@ -345,34 +345,40 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Sparkles className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
 
-          {/* Pills de categoria — só aparece se o salão tem categorias */}
+          {/* Pills de categoria — sticky com fade nas bordas */}
           {categories.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => setActiveCategory(null)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium border transition ${
-                  activeCategory === null
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border bg-card hover:border-foreground/25"
-                }`}
-              >
-                Todos
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setActiveCategory(c.id)}
-                  className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium border transition ${
-                    activeCategory === c.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border bg-card hover:border-foreground/25"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+            <div className="sticky top-0 z-10 -mx-4 bg-background/95 backdrop-blur-sm">
+              <div className="relative">
+                <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(null)}
+                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium border transition ${
+                      activeCategory === null
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border bg-card hover:border-foreground/25"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {categories.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setActiveCategory(c.id)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium border transition ${
+                        activeCategory === c.id
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border bg-card hover:border-foreground/25"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+                {/* fade direita — indica mais conteúdo */}
+                <div className="pointer-events-none absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-background/95 to-transparent" />
+              </div>
             </div>
           )}
 
