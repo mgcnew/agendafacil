@@ -20,7 +20,6 @@ const NAV: { item: NavItem; perms?: string[] }[] = [
   { item: { href: "/estoque", label: "Estoque", icon: "Boxes" }, perms: ["inventory.view"] },
   // Horários virou tab dentro de Configurações; engrenagem aparece com qualquer perm relevante
   { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage", "team.manage"] },
-  { item: { href: "/assinatura", label: "Assinatura", icon: "CreditCard" }, perms: ["salon.manage"] },
 ];
 
 export default async function PanelLayout({

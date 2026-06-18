@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
+import { getAccessStatus } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsTabs } from "./SettingsTabs";
 
@@ -56,6 +57,8 @@ export default async function ConfigPage({
       }
     : null;
 
+  const access = await getAccessStatus(slug);
+
   const proList = (pros ?? []).map((p) => ({
     id: p.id,
     name:
@@ -78,6 +81,7 @@ export default async function ConfigPage({
       permissions={permList ?? []}
       roleDefaults={roleDefaults ?? []}
       salonRolePerms={salonRolePerms ?? []}
+      access={access}
     />
   );
 }

@@ -10,6 +10,8 @@ import { COLOR_GROUPS, CHOOSABLE_NICHES, type ColorTheme, type Niche } from "@/l
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
 import { uploadLogo, removeLogo } from "./actions";
+import { SubscribePanel } from "../assinatura/SubscribePanel";
+import type { AccessStatus } from "@/lib/subscription";
 import {
   Store,
   Clock,
@@ -22,11 +24,12 @@ import {
   ShieldCheck,
   Upload,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
-type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia" | "acessos";
+type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia" | "acessos" | "assinatura";
 type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
@@ -37,6 +40,7 @@ const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | 
   { id: "agendamento", label: "Agendamento", icon: Link2, need: "salon" },
   { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
+  { id: "assinatura", label: "Assinatura", icon: CreditCard, need: "salon" },
 ];
 
 export function SettingsTabs({
@@ -52,6 +56,7 @@ export function SettingsTabs({
   permissions,
   roleDefaults,
   salonRolePerms,
+  access,
 }: {
   salon: Tables<"salons">;
   owner: OwnerInfo | null;
@@ -65,6 +70,7 @@ export function SettingsTabs({
   permissions: Perm[];
   roleDefaults: RolePerm[];
   salonRolePerms: RolePerm[];
+  access: AccessStatus | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -147,6 +153,21 @@ export function SettingsTabs({
           salonRolePerms={salonRolePerms}
         />
       )}
+      {active === "assinatura" &&
+        (access ? (
+          <SubscribePanel
+            slug={salon.slug}
+            status={access.status}
+            trialEndsAt={access.trial_ends_at}
+            currentPeriodEnd={access.current_period_end}
+            plan={access.plan}
+            pendingPlan={access.pending_plan}
+          />
+        ) : (
+          <Card className="p-6 text-sm text-muted-foreground">
+            Não foi possível carregar os dados da assinatura.
+          </Card>
+        ))}
     </div>
   );
 }
