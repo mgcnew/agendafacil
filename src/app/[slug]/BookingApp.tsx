@@ -278,7 +278,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   /* ---------------- render ---------------- */
   return (
-    <div className="max-w-xl mx-auto px-4 pb-24">
+    <div className="max-w-xl mx-auto px-4 pb-40">
       {/* Cabeçalho do salão — limpo, sem gradiente */}
       <header className="pt-8 pb-2">
         <div className="flex items-start justify-between gap-3">
