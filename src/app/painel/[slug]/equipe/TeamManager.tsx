@@ -12,8 +12,8 @@ import { formatBRL, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
-  Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
-  Pencil, Camera, Wallet, Download,
+  Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
+  Pencil, Camera, Wallet, Download, Share2,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -73,7 +73,6 @@ export function TeamManager({
   const [commission, setCommission] = useState("0");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const canManage = myRole === "owner" || myRole === "manager";
 
@@ -82,10 +81,11 @@ export function TeamManager({
       ? `${window.location.origin}/convite/${token}`
       : `/convite/${token}`;
 
-  function copyLink(inv: Invite) {
-    navigator.clipboard.writeText(inviteLink(inv.token));
-    setCopiedId(inv.id);
-    setTimeout(() => setCopiedId(null), 2000);
+  /** Abre o WhatsApp com a mensagem do convite + link prontos. */
+  function shareWhatsApp(inv: Invite) {
+    const link = inviteLink(inv.token);
+    const msg = `Olá! Você foi convidado(a) para a equipe do ${salon.name} 💈\nCrie seu acesso por aqui: ${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   }
 
   async function createInvite() {
@@ -108,10 +108,8 @@ export function TeamManager({
     const inv = data as Invite;
     setInvites((x) => [inv, ...x.filter((i) => i.id !== inv.id)]);
     setEmail(""); setCommission("0"); setAdding(false);
-    // já deixa o link copiado para colar no WhatsApp
-    navigator.clipboard.writeText(inviteLink(inv.token));
-    setCopiedId(inv.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    // abre o WhatsApp já com a mensagem do convite
+    shareWhatsApp(inv);
   }
 
   async function revokeInvite(inv: Invite) {
@@ -236,9 +234,8 @@ export function TeamManager({
               </div>
               {canManage && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => copyLink(inv)}>
-                    {copiedId === inv.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copiedId === inv.id ? "Copiado" : "Copiar link"}
+                  <Button variant="outline" size="sm" onClick={() => shareWhatsApp(inv)}>
+                    <Share2 className="h-4 w-4" /> WhatsApp
                   </Button>
                   <button
                     onClick={() => revokeInvite(inv)}
