@@ -6,11 +6,12 @@ import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
+import { formatBRL, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
   Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
-  Pencil, Camera,
+  Pencil, Camera, Wallet, Clock,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -353,7 +354,7 @@ function MemberAvatar({ member, size = 44 }: { member: Member; size?: number }) 
 }
 
 /* ── Modal único com abas: Dados · Serviços · Permissões ─────────── */
-type Tab = "dados" | "servicos" | "permissoes";
+type Tab = "dados" | "servicos" | "financas" | "permissoes";
 
 function MemberEditor({
   member, salonId, services, permissions, roleDefaults,
@@ -372,6 +373,7 @@ function MemberEditor({
   const tabs: { id: Tab; label: string }[] = [
     { id: "dados", label: "Dados" },
     { id: "servicos", label: "Serviços" },
+    { id: "financas", label: "Finanças" },
     { id: "permissoes", label: "Permissões" },
   ];
 
@@ -406,6 +408,9 @@ function MemberEditor({
           )}
           {tab === "servicos" && (
             <ServicesPanel member={member} services={services} salonId={salonId} onSaved={onServicesSaved} />
+          )}
+          {tab === "financas" && (
+            <FinancasPanel member={member} salonId={salonId} />
           )}
           {tab === "permissoes" && (
             <PermissionsPanel member={member} permissions={permissions} roleDefaults={roleDefaults} />
@@ -541,6 +546,118 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>
+    </div>
+  );
+}
+
+/* ── Aba Finanças (comissões a pagar/receber) ───────────────────── */
+/**
+ * Resumo financeiro do profissional. Mostra, para o MÊS ATUAL, a mesma conta
+ * usada em Caixa & Comissões:
+ *   a receber = comissões apuradas (atendimentos concluídos + pacotes) − já pago.
+ *
+ * Já funciona (somente leitura). As ações de fato (dar baixa/registrar
+ * pagamento, histórico por mês, recibo e a visão do próprio profissional)
+ * ficam planejadas abaixo — ver lista "Em breve".
+ */
+function FinancasPanel({ member, salonId }: { member: Member; salonId: string }) {
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [earned, setEarned] = useState(0);
+  const [paid, setPaid] = useState(0);
+
+  const ym = currentMonthBR();
+  const monthLabel = new Date(`${ym}-01T12:00:00`).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { start, end } = monthRangeBR(ym);
+      const periodStartStr = `${ym}-01`;
+
+      const [svc, red, pays] = await Promise.all([
+        supabase
+          .from("appointment_services")
+          .select("commission_amount, appointments!inner(member_id, status, starts_at)")
+          .eq("salon_id", salonId)
+          .eq("appointments.member_id", member.id)
+          .eq("appointments.status", "completed")
+          .gte("appointments.starts_at", start)
+          .lte("appointments.starts_at", end),
+        supabase
+          .from("package_redemptions")
+          .select("commission_amount")
+          .eq("salon_id", salonId)
+          .eq("member_id", member.id)
+          .gte("used_at", start)
+          .lte("used_at", end),
+        supabase
+          .from("commission_payments")
+          .select("amount")
+          .eq("salon_id", salonId)
+          .eq("member_id", member.id)
+          .eq("period_start", periodStartStr),
+      ]);
+
+      if (!alive) return;
+      const e1 = (svc.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+      const e2 = (red.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+      const p = (pays.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+      setEarned(e1 + e2);
+      setPaid(p);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member.id, salonId, ym]);
+
+  const toReceive = Math.max(0, earned - paid);
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground flex items-center gap-2">
+        <Wallet className="h-4 w-4 text-primary" /> Comissões de <span className="font-medium capitalize">{monthLabel}</span>
+      </p>
+
+      {loading ? (
+        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Apurado" value={formatBRL(earned)} />
+            <StatCard label="Já pago" value={formatBRL(paid)} />
+            <StatCard label="A receber" value={formatBRL(toReceive)} highlight />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Mesma base de <b>Caixa &amp; Comissões</b>: atendimentos concluídos e uso de pacotes no mês, menos o que já foi pago.
+          </p>
+        </>
+      )}
+
+      {/* Funções planejadas */}
+      <div className="rounded-[var(--radius)] border border-dashed border-border p-4">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <Clock className="h-4 w-4 text-muted-foreground" /> Em breve nesta aba
+        </p>
+        <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+          <li>• Registrar pagamento (dar baixa) e gerar recibo</li>
+          <li>• Histórico por mês (apurado, pago e saldo)</li>
+          <li>• Detalhamento por atendimento/serviço</li>
+          <li>• Acesso do próprio profissional para ver quanto tem a receber</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-[var(--radius)] border p-3 text-center ${highlight ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`mt-1 font-bold ${highlight ? "text-primary text-lg" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }
