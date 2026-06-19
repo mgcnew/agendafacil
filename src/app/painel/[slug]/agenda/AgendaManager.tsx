@@ -580,13 +580,14 @@ function ApptDetailModal({
 // ── Day View ───────────────────────────────────────────────────
 const COL_W_DAY = 160;
 
-function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onSlotClick, onDeleteBlock }: {
+function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onSlotClick, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean;
+  canManageSchedule: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onSlotClick: (date: string, proId: string, time: string) => void;
   onDeleteBlock: (b: Block) => void;
 }) {
+  const canDelBlock = (b: Block) => canManageSchedule || (!!myMemberId && b.member_id === myMemberId);
   const cols = activePros.length > 0 ? activePros : pros;
   const bounds  = hourBounds([...appts, ...blocks]);
   const hours   = hoursOf(bounds);
@@ -661,7 +662,7 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, onA
                 {blocksFor(blocks, p.id, date).map(b => (
                   <div key={b.id} className="absolute left-1 right-1 z-[5]"
                     style={{ top: rangeTop(b.starts_at, bounds.start), height: rangeH(b.starts_at, b.ends_at) }}>
-                    <BlockCard b={b} canManage={canManageSchedule} onDelete={onDeleteBlock} />
+                    <BlockCard b={b} canManage={canDelBlock(b)} onDelete={onDeleteBlock} />
                   </div>
                 ))}
                 {proAppts.map(a => {
@@ -686,13 +687,14 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, onA
 }
 
 // ── Mobile: lista cronológica do dia (mais confortável que a grade) ──
-function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onNewAppt, onDeleteBlock }: {
+function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onNewAppt, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean;
+  canManageSchedule: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onNewAppt: (date: string) => void;
   onDeleteBlock: (b: Block) => void;
 }) {
+  const canDelBlock = (b: Block) => canManageSchedule || (!!myMemberId && b.member_id === myMemberId);
   const visible = (activePros.length > 0
     ? appts.filter(a => activePros.some(p => p.id === a.member_id))
     : appts
@@ -725,14 +727,15 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
             {rows.map(row => {
               if (row.kind === "block") {
                 const b = row.block;
+                const canDel = canDelBlock(b);
                 return (
                   <li key={b.id}>
                     <button
                       type="button"
-                      onClick={canManageSchedule ? () => onDeleteBlock(b) : undefined}
+                      onClick={canDel ? () => onDeleteBlock(b) : undefined}
                       className={cn(
                         "w-full flex items-center gap-3 px-3.5 py-3 text-left",
-                        canManageSchedule && "hover:bg-muted/50 transition",
+                        canDel && "hover:bg-muted/50 transition",
                       )}
                     >
                       <div className="shrink-0 text-center w-14">
@@ -807,14 +810,15 @@ function EmptyDay() {
 // ── Week View ──────────────────────────────────────────────────
 const COL_W_WEEK = 90;
 
-function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
+function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean;
+  canManageSchedule: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onDayClick: (d: string) => void;
   onSlotClick: (date: string, time: string) => void;
   onDeleteBlock: (b: Block) => void;
 }) {
+  const canDelBlock = (b: Block) => canManageSchedule || (!!myMemberId && b.member_id === myMemberId);
   const days     = getWeekDays(date);
   const now      = new Date();
   const todayStr = toStr(now);
@@ -906,7 +910,7 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, on
                 {visibleBlocks.filter(b => datePart(b.starts_at) === day).map(b => (
                   <div key={b.id} className="absolute left-0.5 right-0.5 z-[5]"
                     style={{ top: rangeTop(b.starts_at, bounds.start), height: rangeH(b.starts_at, b.ends_at) }}>
-                    <BlockCard b={b} canManage={canManageSchedule} onDelete={onDeleteBlock} />
+                    <BlockCard b={b} canManage={canDelBlock(b)} onDelete={onDeleteBlock} />
                   </div>
                 ))}
                 {dayAppts.map(a => {
@@ -1034,11 +1038,13 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, onApp
 
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
-  salonId, slug, pros, services, clients: initialClients, discounts = {}, canManageSchedule = false,
+  salonId, slug, pros, services, clients: initialClients, discounts = {},
+  canManageSchedule = false, myMemberId,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
   canManageSchedule?: boolean;
+  myMemberId?: string;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1080,6 +1086,10 @@ export function AgendaManager({
     () => (selectedPros.length === 0 ? [] : pros.filter(p => selectedPros.includes(p.id))),
     [pros, selectedPros],
   );
+
+  // Sou um profissional com coluna na agenda? (posso bloquear meu próprio horário)
+  const iAmPro = !!myMemberId && pros.some(p => p.id === myMemberId);
+  const canBlock = canManageSchedule || iAmPro;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1241,7 +1251,7 @@ export function AgendaManager({
             </button>
           </div>
 
-          {canManageSchedule && (
+          {canBlock && (
             <Button variant="outline" onClick={() => setBlocking(true)}>
               <Lock className="h-4 w-4" /> Bloquear
             </Button>
@@ -1304,7 +1314,7 @@ export function AgendaManager({
         ) : view === "semana" ? (
           <WeekView
             date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-            canManageSchedule={canManageSchedule}
+            canManageSchedule={canManageSchedule} myMemberId={myMemberId}
             onApptClick={a => setDetailAppt(a)}
             onDayClick={d => { setDate(d); setView("dia"); }}
             onSlotClick={(d, time) => openCreate(d, undefined, time)}
@@ -1316,7 +1326,7 @@ export function AgendaManager({
             <div className="sm:hidden h-full">
               <AgendaList
                 date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                canManageSchedule={canManageSchedule}
+                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
                 onApptClick={a => setDetailAppt(a)}
                 onNewAppt={d => openCreate(d)}
                 onDeleteBlock={deleteBlock}
@@ -1325,7 +1335,7 @@ export function AgendaManager({
             <div className="hidden sm:block h-full">
               <DayView
                 date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                canManageSchedule={canManageSchedule}
+                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
                 onApptClick={a => setDetailAppt(a)}
                 onSlotClick={(d, proId, time) => openCreate(d, proId, time)}
                 onDeleteBlock={deleteBlock}
@@ -1375,6 +1385,8 @@ export function AgendaManager({
             salonId={salonId}
             pros={pros}
             date={date}
+            selfOnly={!canManageSchedule}
+            myMemberId={myMemberId}
             onClose={() => setBlocking(false)}
             onCreated={() => { setBlocking(false); load(); }}
           />
@@ -1504,13 +1516,16 @@ function FinalizeModal({
 
 // ── Bloquear horário ───────────────────────────────────────────
 function BlockModal({
-  salonId, pros, date: initialDate, onClose, onCreated,
+  salonId, pros, date: initialDate, selfOnly = false, myMemberId, onClose, onCreated,
 }: {
   salonId: string; pros: Pro[]; date: string;
+  selfOnly?: boolean; myMemberId?: string;
   onClose: () => void; onCreated: () => void;
 }) {
   const supabase = createClient();
-  const [memberId, setMemberId] = useState<string>(""); // "" = todos
+  // selfOnly: profissional só pode bloquear a própria agenda.
+  const [memberId, setMemberId] = useState<string>(selfOnly ? (myMemberId ?? "") : ""); // "" = todos
+  const myName = pros.find(p => p.id === myMemberId)?.name ?? "Você";
   const [date, setDate]         = useState(initialDate);
   const [startT, setStartT]     = useState("12:00");
   const [endT, setEndT]         = useState("13:00");
@@ -1558,10 +1573,16 @@ function BlockModal({
         <div className="space-y-4 mt-4">
           <div className="space-y-1.5">
             <Label>Profissional</Label>
-            <Select value={memberId} onValueChange={setMemberId}>
-              <option value="">Todos (salão inteiro)</option>
-              {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
+            {selfOnly ? (
+              <div className="h-11 flex items-center rounded-[var(--radius)] border border-border bg-secondary/40 px-3.5 text-sm text-muted-foreground">
+                {myName} · seu horário
+              </div>
+            ) : (
+              <Select value={memberId} onValueChange={setMemberId}>
+                <option value="">Todos (salão inteiro)</option>
+                {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+            )}
           </div>
 
           <div className="space-y-1.5">

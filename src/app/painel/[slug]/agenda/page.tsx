@@ -58,6 +58,7 @@ export default async function AgendaPage({
       clients={clients ?? []}
       discounts={discounts}
       canManageSchedule={canManageSchedule}
+      myMemberId={membership.id}
     />
   );
 }
