@@ -1364,6 +1364,100 @@ export type Database = {
           },
         ]
       }
+      salon_member_details: {
+        Row: {
+          birth_date: string | null
+          chair_rent_amount: number | null
+          chair_rent_due_day: number | null
+          city: string | null
+          complement: string | null
+          contract_signed: boolean
+          contract_signed_at: string | null
+          cpf: string | null
+          employment_type: string | null
+          member_id: string
+          neighborhood: string | null
+          notes: string | null
+          number: string | null
+          personal_phone: string | null
+          rg: string | null
+          salon_id: string
+          state: string | null
+          street: string | null
+          updated_at: string
+          updated_by: string | null
+          zip: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          chair_rent_amount?: number | null
+          chair_rent_due_day?: number | null
+          city?: string | null
+          complement?: string | null
+          contract_signed?: boolean
+          contract_signed_at?: string | null
+          cpf?: string | null
+          employment_type?: string | null
+          member_id: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          personal_phone?: string | null
+          rg?: string | null
+          salon_id: string
+          state?: string | null
+          street?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          zip?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          chair_rent_amount?: number | null
+          chair_rent_due_day?: number | null
+          city?: string | null
+          complement?: string | null
+          contract_signed?: boolean
+          contract_signed_at?: string | null
+          cpf?: string | null
+          employment_type?: string | null
+          member_id?: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          personal_phone?: string | null
+          rg?: string | null
+          salon_id?: string
+          state?: string | null
+          street?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salon_member_details_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "salon_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salon_member_details_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salon_member_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salon_members: {
         Row: {
           bio: string | null

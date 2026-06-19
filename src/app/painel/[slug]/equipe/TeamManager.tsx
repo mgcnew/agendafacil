@@ -14,6 +14,7 @@ import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
   Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
   Pencil, Camera, Wallet, Download, Share2,
+  Briefcase, MapPin, FileText, Armchair,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -358,8 +359,8 @@ function MemberAvatar({ member, size = 44 }: { member: Member; size?: number }) 
   );
 }
 
-/* ── Modal único com abas: Dados · Serviços · Permissões ─────────── */
-type Tab = "dados" | "servicos" | "financas" | "permissoes";
+/* ── Modal único com abas: Dados · Cadastro · Serviços · Finanças · Permissões */
+type Tab = "dados" | "cadastro" | "servicos" | "financas" | "permissoes";
 
 function MemberEditor({
   member, salonId, services, permissions, roleDefaults, canSeeFinance, salon,
@@ -379,6 +380,7 @@ function MemberEditor({
   const [tab, setTab] = useState<Tab>("dados");
   const tabs: { id: Tab; label: string }[] = [
     { id: "dados", label: "Dados" },
+    { id: "cadastro", label: "Cadastro" },
     { id: "servicos", label: "Serviços" },
     ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças" }] : []),
     { id: "permissoes", label: "Permissões" },
@@ -412,6 +414,9 @@ function MemberEditor({
         <div className="flex-1 overflow-auto p-5">
           {tab === "dados" && (
             <DadosPanel member={member} salonId={salonId} onSaved={onMemberSaved} />
+          )}
+          {tab === "cadastro" && (
+            <CadastroPanel member={member} salonId={salonId} />
           )}
           {tab === "servicos" && (
             <ServicesPanel member={member} services={services} salonId={salonId} onSaved={onServicesSaved} />
@@ -550,6 +555,304 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving || uploading}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar dados
+        </Button>
+        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Aba Cadastro: documentos, endereço e vínculo de trabalho ───── */
+type Details = Tables<"salon_member_details">;
+
+const EMPLOYMENT_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "clt", label: "CLT (registrado)", hint: "Funcionário com carteira assinada." },
+  { value: "autonomo", label: "Autônomo", hint: "Presta serviço por conta própria." },
+  { value: "chair_rent", label: "Aluguel de cadeira", hint: "Paga um valor pelo espaço, não recebe comissão." },
+  { value: "freelancer", label: "Freelancer / diarista", hint: "Trabalha por demanda ou diária." },
+  { value: "other", label: "Outro", hint: "" },
+];
+
+const UF_LIST = [
+  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB",
+  "PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
+];
+
+function onlyDigits(s: string) {
+  return s.replace(/\D/g, "");
+}
+
+/** CPF mascarado 000.000.000-00 enquanto digita. */
+function maskCPF(v: string) {
+  const d = onlyDigits(v).slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+}
+
+/** CEP mascarado 00000-000 enquanto digita. */
+function maskCEP(v: string) {
+  const d = onlyDigits(v).slice(0, 8);
+  return d.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+function CadastroPanel({ member, salonId }: { member: Member; salonId: string }) {
+  const supabase = createClient();
+  const [form, setForm] = useState<Partial<Details>>({});
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from("salon_member_details")
+      .select("*")
+      .eq("member_id", member.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setForm(data ?? {});
+        setLoaded(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member.id]);
+
+  function set<K extends keyof Details>(k: K, v: Details[K]) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  /** Busca rua/bairro/cidade/UF pelo CEP (ViaCEP). Não bloqueia se falhar. */
+  async function lookupCep(raw: string) {
+    const cep = onlyDigits(raw);
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setForm((f) => ({
+          ...f,
+          street: data.logradouro || f.street,
+          neighborhood: data.bairro || f.neighborhood,
+          city: data.localidade || f.city,
+          state: data.uf || f.state,
+        }));
+      }
+    } catch {
+      /* silencioso — o usuário pode preencher manualmente */
+    } finally {
+      setCepLoading(false);
+    }
+  }
+
+  async function save() {
+    setSaving(true); setErr(null); setOk(false);
+    const { data: userRes } = await supabase.auth.getUser();
+    const payload = {
+      member_id: member.id,
+      salon_id: salonId,
+      employment_type: form.employment_type || null,
+      chair_rent_amount:
+        form.employment_type === "chair_rent" && form.chair_rent_amount != null
+          ? form.chair_rent_amount
+          : null,
+      chair_rent_due_day:
+        form.employment_type === "chair_rent" && form.chair_rent_due_day
+          ? form.chair_rent_due_day
+          : null,
+      cpf: form.cpf || null,
+      rg: form.rg || null,
+      birth_date: form.birth_date || null,
+      personal_phone: form.personal_phone || null,
+      zip: form.zip || null,
+      street: form.street || null,
+      number: form.number || null,
+      complement: form.complement || null,
+      neighborhood: form.neighborhood || null,
+      city: form.city || null,
+      state: form.state || null,
+      contract_signed: form.contract_signed ?? false,
+      contract_signed_at: form.contract_signed ? (form.contract_signed_at || null) : null,
+      notes: form.notes || null,
+      updated_at: new Date().toISOString(),
+      updated_by: userRes.user?.id ?? null,
+    };
+    const { error } = await supabase
+      .from("salon_member_details")
+      .upsert(payload, { onConflict: "member_id" });
+    setSaving(false);
+    if (error) { setErr("Não foi possível salvar o cadastro. Tente novamente."); return; }
+    setOk(true);
+    setTimeout(() => setOk(false), 1800);
+  }
+
+  if (!loaded) {
+    return <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  const isChairRent = form.employment_type === "chair_rent";
+
+  return (
+    <div className="space-y-6">
+      <p className="text-xs text-muted-foreground">
+        Informações pessoais e de vínculo. Visível apenas para você (proprietária/gerente).
+      </p>
+
+      {/* Vínculo de trabalho */}
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Vínculo de trabalho</h4>
+        <div className="space-y-1.5">
+          <Label htmlFor="emp">Tipo de acordo</Label>
+          <Select
+            id="emp"
+            value={form.employment_type ?? ""}
+            onValueChange={(v) => set("employment_type", v || null)}
+          >
+            <option value="">Não definido</option>
+            {EMPLOYMENT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </Select>
+          {form.employment_type && (
+            <p className="text-xs text-muted-foreground">
+              {EMPLOYMENT_OPTIONS.find((o) => o.value === form.employment_type)?.hint}
+            </p>
+          )}
+        </div>
+
+        {isChairRent && (
+          <div className="grid sm:grid-cols-2 gap-3 rounded-[var(--radius)] border border-border p-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="rent"><Armchair className="inline h-3.5 w-3.5 mr-1" />Valor do aluguel (R$)</Label>
+              <Input
+                id="rent"
+                inputMode="decimal"
+                value={form.chair_rent_amount ?? ""}
+                onChange={(e) => set("chair_rent_amount", e.target.value === "" ? null : Number(e.target.value.replace(",", ".")))}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="due">Dia do vencimento</Label>
+              <Input
+                id="due"
+                type="number"
+                min={1}
+                max={28}
+                value={form.chair_rent_due_day ?? ""}
+                onChange={(e) => set("chair_rent_due_day", e.target.value === "" ? null : Number(e.target.value))}
+                placeholder="Ex.: 5"
+              />
+            </div>
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              No aluguel de cadeira o profissional paga pelo espaço e <b>não recebe comissão</b>: o sistema já zera automaticamente a comissão dele em atendimentos e pacotes, mesmo que o serviço tenha comissão padrão.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Documentos */}
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Documentos</h4>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="cpf">CPF</Label>
+            <Input id="cpf" value={form.cpf ?? ""} onChange={(e) => set("cpf", maskCPF(e.target.value))} placeholder="000.000.000-00" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rg">RG</Label>
+            <Input id="rg" value={form.rg ?? ""} onChange={(e) => set("rg", e.target.value)} placeholder="00.000.000-0" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="bd">Nascimento</Label>
+            <Input id="bd" type="date" value={form.birth_date ?? ""} onChange={(e) => set("birth_date", e.target.value || null)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ph">Telefone pessoal</Label>
+            <Input id="ph" value={form.personal_phone ?? ""} onChange={(e) => set("personal_phone", e.target.value)} placeholder="(00) 00000-0000" />
+          </div>
+        </div>
+      </section>
+
+      {/* Endereço */}
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Endereço</h4>
+        <div className="grid sm:grid-cols-6 gap-3">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="cep">CEP</Label>
+            <div className="relative">
+              <Input
+                id="cep"
+                value={form.zip ?? ""}
+                onChange={(e) => set("zip", maskCEP(e.target.value))}
+                onBlur={(e) => lookupCep(e.target.value)}
+                placeholder="00000-000"
+              />
+              {cepLoading && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+            </div>
+          </div>
+          <div className="space-y-1.5 sm:col-span-4">
+            <Label htmlFor="street">Rua</Label>
+            <Input id="street" value={form.street ?? ""} onChange={(e) => set("street", e.target.value)} placeholder="Rua / Avenida" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="num">Número</Label>
+            <Input id="num" value={form.number ?? ""} onChange={(e) => set("number", e.target.value)} placeholder="Nº" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-4">
+            <Label htmlFor="comp">Complemento</Label>
+            <Input id="comp" value={form.complement ?? ""} onChange={(e) => set("complement", e.target.value)} placeholder="Apto, bloco..." />
+          </div>
+          <div className="space-y-1.5 sm:col-span-3">
+            <Label htmlFor="bairro">Bairro</Label>
+            <Input id="bairro" value={form.neighborhood ?? ""} onChange={(e) => set("neighborhood", e.target.value)} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="city">Cidade</Label>
+            <Input id="city" value={form.city ?? ""} onChange={(e) => set("city", e.target.value)} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-1">
+            <Label htmlFor="uf">UF</Label>
+            <Select id="uf" value={form.state ?? ""} onValueChange={(v) => set("state", v || null)}>
+              <option value="">—</option>
+              {UF_LIST.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+            </Select>
+          </div>
+        </div>
+      </section>
+
+      {/* Contrato */}
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Contrato</h4>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.contract_signed ?? false}
+            onChange={(e) => set("contract_signed", e.target.checked)}
+            className="h-4 w-4 accent-[var(--primary)]"
+          />
+          <span className="text-sm">Contrato assinado</span>
+        </label>
+        {form.contract_signed && (
+          <div className="space-y-1.5 max-w-[220px]">
+            <Label htmlFor="csa">Data da assinatura</Label>
+            <Input id="csa" type="date" value={form.contract_signed_at ?? ""} onChange={(e) => set("contract_signed_at", e.target.value || null)} />
+          </div>
+        )}
+      </section>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="notes">Observações</Label>
+        <Textarea id="notes" rows={2} value={form.notes ?? ""} onChange={(e) => set("notes", e.target.value)} placeholder="Anotações internas sobre o profissional" />
+      </div>
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button onClick={save} disabled={saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar cadastro
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>
