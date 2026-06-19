@@ -36,6 +36,7 @@ type Appt    = {
   salon_members: { display_name: string | null } | null;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
+type Block = { id: string; member_id: string | null; starts_at: string; ends_at: string; reason: string | null };
 type HistoryAppt = {
   id: string;
   starts_at: string;
@@ -93,10 +94,10 @@ const CELL_H        = 64;
 
 type Bounds = { start: number; end: number };
 
-function hourBounds(appts: Appt[]): Bounds {
+function hourBounds(items: { starts_at: string; ends_at: string | null }[]): Bounds {
   let start = DEFAULT_START;
   let end   = DEFAULT_END;
-  for (const a of appts) {
+  for (const a of items) {
     const s = new Date(a.starts_at);
     const e = a.ends_at ? new Date(a.ends_at) : s;
     start = Math.min(start, s.getHours());
@@ -176,6 +177,49 @@ function apptH(a: Appt) {
 function getColor(pros: Pro[], memberId: string) {
   const idx = pros.findIndex(p => p.id === memberId);
   return pros[idx]?.color ?? PALETTE[Math.max(0, idx) % PALETTE.length];
+}
+
+// ── Bloqueios de horário (almoço, intervalo, compromisso) ──────
+function rangeTop(startIso: string, hourStart: number) {
+  const d = new Date(startIso);
+  return Math.max(0, (d.getHours() + d.getMinutes() / 60 - hourStart) * CELL_H);
+}
+function rangeH(startIso: string, endIso: string) {
+  const mins = (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000;
+  return Math.max(16, (mins / 60) * CELL_H);
+}
+/** Bloqueios que se aplicam a uma coluna de profissional num dia. */
+function blocksFor(blocks: Block[], memberId: string | null, day: string) {
+  return blocks.filter(
+    b => datePart(b.starts_at) === day && (b.member_id === null || b.member_id === memberId),
+  );
+}
+
+const BLOCK_STRIPES =
+  "repeating-linear-gradient(45deg, rgba(100,116,139,0.16), rgba(100,116,139,0.16) 6px, rgba(100,116,139,0.06) 6px, rgba(100,116,139,0.06) 12px)";
+
+function BlockCard({ b, canManage, onDelete }: {
+  b: Block; canManage: boolean; onDelete: (b: Block) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={canManage ? (e) => { e.stopPropagation(); onDelete(b); } : undefined}
+      title={canManage ? "Clique para remover o bloqueio" : (b.reason ?? "Horário bloqueado")}
+      className={cn(
+        "absolute inset-0 rounded-[6px] overflow-hidden text-left border border-slate-300/60",
+        canManage ? "cursor-pointer" : "cursor-default",
+      )}
+      style={{ background: BLOCK_STRIPES }}
+    >
+      <div className="px-2 py-1 h-full flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600">
+          <Lock className="h-2.5 w-2.5 shrink-0" /> Bloqueado
+        </span>
+        {b.reason && <span className="text-[11px] text-slate-600/90 truncate leading-tight">{b.reason}</span>}
+      </div>
+    </button>
+  );
 }
 
 // ── Appointment card (grid block, opens detail modal on click) ─
@@ -536,13 +580,15 @@ function ApptDetailModal({
 // ── Day View ───────────────────────────────────────────────────
 const COL_W_DAY = 160;
 
-function DayView({ date, appts, pros, activePros, onApptClick, onSlotClick }: {
-  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onSlotClick, onDeleteBlock }: {
+  date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
+  canManageSchedule: boolean;
   onApptClick: (a: Appt) => void;
   onSlotClick: (date: string, proId: string, time: string) => void;
+  onDeleteBlock: (b: Block) => void;
 }) {
   const cols = activePros.length > 0 ? activePros : pros;
-  const bounds  = hourBounds(appts);
+  const bounds  = hourBounds([...appts, ...blocks]);
   const hours   = hoursOf(bounds);
   const totalH  = totalHeight(bounds);
   const now = new Date();
@@ -612,6 +658,12 @@ function DayView({ date, appts, pros, activePros, onApptClick, onSlotClick }: {
                     <div className="border-t-2 border-primary w-full" />
                   </div>
                 )}
+                {blocksFor(blocks, p.id, date).map(b => (
+                  <div key={b.id} className="absolute left-1 right-1 z-[5]"
+                    style={{ top: rangeTop(b.starts_at, bounds.start), height: rangeH(b.starts_at, b.ends_at) }}>
+                    <BlockCard b={b} canManage={canManageSchedule} onDelete={onDeleteBlock} />
+                  </div>
+                ))}
                 {proAppts.map(a => {
                   const top = apptTop(a, bounds.start);
                   const h   = apptH(a);
@@ -634,20 +686,33 @@ function DayView({ date, appts, pros, activePros, onApptClick, onSlotClick }: {
 }
 
 // ── Mobile: lista cronológica do dia (mais confortável que a grade) ──
-function AgendaList({ date, appts, pros, activePros, onApptClick, onNewAppt }: {
-  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onNewAppt, onDeleteBlock }: {
+  date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
+  canManageSchedule: boolean;
   onApptClick: (a: Appt) => void;
   onNewAppt: (date: string) => void;
+  onDeleteBlock: (b: Block) => void;
 }) {
   const visible = (activePros.length > 0
     ? appts.filter(a => activePros.some(p => p.id === a.member_id))
     : appts
   ).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
+  const visibleBlocks = (activePros.length > 0
+    ? blocks.filter(b => b.member_id === null || activePros.some(p => p.id === b.member_id))
+    : blocks
+  ).filter(b => datePart(b.starts_at) === date);
+
+  // Mescla atendimentos e bloqueios em ordem cronológica.
+  const rows = [
+    ...visible.map(a => ({ kind: "appt" as const, at: a.starts_at, appt: a })),
+    ...visibleBlocks.map(b => ({ kind: "block" as const, at: b.starts_at, block: b })),
+  ].sort((x, y) => x.at.localeCompare(y.at));
+
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-auto scroll-thin">
-        {visible.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center px-6 py-16">
             <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
@@ -657,7 +722,35 @@ function AgendaList({ date, appts, pros, activePros, onApptClick, onNewAppt }: {
           </div>
         ) : (
           <ul className="divide-y divide-border">
-            {visible.map(a => {
+            {rows.map(row => {
+              if (row.kind === "block") {
+                const b = row.block;
+                return (
+                  <li key={b.id}>
+                    <button
+                      type="button"
+                      onClick={canManageSchedule ? () => onDeleteBlock(b) : undefined}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3.5 py-3 text-left",
+                        canManageSchedule && "hover:bg-muted/50 transition",
+                      )}
+                    >
+                      <div className="shrink-0 text-center w-14">
+                        <p className="text-sm font-semibold leading-tight">{fmtHM(b.starts_at)}</p>
+                        <p className="text-[11px] text-muted-foreground">{fmtHM(b.ends_at)}</p>
+                      </div>
+                      <span className="h-9 w-1 rounded-full shrink-0 bg-slate-300" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate flex items-center gap-1 text-slate-600">
+                          <Lock className="h-3.5 w-3.5 shrink-0" /> Horário bloqueado
+                        </p>
+                        {b.reason && <p className="text-xs text-muted-foreground truncate">{b.reason}</p>}
+                      </div>
+                    </button>
+                  </li>
+                );
+              }
+              const a = row.appt;
               const color = getColor(pros, a.member_id);
               const st = STATUS_META[a.status];
               return (
@@ -714,11 +807,13 @@ function EmptyDay() {
 // ── Week View ──────────────────────────────────────────────────
 const COL_W_WEEK = 90;
 
-function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick, onSlotClick }: {
-  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
+  date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
+  canManageSchedule: boolean;
   onApptClick: (a: Appt) => void;
   onDayClick: (d: string) => void;
   onSlotClick: (date: string, time: string) => void;
+  onDeleteBlock: (b: Block) => void;
 }) {
   const days     = getWeekDays(date);
   const now      = new Date();
@@ -727,7 +822,10 @@ function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick, onSl
   const visible  = activePros.length > 0
     ? appts.filter(a => activePros.some(p => p.id === a.member_id))
     : appts;
-  const bounds   = hourBounds(visible);
+  const visibleBlocks = activePros.length > 0
+    ? blocks.filter(b => b.member_id === null || activePros.some(p => p.id === b.member_id))
+    : blocks;
+  const bounds   = hourBounds([...visible, ...visibleBlocks]);
   const hours    = hoursOf(bounds);
   const totalH   = totalHeight(bounds);
   const isEmpty  = visible.length === 0;
@@ -805,6 +903,12 @@ function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick, onSl
                     <div className="border-t-2 border-primary w-full" />
                   </div>
                 )}
+                {visibleBlocks.filter(b => datePart(b.starts_at) === day).map(b => (
+                  <div key={b.id} className="absolute left-0.5 right-0.5 z-[5]"
+                    style={{ top: rangeTop(b.starts_at, bounds.start), height: rangeH(b.starts_at, b.ends_at) }}>
+                    <BlockCard b={b} canManage={canManageSchedule} onDelete={onDeleteBlock} />
+                  </div>
+                ))}
                 {dayAppts.map(a => {
                   const color = getColor(pros, a.member_id);
                   const top   = apptTop(a, bounds.start);
@@ -930,10 +1034,11 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, onApp
 
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
-  salonId, slug, pros, services, clients: initialClients, discounts = {},
+  salonId, slug, pros, services, clients: initialClients, discounts = {}, canManageSchedule = false,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
+  canManageSchedule?: boolean;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -943,7 +1048,9 @@ export function AgendaManager({
   const [date, setDate]             = useState(() => toStr(new Date()));
   const [selectedPros, setSelected] = useState<string[]>([]);
   const [appts, setAppts]           = useState<Appt[]>([]);
+  const [blocks, setBlocks]         = useState<Block[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [blocking, setBlocking]     = useState(false);
   const [creating, setCreating]     = useState(false);
   const [createDate, setCreateDate] = useState(date);
   const [createPro, setCreatePro]   = useState<string | undefined>(undefined);
@@ -989,14 +1096,23 @@ export function AgendaManager({
       start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
       end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
     }
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name)")
-      .eq("salon_id", salonId)
-      .gte("starts_at", start)
-      .lte("starts_at", end)
-      .order("starts_at");
+    const [{ data }, { data: blockData }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name)")
+        .eq("salon_id", salonId)
+        .gte("starts_at", start)
+        .lte("starts_at", end)
+        .order("starts_at"),
+      supabase
+        .from("schedule_blocks")
+        .select("id, member_id, starts_at, ends_at, reason")
+        .eq("salon_id", salonId)
+        .lte("starts_at", end)
+        .gte("ends_at", start),
+    ]);
     setAppts((data as Appt[]) ?? []);
+    setBlocks((blockData as Block[]) ?? []);
     setLoading(false);
   }, [supabase, salonId, date, view]);
 
@@ -1010,6 +1126,11 @@ export function AgendaManager({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments", filter: `salon_id=eq.${salonId}` },
+        () => loadRef.current(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "schedule_blocks", filter: `salon_id=eq.${salonId}` },
         () => loadRef.current(),
       )
       .subscribe();
@@ -1031,6 +1152,14 @@ export function AgendaManager({
       setAppts(list => list.map(x => x.id === a.id ? { ...x, status: prev } : x));
       if (detailAppt?.id === a.id) setDetailAppt(d => d ? { ...d, status: prev } : d);
     }
+  }
+
+  async function deleteBlock(b: Block) {
+    if (!confirm("Remover este bloqueio? O horário volta a ficar disponível.")) return;
+    const prev = blocks;
+    setBlocks(list => list.filter(x => x.id !== b.id));
+    const { error } = await supabase.from("schedule_blocks").delete().eq("id", b.id);
+    if (error) setBlocks(prev);
   }
 
   function navigate(n: number) {
@@ -1112,6 +1241,11 @@ export function AgendaManager({
             </button>
           </div>
 
+          {canManageSchedule && (
+            <Button variant="outline" onClick={() => setBlocking(true)}>
+              <Lock className="h-4 w-4" /> Bloquear
+            </Button>
+          )}
           <Button onClick={() => openCreate(date)}>
             <Plus className="h-4 w-4" /> Novo agendamento
           </Button>
@@ -1169,26 +1303,32 @@ export function AgendaManager({
           />
         ) : view === "semana" ? (
           <WeekView
-            date={date} appts={appts} pros={pros} activePros={activePros}
+            date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
+            canManageSchedule={canManageSchedule}
             onApptClick={a => setDetailAppt(a)}
             onDayClick={d => { setDate(d); setView("dia"); }}
             onSlotClick={(d, time) => openCreate(d, undefined, time)}
+            onDeleteBlock={deleteBlock}
           />
         ) : (
           <>
             {/* Mobile: lista cronológica · Desktop: grade por profissional */}
             <div className="sm:hidden h-full">
               <AgendaList
-                date={date} appts={appts} pros={pros} activePros={activePros}
+                date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
+                canManageSchedule={canManageSchedule}
                 onApptClick={a => setDetailAppt(a)}
                 onNewAppt={d => openCreate(d)}
+                onDeleteBlock={deleteBlock}
               />
             </div>
             <div className="hidden sm:block h-full">
               <DayView
-                date={date} appts={appts} pros={pros} activePros={activePros}
+                date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
+                canManageSchedule={canManageSchedule}
                 onApptClick={a => setDetailAppt(a)}
                 onSlotClick={(d, proId, time) => openCreate(d, proId, time)}
+                onDeleteBlock={deleteBlock}
               />
             </div>
           </>
@@ -1223,6 +1363,20 @@ export function AgendaManager({
             initialTime={createTime}
             onClose={() => setCreating(false)}
             onCreated={() => { setCreating(false); load(); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Bloquear horário ──────────────────────────────── */}
+      <AnimatePresence>
+        {blocking && (
+          <BlockModal
+            key="block"
+            salonId={salonId}
+            pros={pros}
+            date={date}
+            onClose={() => setBlocking(false)}
+            onCreated={() => { setBlocking(false); load(); }}
           />
         )}
       </AnimatePresence>
@@ -1343,6 +1497,103 @@ function FinalizeModal({
             </p>
           </>
         )}
+      </Card>
+    </MotionModal>
+  );
+}
+
+// ── Bloquear horário ───────────────────────────────────────────
+function BlockModal({
+  salonId, pros, date: initialDate, onClose, onCreated,
+}: {
+  salonId: string; pros: Pro[]; date: string;
+  onClose: () => void; onCreated: () => void;
+}) {
+  const supabase = createClient();
+  const [memberId, setMemberId] = useState<string>(""); // "" = todos
+  const [date, setDate]         = useState(initialDate);
+  const [startT, setStartT]     = useState("12:00");
+  const [endT, setEndT]         = useState("13:00");
+  const [reason, setReason]     = useState("");
+  const [busy, setBusy]         = useState(false);
+  const [err, setErr]           = useState<string | null>(null);
+
+  async function save() {
+    const startsAt = new Date(`${date}T${startT}:00`);
+    const endsAt   = new Date(`${date}T${endT}:00`);
+    if (!(endsAt > startsAt)) { setErr("O fim precisa ser depois do início."); return; }
+    setBusy(true); setErr(null);
+    const { error } = await supabase.from("schedule_blocks").insert({
+      salon_id: salonId,
+      member_id: memberId || null,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      reason: reason.trim() || null,
+    });
+    setBusy(false);
+    if (error) {
+      setErr(
+        error.message.includes("permission") || error.code === "42501"
+          ? "Você não tem permissão para bloquear horários."
+          : "Não foi possível bloquear. Tente novamente.",
+      );
+      return;
+    }
+    onCreated();
+  }
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" /> Bloquear horário
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Almoço, intervalo, compromisso… O horário some da agenda online.
+        </p>
+
+        <div className="space-y-4 mt-4">
+          <div className="space-y-1.5">
+            <Label>Profissional</Label>
+            <Select value={memberId} onValueChange={setMemberId}>
+              <option value="">Todos (salão inteiro)</option>
+              {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Data</Label>
+            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Início</Label>
+              <Input type="time" value={startT} onChange={e => setStartT(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fim</Label>
+              <Input type="time" value={endT} onChange={e => setEndT(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Motivo (opcional)</Label>
+            <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Ex.: Almoço, médico, reunião" />
+          </div>
+
+          {err && <p className="text-sm text-red-600">{err}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <Button onClick={save} disabled={busy} className="flex-1">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} Bloquear
+            </Button>
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          </div>
+        </div>
       </Card>
     </MotionModal>
   );

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { AgendaManager } from "./AgendaManager";
 
@@ -13,6 +13,9 @@ export default async function AgendaPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  const canManageSchedule = perms.has("schedule.manage");
 
   const supabase = await createClient();
   const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }] = await Promise.all([
@@ -54,6 +57,7 @@ export default async function AgendaPage({
       services={services ?? []}
       clients={clients ?? []}
       discounts={discounts}
+      canManageSchedule={canManageSchedule}
     />
   );
 }
