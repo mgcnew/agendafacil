@@ -1061,14 +1061,16 @@ export function AgendaManager({
   const [createDate, setCreateDate] = useState(date);
   const [createPro, setCreatePro]   = useState<string | undefined>(undefined);
   const [createTime, setCreateTime] = useState<string | undefined>(undefined);
+  const [createClientId, setCreateClientId] = useState<string | undefined>(undefined);
   const [detailAppt, setDetailAppt] = useState<Appt | null>(null);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
 
-  /** Abre o modal de criação, opcionalmente já com profissional e horário. */
-  const openCreate = useCallback((d: string, pro?: string, time?: string) => {
+  /** Abre o modal de criação, opcionalmente já com profissional, horário e cliente. */
+  const openCreate = useCallback((d: string, pro?: string, time?: string, clientId?: string) => {
     setCreateDate(d);
     setCreatePro(pro);
     setCreateTime(time);
+    setCreateClientId(clientId);
     setCreating(true);
   }, []);
 
@@ -1077,7 +1079,7 @@ export function AgendaManager({
     if (openedFromUrl.current) return;
     if (searchParams.get("novo") === "1") {
       openedFromUrl.current = true;
-      openCreate(toStr(new Date()));
+      openCreate(toStr(new Date()), undefined, undefined, searchParams.get("cliente") ?? undefined);
       router.replace(pathname, { scroll: false });
     }
   }, [searchParams, router, pathname, openCreate]);
@@ -1371,6 +1373,7 @@ export function AgendaManager({
             date={createDate}
             initialPro={createPro}
             initialTime={createTime}
+            initialClient={createClientId}
             onClose={() => setCreating(false)}
             onCreated={() => { setCreating(false); load(); }}
           />
@@ -1622,17 +1625,20 @@ function BlockModal({
 
 // ── Create Appointment Modal ───────────────────────────────────
 function CreateAppointment({
-  salonId, pros, services, clients, discounts, date: initialDate, initialPro, initialTime, onClose, onCreated,
+  salonId, pros, services, clients, discounts, date: initialDate, initialPro, initialTime, initialClient, onClose, onCreated,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts: Record<string, number>;
-  date: string; initialPro?: string; initialTime?: string;
+  date: string; initialPro?: string; initialTime?: string; initialClient?: string;
   onClose: () => void; onCreated: () => void;
 }) {
   const supabase = createClient();
   const [clientName, setClientName]     = useState("");
   const [clientPhone, setClientPhone]   = useState("");
-  const [existingClient, setExisting]   = useState("");
+  // Pré-seleciona o cliente se ele já existir na lista (ex.: veio da ficha).
+  const [existingClient, setExisting]   = useState(
+    initialClient && clients.some(c => c.id === initialClient) ? initialClient : "",
+  );
   const [proId, setProId]               = useState(initialPro ?? pros[0]?.id ?? "");
   // Aplica o horário clicado na grade só uma vez, assim que os slots carregam.
   const initialTimeUsed = useRef(false);

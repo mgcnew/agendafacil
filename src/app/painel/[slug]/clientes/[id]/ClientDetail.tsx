@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
-import { formatBRL, formatDate, formatTime } from "@/lib/utils";
+import { formatBRL, formatDate, formatTime, waLink } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
   getAnamnesisConfig,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/anamnesis";
 import {
   ArrowLeft, AlertTriangle, User, HeartPulse, History, Loader2,
-  Check, ShieldCheck, Phone, Mail, Calendar, Cake,
+  Check, ShieldCheck, Phone, Mail, Calendar, Cake, MessageCircle, CalendarPlus,
 } from "lucide-react";
 
 type Client = Tables<"clients">;
@@ -29,6 +29,12 @@ type HistoryItem = {
   total_price: number;
   salon_members: { display_name: string | null } | null;
 };
+type ClientStats = {
+  visits: number;
+  totalSpent: number;
+  avgTicket: number;
+  lastVisit: string | null;
+};
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando", confirmed: "Confirmado", in_progress: "Em andamento",
@@ -38,12 +44,13 @@ const STATUS_LABEL: Record<string, string> = {
 type Tab = "dados" | "anamnese" | "historico";
 
 export function ClientDetail({
-  slug, client, anamnesis, history, canManage, niche,
+  slug, client, anamnesis, history, stats, canManage, niche,
 }: {
   slug: string;
   client: Client;
   anamnesis: Anamnesis | null;
   history: HistoryItem[];
+  stats: ClientStats;
   canManage: boolean;
   niche: Niche;
 }) {
@@ -52,20 +59,43 @@ export function ClientDetail({
   const [tab, setTab] = useState<Tab>("dados");
   const [alert, setAlert] = useState<string | null>(client.alert_summary);
 
+  const wa = client.phone ? waLink(client.phone, `Oi ${client.full_name.split(" ")[0]}! Tudo bem? 😊`) : null;
+  const agendarHref = `/painel/${slug}/agenda?novo=1&cliente=${client.id}`;
+
   return (
     <div className="space-y-6">
       <Link href={`/painel/${slug}/clientes`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar para clientes
       </Link>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <span className="grid place-items-center h-14 w-14 rounded-full bg-secondary text-secondary-foreground font-display text-xl font-bold shrink-0">
           {client.full_name.charAt(0)}
         </span>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="font-display text-2xl">{client.full_name}</h1>
           {client.phone && <p className="text-sm text-muted-foreground">{client.phone}</p>}
         </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {wa && (
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
+              <Button variant="outline" className="w-full text-emerald-600 border-emerald-200 hover:bg-emerald-50">
+                <MessageCircle className="h-4 w-4" /> WhatsApp
+              </Button>
+            </a>
+          )}
+          <Link href={agendarHref} className="flex-1 sm:flex-none">
+            <Button className="w-full"><CalendarPlus className="h-4 w-4" /> Agendar</Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Resumo de valor do cliente */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatBox label="Visitas" value={String(stats.visits)} />
+        <StatBox label="Total gasto" value={formatBRL(stats.totalSpent)} />
+        <StatBox label="Ticket médio" value={formatBRL(stats.avgTicket)} />
+        <StatBox label="Última visita" value={stats.lastVisit ? formatDate(stats.lastVisit) : "—"} />
       </div>
 
       {/* Alerta de segurança */}
@@ -368,6 +398,16 @@ function HistoricoTab({ history }: { history: HistoryItem[] }) {
           <span className="font-semibold text-primary text-sm">{formatBRL(Number(a.total_price))}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------------- Resumo (cards) ---------------- */
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-3 text-center">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display font-bold text-foreground truncate">{value}</p>
     </div>
   );
 }

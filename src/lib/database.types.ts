@@ -2160,6 +2160,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      clients_overview: {
+        Args: { p_salon: string }
+        Returns: {
+          client_id: string
+          visits: number
+          total_spent: number
+          last_visit: string
+        }[]
+      }
       effective_price: {
         Args: {
           p_base: number

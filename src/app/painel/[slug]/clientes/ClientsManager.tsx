@@ -4,21 +4,30 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
+import { waLink, formatDate, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight, X,
+  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight, X, MessageCircle,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 
 type Client = Tables<"clients">;
 
+const DAY_MS = 86_400_000;
+/** Dias desde a última visita (null se nunca veio). */
+function daysSince(iso: string | undefined): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
+}
+
 export function ClientsManager({
-  slug, salonId, initial, canManage,
+  slug, salonId, initial, lastVisit, canManage,
 }: {
   slug: string;
   salonId: string;
   initial: Client[];
+  lastVisit: Record<string, string>;
   canManage: boolean;
 }) {
   const supabase = createClient();
@@ -31,11 +40,22 @@ export function ClientsManager({
   const [referral, setReferral] = useState("");
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
+  const [inactiveDays, setInactiveDays] = useState(0); // 0 = sem filtro; 30/60/90
   const [err, setErr] = useState<string | null>(null);
 
-  const filtered = clients.filter((c) =>
-    c.full_name.toLowerCase().includes(q.toLowerCase()) || (c.phone ?? "").includes(q),
-  );
+  const filtered = clients.filter((c) => {
+    const matchesQ =
+      c.full_name.toLowerCase().includes(q.toLowerCase()) || (c.phone ?? "").includes(q);
+    if (!matchesQ) return false;
+    if (inactiveDays > 0) {
+      const d = daysSince(lastVisit[c.id]);
+      // "sumidas" = última visita há mais de X dias (quem nunca veio não entra)
+      if (d === null || d < inactiveDays) return false;
+    }
+    return true;
+  });
+
+  const greeting = (c: Client) => `Oi ${c.full_name.split(" ")[0]}! Tudo bem? 😊`;
 
   async function add() {
     if (!name) return;
@@ -146,6 +166,35 @@ export function ClientsManager({
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou telefone" className="pl-9" />
       </div>
 
+      {/* Reativação: filtrar quem não volta há X dias */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground shrink-0">Sem visita há:</span>
+        {[
+          { d: 0, label: "Todas" },
+          { d: 30, label: "30+ dias" },
+          { d: 60, label: "60+ dias" },
+          { d: 90, label: "90+ dias" },
+        ].map((opt) => (
+          <button
+            key={opt.d}
+            onClick={() => setInactiveDays(opt.d)}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border transition font-medium",
+              inactiveDays === opt.d
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:border-foreground/30 text-foreground",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {inactiveDays > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {filtered.length} cliente{filtered.length === 1 ? "" : "s"} para reativar
+          </span>
+        )}
+      </div>
+
       {filtered.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
           <Contact className="h-8 w-8 mx-auto text-muted-foreground" />
@@ -153,8 +202,10 @@ export function ClientsManager({
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card pr-3 hover:border-foreground/20 transition">
+          {filtered.map((c) => {
+            const days = daysSince(lastVisit[c.id]);
+            return (
+            <div key={c.id} className="flex items-center gap-1 rounded-[var(--radius)] border border-border bg-card pr-2 hover:border-foreground/20 transition">
               <Link href={`/painel/${slug}/clientes/${c.id}`} className="flex items-center gap-4 p-4 flex-1 min-w-0">
                 <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
                   {c.full_name.charAt(0)}
@@ -168,21 +219,39 @@ export function ClientsManager({
                       </span>
                     )}
                   </p>
-                  {c.phone && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> {c.phone}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                    {c.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {c.phone}</span>}
+                    <span>
+                      {days === null
+                        ? "Nunca veio"
+                        : days === 0
+                          ? "Veio hoje"
+                          : `Última visita há ${days} dia${days === 1 ? "" : "s"}`}
+                    </span>
+                  </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
+              {c.phone && (
+                <a
+                  href={waLink(c.phone, greeting(c))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-2 text-emerald-600 hover:text-emerald-700 shrink-0"
+                  title="Chamar no WhatsApp"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </a>
+              )}
               {canManage && (
                 <button onClick={() => remove(c.id)} className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
                   <Trash2 className="h-4 w-4" />
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

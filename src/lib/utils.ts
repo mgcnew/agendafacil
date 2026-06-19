@@ -12,6 +12,18 @@ export function formatBRL(value: number): string {
   }).format(value);
 }
 
+/**
+ * Monta um link do WhatsApp (wa.me) a partir de um telefone BR.
+ * Normaliza para 55 + DDD + número (só dígitos). Sem telefone, abre o WhatsApp
+ * sem destinatário (o usuário escolhe o contato). `text` é opcional.
+ */
+export function waLink(phone: string | null | undefined, text?: string): string {
+  const d = (phone ?? "").replace(/\D/g, "");
+  const num = d ? (d.startsWith("55") ? d : `55${d}`) : "";
+  const q = text ? `?text=${encodeURIComponent(text)}` : "";
+  return num ? `https://wa.me/${num}${q}` : `https://wa.me/${q}`;
+}
+
 /** Formata o preço de um serviço conforme o tipo (exato, a partir de, sob consulta). */
 export function formatServicePrice(price: number, priceType?: string | null): string {
   if (priceType === "on_request") return "Sob consulta";

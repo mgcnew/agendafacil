@@ -15,11 +15,20 @@ export default async function ClientesPage({
   if (!membership) redirect("/painel");
 
   const supabase = await createClient();
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("salon_id", membership.salon_id)
-    .order("full_name");
+  const [{ data: clients }, { data: overview }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("*")
+      .eq("salon_id", membership.salon_id)
+      .order("full_name"),
+    supabase.rpc("clients_overview", { p_salon: membership.salon_id }),
+  ]);
+
+  // Mapa client_id → última visita (ISO) para mostrar/filtrar inativas.
+  const lastVisit: Record<string, string> = {};
+  for (const r of overview ?? []) {
+    if (r.last_visit) lastVisit[r.client_id] = r.last_visit;
+  }
 
   const canManage =
     membership.role === "owner" ||
@@ -31,6 +40,7 @@ export default async function ClientesPage({
       slug={slug}
       salonId={membership.salon_id}
       initial={clients ?? []}
+      lastVisit={lastVisit}
       canManage={canManage}
     />
   );

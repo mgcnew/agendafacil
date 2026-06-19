@@ -26,7 +26,7 @@ export default async function ClientDetailPage({
     .maybeSingle();
   if (!client) notFound();
 
-  const [{ data: anamnesis }, { data: history }] = await Promise.all([
+  const [{ data: anamnesis }, { data: history }, { data: completed }] = await Promise.all([
     supabase.from("client_anamnesis").select("*").eq("client_id", id).maybeSingle(),
     supabase
       .from("appointments")
@@ -34,7 +34,27 @@ export default async function ClientDetailPage({
       .eq("client_id", id)
       .order("starts_at", { ascending: false })
       .limit(50),
+    // Todos os concluídos (só 2 colunas) para o resumo de valor do cliente.
+    supabase
+      .from("appointments")
+      .select("total_price, starts_at")
+      .eq("client_id", id)
+      .eq("salon_id", membership.salon_id)
+      .eq("status", "completed"),
   ]);
+
+  const visits = completed?.length ?? 0;
+  const totalSpent = (completed ?? []).reduce((s, r) => s + Number(r.total_price ?? 0), 0);
+  const lastVisit = (completed ?? []).reduce<string | null>(
+    (acc, r) => (!acc || r.starts_at > acc ? r.starts_at : acc),
+    null,
+  );
+  const stats = {
+    visits,
+    totalSpent,
+    avgTicket: visits > 0 ? totalSpent / visits : 0,
+    lastVisit,
+  };
 
   return (
     <ClientDetail
@@ -42,6 +62,7 @@ export default async function ClientDetailPage({
       client={client}
       anamnesis={anamnesis ?? null}
       history={history ?? []}
+      stats={stats}
       canManage={canManage}
       niche={membership.salons.niche}
     />
