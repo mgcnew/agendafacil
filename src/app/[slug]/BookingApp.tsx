@@ -41,7 +41,7 @@ type Service = {
   category_id: string | null;
 };
 type Category = { id: string; name: string; sort_order: number };
-type Professional = { id: string; display_name: string; color: string | null; bio: string | null };
+type Professional = { id: string; display_name: string; color: string | null; bio: string | null; photo_url: string | null };
 type Appt = {
   id: string;
   salon_name: string;
@@ -473,12 +473,21 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
                 }`}
               >
-                <span
-                  className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
-                  style={{ background: p.color || "var(--primary)" }}
-                >
-                  {p.display_name?.charAt(0) ?? "?"}
-                </span>
+                {p.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={p.photo_url}
+                    alt={p.display_name}
+                    className="h-11 w-11 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <span
+                    className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
+                    style={{ background: p.color || "var(--primary)" }}
+                  >
+                    {p.display_name?.charAt(0) ?? "?"}
+                  </span>
+                )}
                 <div className="flex-1">
                   <p className="font-medium">{p.display_name}</p>
                   {p.bio && <p className="text-xs text-muted-foreground">{p.bio}</p>}

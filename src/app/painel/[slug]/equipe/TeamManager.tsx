@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
-  Loader2, ShieldCheck, X, UserPlus, Settings2, Crown,
+  Loader2, ShieldCheck, X, UserPlus, Crown,
   Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
+  Pencil, Camera,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -27,6 +28,12 @@ const ROLE_LABEL: Record<Role, string> = {
   receptionist: "Recepção",
 };
 const ROLE_OPTIONS: Role[] = ["manager", "professional", "receptionist"];
+
+/** Paleta de cores para o avatar (quando não há foto). */
+const AVATAR_COLORS = [
+  "#8e3b5e", "#db2777", "#7c3aed", "#2563eb",
+  "#0891b2", "#047857", "#b5832a", "#dc2626",
+];
 
 export function TeamManager({
   salonId,
@@ -51,14 +58,13 @@ export function TeamManager({
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [invites, setInvites] = useState<Invite[]>(initialInvites);
   const [counts, setCounts] = useState<Record<string, number>>(serviceCounts);
-  const [editingServices, setEditingServices] = useState<Member | null>(null);
+  const [editing, setEditing] = useState<Member | null>(null);
   const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("professional");
   const [commission, setCommission] = useState("0");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Member | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const canManage = myRole === "owner" || myRole === "manager";
@@ -131,7 +137,7 @@ export function TeamManager({
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Equipe</h1>
-          <p className="text-muted-foreground text-sm">Cargos e permissões de cada pessoa.</p>
+          <p className="text-muted-foreground text-sm">Dados, serviços e permissões de cada pessoa.</p>
         </div>
         {canManage && (
           <Button onClick={() => { setAdding((v) => !v); setErr(null); }}>
@@ -243,12 +249,7 @@ export function TeamManager({
       <div className="space-y-2">
         {members.map((m) => (
           <div key={m.id} className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
-            <span
-              className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
-              style={{ background: m.color || "var(--primary)" }}
-            >
-              {(m.display_name ?? m.profiles?.full_name ?? "?").charAt(0)}
-            </span>
+            <MemberAvatar member={m} />
             <div className="flex-1 min-w-[140px]">
               <p className="font-medium flex items-center gap-1.5">
                 {m.display_name ?? m.profiles?.full_name ?? "—"}
@@ -284,20 +285,9 @@ export function TeamManager({
                   )}
                   {canManage && (
                     <>
-                      <button
-                        onClick={() => setEditingServices(m)}
-                        className="p-2 text-muted-foreground hover:text-primary"
-                        title="Serviços que faz"
-                      >
-                        <Scissors className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setEditing(m)}
-                        className="p-2 text-muted-foreground hover:text-primary"
-                        title="Permissões"
-                      >
-                        <Settings2 className="h-4 w-4" />
-                      </button>
+                      <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
+                        <Pencil className="h-4 w-4" /> Editar
+                      </Button>
                       <button
                         onClick={() => deactivate(m)}
                         className="p-2 text-muted-foreground hover:text-red-600"
@@ -316,28 +306,20 @@ export function TeamManager({
 
       <AnimatePresence>
         {editing && (
-          <PermissionsEditor
-            key="permissions"
+          <MemberEditor
+            key="member-editor"
             member={editing}
+            salonId={salonId}
+            services={services}
             permissions={permissions}
             roleDefaults={roleDefaults}
             onClose={() => setEditing(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {editingServices && (
-          <ServicesEditor
-            key="services"
-            member={editingServices}
-            services={services}
-            salonId={salonId}
-            onClose={() => setEditingServices(null)}
-            onSaved={(count) => {
-              setCounts((c) => ({ ...c, [editingServices.id]: count }));
-              setEditingServices(null);
-            }}
+            onMemberSaved={(patch) =>
+              setMembers((ms) => ms.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
+            }
+            onServicesSaved={(count) =>
+              setCounts((c) => ({ ...c, [editing.id]: count }))
+            }
           />
         )}
       </AnimatePresence>
@@ -345,18 +327,210 @@ export function TeamManager({
   );
 }
 
-// ── Editor de serviços que o profissional faz ────────────────────
-function ServicesEditor({
-  member,
-  services,
-  salonId,
-  onClose,
-  onSaved,
+/* ── Avatar (foto ou cor + inicial) ─────────────────────────────── */
+function MemberAvatar({ member, size = 44 }: { member: Member; size?: number }) {
+  const name = member.display_name ?? member.profiles?.full_name ?? "?";
+  if (member.photo_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={member.photo_url}
+        alt={name}
+        className="rounded-full object-cover shrink-0"
+        style={{ height: size, width: size }}
+      />
+    );
+  }
+  return (
+    <span
+      className="grid place-items-center rounded-full text-white font-semibold shrink-0"
+      style={{ height: size, width: size, background: member.color || "var(--primary)" }}
+    >
+      {name.charAt(0)}
+    </span>
+  );
+}
+
+/* ── Modal único com abas: Dados · Serviços · Permissões ─────────── */
+type Tab = "dados" | "servicos" | "permissoes";
+
+function MemberEditor({
+  member, salonId, services, permissions, roleDefaults,
+  onClose, onMemberSaved, onServicesSaved,
+}: {
+  member: Member;
+  salonId: string;
+  services: Svc[];
+  permissions: Permission[];
+  roleDefaults: RoleDefault[];
+  onClose: () => void;
+  onMemberSaved: (patch: Partial<Member>) => void;
+  onServicesSaved: (count: number) => void;
+}) {
+  const [tab, setTab] = useState<Tab>("dados");
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "dados", label: "Dados" },
+    { id: "servicos", label: "Serviços" },
+    { id: "permissoes", label: "Permissões" },
+  ];
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-lg mx-auto max-h-[88vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3">
+          <h3 className="font-display text-lg font-bold">
+            {member.display_name ?? member.profiles?.full_name ?? "Profissional"}
+          </h3>
+          <button onClick={onClose} className="p-2 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+
+        {/* Abas */}
+        <div className="flex gap-1 px-5 border-b border-border">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-auto p-5">
+          {tab === "dados" && (
+            <DadosPanel member={member} onSaved={onMemberSaved} />
+          )}
+          {tab === "servicos" && (
+            <ServicesPanel member={member} services={services} salonId={salonId} onSaved={onServicesSaved} />
+          )}
+          {tab === "permissoes" && (
+            <PermissionsPanel member={member} permissions={permissions} roleDefaults={roleDefaults} />
+          )}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+/* ── Aba Dados: foto, nome de exibição, bio, cor ────────────────── */
+function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Partial<Member>) => void }) {
+  const supabase = createClient();
+  const [displayName, setDisplayName] = useState(member.display_name ?? "");
+  const [bio, setBio] = useState(member.bio ?? "");
+  const [color, setColor] = useState(member.color ?? AVATAR_COLORS[0]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(member.photo_url);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5_000_000) { setErr("Imagem muito grande (máx. 5MB)."); return; }
+    setUploading(true); setErr(null);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `avatars/${member.id}.${ext}`;
+    const up = await supabase.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) { setErr("Não foi possível enviar a foto. Tente novamente."); setUploading(false); return; }
+    const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
+    // cache-bust para a nova imagem aparecer na hora
+    setPhotoUrl(`${pub.publicUrl}?t=${Date.now()}`);
+    setUploading(false);
+  }
+
+  async function save() {
+    setSaving(true); setErr(null); setOk(false);
+    const patch = {
+      display_name: displayName.trim() || null,
+      bio: bio.trim() || null,
+      color,
+      photo_url: photoUrl,
+    };
+    const { error } = await supabase.from("salon_members").update(patch).eq("id", member.id);
+    setSaving(false);
+    if (error) { setErr("Não foi possível salvar os dados. Tente novamente."); return; }
+    onSaved(patch);
+    setOk(true);
+    setTimeout(() => setOk(false), 1800);
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Foto */}
+      <div className="flex items-center gap-4">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt="Foto" className="h-16 w-16 rounded-full object-cover" />
+        ) : (
+          <span className="grid h-16 w-16 place-items-center rounded-full text-white text-xl font-semibold" style={{ background: color }}>
+            {(displayName || member.profiles?.full_name || "?").charAt(0)}
+          </span>
+        )}
+        <div className="flex flex-col gap-1.5">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm hover:bg-muted">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            {photoUrl ? "Trocar foto" : "Enviar foto"}
+            <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} disabled={uploading} />
+          </label>
+          {photoUrl && (
+            <button onClick={() => setPhotoUrl(null)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5" /> Remover foto
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="dn">Nome de exibição</Label>
+        <Input id="dn" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Como aparece para os clientes" />
+        <p className="text-xs text-muted-foreground">É o nome que o cliente vê no agendamento.</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="bio">Mini-bio</Label>
+        <Textarea id="bio" rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Ex.: Especialista em coloração e cortes femininos" />
+      </div>
+
+      {/* Cor do avatar (usada quando não há foto) */}
+      <div className="space-y-1.5">
+        <Label>Cor do avatar</Label>
+        <div className="flex flex-wrap gap-2">
+          {AVATAR_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className={`h-8 w-8 rounded-full transition ${color === c ? "ring-2 ring-offset-2 ring-foreground" : ""}`}
+              style={{ background: c }}
+              aria-label={c}
+            />
+          ))}
+        </div>
+      </div>
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button onClick={save} disabled={saving || uploading}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar dados
+        </Button>
+        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Aba Serviços ───────────────────────────────────────────────── */
+function ServicesPanel({
+  member, services, salonId, onSaved,
 }: {
   member: Member;
   services: Svc[];
   salonId: string;
-  onClose: () => void;
   onSaved: (count: number) => void;
 }) {
   const supabase = createClient();
@@ -364,6 +538,7 @@ function ServicesEditor({
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
 
   useEffect(() => {
     supabase
@@ -396,14 +571,13 @@ function ServicesEditor({
   async function save() {
     setSaving(true);
     setErr(null);
+    setOk(false);
 
-    // Guarda o estado atual no banco para restaurar se o insert falhar.
     const { data: prevRows } = await supabase
       .from("professional_services")
       .select("salon_id, member_id, service_id, commission_percent")
       .eq("member_id", member.id);
 
-    // estratégia simples: remove tudo e reinsere os marcados
     const { error: delErr } = await supabase.from("professional_services").delete().eq("member_id", member.id);
     if (delErr) { setErr("Não foi possível salvar. Tente novamente."); setSaving(false); return; }
 
@@ -428,84 +602,75 @@ function ServicesEditor({
       }
     }
     setSaving(false);
+    setOk(true);
+    setTimeout(() => setOk(false), 1800);
     onSaved(rows.length);
   }
 
   return (
-    <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <Scissors className="h-5 w-5 text-primary" /> Serviços
-          </h3>
-          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          {member.display_name ?? member.profiles?.full_name} · marque os serviços que faz.
-          A comissão (%) é opcional e tem prioridade sobre a do serviço.
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground flex items-center gap-2">
+        <Scissors className="h-4 w-4 text-primary" />
+        Marque os serviços que essa pessoa faz. A comissão (%) é opcional e tem prioridade sobre a do serviço.
+      </p>
+
+      {!loaded ? (
+        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : services.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          Nenhum serviço cadastrado. Crie serviços primeiro.
         </p>
-
-        {!loaded ? (
-          <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        ) : services.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            Nenhum serviço cadastrado. Crie serviços primeiro.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            {services.map((sv) => {
-              const on = state[sv.id]?.on ?? false;
-              return (
-                <div key={sv.id} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted">
-                  <button
-                    type="button"
-                    onClick={() => toggle(sv.id)}
-                    className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
-                    aria-pressed={on}
-                  >
-                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-                  </button>
-                  <span className="flex-1 text-sm">{sv.name}</span>
-                  {on && (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        value={state[sv.id]?.commission ?? ""}
-                        onChange={(e) => setComm(sv.id, e.target.value)}
-                        placeholder={sv.commission_percent != null ? String(sv.commission_percent) : "%"}
-                        className="w-16 h-8 text-sm text-center"
-                      />
-                      <span className="text-xs text-muted-foreground">%</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
-
-        <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
-          <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
-          </Button>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      ) : (
+        <div className="space-y-1.5">
+          {services.map((sv) => {
+            const on = state[sv.id]?.on ?? false;
+            return (
+              <div key={sv.id} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted">
+                <button
+                  type="button"
+                  onClick={() => toggle(sv.id)}
+                  className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  aria-pressed={on}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <span className="flex-1 text-sm">{sv.name}</span>
+                {on && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={state[sv.id]?.commission ?? ""}
+                      onChange={(e) => setComm(sv.id, e.target.value)}
+                      placeholder={sv.commission_percent != null ? String(sv.commission_percent) : "%"}
+                      className="w-16 h-8 text-sm text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </Card>
-    </MotionModal>
+      )}
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button onClick={save} disabled={saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
+        </Button>
+        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+      </div>
+    </div>
   );
 }
 
-function PermissionsEditor({
-  member,
-  permissions,
-  roleDefaults,
-  onClose,
+/* ── Aba Permissões ─────────────────────────────────────────────── */
+function PermissionsPanel({
+  member, permissions, roleDefaults,
 }: {
   member: Member;
   permissions: Permission[];
   roleDefaults: RoleDefault[];
-  onClose: () => void;
 }) {
   const supabase = createClient();
   const defaults = new Set(
@@ -515,8 +680,8 @@ function PermissionsEditor({
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
 
-  // carrega overrides existentes
   useEffect(() => {
     supabase
       .from("member_permissions")
@@ -535,7 +700,6 @@ function PermissionsEditor({
     if (key in overrides) return overrides[key];
     return defaults.has(key);
   }
-
   function toggle(key: string) {
     setOverrides((o) => ({ ...o, [key]: !isOn(key) }));
   }
@@ -543,7 +707,7 @@ function PermissionsEditor({
   async function save() {
     setSaving(true);
     setErr(null);
-    // grava todos como overrides explícitos (allowed conforme estado atual)
+    setOk(false);
     const rows = permissions.map((p) => ({
       member_id: member.id,
       permission_key: p.key,
@@ -554,7 +718,8 @@ function PermissionsEditor({
       .upsert(rows, { onConflict: "member_id,permission_key" });
     if (error) { setErr("Não foi possível salvar as permissões. Tente novamente."); setSaving(false); return; }
     setSaving(false);
-    onClose();
+    setOk(true);
+    setTimeout(() => setOk(false), 1800);
   }
 
   const grouped = permissions.reduce<Record<string, Permission[]>>((acc, p) => {
@@ -563,58 +728,50 @@ function PermissionsEditor({
   }, {});
 
   return (
-    <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" /> Permissões
-          </h3>
-          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          {member.display_name ?? member.profiles?.full_name} · cargo {ROLE_LABEL[member.role]}
-        </p>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-primary" /> Cargo {ROLE_LABEL[member.role]}
+      </p>
 
-        {!loaded ? (
-          <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        ) : (
-          <div className="space-y-5">
-            {Object.entries(grouped).map(([cat, perms]) => (
-              <div key={cat}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
-                <div className="space-y-1">
-                  {perms.map((p) => {
-                    const on = isOn(p.key);
-                    const isDefault = !(p.key in overrides);
-                    return (
-                      <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
-                        <button
-                          type="button"
-                          onClick={() => toggle(p.key)}
-                          className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
-                        >
-                          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-                        </button>
-                        <span className="flex-1 text-sm">{p.label}</span>
-                        {!isDefault && <span className="text-[10px] text-accent font-medium">personalizado</span>}
-                      </label>
-                    );
-                  })}
-                </div>
+      {!loaded ? (
+        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : (
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([cat, perms]) => (
+            <div key={cat}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
+              <div className="space-y-1">
+                {perms.map((p) => {
+                  const on = isOn(p.key);
+                  const isDefault = !(p.key in overrides);
+                  return (
+                    <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
+                      <button
+                        type="button"
+                        onClick={() => toggle(p.key)}
+                        className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                      >
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                      </button>
+                      <span className="flex-1 text-sm">{p.label}</span>
+                      {!isDefault && <span className="text-[10px] text-accent font-medium">personalizado</span>}
+                    </label>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-
-        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
-
-        <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
-          <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar permissões
-          </Button>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            </div>
+          ))}
         </div>
-      </Card>
-    </MotionModal>
+      )}
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button onClick={save} disabled={saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar permissões
+        </Button>
+        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+      </div>
+    </div>
   );
 }

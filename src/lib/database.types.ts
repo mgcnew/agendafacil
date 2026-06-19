@@ -1373,6 +1373,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_active: boolean
+          photo_url: string | null
           profile_id: string
           role: Database["public"]["Enums"]["member_role"]
           salon_id: string
@@ -1385,6 +1386,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           profile_id: string
           role?: Database["public"]["Enums"]["member_role"]
           salon_id: string
@@ -1397,6 +1399,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           profile_id?: string
           role?: Database["public"]["Enums"]["member_role"]
           salon_id?: string
@@ -2163,6 +2166,7 @@ export type Database = {
           color: string
           display_name: string
           id: string
+          photo_url: string
         }[]
       }
       public_salon: {
