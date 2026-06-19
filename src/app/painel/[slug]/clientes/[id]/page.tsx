@@ -43,6 +43,7 @@ export default async function ClientDetailPage({
       anamnesis={anamnesis ?? null}
       history={history ?? []}
       canManage={canManage}
+      niche={membership.salons.niche}
     />
   );
 }

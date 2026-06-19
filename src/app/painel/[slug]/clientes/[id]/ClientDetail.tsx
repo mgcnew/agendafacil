@@ -8,12 +8,13 @@ import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { formatBRL, formatDate, formatTime } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  HEALTH_CONDITIONS,
+  getAnamnesisConfig,
   anamnesisToForm,
   computeAlertSummary,
   type Anamnesis,
   type AnamnesisForm,
   type ConditionKey,
+  type Niche,
 } from "@/lib/anamnesis";
 import {
   ArrowLeft, AlertTriangle, User, HeartPulse, History, Loader2,
@@ -37,13 +38,14 @@ const STATUS_LABEL: Record<string, string> = {
 type Tab = "dados" | "anamnese" | "historico";
 
 export function ClientDetail({
-  slug, client, anamnesis, history, canManage,
+  slug, client, anamnesis, history, canManage, niche,
 }: {
   slug: string;
   client: Client;
   anamnesis: Anamnesis | null;
   history: HistoryItem[];
   canManage: boolean;
+  niche: Niche;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -105,6 +107,7 @@ export function ClientDetail({
           client={client}
           anamnesis={anamnesis}
           canManage={canManage}
+          niche={niche}
           onAlertChange={setAlert}
           onSaved={() => router.refresh()}
         />
@@ -193,15 +196,17 @@ function DadosTab({
 
 /* ---------------- Anamnese ---------------- */
 function AnamneseTab({
-  supabase, client, anamnesis, canManage, onAlertChange, onSaved,
+  supabase, client, anamnesis, canManage, niche, onAlertChange, onSaved,
 }: {
   supabase: ReturnType<typeof createClient>;
   client: Client;
   anamnesis: Anamnesis | null;
   canManage: boolean;
+  niche: Niche;
   onAlertChange: (s: string | null) => void;
   onSaved: () => void;
 }) {
+  const cfg = getAnamnesisConfig(niche);
   const [form, setForm] = useState<AnamnesisForm>(anamnesisToForm(anamnesis));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -258,7 +263,7 @@ function AnamneseTab({
         <h3 className="font-display font-semibold flex items-center gap-2"><HeartPulse className="h-5 w-5 text-primary" /> Condições de saúde</h3>
         <p className="text-xs text-muted-foreground mt-1">Marque o que se aplica. Itens críticos geram alerta automático.</p>
         <div className="grid sm:grid-cols-2 gap-2 mt-4">
-          {HEALTH_CONDITIONS.map((c) => {
+          {cfg.conditions.map((c) => {
             const on = form[c.key as ConditionKey];
             return (
               <button
@@ -282,22 +287,16 @@ function AnamneseTab({
 
       {/* Textos */}
       <Card className="p-6 space-y-4">
-        {[
-          ["allergies", "Alergias e sensibilidades", "Amônia, henna, látex, esmalte, anestésico, níquel..."],
-          ["medications", "Medicamentos em uso", "Ex.: anticoagulante, isotretinoína (Roacutan)..."],
-          ["recent_procedures", "Procedimentos / cirurgias recentes", "Botox, preenchimento, peeling, cirurgia..."],
-          ["skin_hair_notes", "Histórico de pele / cabelo / unhas", "Química recente, dermatite, lesão ativa, micose..."],
-          ["general_notes", "Outras observações de saúde", ""],
-        ].map(([key, label, ph]) => (
+        {cfg.textFields.map(({ key, label, placeholder }) => (
           <div key={key} className="space-y-1.5">
             <Label htmlFor={key}>{label}</Label>
             <Textarea
               id={key}
               rows={2}
-              value={form[key as keyof AnamnesisForm] as string}
-              onChange={(e) => setField(key as keyof AnamnesisForm, e.target.value as never)}
+              value={form[key] as string}
+              onChange={(e) => setField(key, e.target.value)}
               disabled={!canManage}
-              placeholder={ph}
+              placeholder={placeholder}
             />
           </div>
         ))}

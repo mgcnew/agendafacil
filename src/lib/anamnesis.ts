@@ -1,6 +1,7 @@
-import type { Tables } from "@/lib/database.types";
+import type { Tables, Enums } from "@/lib/database.types";
 
 export type Anamnesis = Tables<"client_anamnesis">;
+export type Niche = Enums<"salon_niche">;
 
 /** Condições de saúde marcáveis. `critical` entra no alerta de segurança. */
 export const HEALTH_CONDITIONS = [
@@ -63,6 +64,66 @@ export function computeAlertSummary(f: AnamnesisForm): string | null {
   }
   if (f.allergies.trim()) parts.push("Alergias");
   return parts.length ? parts.join(" · ") : null;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Ficha por nicho. As COLUNAS do banco são as mesmas; o que muda é quais
+ * condições mostrar e os rótulos/exemplos dos campos de texto. Assim a
+ * barbearia tem uma ficha própria (pele/barba, cortes de navalha) sem migração.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export type ConditionDef = { key: ConditionKey; label: string; critical: boolean };
+export type TextFieldKey =
+  | "allergies" | "medications" | "recent_procedures" | "skin_hair_notes" | "general_notes";
+export type TextFieldDef = { key: TextFieldKey; label: string; placeholder: string };
+export type AnamnesisConfig = {
+  conditions: ConditionDef[];
+  textFields: TextFieldDef[];
+};
+
+const BY_KEY: Record<ConditionKey, ConditionDef> = Object.fromEntries(
+  HEALTH_CONDITIONS.map((c) => [c.key, { key: c.key, label: c.label, critical: c.critical }]),
+) as Record<ConditionKey, ConditionDef>;
+
+const pick = (keys: ConditionKey[]): ConditionDef[] => keys.map((k) => BY_KEY[k]);
+
+// Salão/estética/neutro: ficha completa (foco em química, pele, unhas).
+const DEFAULT_TEXT: TextFieldDef[] = [
+  { key: "allergies", label: "Alergias e sensibilidades", placeholder: "Amônia, henna, látex, esmalte, anestésico, níquel..." },
+  { key: "medications", label: "Medicamentos em uso", placeholder: "Ex.: anticoagulante, isotretinoína (Roacutan)..." },
+  { key: "recent_procedures", label: "Procedimentos / cirurgias recentes", placeholder: "Botox, preenchimento, peeling, cirurgia..." },
+  { key: "skin_hair_notes", label: "Histórico de pele / cabelo / unhas", placeholder: "Química recente, dermatite, lesão ativa, micose..." },
+  { key: "general_notes", label: "Outras observações de saúde", placeholder: "" },
+];
+
+// Barbearia: foco em pele e barba e em cortes de navalha (sangramento/cicatrização).
+const BARBER_TEXT: TextFieldDef[] = [
+  { key: "allergies", label: "Alergias e sensibilidades", placeholder: "Lâmina/navalha, produtos, perfume, níquel, propilenoglicol..." },
+  { key: "medications", label: "Medicamentos em uso", placeholder: "Ex.: anticoagulante, isotretinoína (Roacutan)..." },
+  { key: "skin_hair_notes", label: "Pele e barba", placeholder: "Pelos encravados, foliculite, dermatite, acne, sensibilidade, lesão ativa..." },
+  { key: "recent_procedures", label: "Procedimentos recentes na pele/barba", placeholder: "Laser, tatuagem recente, cicatriz, peeling..." },
+  { key: "general_notes", label: "Outras observações", placeholder: "" },
+];
+
+const BARBER_CONDITIONS: ConditionKey[] = [
+  "has_diabetes",          // cicatrização/infecção em cortes
+  "has_coagulation_issue", // sangramento na navalha
+  "has_hypertension",
+  "has_heart_condition",
+  "has_epilepsy",
+  "has_thyroid",
+  "has_cancer_treatment",
+];
+
+/** Configuração da ficha conforme o nicho do salão. */
+export function getAnamnesisConfig(niche: Niche): AnamnesisConfig {
+  if (niche === "barbearia") {
+    return { conditions: pick(BARBER_CONDITIONS), textFields: BARBER_TEXT };
+  }
+  return {
+    conditions: HEALTH_CONDITIONS.map((c) => ({ key: c.key, label: c.label, critical: c.critical })),
+    textFields: DEFAULT_TEXT,
+  };
 }
 
 export function anamnesisToForm(a: Anamnesis | null): AnamnesisForm {
