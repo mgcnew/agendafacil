@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug } from "@/lib/salon";
+import { getAccessStatus } from "@/lib/subscription";
+import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { TeamManager } from "./TeamManager";
 
@@ -13,6 +15,10 @@ export default async function EquipePage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // Aba Finanças (comissões) é conceito do Caixa & Comissões → só Pro/Max.
+  const access = await getAccessStatus(slug);
+  const canSeeFinance = planAllowsHref(access?.effective_plan ?? null, "/financeiro");
 
   const supabase = await createClient();
   const [{ data: members }, { data: permissions }, { data: roleDefaults }, { data: invites }, { data: services }, { data: profSvc }] =
@@ -57,6 +63,7 @@ export default async function EquipePage({
       invites={invites ?? []}
       services={services ?? []}
       serviceCounts={serviceCounts}
+      canSeeFinance={canSeeFinance}
     />
   );
 }

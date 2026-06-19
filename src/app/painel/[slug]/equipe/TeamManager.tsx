@@ -46,6 +46,7 @@ export function TeamManager({
   invites: initialInvites,
   services,
   serviceCounts,
+  canSeeFinance,
 }: {
   salonId: string;
   myRole: Role;
@@ -55,6 +56,7 @@ export function TeamManager({
   invites: Invite[];
   services: Svc[];
   serviceCounts: Record<string, number>;
+  canSeeFinance: boolean;
 }) {
   const supabase = createClient();
   const [members, setMembers] = useState<Member[]>(initialMembers);
@@ -315,6 +317,7 @@ export function TeamManager({
             services={services}
             permissions={permissions}
             roleDefaults={roleDefaults}
+            canSeeFinance={canSeeFinance}
             onClose={() => setEditing(null)}
             onMemberSaved={(patch) =>
               setMembers((ms) => ms.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
@@ -357,7 +360,7 @@ function MemberAvatar({ member, size = 44 }: { member: Member; size?: number }) 
 type Tab = "dados" | "servicos" | "financas" | "permissoes";
 
 function MemberEditor({
-  member, salonId, services, permissions, roleDefaults,
+  member, salonId, services, permissions, roleDefaults, canSeeFinance,
   onClose, onMemberSaved, onServicesSaved,
 }: {
   member: Member;
@@ -365,6 +368,7 @@ function MemberEditor({
   services: Svc[];
   permissions: Permission[];
   roleDefaults: RoleDefault[];
+  canSeeFinance: boolean;
   onClose: () => void;
   onMemberSaved: (patch: Partial<Member>) => void;
   onServicesSaved: (count: number) => void;
@@ -373,7 +377,7 @@ function MemberEditor({
   const tabs: { id: Tab; label: string }[] = [
     { id: "dados", label: "Dados" },
     { id: "servicos", label: "Serviços" },
-    { id: "financas", label: "Finanças" },
+    ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças" }] : []),
     { id: "permissoes", label: "Permissões" },
   ];
 

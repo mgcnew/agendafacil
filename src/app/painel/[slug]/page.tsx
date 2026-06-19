@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
+import { getAccessStatus } from "@/lib/subscription";
+import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
-import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
+import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight } from "lucide-react";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { BirthdayCard, type BirthdayClient } from "./BirthdayCard";
@@ -96,6 +98,47 @@ export default async function DashboardPage({
   const fullName = (profile?.full_name ?? membership.display_name ?? "").trim();
   const firstName = fullName ? fullName.split(" ")[0] : "";
 
+  // ── Minhas comissões (profissional/gerente, só Pro/Max) ──────────
+  const access = await getAccessStatus(slug);
+  const earnsCommission = membership.role === "professional" || membership.role === "manager";
+  const showMyComm = earnsCommission && planAllowsHref(access?.effective_plan ?? null, "/financeiro");
+
+  let myComm: { earned: number; paid: number; toReceive: number; monthLabel: string } | null = null;
+  if (showMyComm) {
+    const ym = currentMonthBR();
+    const { start, end } = monthRangeBR(ym);
+    const periodStartStr = `${ym}-01`;
+    const [svc, red, pays] = await Promise.all([
+      supabase
+        .from("appointment_services")
+        .select("commission_amount, appointments!inner(member_id, status, starts_at)")
+        .eq("salon_id", salonId)
+        .eq("appointments.member_id", membership.id)
+        .eq("appointments.status", "completed")
+        .gte("appointments.starts_at", start)
+        .lte("appointments.starts_at", end),
+      supabase
+        .from("package_redemptions")
+        .select("commission_amount")
+        .eq("salon_id", salonId)
+        .eq("member_id", membership.id)
+        .gte("used_at", start)
+        .lte("used_at", end),
+      supabase
+        .from("commission_payments")
+        .select("amount")
+        .eq("salon_id", salonId)
+        .eq("member_id", membership.id)
+        .eq("period_start", periodStartStr),
+    ]);
+    const earned =
+      (svc.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0) +
+      (red.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+    const paid = (pays.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+    const monthLabel = new Date(`${ym}-01T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    myComm = { earned, paid, toReceive: Math.max(0, earned - paid), monthLabel };
+  }
+
   const appts = todayAppts ?? [];
   const revenue = appts
     .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
@@ -164,6 +207,22 @@ export default async function DashboardPage({
 
       {/* Aniversários da semana */}
       <BirthdayCard clients={birthdays} salonName={membership.salons.name} slug={slug} />
+
+      {/* Minhas comissões (profissional/gerente) */}
+      {myComm && (
+        <div className="rounded-[var(--radius)] border border-primary/30 bg-primary/5 p-5">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <Wallet className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
+            <span className="capitalize text-muted-foreground">{myComm.monthLabel}</span>
+          </p>
+          <p className="font-display text-3xl font-bold text-primary mt-2">{formatBRL(myComm.toReceive)}</p>
+          <p className="text-xs text-muted-foreground">a receber este mês</p>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            <span>Apurado: <b className="text-foreground">{formatBRL(myComm.earned)}</b></span>
+            <span>Já pago: <b className="text-foreground">{formatBRL(myComm.paid)}</b></span>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
