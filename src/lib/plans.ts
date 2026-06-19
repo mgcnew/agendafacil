@@ -45,12 +45,22 @@ export const PRO_ONLY_HREFS = [
   "/estoque",
 ] as const;
 
-/** O plano efetivo libera a rota? Básico só acessa o que não é PRO_ONLY. */
+/**
+ * Rotas exclusivas do Max (bloqueadas no Básico e no Pro).
+ * TODO(lançamento Divulgação): mover "/marketing" para cá quando a IA estiver
+ * ligada. Por ora a página fica acessível a todos os planos para desenvolvimento.
+ */
+export const MAX_ONLY_HREFS = [] as const;
+
+/** O plano efetivo libera a rota? Básico só acessa o que não é PRO/MAX-only. */
 export function planAllowsHref(
   effectivePlan: PlanId | null,
   href: string,
 ): boolean {
   if (!effectivePlan) return false;
+  if (MAX_ONLY_HREFS.includes(href as (typeof MAX_ONLY_HREFS)[number])) {
+    return effectivePlan === "max";
+  }
   if (!PRO_ONLY_HREFS.includes(href as (typeof PRO_ONLY_HREFS)[number])) {
     return true;
   }

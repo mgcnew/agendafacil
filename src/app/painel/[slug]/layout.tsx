@@ -12,6 +12,7 @@ const NAV: { item: NavItem; perms?: string[] }[] = [
   { item: { href: "/agenda", label: "Agenda", icon: "CalendarDays" } },
   { item: { href: "/servicos", label: "Serviços", icon: "Sparkles" }, perms: ["services.manage"] },
   { item: { href: "/campanhas", label: "Campanhas", icon: "BadgePercent" }, perms: ["services.manage"] },
+  { item: { href: "/marketing", label: "Divulgação", icon: "Megaphone" }, perms: ["services.manage"] },
   { item: { href: "/equipe", label: "Equipe", icon: "UserRoundCog" }, perms: ["team.manage"] },
   { item: { href: "/clientes", label: "Clientes", icon: "UsersRound" }, perms: ["clients.view"] },
   { item: { href: "/pacotes", label: "Pacotes", icon: "Package" }, perms: ["packages.view"] },

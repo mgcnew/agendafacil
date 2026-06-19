@@ -20,6 +20,7 @@ import {
   BadgePercent,
   BarChart3,
   CreditCard,
+  Megaphone,
   Ellipsis,
   X,
   LogOut,
@@ -44,6 +45,7 @@ const ICONS = {
   BadgePercent,
   BarChart3,
   CreditCard,
+  Megaphone,
 } as const;
 
 export type NavItem = {
