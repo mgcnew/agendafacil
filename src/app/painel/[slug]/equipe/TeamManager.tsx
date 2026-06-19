@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
+import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
@@ -401,7 +402,7 @@ function MemberEditor({
 
         <div className="flex-1 overflow-auto p-5">
           {tab === "dados" && (
-            <DadosPanel member={member} onSaved={onMemberSaved} />
+            <DadosPanel member={member} salonId={salonId} onSaved={onMemberSaved} />
           )}
           {tab === "servicos" && (
             <ServicesPanel member={member} services={services} salonId={salonId} onSaved={onServicesSaved} />
@@ -416,7 +417,7 @@ function MemberEditor({
 }
 
 /* ── Aba Dados: foto, nome de exibição, bio, cor ────────────────── */
-function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Partial<Member>) => void }) {
+function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: string; onSaved: (patch: Partial<Member>) => void }) {
   const supabase = createClient();
   const [displayName, setDisplayName] = useState(member.display_name ?? "");
   const [bio, setBio] = useState(member.bio ?? "");
@@ -432,26 +433,34 @@ function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Part
     if (!file) return;
     setUploading(true); setErr(null);
     try {
-      // Comprime/redimensiona no navegador: fotos de celular (grandes) viram
-      // um JPEG pequeno (~512px), evitando limites e deixando o carregamento rápido.
+      // 1) Comprime/redimensiona no navegador (fotos grandes de celular → ~512px JPEG).
       const blob = await compressImage(file);
-      const path = `avatars/${member.id}.jpg`;
-      const up = await supabase.storage
-        .from("logos")
-        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
-      if (up.error) {
-        setErr(`Não foi possível enviar a foto: ${up.error.message}`);
+      // 2) Sobe pelo servidor (admin client) — o upload direto do navegador é
+      //    barrado pela RLS do Storage. A action grava photo_url no banco.
+      const form = new FormData();
+      form.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+      const res = await uploadMemberPhoto(salonId, member.id, form);
+      if ("error" in res) {
+        setErr(`Não foi possível enviar a foto: ${res.error}`);
         return;
       }
-      const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
-      // cache-bust para a nova imagem aparecer na hora
-      setPhotoUrl(`${pub.publicUrl}?t=${Date.now()}`);
+      setPhotoUrl(res.url);
+      onSaved({ photo_url: res.url });
     } catch {
       setErr("Não consegui processar essa imagem. Tente uma foto JPG ou PNG.");
     } finally {
       setUploading(false);
       e.target.value = ""; // permite reenviar o mesmo arquivo
     }
+  }
+
+  async function removePhoto() {
+    setUploading(true); setErr(null);
+    const res = await removeMemberPhoto(salonId, member.id);
+    setUploading(false);
+    if ("error" in res) { setErr(res.error); return; }
+    setPhotoUrl(null);
+    onSaved({ photo_url: null });
   }
 
   async function save() {
@@ -489,7 +498,7 @@ function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Part
             <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} disabled={uploading} />
           </label>
           {photoUrl && (
-            <button onClick={() => setPhotoUrl(null)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600">
+            <button onClick={removePhoto} disabled={uploading} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 disabled:opacity-50">
               <Trash2 className="h-3.5 w-3.5" /> Remover foto
             </button>
           )}
