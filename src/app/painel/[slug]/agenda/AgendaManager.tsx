@@ -14,7 +14,7 @@ import type { Enums } from "@/lib/database.types";
 import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
 import {
   Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X,
-  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors,
+  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors, MessageCircle, Lock,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -146,6 +146,19 @@ function fmtDate(iso: string) {
   const d = new Date(iso);
   return `${DAY_SHORT[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]}`;
 }
+/** Normaliza telefone BR para o formato do wa.me (55 + DDD + número, só dígitos). */
+function waPhone(raw: string | null | undefined) {
+  const d = (raw ?? "").replace(/\D/g, "");
+  if (!d) return "";
+  return d.startsWith("55") ? d : `55${d}`;
+}
+/** Converte posição Y (px) dentro da grade em horário "HH:mm", arredondando a 30 min. */
+function yToTime(y: number, hourStart: number) {
+  const totalMin = (y / CELL_H + hourStart) * 60;
+  const rounded = Math.round(totalMin / 30) * 30;
+  const clamped = Math.max(0, Math.min(23 * 60 + 30, rounded));
+  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
+}
 function inCurrentMonth(s: string, y: number, m: number) {
   const d = parse(s); return d.getFullYear() === y && d.getMonth() === m;
 }
@@ -257,6 +270,21 @@ function ApptDetailModal({
 
   const clientInitial = (appt.clients?.full_name ?? "?").charAt(0).toUpperCase();
   const isFinished    = appt.status === "completed" || appt.status === "cancelled" || appt.status === "no_show";
+  const phone         = waPhone(appt.clients?.phone);
+
+  /** Abre o WhatsApp do cliente com a confirmação do horário pronta. */
+  function remindWhatsApp() {
+    const first = (appt.clients?.full_name ?? "").split(" ")[0];
+    const svcNames = (services ?? []).map((s) => s.name).join(", ");
+    const msg =
+      `Oi${first ? ` ${first}` : ""}! Passando para confirmar seu horário ` +
+      `${fmtDate(appt.starts_at)} às ${fmtHM(appt.starts_at)}` +
+      `${svcNames ? ` — ${svcNames}` : ""}. Está confirmado? 💇`;
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener");
+  }
 
   return (
     <MotionModal onClose={onClose}>
@@ -376,9 +404,16 @@ function ApptDetailModal({
             </div>
 
             {!isFinished && (
-              <Button onClick={onFinalize} className="w-full">
-                <Scissors className="h-4 w-4" /> Finalizar atendimento
-              </Button>
+              <div className="grid grid-cols-1 gap-2">
+                {appt.clients?.phone && (
+                  <Button variant="outline" onClick={remindWhatsApp} className="w-full">
+                    <MessageCircle className="h-4 w-4" /> Lembrar pelo WhatsApp
+                  </Button>
+                )}
+                <Button onClick={onFinalize} className="w-full">
+                  <Scissors className="h-4 w-4" /> Finalizar atendimento
+                </Button>
+              </div>
             )}
           </div>
 
@@ -501,9 +536,10 @@ function ApptDetailModal({
 // ── Day View ───────────────────────────────────────────────────
 const COL_W_DAY = 160;
 
-function DayView({ date, appts, pros, activePros, onApptClick }: {
+function DayView({ date, appts, pros, activePros, onApptClick, onSlotClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onApptClick: (a: Appt) => void;
+  onSlotClick: (date: string, proId: string, time: string) => void;
 }) {
   const cols = activePros.length > 0 ? activePros : pros;
   const bounds  = hourBounds(appts);
@@ -554,8 +590,13 @@ function DayView({ date, appts, pros, activePros, onApptClick }: {
             const proAppts = appts.filter(a => a.member_id === p.id);
             return (
               <div key={p.id}
-                className="relative border-l border-border"
+                className="relative border-l border-border cursor-pointer"
                 style={{ height: totalH, minWidth: COL_W_DAY, flex: 1 }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  onSlotClick(date, p.id, yToTime(e.clientY - rect.top, bounds.start));
+                }}
+                title="Clique para agendar neste horário"
               >
                 {hours.map(h => (
                   <Fragment key={h}>
@@ -575,7 +616,8 @@ function DayView({ date, appts, pros, activePros, onApptClick }: {
                   const top = apptTop(a, bounds.start);
                   const h   = apptH(a);
                   return (
-                    <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}>
+                    <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}
+                      onClick={(e) => e.stopPropagation()}>
                       <ApptCard a={a} color={color} onOpen={() => onApptClick(a)} />
                     </div>
                   );
@@ -586,6 +628,74 @@ function DayView({ date, appts, pros, activePros, onApptClick }: {
         </div>
 
         {isEmpty && <EmptyDay />}
+      </div>
+    </div>
+  );
+}
+
+// ── Mobile: lista cronológica do dia (mais confortável que a grade) ──
+function AgendaList({ date, appts, pros, activePros, onApptClick, onNewAppt }: {
+  date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
+  onApptClick: (a: Appt) => void;
+  onNewAppt: (date: string) => void;
+}) {
+  const visible = (activePros.length > 0
+    ? appts.filter(a => activePros.some(p => p.id === a.member_id))
+    : appts
+  ).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto scroll-thin">
+        {visible.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center px-6 py-16">
+            <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
+            <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
+              <Plus className="h-4 w-4" /> Novo agendamento
+            </Button>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {visible.map(a => {
+              const color = getColor(pros, a.member_id);
+              const st = STATUS_META[a.status];
+              return (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => onApptClick(a)}
+                    className="w-full flex items-center gap-3 px-3.5 py-3 text-left hover:bg-muted/50 transition"
+                  >
+                    {/* Faixa de horário */}
+                    <div className="shrink-0 text-center w-14">
+                      <p className="text-sm font-semibold leading-tight">{fmtHM(a.starts_at)}</p>
+                      {a.ends_at && <p className="text-[11px] text-muted-foreground">{fmtHM(a.ends_at)}</p>}
+                    </div>
+                    {/* Barra colorida do profissional */}
+                    <span className="h-9 w-1 rounded-full shrink-0" style={{ background: color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate flex items-center gap-1">
+                        {a.clients?.alert_summary && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                        {a.clients?.full_name ?? "Cliente"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {a.salon_members?.display_name ?? "—"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold">{formatBRL(Number(a.total_price))}</p>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.dot }} />
+                        {st.label}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -604,10 +714,11 @@ function EmptyDay() {
 // ── Week View ──────────────────────────────────────────────────
 const COL_W_WEEK = 90;
 
-function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick }: {
+function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick, onSlotClick }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onApptClick: (a: Appt) => void;
   onDayClick: (d: string) => void;
+  onSlotClick: (date: string, time: string) => void;
 }) {
   const days     = getWeekDays(date);
   const now      = new Date();
@@ -672,8 +783,13 @@ function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick }: {
 
             return (
               <div key={day}
-                className={cn("relative border-l border-border", isT && "bg-primary/[0.03]")}
+                className={cn("relative border-l border-border cursor-pointer", isT && "bg-primary/[0.03]")}
                 style={{ height: totalH, minWidth: COL_W_WEEK, flex: 1 }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  onSlotClick(day, yToTime(e.clientY - rect.top, bounds.start));
+                }}
+                title="Clique para agendar neste horário"
               >
                 {hours.map(h => (
                   <Fragment key={h}>
@@ -694,7 +810,8 @@ function WeekView({ date, appts, pros, activePros, onApptClick, onDayClick }: {
                   const top   = apptTop(a, bounds.start);
                   const h     = apptH(a);
                   return (
-                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}>
+                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}
+                      onClick={(e) => e.stopPropagation()}>
                       <ApptCard a={a} color={color} compact={h < 40}
                         onOpen={() => onApptClick(a)} />
                     </div>
@@ -829,19 +946,28 @@ export function AgendaManager({
   const [loading, setLoading]       = useState(true);
   const [creating, setCreating]     = useState(false);
   const [createDate, setCreateDate] = useState(date);
+  const [createPro, setCreatePro]   = useState<string | undefined>(undefined);
+  const [createTime, setCreateTime] = useState<string | undefined>(undefined);
   const [detailAppt, setDetailAppt] = useState<Appt | null>(null);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
+
+  /** Abre o modal de criação, opcionalmente já com profissional e horário. */
+  const openCreate = useCallback((d: string, pro?: string, time?: string) => {
+    setCreateDate(d);
+    setCreatePro(pro);
+    setCreateTime(time);
+    setCreating(true);
+  }, []);
 
   const openedFromUrl = useRef(false);
   useEffect(() => {
     if (openedFromUrl.current) return;
     if (searchParams.get("novo") === "1") {
       openedFromUrl.current = true;
-      setCreateDate(toStr(new Date()));
-      setCreating(true);
+      openCreate(toStr(new Date()));
       router.replace(pathname, { scroll: false });
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, router, pathname, openCreate]);
 
   const activePros = useMemo(
     () => (selectedPros.length === 0 ? [] : pros.filter(p => selectedPros.includes(p.id))),
@@ -986,7 +1112,7 @@ export function AgendaManager({
             </button>
           </div>
 
-          <Button onClick={() => { setCreateDate(date); setCreating(true); }}>
+          <Button onClick={() => openCreate(date)}>
             <Plus className="h-4 w-4" /> Novo agendamento
           </Button>
         </div>
@@ -1038,7 +1164,7 @@ export function AgendaManager({
           <MonthView
             date={date} appts={appts} pros={pros} activePros={activePros}
             onDayClick={d => { setDate(d); setView("dia"); }}
-            onNewAppt={d => { setCreateDate(d); setCreating(true); }}
+            onNewAppt={d => openCreate(d)}
             onApptClick={a => setDetailAppt(a)}
           />
         ) : view === "semana" ? (
@@ -1046,12 +1172,26 @@ export function AgendaManager({
             date={date} appts={appts} pros={pros} activePros={activePros}
             onApptClick={a => setDetailAppt(a)}
             onDayClick={d => { setDate(d); setView("dia"); }}
+            onSlotClick={(d, time) => openCreate(d, undefined, time)}
           />
         ) : (
-          <DayView
-            date={date} appts={appts} pros={pros} activePros={activePros}
-            onApptClick={a => setDetailAppt(a)}
-          />
+          <>
+            {/* Mobile: lista cronológica · Desktop: grade por profissional */}
+            <div className="sm:hidden h-full">
+              <AgendaList
+                date={date} appts={appts} pros={pros} activePros={activePros}
+                onApptClick={a => setDetailAppt(a)}
+                onNewAppt={d => openCreate(d)}
+              />
+            </div>
+            <div className="hidden sm:block h-full">
+              <DayView
+                date={date} appts={appts} pros={pros} activePros={activePros}
+                onApptClick={a => setDetailAppt(a)}
+                onSlotClick={(d, proId, time) => openCreate(d, proId, time)}
+              />
+            </div>
+          </>
         )}
       </div>
 
@@ -1079,6 +1219,8 @@ export function AgendaManager({
             salonId={salonId} pros={pros} services={services} clients={initialClients}
             discounts={discounts}
             date={createDate}
+            initialPro={createPro}
+            initialTime={createTime}
             onClose={() => setCreating(false)}
             onCreated={() => { setCreating(false); load(); }}
           />
@@ -1208,17 +1350,20 @@ function FinalizeModal({
 
 // ── Create Appointment Modal ───────────────────────────────────
 function CreateAppointment({
-  salonId, pros, services, clients, discounts, date: initialDate, onClose, onCreated,
+  salonId, pros, services, clients, discounts, date: initialDate, initialPro, initialTime, onClose, onCreated,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts: Record<string, number>;
-  date: string; onClose: () => void; onCreated: () => void;
+  date: string; initialPro?: string; initialTime?: string;
+  onClose: () => void; onCreated: () => void;
 }) {
   const supabase = createClient();
   const [clientName, setClientName]     = useState("");
   const [clientPhone, setClientPhone]   = useState("");
   const [existingClient, setExisting]   = useState("");
-  const [proId, setProId]               = useState(pros[0]?.id ?? "");
+  const [proId, setProId]               = useState(initialPro ?? pros[0]?.id ?? "");
+  // Aplica o horário clicado na grade só uma vez, assim que os slots carregam.
+  const initialTimeUsed = useRef(false);
   const [selected, setSelected]         = useState<string[]>([]);
   const [date, setDate]                 = useState(initialDate);
   const [showCal, setShowCal]           = useState(false);
@@ -1252,7 +1397,16 @@ function CreateAppointment({
         if (cancelled) return;
         const list = (data as string[]) ?? [];
         setSlots(list);
-        setSlot(cur => (list.includes(cur) ? cur : ""));
+        setSlot(cur => {
+          if (list.includes(cur)) return cur;
+          // primeira carga: tenta casar com o horário clicado na grade
+          if (!initialTimeUsed.current && initialTime) {
+            initialTimeUsed.current = true;
+            const match = list.find(s => slotLabel(s) === initialTime);
+            if (match) return match;
+          }
+          return "";
+        });
         setLoadingSlots(false);
       });
     return () => { cancelled = true; };

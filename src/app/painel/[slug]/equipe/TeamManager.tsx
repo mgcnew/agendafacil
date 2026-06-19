@@ -184,7 +184,7 @@ export function TeamManager({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="commission">Comissão (%)</Label>
+                  <Label htmlFor="commission">Comissão geral (%)</Label>
                   <Input
                     id="commission"
                     type="number"
@@ -198,7 +198,9 @@ export function TeamManager({
               </div>
               <p className="text-xs text-muted-foreground mt-3">
                 A pessoa recebe um link, cria a conta e preenche os próprios dados.
-                Comissão e horários ficam sob seu controle.
+                A <b>comissão geral</b> vale para todos os atendimentos dela; depois, se quiser, você
+                pode definir uma comissão diferente por serviço na aba <b>Serviços</b>. Horários e
+                comissão ficam sob seu controle.
               </p>
               {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
               <div className="flex gap-2 mt-5">
@@ -1231,10 +1233,17 @@ function ServicesPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground flex items-center gap-2">
-        <Scissors className="h-4 w-4 text-primary" />
-        Marque os serviços que essa pessoa faz. A comissão (%) é opcional e tem prioridade sobre a do serviço.
-      </p>
+      <div className="text-sm text-muted-foreground space-y-2">
+        <p className="flex items-center gap-2">
+          <Scissors className="h-4 w-4 text-primary shrink-0" />
+          Marque os serviços que essa pessoa faz — assim ela aparece na agenda só nesses serviços.
+        </p>
+        <p className="rounded-[var(--radius)] bg-muted/60 px-3 py-2 text-xs">
+          O campo de <b>%</b> é uma comissão <b>só para aquele serviço</b> (exceção). Deixe em
+          branco para usar a comissão padrão — primeiro a do serviço, depois a comissão geral do
+          profissional.
+        </p>
+      </div>
 
       {!loaded ? (
         <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
