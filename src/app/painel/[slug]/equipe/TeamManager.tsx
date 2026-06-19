@@ -430,16 +430,28 @@ function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Part
   async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5_000_000) { setErr("Imagem muito grande (máx. 5MB)."); return; }
     setUploading(true); setErr(null);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `avatars/${member.id}.${ext}`;
-    const up = await supabase.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type });
-    if (up.error) { setErr("Não foi possível enviar a foto. Tente novamente."); setUploading(false); return; }
-    const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
-    // cache-bust para a nova imagem aparecer na hora
-    setPhotoUrl(`${pub.publicUrl}?t=${Date.now()}`);
-    setUploading(false);
+    try {
+      // Comprime/redimensiona no navegador: fotos de celular (grandes) viram
+      // um JPEG pequeno (~512px), evitando limites e deixando o carregamento rápido.
+      const blob = await compressImage(file);
+      const path = `avatars/${member.id}.jpg`;
+      const up = await supabase.storage
+        .from("logos")
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (up.error) {
+        setErr(`Não foi possível enviar a foto: ${up.error.message}`);
+        return;
+      }
+      const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
+      // cache-bust para a nova imagem aparecer na hora
+      setPhotoUrl(`${pub.publicUrl}?t=${Date.now()}`);
+    } catch {
+      setErr("Não consegui processar essa imagem. Tente uma foto JPG ou PNG.");
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // permite reenviar o mesmo arquivo
+    }
   }
 
   async function save() {
@@ -522,6 +534,48 @@ function DadosPanel({ member, onSaved }: { member: Member; onSaved: (patch: Part
       </div>
     </div>
   );
+}
+
+/* ── Compressão de imagem no cliente (para avatares) ────────────── */
+/**
+ * Redimensiona para no máx. `maxDim` px no maior lado e exporta JPEG.
+ * Fotos grandes de celular (5–12MB) viram ~50–150KB, o que evita limites
+ * de upload e deixa o avatar leve. Lança erro se a imagem não decodificar
+ * (ex.: formatos não suportados pelo navegador).
+ */
+async function compressImage(file: File, maxDim = 512, quality = 0.85): Promise<Blob> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = () => reject(new Error("read_failed"));
+    fr.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("decode_failed"));
+    i.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no_canvas");
+  ctx.drawImage(img, 0, 0, w, h);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("encode_failed"))),
+      "image/jpeg",
+      quality,
+    );
+  });
 }
 
 /* ── Aba Serviços ───────────────────────────────────────────────── */
