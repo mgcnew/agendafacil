@@ -141,7 +141,17 @@ export function InviteAccept({
     });
 
     if (signUpErr && !signUpErr.message.toLowerCase().includes("already")) {
-      setError("Não foi possível criar a conta. Verifique a senha (mín. 6 caracteres).");
+      const msg = signUpErr.message.toLowerCase();
+      const code = signUpErr.code ?? "";
+      let friendly = "Não foi possível criar a conta. Tente novamente.";
+      if (code === "email_provider_disabled" || msg.includes("signups are disabled")) {
+        friendly = "Cadastros por e-mail estão desativados no momento. Avise o administrador do salão.";
+      } else if (msg.includes("password") || msg.includes("weak") || msg.includes("6")) {
+        friendly = "Senha inválida. Use no mínimo 6 caracteres.";
+      } else if (code === "over_email_send_rate_limit" || msg.includes("rate limit")) {
+        friendly = "Muitas tentativas em sequência. Aguarde alguns minutos e tente de novo.";
+      }
+      setError(friendly);
       setLoading(false);
       return;
     }
