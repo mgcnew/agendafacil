@@ -11,7 +11,7 @@ import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
   Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
-  Pencil, Camera, Wallet, Clock,
+  Pencil, Camera, Wallet,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -564,61 +564,106 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
  * pagamento, histórico por mês, recibo e a visão do próprio profissional)
  * ficam planejadas abaixo — ver lista "Em breve".
  */
+type Payment = { id: string; amount: number; period_start: string; created_at: string };
+
 function FinancasPanel({ member, salonId }: { member: Member; salonId: string }) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [earned, setEarned] = useState(0);
   const [paid, setPaid] = useState(0);
+  const [history, setHistory] = useState<Payment[]>([]);
+  const [payAmount, setPayAmount] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
+  const name = member.display_name ?? member.profiles?.full_name ?? "profissional";
   const ym = currentMonthBR();
+  const [py, pm] = ym.split("-").map(Number);
+  const periodStart = `${ym}-01`;
+  const periodEnd = `${ym}-${String(new Date(py, pm, 0).getDate()).padStart(2, "0")}`;
   const monthLabel = new Date(`${ym}-01T12:00:00`).toLocaleDateString("pt-BR", {
     month: "long",
     year: "numeric",
   });
 
+  async function load() {
+    setLoading(true);
+    const { start, end } = monthRangeBR(ym);
+    const [svc, red, paysMonth, hist] = await Promise.all([
+      supabase
+        .from("appointment_services")
+        .select("commission_amount, appointments!inner(member_id, status, starts_at)")
+        .eq("salon_id", salonId)
+        .eq("appointments.member_id", member.id)
+        .eq("appointments.status", "completed")
+        .gte("appointments.starts_at", start)
+        .lte("appointments.starts_at", end),
+      supabase
+        .from("package_redemptions")
+        .select("commission_amount")
+        .eq("salon_id", salonId)
+        .eq("member_id", member.id)
+        .gte("used_at", start)
+        .lte("used_at", end),
+      supabase
+        .from("commission_payments")
+        .select("amount")
+        .eq("salon_id", salonId)
+        .eq("member_id", member.id)
+        .eq("period_start", periodStart),
+      supabase
+        .from("commission_payments")
+        .select("id, amount, period_start, created_at")
+        .eq("salon_id", salonId)
+        .eq("member_id", member.id)
+        .order("created_at", { ascending: false })
+        .limit(6),
+    ]);
+
+    const e1 = (svc.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+    const e2 = (red.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+    const p = (paysMonth.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+    const total = e1 + e2;
+    setEarned(total);
+    setPaid(p);
+    setHistory((hist.data ?? []) as Payment[]);
+    setPayAmount(Math.max(0, total - p).toFixed(2));
+    setLoading(false);
+  }
+
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { start, end } = monthRangeBR(ym);
-      const periodStartStr = `${ym}-01`;
-
-      const [svc, red, pays] = await Promise.all([
-        supabase
-          .from("appointment_services")
-          .select("commission_amount, appointments!inner(member_id, status, starts_at)")
-          .eq("salon_id", salonId)
-          .eq("appointments.member_id", member.id)
-          .eq("appointments.status", "completed")
-          .gte("appointments.starts_at", start)
-          .lte("appointments.starts_at", end),
-        supabase
-          .from("package_redemptions")
-          .select("commission_amount")
-          .eq("salon_id", salonId)
-          .eq("member_id", member.id)
-          .gte("used_at", start)
-          .lte("used_at", end),
-        supabase
-          .from("commission_payments")
-          .select("amount")
-          .eq("salon_id", salonId)
-          .eq("member_id", member.id)
-          .eq("period_start", periodStartStr),
-      ]);
-
-      if (!alive) return;
-      const e1 = (svc.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
-      const e2 = (red.data ?? []).reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
-      const p = (pays.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
-      setEarned(e1 + e2);
-      setPaid(p);
-      setLoading(false);
-    })();
-    return () => { alive = false; };
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [member.id, salonId, ym]);
 
   const toReceive = Math.max(0, earned - paid);
+
+  async function pay() {
+    const value = parseFloat(payAmount.replace(",", "."));
+    if (!value || value <= 0) { setErr("Informe um valor válido."); return; }
+    if (!confirm(`Registrar pagamento de ${formatBRL(value)} para ${name}?`)) return;
+    setPaying(true); setErr(null); setMsg(null);
+    const { data, error } = await supabase.rpc("pay_commission", {
+      p_salon: salonId,
+      p_member: member.id,
+      p_amount: value,
+      p_period_start: periodStart,
+      p_period_end: periodEnd,
+    });
+    setPaying(false);
+    if (error) {
+      setErr(
+        error.message.includes("forbidden")
+          ? "Você não tem permissão para registrar pagamentos de comissão."
+          : "Não foi possível registrar o pagamento. Tente novamente.",
+      );
+      return;
+    }
+    const cashRecorded = (data as { cash_recorded?: boolean } | null)?.cash_recorded;
+    setMsg(cashRecorded ? "Pagamento registrado e lançado no caixa." : "Pagamento registrado.");
+    await load();
+  }
 
   return (
     <div className="space-y-5">
@@ -638,21 +683,47 @@ function FinancasPanel({ member, salonId }: { member: Member; salonId: string })
           <p className="text-xs text-muted-foreground">
             Mesma base de <b>Caixa &amp; Comissões</b>: atendimentos concluídos e uso de pacotes no mês, menos o que já foi pago.
           </p>
+
+          {/* Registrar pagamento (dá baixa e lança no caixa, se aberto) */}
+          <div className="rounded-[var(--radius)] border border-border p-4 space-y-3">
+            <p className="text-sm font-medium">Registrar pagamento</p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="pay">Valor</Label>
+                <Input
+                  id="pay"
+                  inputMode="decimal"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="0,00"
+                />
+              </div>
+              <Button onClick={pay} disabled={paying || toReceive <= 0}>
+                {paying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Pagar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se o caixa estiver aberto, isso lança uma saída de comissão automaticamente.
+            </p>
+            {err && <p className="text-sm text-red-600">{err}</p>}
+            {msg && <p className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> {msg}</p>}
+          </div>
+
+          {/* Histórico de pagamentos */}
+          {history.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pagamentos recentes</p>
+              {history.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-[var(--radius)] border border-border px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">{new Date(p.created_at).toLocaleDateString("pt-BR")}</span>
+                  <span className="font-medium">{formatBRL(Number(p.amount))}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
-
-      {/* Funções planejadas */}
-      <div className="rounded-[var(--radius)] border border-dashed border-border p-4">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <Clock className="h-4 w-4 text-muted-foreground" /> Em breve nesta aba
-        </p>
-        <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
-          <li>• Registrar pagamento (dar baixa) e gerar recibo</li>
-          <li>• Histórico por mês (apurado, pago e saldo)</li>
-          <li>• Detalhamento por atendimento/serviço</li>
-          <li>• Acesso do próprio profissional para ver quanto tem a receber</li>
-        </ul>
-      </div>
     </div>
   );
 }
