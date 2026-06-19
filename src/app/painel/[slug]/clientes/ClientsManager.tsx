@@ -8,6 +8,7 @@ import { waLink, formatDate, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
   Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight, X, MessageCircle,
+  ChevronLeft,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
@@ -42,6 +43,11 @@ export function ClientsManager({
   const [q, setQ] = useState("");
   const [inactiveDays, setInactiveDays] = useState(0); // 0 = sem filtro; 30/60/90
   const [err, setErr] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
+  const PAGE_SIZE = 30;
+
+  function resetPage() { setPage(0); }
 
   const filtered = clients.filter((c) => {
     const matchesQ =
@@ -54,6 +60,9 @@ export function ClientsManager({
     }
     return true;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const greeting = (c: Client) => `Oi ${c.full_name.split(" ")[0]}! Tudo bem? 😊`;
 
@@ -163,7 +172,7 @@ export function ClientsManager({
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou telefone" className="pl-9" />
+        <Input value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} placeholder="Buscar por nome ou telefone" className="pl-9" />
       </div>
 
       {/* Reativação: filtrar quem não volta há X dias */}
@@ -177,7 +186,7 @@ export function ClientsManager({
         ].map((opt) => (
           <button
             key={opt.d}
-            onClick={() => setInactiveDays(opt.d)}
+            onClick={() => { setInactiveDays(opt.d); resetPage(); }}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border transition font-medium",
               inactiveDays === opt.d
@@ -202,7 +211,7 @@ export function ClientsManager({
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c) => {
+          {paginated.map((c) => {
             const days = daysSince(lastVisit[c.id]);
             return (
             <div key={c.id} className="flex items-center gap-1 rounded-[var(--radius)] border border-border bg-card pr-2 hover:border-foreground/20 transition">
@@ -252,6 +261,28 @@ export function ClientsManager({
             </div>
             );
           })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <ChevronLeft className="h-4 w-4" /> Anterior
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {page + 1} de {totalPages} &middot; {filtered.length} clientes
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            Próxima <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>
