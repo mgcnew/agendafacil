@@ -64,6 +64,12 @@ export default async function EquipePage({
       services={services ?? []}
       serviceCounts={serviceCounts}
       canSeeFinance={canSeeFinance}
+      salon={{
+        name: membership.salons.name,
+        phone: membership.salons.phone,
+        address: membership.salons.address,
+        logo_url: membership.salons.logo_url,
+      }}
     />
   );
 }

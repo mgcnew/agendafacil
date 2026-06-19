@@ -6,12 +6,14 @@ import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
+import { generateCommissionReceiptPdf } from "./commissionReceipt";
+import type { SalonInfo } from "../financeiro/receipt";
 import { formatBRL, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
   Copy, Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
-  Pencil, Camera, Wallet,
+  Pencil, Camera, Wallet, Download,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -47,6 +49,7 @@ export function TeamManager({
   services,
   serviceCounts,
   canSeeFinance,
+  salon,
 }: {
   salonId: string;
   myRole: Role;
@@ -57,6 +60,7 @@ export function TeamManager({
   services: Svc[];
   serviceCounts: Record<string, number>;
   canSeeFinance: boolean;
+  salon: SalonInfo;
 }) {
   const supabase = createClient();
   const [members, setMembers] = useState<Member[]>(initialMembers);
@@ -318,6 +322,7 @@ export function TeamManager({
             permissions={permissions}
             roleDefaults={roleDefaults}
             canSeeFinance={canSeeFinance}
+            salon={salon}
             onClose={() => setEditing(null)}
             onMemberSaved={(patch) =>
               setMembers((ms) => ms.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
@@ -360,7 +365,7 @@ function MemberAvatar({ member, size = 44 }: { member: Member; size?: number }) 
 type Tab = "dados" | "servicos" | "financas" | "permissoes";
 
 function MemberEditor({
-  member, salonId, services, permissions, roleDefaults, canSeeFinance,
+  member, salonId, services, permissions, roleDefaults, canSeeFinance, salon,
   onClose, onMemberSaved, onServicesSaved,
 }: {
   member: Member;
@@ -369,6 +374,7 @@ function MemberEditor({
   permissions: Permission[];
   roleDefaults: RoleDefault[];
   canSeeFinance: boolean;
+  salon: SalonInfo;
   onClose: () => void;
   onMemberSaved: (patch: Partial<Member>) => void;
   onServicesSaved: (count: number) => void;
@@ -414,7 +420,7 @@ function MemberEditor({
             <ServicesPanel member={member} services={services} salonId={salonId} onSaved={onServicesSaved} />
           )}
           {tab === "financas" && (
-            <FinancasPanel member={member} salonId={salonId} />
+            <FinancasPanel member={member} salonId={salonId} salon={salon} />
           )}
           {tab === "permissoes" && (
             <PermissionsPanel member={member} permissions={permissions} roleDefaults={roleDefaults} />
@@ -566,7 +572,7 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
  */
 type Payment = { id: string; amount: number; period_start: string; created_at: string };
 
-function FinancasPanel({ member, salonId }: { member: Member; salonId: string }) {
+function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: string; salon: SalonInfo }) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [earned, setEarned] = useState(0);
@@ -576,8 +582,24 @@ function FinancasPanel({ member, salonId }: { member: Member; salonId: string })
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [lastPaid, setLastPaid] = useState<number | null>(null);
 
   const name = member.display_name ?? member.profiles?.full_name ?? "profissional";
+
+  function periodLabelOf(periodStart: string) {
+    return new Date(`${periodStart.slice(0, 7)}-01T12:00:00`).toLocaleDateString("pt-BR", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  async function downloadReceipt(amount: number, dateLabel: string, periodLabel: string) {
+    const safe = name.replace(/\s+/g, "-").toLowerCase();
+    await generateCommissionReceiptPdf(
+      { professional: name, amount, periodLabel, dateLabel, fileBase: `comissao-${safe}-${periodLabel.replace(/\s+/g, "-")}` },
+      salon,
+    );
+  }
   const ym = currentMonthBR();
   const [py, pm] = ym.split("-").map(Number);
   const periodStart = `${ym}-01`;
@@ -662,6 +684,7 @@ function FinancasPanel({ member, salonId }: { member: Member; salonId: string })
     }
     const cashRecorded = (data as { cash_recorded?: boolean } | null)?.cash_recorded;
     setMsg(cashRecorded ? "Pagamento registrado e lançado no caixa." : "Pagamento registrado.");
+    setLastPaid(value);
     await load();
   }
 
@@ -707,7 +730,19 @@ function FinancasPanel({ member, salonId }: { member: Member; salonId: string })
               Se o caixa estiver aberto, isso lança uma saída de comissão automaticamente.
             </p>
             {err && <p className="text-sm text-red-600">{err}</p>}
-            {msg && <p className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> {msg}</p>}
+            {msg && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> {msg}</p>
+                {lastPaid != null && (
+                  <button
+                    onClick={() => downloadReceipt(lastPaid, new Date().toLocaleDateString("pt-BR"), monthLabel)}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    <Download className="h-4 w-4" /> Baixar recibo
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Histórico de pagamentos */}
@@ -715,9 +750,24 @@ function FinancasPanel({ member, salonId }: { member: Member; salonId: string })
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pagamentos recentes</p>
               {history.map((p) => (
-                <div key={p.id} className="flex items-center justify-between rounded-[var(--radius)] border border-border px-3 py-2 text-sm">
+                <div key={p.id} className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm">
                   <span className="text-muted-foreground">{new Date(p.created_at).toLocaleDateString("pt-BR")}</span>
-                  <span className="font-medium">{formatBRL(Number(p.amount))}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{formatBRL(Number(p.amount))}</span>
+                    <button
+                      onClick={() =>
+                        downloadReceipt(
+                          Number(p.amount),
+                          new Date(p.created_at).toLocaleDateString("pt-BR"),
+                          periodLabelOf(p.period_start),
+                        )
+                      }
+                      className="text-muted-foreground hover:text-primary"
+                      title="Baixar recibo"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
