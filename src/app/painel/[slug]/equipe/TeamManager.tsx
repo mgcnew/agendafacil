@@ -8,13 +8,13 @@ import { MotionModal } from "@/components/MotionModal";
 import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
 import { generateCommissionReceiptPdf } from "./commissionReceipt";
 import type { SalonInfo } from "../financeiro/receipt";
-import { formatBRL, currentMonthBR, monthRangeBR } from "@/lib/utils";
+import { formatBRL, currentMonthBR, monthRangeBR, cn } from "@/lib/utils";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
   Loader2, ShieldCheck, X, UserPlus, Crown,
   Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
   Pencil, Camera, Wallet, Download, Share2,
-  Briefcase, MapPin, FileText, Armchair,
+  Briefcase, MapPin, FileText, Armchair, User,
 } from "lucide-react";
 
 type Role = Enums<"member_role">;
@@ -378,12 +378,12 @@ function MemberEditor({
   onServicesSaved: (count: number) => void;
 }) {
   const [tab, setTab] = useState<Tab>("dados");
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "dados", label: "Dados" },
-    { id: "cadastro", label: "Cadastro" },
-    { id: "servicos", label: "Serviços" },
-    ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças" }] : []),
-    { id: "permissoes", label: "Permissões" },
+  const tabs: { id: Tab; label: string; icon: typeof User }[] = [
+    { id: "dados", label: "Dados", icon: User },
+    { id: "cadastro", label: "Cadastro", icon: FileText },
+    { id: "servicos", label: "Serviços", icon: Scissors },
+    ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças", icon: Wallet }] : []),
+    { id: "permissoes", label: "Permissões", icon: ShieldCheck },
   ];
 
   return (
@@ -396,19 +396,36 @@ function MemberEditor({
           <button onClick={onClose} className="p-2 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
 
-        {/* Abas */}
-        <div className="flex gap-1 px-5 border-b border-border">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${
-                tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Abas — mobile: pílulas com ícone (a ativa expande o rótulo);
+            desktop: abas sublinhadas com ícone + texto */}
+        <div className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
+          {tabs.map((t) => {
+            const on = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                aria-label={t.label}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
+                  // Mobile (pílula)
+                  "rounded-full px-3.5 py-2 text-sm",
+                  on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                  // Desktop (aba sublinhada) — sobrescreve o visual de pílula
+                  "sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-3 sm:py-2 sm:bg-transparent",
+                  on
+                    ? "sm:border-primary sm:text-primary"
+                    : "sm:border-transparent sm:hover:bg-transparent sm:hover:text-foreground",
+                )}
+              >
+                <t.icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
+                <span className={cn("leading-none", on ? "inline" : "hidden", "sm:inline")}>
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex-1 overflow-auto p-5">
