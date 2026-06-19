@@ -28,6 +28,7 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [mode, setMode] = useState<"login" | "forgot">("login");
 
   // pré-preenche o e-mail lembrado
   useEffect(() => {
@@ -65,7 +66,8 @@ export function LoginForm({
     router.refresh();
   }
 
-  async function forgotPassword() {
+  async function forgotPassword(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!email) {
       setError("Informe o e-mail para recuperar a senha.");
       return;
@@ -96,12 +98,48 @@ export function LoginForm({
         </p>
         <button
           type="button"
-          onClick={() => setResetSent(false)}
+          onClick={() => { setResetSent(false); setMode("login"); }}
           className="text-sm text-primary font-medium mt-4"
         >
           Voltar ao login
         </button>
       </div>
+    );
+  }
+
+  // ── Modo "Esqueci a senha": pede apenas o e-mail ──────────────
+  if (mode === "forgot") {
+    return (
+      <form onSubmit={forgotPassword} className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Informe seu e-mail e enviaremos um link para você criar uma nova senha.
+        </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="reset-email">E-mail</Label>
+          <Input
+            id="reset-email"
+            type="email"
+            required
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@salao.com"
+          />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" size="lg" className="w-full" disabled={resetting}>
+          {resetting && <Loader2 className="h-4 w-4 animate-spin" />}
+          Enviar link de recuperação
+        </Button>
+        <button
+          type="button"
+          onClick={() => { setMode("login"); setError(null); }}
+          className="w-full text-sm text-primary font-medium"
+        >
+          Voltar ao login
+        </button>
+      </form>
     );
   }
 
@@ -151,11 +189,10 @@ export function LoginForm({
         </button>
         <button
           type="button"
-          onClick={forgotPassword}
-          disabled={resetting}
-          className="text-sm text-primary font-medium hover:underline disabled:opacity-60"
+          onClick={() => { setMode("forgot"); setError(null); }}
+          className="text-sm text-primary font-medium hover:underline"
         >
-          {resetting ? "Enviando…" : "Esqueci a senha"}
+          Esqueci a senha
         </button>
       </div>
 
