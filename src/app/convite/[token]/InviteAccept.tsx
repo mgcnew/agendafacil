@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -42,6 +42,20 @@ export function InviteAccept({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  // Se a pessoa já está logada (ex.: acabou de confirmar o e-mail e voltou
+  // para cá pelo callback), pulamos a senha e só finalizamos o cadastro.
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    if (!invite) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email?.toLowerCase() === invite.email.toLowerCase()) {
+        setAuthed(true);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Estados inválidos ────────────────────────────────────────
   if (!invite) {
@@ -107,11 +121,23 @@ export function InviteAccept({
     setError(null);
     const supabase = createClient();
 
-    // 1) tenta criar a conta com o e-mail do convite
+    // Já logada (voltou da confirmação de e-mail): só finaliza, sem mexer na senha.
+    if (authed) {
+      await acceptWithSession();
+      return;
+    }
+
+    // 1) tenta criar a conta com o e-mail do convite.
+    //    Após confirmar o e-mail, o link volta para este mesmo convite já logada.
     const { data: signUp, error: signUpErr } = await supabase.auth.signUp({
       email: invite.email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+          `/convite/${token}`,
+        )}`,
+      },
     });
 
     if (signUpErr && !signUpErr.message.toLowerCase().includes("already")) {
@@ -122,19 +148,22 @@ export function InviteAccept({
 
     // 2) garante sessão (conta nova sem confirmação, ou conta já existente)
     if (!signUp?.session) {
-      const { data: signIn } = await supabase.auth.signInWithPassword({
+      const { data: signIn, error: signInErr } = await supabase.auth.signInWithPassword({
         email: invite.email,
         password,
       });
       if (!signIn.session) {
-        if (signUpErr) {
-          // já existia conta e a senha não bateu
-          setError("Já existe uma conta com este e-mail. Informe a senha correta.");
+        const notConfirmed =
+          signInErr?.code === "email_not_confirmed" ||
+          signInErr?.message.toLowerCase().includes("not confirmed");
+        if (notConfirmed || !signUpErr) {
+          // conta criada mas exige confirmação de e-mail
+          setNeedsConfirm(true);
           setLoading(false);
           return;
         }
-        // conta criada mas exige confirmação de e-mail
-        setNeedsConfirm(true);
+        // já existia conta e a senha não bateu
+        setError("Já existe uma conta com este e-mail. Use 'Esqueci a senha' no login para redefinir.");
         setLoading(false);
         return;
       }
@@ -147,7 +176,7 @@ export function InviteAccept({
     return (
       <InvalidState
         title="Confirme seu e-mail"
-        message={`Enviamos um link de confirmação para ${invite.email}. Após confirmar, abra novamente este convite para concluir.`}
+        message={`Enviamos um link de confirmação para ${invite.email}. Abra o e-mail e clique no link — você volta para cá já autenticada para concluir o cadastro.`}
       />
     );
   }
@@ -156,7 +185,11 @@ export function InviteAccept({
   return (
     <AuthShell
       title="Complete seu cadastro"
-      subtitle={`Você foi convidada para ${invite.salon_name} como ${ROLE_LABEL[invite.role] ?? invite.role}.`}
+      subtitle={
+        authed
+          ? `E-mail confirmado! Finalize seu cadastro em ${invite.salon_name}.`
+          : `Você foi convidada para ${invite.salon_name} como ${ROLE_LABEL[invite.role] ?? invite.role}.`
+      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -188,16 +221,18 @@ export function InviteAccept({
           <Textarea id="bio" rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Especialidades, experiência…" />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Crie uma senha</Label>
-          <Input id="password" type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
-        </div>
+        {!authed && (
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Crie uma senha</Label>
+            <Input id="password" type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          Entrar na equipe
+          {authed ? "Concluir cadastro" : "Entrar na equipe"}
         </Button>
         <p className="text-xs text-muted-foreground text-center">
           Comissões e horários são definidos pelo salão.

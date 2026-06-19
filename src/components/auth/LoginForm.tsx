@@ -45,7 +45,14 @@ export function LoginForm({
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError("E-mail ou senha incorretos.");
+      const notConfirmed =
+        error.code === "email_not_confirmed" ||
+        error.message.toLowerCase().includes("not confirmed");
+      setError(
+        notConfirmed
+          ? "Confirme seu e-mail pelo link que enviamos antes de entrar."
+          : "E-mail ou senha incorretos.",
+      );
       setLoading(false);
       return;
     }
@@ -67,7 +74,7 @@ export function LoginForm({
     setError(null);
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
     });
     setResetting(false);
     if (error) {
