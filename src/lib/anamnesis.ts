@@ -96,16 +96,18 @@ const DEFAULT_TEXT: TextFieldDef[] = [
   { key: "general_notes", label: "Outras observações de saúde", placeholder: "" },
 ];
 
-// Barbearia: foco em pele e barba e em cortes de navalha (sangramento/cicatrização).
+// Barbearia: cabelo + couro cabeludo + barba + química (coloração, descoloração,
+// platinado, progressiva) e cortes de navalha (sangramento/cicatrização).
 const BARBER_TEXT: TextFieldDef[] = [
-  { key: "allergies", label: "Alergias e sensibilidades", placeholder: "Lâmina/navalha, produtos, perfume, níquel, propilenoglicol..." },
+  { key: "allergies", label: "Alergias e sensibilidades", placeholder: "Tintura/coloração (PPD), amônia, água oxigenada, lâmina, perfume, níquel..." },
   { key: "medications", label: "Medicamentos em uso", placeholder: "Ex.: anticoagulante, isotretinoína (Roacutan)..." },
-  { key: "skin_hair_notes", label: "Pele e barba", placeholder: "Pelos encravados, foliculite, dermatite, acne, sensibilidade, lesão ativa..." },
-  { key: "recent_procedures", label: "Procedimentos recentes na pele/barba", placeholder: "Laser, tatuagem recente, cicatriz, peeling..." },
+  { key: "skin_hair_notes", label: "Cabelo, couro cabeludo e barba", placeholder: "Couro cabeludo sensível, caspa/dermatite, queda, pelos encravados, foliculite, lesão ativa..." },
+  { key: "recent_procedures", label: "Química e procedimentos recentes", placeholder: "Coloração, descoloração, platinado, progressiva/alisamento, luzes, cirurgia..." },
   { key: "general_notes", label: "Outras observações", placeholder: "" },
 ];
 
 const BARBER_CONDITIONS: ConditionKey[] = [
+  "is_pregnant",           // química/coloração na gestação
   "has_diabetes",          // cicatrização/infecção em cortes
   "has_coagulation_issue", // sangramento na navalha
   "has_hypertension",
