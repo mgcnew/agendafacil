@@ -237,14 +237,22 @@ function ApptCard({ a, color, compact = false, onOpen }: {
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
     >
-      <div className="px-2 py-1.5 h-full overflow-hidden">
-        <p className="text-[11px] font-semibold truncate text-foreground/80">
-          {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
-        </p>
-        {!compact && (
-          <p className="text-[12px] font-medium text-foreground truncate leading-tight">
-            {a.clients?.full_name ?? "Cliente"}
+      <div className="px-2 py-1 h-full flex flex-col justify-start gap-0.5 overflow-hidden">
+        {compact ? (
+          /* Card compacto (< 44px): horário + nome na mesma linha */
+          <p className="text-[11px] font-medium truncate leading-tight text-foreground/90">
+            <span className="font-semibold">{fmtHM(a.starts_at)}</span>
+            {" · "}{a.clients?.full_name ?? "Cliente"}
           </p>
+        ) : (
+          <>
+            <p className="text-[11px] font-semibold truncate text-foreground/80 leading-tight">
+              {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
+            </p>
+            <p className="text-[12px] font-medium text-foreground truncate leading-tight">
+              {a.clients?.full_name ?? "Cliente"}
+            </p>
+          </>
         )}
         {h > 58 && !compact && (
           <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
@@ -671,7 +679,7 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
                   return (
                     <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}
                       onClick={(e) => e.stopPropagation()}>
-                      <ApptCard a={a} color={color} onOpen={() => onApptClick(a)} />
+                      <ApptCard a={a} color={color} compact={h < 44} onOpen={() => onApptClick(a)} />
                     </div>
                   );
                 })}
