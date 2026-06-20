@@ -273,9 +273,16 @@ export function TeamManager({
 
             <div className="flex items-center gap-1 ml-auto shrink-0">
               {m.role === "owner" ? (
-                <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-3 py-1 font-medium">
-                  {ROLE_LABEL.owner}
-                </span>
+                <>
+                  <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-3 py-1 font-medium">
+                    {ROLE_LABEL.owner}
+                  </span>
+                  {canManage && (
+                    <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
+                      <Pencil className="h-4 w-4" /> Editar
+                    </Button>
+                  )}
+                </>
               ) : (
                 <>
                   {canManage ? (
