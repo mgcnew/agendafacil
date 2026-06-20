@@ -187,9 +187,7 @@ export function TeamManager({
                   <Label htmlFor="commission">Comissão geral (%)</Label>
                   <Input
                     id="commission"
-                    type="number"
-                    min={0}
-                    max={100}
+                    inputMode="decimal"
                     value={commission}
                     onChange={(e) => setCommission(e.target.value)}
                     placeholder="0"
