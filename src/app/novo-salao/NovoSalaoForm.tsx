@@ -12,6 +12,40 @@ import {
   ArrowLeft, ArrowRight, Store, Star, X, Plus, Sparkles,
 } from "lucide-react";
 
+async function compressImage(file: File, maxDim = 512, quality = 0.9): Promise<File> {
+  try {
+    const dataUrl: string = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result as string);
+      r.onerror = () => rej(new Error("read"));
+      r.readAsDataURL(file);
+    });
+    const img: HTMLImageElement = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error("decode"));
+      i.src = dataUrl;
+    });
+    let { width, height } = img;
+    if (width > maxDim || height > maxDim) {
+      const scale = Math.min(maxDim / width, maxDim / height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/webp", quality));
+    if (!blob) return file;
+    const base = file.name.replace(/\.[^.]+$/, "");
+    return new File([blob], `${base}.webp`, { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
 function slugify(s: string) {
   return s
     .toLowerCase()
@@ -110,13 +144,13 @@ export default function NovoSalaoPage() {
       if (phone) patch.phone = phone;
       if (address) patch.address = address;
 
-      // logo
+      // logo — comprime para WebP antes de subir
       if (logoFile) {
-        const ext = (logoFile.name.split(".").pop() || "png").toLowerCase();
-        const path = `${salon.id}.${ext}`;
+        const compressed = await compressImage(logoFile);
+        const path = `${salon.id}.webp`;
         const up = await supabase.storage
           .from("logos")
-          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+          .upload(path, compressed, { upsert: true, contentType: "image/webp" });
         if (!up.error) {
           const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
           patch.logo_url = pub.publicUrl;
