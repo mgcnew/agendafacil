@@ -846,6 +846,47 @@ export type Database = {
           },
         ]
       }
+      fixed_costs: {
+        Row: {
+          amount: number
+          created_at: string
+          due_day: number | null
+          id: string
+          is_active: boolean
+          name: string
+          salon_id: string
+          type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          due_day?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          salon_id: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_day?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          salon_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fixed_costs_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_permissions: {
         Row: {
           allowed: boolean

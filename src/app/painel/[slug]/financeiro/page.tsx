@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { FinanceManager, type Receivable } from "./FinanceManager";
+import type { FixedCost, ChairRental } from "./FixedCostsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function FinanceiroPage({
 }) {
   const { slug } = await params;
   const { tab, cmes } = await searchParams;
+  const validTab = tab === "comissoes" ? "comissoes" : tab === "fixos" ? "fixos" : "caixa";
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
   await guardFeature(slug, "/financeiro");
@@ -127,6 +129,46 @@ export default async function FinanceiroPage({
   } as never);
   const receivable = (Array.isArray(receivableRaw) ? receivableRaw : []) as Receivable[];
 
+  // ── fixos ──
+  const [{ data: fixedCostsRaw }, { data: chairRaw }, { data: pkgsRaw }] = await Promise.all([
+    supabase
+      .from("fixed_costs" as never)
+      .select("id, name, amount, due_day, type, is_active")
+      .eq("salon_id", salonId)
+      .eq("is_active", true)
+      .order("created_at"),
+    supabase
+      .from("salon_member_details")
+      .select("chair_rent_amount, chair_rent_due_day, salon_members(display_name, is_active)")
+      .eq("salon_id", salonId)
+      .not("chair_rent_amount", "is", null)
+      .gt("chair_rent_amount", 0),
+    supabase
+      .from("client_packages")
+      .select("price")
+      .eq("salon_id", salonId)
+      .eq("status", "active"),
+  ]);
+
+  const fixedCosts = ((fixedCostsRaw ?? []) as FixedCost[]);
+
+  const chairRentals: ChairRental[] = ((chairRaw ?? []) as Array<{
+    chair_rent_amount: number;
+    chair_rent_due_day: number | null;
+    salon_members: { display_name: string | null; is_active: boolean } | null;
+  }>)
+    .filter((r) => r.salon_members?.is_active)
+    .map((r) => ({
+      member_name: r.salon_members?.display_name ?? "Profissional",
+      amount: r.chair_rent_amount,
+      due_day: r.chair_rent_due_day,
+    }));
+
+  const activePackages = {
+    count: (pkgsRaw ?? []).length,
+    total_value: (pkgsRaw ?? []).reduce((s: number, p: { price: number }) => s + Number(p.price), 0),
+  };
+
   return (
     <FinanceManager
       salonId={salonId}
@@ -142,7 +184,10 @@ export default async function FinanceiroPage({
         address: membership.salons.address,
         logo_url: membership.salons.logo_url,
       }}
-      initialTab={tab === "comissoes" ? "comissoes" : "caixa"}
+      initialTab={validTab}
+      fixedCosts={fixedCosts}
+      chairRentals={chairRentals}
+      activePackages={activePackages}
       period={{
         label: `${MONTHS[pm - 1]} ${py}`,
         prevCmes,

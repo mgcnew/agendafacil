@@ -18,6 +18,7 @@ import {
   generateReceiptPdf, buildReceiptText, payLabel,
   type ReceiptData, type SalonInfo,
 } from "./receipt";
+import { FixedCostsPanel, type FixedCost, type ChairRental, type ActivePackageSummary } from "./FixedCostsPanel";
 
 type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
@@ -42,6 +43,9 @@ export function FinanceManager({
   salon,
   initialTab,
   period,
+  fixedCosts,
+  chairRentals,
+  activePackages,
 }: {
   salonId: string;
   canManage: boolean;
@@ -51,13 +55,16 @@ export function FinanceManager({
   closedSessions: Session[];
   receivable: Receivable[];
   salon: SalonInfo;
-  initialTab: "caixa" | "comissoes";
+  initialTab: "caixa" | "comissoes" | "fixos";
   period: Period;
+  fixedCosts: FixedCost[];
+  chairRentals: ChairRental[];
+  activePackages: ActivePackageSummary;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
-  const [tab, setTab] = useState<"caixa" | "comissoes">(initialTab);
+  const [tab, setTab] = useState<"caixa" | "comissoes" | "fixos">(initialTab);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -159,7 +166,7 @@ export function FinanceManager({
       )}
 
       <div className="flex gap-1 border-b border-border">
-        {(["caixa", "comissoes"] as const).map((t) => (
+        {(["caixa", "comissoes", "fixos"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -167,7 +174,7 @@ export function FinanceManager({
               tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground"
             }`}
           >
-            {t === "caixa" ? "Caixa" : "Comissões"}
+            {t === "caixa" ? "Caixa" : t === "comissoes" ? "Comissões" : "Fixos"}
           </button>
         ))}
       </div>
@@ -451,6 +458,15 @@ export function FinanceManager({
             Ao pagar, o valor entra como saída no caixa (se aberto).
           </p>
         </div>
+      )}
+
+      {tab === "fixos" && (
+        <FixedCostsPanel
+          salonId={salonId}
+          fixedCosts={fixedCosts}
+          chairRentals={chairRentals}
+          activePackages={activePackages}
+        />
       )}
     </div>
   );
