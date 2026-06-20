@@ -386,14 +386,20 @@ function MemberEditor({
   onMemberSaved: (patch: Partial<Member>) => void;
   onServicesSaved: (count: number) => void;
 }) {
+  const isOwner = member.role === "owner";
   const [tab, setTab] = useState<Tab>("dados");
-  const tabs: { id: Tab; label: string; icon: typeof User }[] = [
-    { id: "dados", label: "Dados", icon: User },
-    { id: "cadastro", label: "Cadastro", icon: FileText },
-    { id: "servicos", label: "Serviços", icon: Scissors },
-    ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças", icon: Wallet }] : []),
-    { id: "permissoes", label: "Permissões", icon: ShieldCheck },
-  ];
+  const tabs: { id: Tab; label: string; icon: typeof User }[] = isOwner
+    ? [
+        { id: "dados", label: "Dados", icon: User },
+        { id: "servicos", label: "Serviços", icon: Scissors },
+      ]
+    : [
+        { id: "dados", label: "Dados", icon: User },
+        { id: "cadastro", label: "Cadastro", icon: FileText },
+        { id: "servicos", label: "Serviços", icon: Scissors },
+        ...(canSeeFinance ? [{ id: "financas" as Tab, label: "Finanças", icon: Wallet }] : []),
+        { id: "permissoes", label: "Permissões", icon: ShieldCheck },
+      ];
 
   return (
     <MotionModal onClose={onClose}>
