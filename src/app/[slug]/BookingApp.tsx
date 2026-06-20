@@ -133,10 +133,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
     : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice);
 
   // profissionais que fazem TODOS os serviços escolhidos.
-  // Fallback: serviço sem nenhum vínculo = qualquer profissional pode fazer.
+  // Excluí profissionais sem nenhum serviço atribuído (ex: dono sem serviços).
+  // Fallback: serviço sem nenhum vínculo = qualquer profissional com serviços pode fazer.
   const eligiblePros = useMemo(() => {
-    if (selected.length === 0) return pros;
-    return pros.filter((p) =>
+    const prosWithServices = pros.filter((p) => proSvc.some((x) => x.member_id === p.id));
+    if (selected.length === 0) return prosWithServices;
+    return prosWithServices.filter((p) =>
       selected.every((sid) => {
         const linked = proSvc.filter((x) => x.service_id === sid);
         return linked.length === 0 || linked.some((x) => x.member_id === p.id);

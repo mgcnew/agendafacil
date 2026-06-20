@@ -18,7 +18,7 @@ export default async function AgendaPage({
   const canManageSchedule = perms.has("schedule.manage");
 
   const supabase = await createClient();
-  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }] = await Promise.all([
+  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }] = await Promise.all([
     supabase
       .from("salon_members")
       .select("id, display_name, profiles(full_name), commission_percent, color")
@@ -35,6 +35,10 @@ export default async function AgendaPage({
       .eq("salon_id", membership.salon_id)
       .order("full_name"),
     supabase.rpc("public_campaign_discounts", { p_salon: membership.salon_id }),
+    supabase
+      .from("professional_services")
+      .select("member_id")
+      .eq("salon_id", membership.salon_id),
   ]);
 
   const discounts: Record<string, number> = {};
@@ -42,12 +46,16 @@ export default async function AgendaPage({
     discounts[r.service_id] = Number(r.discount_percent);
   }
 
-  const proList = (pros ?? []).map((p) => ({
-    id: p.id,
-    name: p.display_name ?? (p.profiles as { full_name?: string } | null)?.full_name ?? "—",
-    commission_percent: p.commission_percent,
-    color: p.color,
-  }));
+  // Only show professionals who have at least one service assigned.
+  const prosWithServices = new Set((proSvcRows ?? []).map((r) => r.member_id));
+  const proList = (pros ?? [])
+    .filter((p) => prosWithServices.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      name: p.display_name ?? (p.profiles as { full_name?: string } | null)?.full_name ?? "—",
+      commission_percent: p.commission_percent,
+      color: p.color,
+    }));
 
   return (
     <AgendaManager
