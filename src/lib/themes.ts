@@ -156,6 +156,24 @@ export const CHOOSABLE_NICHES: NicheMeta[] = [
   NICHES.barbearia,
 ];
 
+/**
+ * Paleta padrão recomendada por nicho.
+ * null = identidade visual nativa do nicho (sem data-color — CSS :not([data-color]) aplica).
+ */
+export const NICHE_DEFAULT_COLOR: Record<Niche, ColorTheme | null> = {
+  barbearia: null,  // grafite + cobre escuro — identidade exclusiva no CSS
+  feminino:  "a",   // Rosa Gold
+  estetica:  "c",   // Sálvia
+  neutro:    "e",   // Laranja
+};
+
+/** Cores de preview do padrão da barbearia (usadas no swatch do botão Padrão). */
+export const BARBEARIA_DEFAULT_PREVIEW = {
+  background: "#1a1613",
+  primary:    "#c8852f",
+  accent:     "#e7b96a",
+} as const;
+
 export function nicheLabel(n: Niche): string {
   return NICHES[n].label;
 }

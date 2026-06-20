@@ -77,7 +77,11 @@ export default async function PanelLayout({
     return (
       <div
         data-niche={membership.salons.niche}
-        data-color={(membership.salons.color_theme ?? "a") as string}
+        data-color={
+          (membership.salons.color_theme && membership.salons.color_theme !== "")
+            ? membership.salons.color_theme
+            : (membership.salons.niche === "barbearia" ? undefined : "a")
+        }
       >
         <SubscriptionGate
           slug={slug}
@@ -101,12 +105,18 @@ export default async function PanelLayout({
     }))
     .filter((g) => g.items.length > 0);
 
-  const colorTheme = (membership.salons.color_theme ?? "a") as string;
+  const niche = membership.salons.niche;
+  const rawColor = membership.salons.color_theme;
+  // "" ou ausente → barbearia usa identidade CSS nativa (:not([data-color]));
+  // outros nichos caem em "a" (Rosa Gold) como padrão global.
+  const colorAttr = (rawColor && rawColor !== "")
+    ? rawColor
+    : (niche === "barbearia" ? undefined : "a");
 
   return (
     <div
-      data-niche={membership.salons.niche}
-      data-color={colorTheme}
+      data-niche={niche}
+      data-color={colorAttr}
       className="min-h-full bg-background text-foreground"
     >
       <PanelShell

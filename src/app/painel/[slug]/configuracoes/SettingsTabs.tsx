@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { Select } from "@/components/Select";
 import { cn } from "@/lib/utils";
-import { COLOR_GROUPS, CHOOSABLE_NICHES, type ColorTheme, type Niche } from "@/lib/themes";
+import { COLOR_GROUPS, CHOOSABLE_NICHES, NICHE_DEFAULT_COLOR, BARBEARIA_DEFAULT_PREVIEW, type ColorTheme, type Niche } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
 import { uploadLogo, removeLogo } from "./actions";
@@ -850,12 +850,21 @@ function AppearancePanel({
   canEdit: boolean;
 }) {
   const router = useRouter();
-  const [colorTheme, setColorTheme] = useState<ColorTheme>(
-    (salon.color_theme ?? "a") as ColorTheme,
+  const niche = salon.niche as Niche;
+  const defaultColor = NICHE_DEFAULT_COLOR[niche]; // null = identidade nativa (barbearia)
+  // "" = sentinela "usar padrão do nicho" (sem data-color no HTML para barbearia)
+  const toState = (v: string | null | undefined): ColorTheme | "" =>
+    !v || v === "" ? "" : (v as ColorTheme);
+
+  const [colorTheme, setColorTheme] = useState<ColorTheme | "">(
+    toState(salon.color_theme),
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "padrão" = string vazia (ou, para nichos não-barbearia, a cor mapeada)
+  const isDefault = defaultColor === null ? colorTheme === "" : colorTheme === defaultColor;
 
   async function save() {
     setSaving(true);
@@ -864,7 +873,7 @@ function AppearancePanel({
     const supabase = createClient();
     const { error: e } = await supabase
       .from("salons")
-      .update({ color_theme: colorTheme })
+      .update({ color_theme: colorTheme || "" })
       .eq("id", salon.id);
     setSaving(false);
     if (e) {
@@ -876,17 +885,59 @@ function AppearancePanel({
     setTimeout(() => setSaved(false), 2500);
   }
 
+  // Swatch visual do padrão do nicho (barbearia tem preview próprio; outros usam a paleta default)
+  const defaultPreview = defaultColor === null
+    ? BARBEARIA_DEFAULT_PREVIEW
+    : (() => {
+        const v = COLOR_GROUPS.flatMap((g) => g.variants).find((x) => x.id === defaultColor);
+        return v ? { background: v.background, primary: v.primary, accent: v.accent } : BARBEARIA_DEFAULT_PREVIEW;
+      })();
+
   return (
     <div className="space-y-5">
       <Card className="p-6 space-y-6">
         <div>
           <h2 className="font-display font-semibold">Paleta de cores</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            O segmento define a tipografia; a cor é livre — escolha entre os 3 grupos.
+            O segmento define a tipografia; a cor é livre — escolha entre os 3 grupos ou volte ao Padrão.
           </p>
         </div>
 
-        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-3">
+        {/* Swatch "Padrão" destacado no topo */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider">Padrão do segmento</p>
+          <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() => setColorTheme(defaultColor ?? "")}
+            aria-pressed={isDefault}
+            className={`w-full sm:w-48 overflow-hidden rounded-xl border text-left transition disabled:opacity-60 ${
+              isDefault
+                ? "border-primary ring-2 ring-primary/30"
+                : "border-border hover:border-foreground/25"
+            }`}
+          >
+            <div
+              className="flex h-14 items-center justify-center gap-2"
+              style={{ background: defaultPreview.background }}
+            >
+              <span
+                className="h-7 w-7 rounded-full ring-1 ring-black/10"
+                style={{ background: defaultPreview.primary }}
+              />
+              <span
+                className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
+                style={{ background: defaultPreview.accent }}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-1 bg-card px-2.5 py-2">
+              <span className="text-xs font-medium">Padrão</span>
+              {isDefault && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+            </div>
+          </button>
+        </div>
+
+        <div className="border-t border-border pt-5 grid gap-x-8 gap-y-6 lg:grid-cols-3">
         {COLOR_GROUPS.map((group) => (
           <div key={group.id} className="space-y-3">
             <div>
@@ -910,7 +961,6 @@ function AppearancePanel({
                         : "border-border hover:border-foreground/25"
                     }`}
                   >
-                    {/* Mini-preview do tema */}
                     <div
                       className="flex h-14 items-center justify-center gap-2"
                       style={{ background: v.background }}
@@ -924,7 +974,6 @@ function AppearancePanel({
                         style={{ background: v.accent }}
                       />
                     </div>
-                    {/* Rótulo */}
                     <div className="flex items-center justify-between gap-1 bg-card px-2.5 py-2">
                       <span className="text-xs font-medium truncate">{v.label}</span>
                       {activeColor && (

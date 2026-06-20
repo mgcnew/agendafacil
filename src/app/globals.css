@@ -343,10 +343,11 @@
 
 /* ============================================================
    BARBEARIA — identidade própria (grafite + cobre).
-   Vem depois dos [data-color] de propósito: o nicho barbearia
-   tem paleta escura fixa, independente da cor escolhida.
+   Só aplica quando o usuário não escolheu uma paleta explícita
+   (data-color ausente). Quando data-color está presente, a
+   paleta escolhida sobrescreve normalmente.
    ============================================================ */
-[data-niche="barbearia"] {
+[data-niche="barbearia"]:not([data-color]) {
   --background: #1a1613;
   --foreground: #f2ede4;
   --card: #221c16;
