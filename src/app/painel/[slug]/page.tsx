@@ -169,6 +169,7 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6 af-rise">
+      {/* Header — sempre largura total */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">
@@ -184,109 +185,119 @@ export default async function DashboardPage({
         </Link>
       </div>
 
-      {/* Alerta: clientes para reativar */}
-      {reactCount > 0 && (
-        <Link
-          href={`/painel/${slug}/relatorios?tab=reativacao`}
-          className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
-        >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
-            <UserRoundCheck className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-sm">
-              {reactCount} cliente{reactCount === 1 ? "" : "s"} para reativar
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno — mande um oi pelo WhatsApp.
-            </p>
+      {/* Desktop: 2 colunas. Mobile: coluna única */}
+      <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start">
+
+        {/* ── Coluna principal ──────────────────────────────────�� */}
+        <div className="space-y-6 min-w-0">
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-[var(--radius)] border border-border bg-card p-5">
+                <s.icon className="h-5 w-5 text-primary" />
+                <p className="font-display text-2xl font-bold mt-3">{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+              </div>
+            ))}
           </div>
-          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-        </Link>
-      )}
 
-      {/* Aniversários da semana */}
-      <BirthdayCard clients={birthdays} salonName={membership.salons.name} slug={slug} />
-
-      {/* Minhas comissões (profissional/gerente) */}
-      {myComm && (
-        <div className="rounded-[var(--radius)] border border-primary/30 bg-primary/5 p-5">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <Wallet className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
-            <span className="capitalize text-muted-foreground">{myComm.monthLabel}</span>
-          </p>
-          <p className="font-display text-3xl font-bold text-primary mt-2">{formatBRL(myComm.toReceive)}</p>
-          <p className="text-xs text-muted-foreground">a receber este mês</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-            <span>Apurado: <b className="text-foreground">{formatBRL(myComm.earned)}</b></span>
-            <span>Já pago: <b className="text-foreground">{formatBRL(myComm.paid)}</b></span>
-          </div>
-        </div>
-      )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-[var(--radius)] border border-border bg-card p-5">
-            <s.icon className="h-5 w-5 text-primary" />
-            <p className="font-display text-2xl font-bold mt-3">{s.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Lembretes de amanhã (anti-falta) */}
-      <TomorrowReminders items={reminderItems} dateLabel={tomorrowLabel} salonName={membership.salons.name} />
-
-      {/* Carnê — pacotes ativos (lembrete) */}
-      {pkgs.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" /> Pacotes ativos
+          {/* Agenda de hoje */}
+          <div>
+            <h2 className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" /> Agenda de hoje
             </h2>
-            <Link href={`/painel/${slug}/pacotes`} className="text-sm text-primary font-medium">
-              Ver todos
-            </Link>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {pkgs.map((p) => {
-              const soon = p.dleft <= 3;
-              return (
-                <Link
-                  key={p.id}
-                  href={`/painel/${slug}/pacotes`}
-                  className="rounded-[var(--radius)] border border-border bg-card p-3.5 hover:shadow-card transition"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-sm truncate">{p.client}</p>
-                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${
-                      soon ? "bg-red-500/12 text-red-600" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {p.dleft >= 0 ? `${p.dleft}d` : "vencido"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.name}</p>
-                  <p className="text-xs text-primary font-medium mt-1">{p.remaining} restante{p.remaining === 1 ? "" : "s"}</p>
-                </Link>
-              );
-            })}
+            {appts.length === 0 ? (
+              <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                Nenhum agendamento para hoje ainda.
+              </div>
+            ) : (
+              <TodayAgenda items={agendaItems} salonId={salonId} />
+            )}
           </div>
         </div>
-      )}
 
-      {/* Agenda de hoje */}
-      <div>
-        <h2 className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
-          <Clock className="h-5 w-5 text-primary" /> Agenda de hoje
-        </h2>
-        {appts.length === 0 ? (
-          <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-            Nenhum agendamento para hoje ainda.
-          </div>
-        ) : (
-          <TodayAgenda items={agendaItems} salonId={salonId} />
-        )}
+        {/* ── Sidebar contextual ───────────────────────────────── */}
+        <div className="space-y-4 min-w-0">
+          {/* Alerta: clientes para reativar */}
+          {reactCount > 0 && (
+            <Link
+              href={`/painel/${slug}/relatorios?tab=reativacao`}
+              className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
+                <UserRoundCheck className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm">
+                  {reactCount} cliente{reactCount === 1 ? "" : "s"} para reativar
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          )}
+
+          {/* Aniversários da semana */}
+          <BirthdayCard clients={birthdays} salonName={membership.salons.name} slug={slug} />
+
+          {/* Minhas comissões (profissional/gerente) */}
+          {myComm && (
+            <div className="rounded-[var(--radius)] border border-primary/30 bg-primary/5 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Wallet className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
+                <span className="capitalize text-muted-foreground text-xs">{myComm.monthLabel}</span>
+              </p>
+              <p className="font-display text-3xl font-bold text-primary mt-2">{formatBRL(myComm.toReceive)}</p>
+              <p className="text-xs text-muted-foreground">a receber este mês</p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>Apurado: <b className="text-foreground">{formatBRL(myComm.earned)}</b></span>
+                <span>Já pago: <b className="text-foreground">{formatBRL(myComm.paid)}</b></span>
+              </div>
+            </div>
+          )}
+
+          {/* Lembretes de amanhã */}
+          <TomorrowReminders items={reminderItems} dateLabel={tomorrowLabel} salonName={membership.salons.name} />
+
+          {/* Pacotes ativos */}
+          {pkgs.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4 text-primary" /> Pacotes ativos
+                </h2>
+                <Link href={`/painel/${slug}/pacotes`} className="text-xs text-primary font-medium">
+                  Ver todos
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {pkgs.map((p) => {
+                  const soon = p.dleft <= 3;
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/painel/${slug}/pacotes`}
+                      className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border px-3 py-2 hover:bg-muted/50 transition"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{p.client}</p>
+                        <p className="text-xs text-muted-foreground truncate">{p.name} · {p.remaining} restante{p.remaining === 1 ? "" : "s"}</p>
+                      </div>
+                      <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${
+                        soon ? "bg-red-500/12 text-red-600" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {p.dleft >= 0 ? `${p.dleft}d` : "vencido"}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
