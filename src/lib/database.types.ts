@@ -1458,6 +1458,41 @@ export type Database = {
           },
         ]
       }
+      salon_gallery: {
+        Row: {
+          id: string
+          salon_id: string
+          url: string
+          caption: string | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          url: string
+          caption?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          salon_id?: string
+          url?: string
+          caption?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salon_gallery_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salon_members: {
         Row: {
           bio: string | null

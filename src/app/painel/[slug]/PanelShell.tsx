@@ -21,6 +21,7 @@ import {
   BarChart3,
   CreditCard,
   Megaphone,
+  Images,
   Ellipsis,
   X,
   LogOut,
@@ -46,6 +47,7 @@ const ICONS = {
   BarChart3,
   CreditCard,
   Megaphone,
+  Images,
 } as const;
 
 export type NavItem = {

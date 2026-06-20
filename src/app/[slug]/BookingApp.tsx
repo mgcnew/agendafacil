@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
@@ -12,6 +12,7 @@ import {
   Check,
   Clock,
   ChevronLeft,
+  ChevronRight,
   Loader2,
   CalendarDays,
   User,
@@ -20,6 +21,8 @@ import {
   CircleCheck,
   History,
   MapPin,
+  Images,
+  X,
 } from "lucide-react";
 
 type Salon = {
@@ -54,6 +57,7 @@ type Appt = {
 };
 
 type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done";
+type GalleryPhoto = { id: string; url: string };
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando",
@@ -108,6 +112,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [bookErr, setBookErr] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [mine, setMine] = useState<Appt[]>([]);
+  const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
+  const [showGallery, setShowGallery] = useState(false);
 
   // preço com desconto da campanha (ignora "sob consulta")
   const discPct = (s: Service) => (s.price_type === "on_request" ? 0 : discounts[s.id] ?? 0);
@@ -168,6 +174,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
       }
       setDiscounts(map);
     });
+    supabase
+      .from("salon_gallery")
+      .select("id, url")
+      .eq("salon_id", salon.id)
+      .order("sort_order")
+      .then(({ data }) => setGallery((data as GalleryPhoto[]) ?? []));
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
         // sem sessão: restaura dados salvos localmente
@@ -305,14 +317,24 @@ export function BookingApp({ salon }: { salon: Salon }) {
               )}
             </div>
           </div>
-          {(userId || savedPhone) && (
-            <button
-              onClick={loadMine}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
-            >
-              <History className="h-3.5 w-3.5" /> Meus
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {gallery.length > 0 && (
+              <button
+                onClick={() => setShowGallery(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
+              >
+                <Images className="h-3.5 w-3.5" /> Galeria
+              </button>
+            )}
+            {(userId || savedPhone) && (
+              <button
+                onClick={loadMine}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
+              >
+                <History className="h-3.5 w-3.5" /> Meus
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Saudação personalizada (cliente já conhecida) */}
@@ -722,6 +744,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <MineDrawer key="mine" mine={mine} onClose={() => setShowMine(false)} />
         )}
       </AnimatePresence>
+
+      {/* Modal: galeria de fotos */}
+      {showGallery && gallery.length > 0 && (
+        <GalleryModal photos={gallery} onClose={() => setShowGallery(false)} />
+      )}
     </div>
   );
 
@@ -770,6 +797,103 @@ export function BookingApp({ salon }: { salon: Salon }) {
       </MotionModal>
     );
   }
+}
+
+function GalleryModal({
+  photos,
+  onClose,
+}: {
+  photos: GalleryPhoto[];
+  onClose: () => void;
+}) {
+  const [idx, setIdx] = useState(0);
+  const touchX = useRef<number | null>(null);
+
+  const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
+  const next = () => setIdx((i) => (i + 1) % photos.length);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
+      else if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    touchX.current = null;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* topo */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0">
+        <span className="text-white/60 text-sm font-medium">
+          {idx + 1} / {photos.length}
+        </span>
+        <button onClick={onClose} className="p-2 text-white/70 hover:text-white transition rounded-lg">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* imagem */}
+      <div className="flex-1 flex items-center justify-center relative px-12 min-h-0">
+        {photos.length > 1 && (
+          <button
+            onClick={prev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={photos[idx].id}
+          src={photos[idx].url}
+          alt={`Foto ${idx + 1}`}
+          className="max-h-full max-w-full object-contain rounded-lg select-none"
+          style={{ animation: "fadeIn 0.2s ease" }}
+        />
+        {photos.length > 1 && (
+          <button
+            onClick={next}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        )}
+      </div>
+
+      {/* miniaturas */}
+      {photos.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 justify-center">
+          {photos.map((p, i) => (
+            <button
+              key={p.id}
+              onClick={() => setIdx(i)}
+              className={`shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
+                i === idx ? "border-primary opacity-100" : "border-transparent opacity-50 hover:opacity-75"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Stepper({ step }: { step: Step }) {
