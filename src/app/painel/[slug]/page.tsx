@@ -5,9 +5,9 @@ import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight } from "lucide-react";
+import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight, History, Cake } from "lucide-react";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
-import { BirthdayCard, type BirthdayClient } from "./BirthdayCard";
+import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function DashboardPage({
     return d.toISOString();
   })();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -54,8 +54,8 @@ export default async function DashboardPage({
         .limit(6),
       // Clientes para reativar — retorna erro (null) p/ quem não tem reports.view
       supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
-      // Aniversários próximos — null p/ quem não tem clients.view
-      supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 7 } as never),
+      // Aniversários do mês — janela ampliada para 31 dias
+      supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 31 } as never),
       // Agendamentos de amanhã (para lembrar) — só os que ainda vão acontecer
       supabase
         .from("appointments")
@@ -65,11 +65,29 @@ export default async function DashboardPage({
         .lt("starts_at", tomorrowEnd)
         .in("status", ["pending", "confirmed"])
         .order("starts_at"),
+      // Últimos atendimentos concluídos (excluindo hoje)
+      supabase
+        .from("appointments")
+        .select("id, starts_at, clients(full_name), salon_members(display_name), appointment_services(name)")
+        .eq("salon_id", salonId)
+        .eq("status", "completed")
+        .lt("starts_at", startDay)
+        .order("starts_at", { ascending: false })
+        .limit(6),
     ]);
 
   const reactArr = reactRaw as unknown[] | null;
   const reactCount = Array.isArray(reactArr) ? reactArr.length : 0;
   const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as BirthdayClient[];
+
+  type RecentAppt = { id: string; date: string; client: string; prof: string; services: string[] };
+  const recentAppts: RecentAppt[] = (recentRaw ?? []).map((a) => ({
+    id: a.id,
+    date: formatDate(a.starts_at),
+    client: (a.clients as { full_name?: string } | null)?.full_name ?? "Cliente",
+    prof: (a.salon_members as { display_name?: string } | null)?.display_name ?? "",
+    services: ((a.appointment_services as { name: string }[] | null) ?? []).map((s) => s.name),
+  }));
 
   const reminderItems = (tomorrowAppts ?? []).map((a) => ({
     id: a.id,
@@ -218,6 +236,58 @@ export default async function DashboardPage({
 
         {/* ── Sidebar contextual ───────────────────────────────── */}
         <div className="space-y-4 min-w-0">
+          {/* Últimos atendimentos */}
+          {recentAppts.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <History className="h-4 w-4 text-primary" /> Últimos atendimentos
+              </h2>
+              <div className="space-y-2">
+                {recentAppts.map((a) => (
+                  <div key={a.id} className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{a.client}</p>
+                      <p className="text-xs text-muted-foreground truncate">{a.services.join(", ")}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 mt-0.5">{a.date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Aniversariantes do mês */}
+          {birthdays.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Cake className="h-4 w-4 text-primary" /> Aniversariantes do mês
+              </h2>
+              <div className="space-y-2">
+                {birthdays.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{b.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {b.days_until === 0 ? "hoje 🎉" : b.days_until === 1 ? "amanhã" : `em ${b.days_until} dias`}
+                        {b.turning_age ? ` · ${b.turning_age} anos` : ""}
+                      </p>
+                    </div>
+                    {b.phone && (
+                      <a
+                        href={`https://wa.me/55${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Feliz aniversário, ${b.name.split(" ")[0]}! 🎂`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs font-medium text-primary hover:underline"
+                      >
+                        Parabenizar
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Alerta: clientes para reativar */}
           {reactCount > 0 && (
             <Link
@@ -238,9 +308,6 @@ export default async function DashboardPage({
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Link>
           )}
-
-          {/* Aniversários da semana */}
-          <BirthdayCard clients={birthdays} salonName={membership.salons.name} slug={slug} />
 
           {/* Minhas comissões (profissional/gerente) */}
           {myComm && (
