@@ -411,9 +411,9 @@ function MemberEditor({
           <button onClick={onClose} className="p-2 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
 
-        {/* Abas — mobile: pílulas com ícone (a ativa expande o rótulo);
-            desktop: abas sublinhadas com ícone + texto */}
-        <div className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
+        {/* Abas — mobile: pílulas (ícone + rótulo na ativa);
+            desktop: ícone em cima, rótulo abaixo, distribuídas uniformemente */}
+        <div className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-0 sm:pb-0 sm:px-0">
           {tabs.map((t) => {
             const on = tab === t.id;
             return (
@@ -423,19 +423,25 @@ function MemberEditor({
                 aria-label={t.label}
                 aria-current={on ? "page" : undefined}
                 className={cn(
-                  "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
-                  // Mobile (pílula)
-                  "rounded-full px-3.5 py-2 text-sm",
+                  "transition shrink-0 font-medium whitespace-nowrap",
+                  // Mobile: pílula horizontal
+                  "flex items-center justify-center gap-2 rounded-full px-3.5 py-2 text-sm",
                   on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-                  // Desktop (aba sublinhada) — sobrescreve o visual de pílula
-                  "sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-3 sm:py-2 sm:bg-transparent",
+                  // Desktop: coluna ícone + label, flex-1 para distribuir
+                  "sm:flex-1 sm:flex-col sm:items-center sm:gap-1 sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-2 sm:py-2.5 sm:bg-transparent",
                   on
                     ? "sm:border-primary sm:text-primary"
-                    : "sm:border-transparent sm:hover:bg-transparent sm:hover:text-foreground",
+                    : "sm:border-transparent sm:text-muted-foreground sm:hover:bg-muted/50 sm:hover:text-foreground",
                 )}
               >
                 <t.icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
-                <span className={cn("leading-none", on ? "inline" : "hidden", "sm:inline")}>
+                <span className={cn(
+                  "leading-none",
+                  // Mobile: só mostra na ativa
+                  on ? "inline" : "hidden",
+                  // Desktop: sempre visível, fonte menor
+                  "sm:inline sm:text-[11px]",
+                )}>
                   {t.label}
                 </span>
               </button>
