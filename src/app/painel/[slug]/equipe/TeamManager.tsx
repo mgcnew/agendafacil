@@ -403,7 +403,7 @@ function MemberEditor({
 
   return (
     <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-lg mx-auto max-h-[88vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+      <Card className="w-full sm:max-w-lg mx-auto h-[600px] max-h-[88vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between p-5 pb-3">
           <h3 className="font-display text-lg font-bold">
             {member.display_name ?? member.profiles?.full_name ?? "Profissional"}
