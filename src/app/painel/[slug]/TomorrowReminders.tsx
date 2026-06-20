@@ -22,8 +22,6 @@ export function TomorrowReminders({
   dateLabel: string;
   salonName: string;
 }) {
-  if (!items.length) return null;
-
   const waHref = (it: ReminderItem) => {
     const digits = (it.phone ?? "").replace(/\D/g, "");
     if (!digits) return null;
@@ -34,13 +32,15 @@ export function TomorrowReminders({
   };
 
   return (
-    <Card className="p-5 min-w-0">
-      <h2 className="font-display font-semibold flex items-center gap-2">
-        <BellRing className="h-5 w-5 text-primary" /> Lembretes de amanhã
+    <Card className="p-4 min-w-0">
+      <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+        <BellRing className="h-4 w-4 text-primary" /> Lembretes de amanhã
         <span className="text-xs font-normal text-muted-foreground">{dateLabel}</span>
       </h2>
-      <p className="text-sm text-muted-foreground mt-1">Confirme com um toque e reduza as faltas.</p>
-      <div className="mt-4 space-y-2">
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2">Nenhum agendamento para amanhã.</p>
+      ) : (
+      <div className="space-y-2">
         {items.map((it) => {
           const href = waHref(it);
           return (
@@ -71,6 +71,7 @@ export function TomorrowReminders({
           );
         })}
       </div>
+      )}
     </Card>
   );
 }

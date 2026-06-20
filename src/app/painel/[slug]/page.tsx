@@ -237,11 +237,13 @@ export default async function DashboardPage({
         {/* ── Sidebar contextual ───────────────────────────────── */}
         <div className="space-y-4 min-w-0">
           {/* Últimos atendimentos */}
-          {recentAppts.length > 0 && (
-            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <History className="h-4 w-4 text-primary" /> Últimos atendimentos
-              </h2>
+          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+              <History className="h-4 w-4 text-primary" /> Últimos atendimentos
+            </h2>
+            {recentAppts.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">Nenhum atendimento concluído ainda.</p>
+            ) : (
               <div className="space-y-2">
                 {recentAppts.map((a) => (
                   <div key={a.id} className="flex items-start justify-between gap-2">
@@ -253,15 +255,17 @@ export default async function DashboardPage({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Aniversariantes do mês */}
-          {birthdays.length > 0 && (
-            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <Cake className="h-4 w-4 text-primary" /> Aniversariantes do mês
-              </h2>
+          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+              <Cake className="h-4 w-4 text-primary" /> Aniversariantes do mês
+            </h2>
+            {birthdays.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">Nenhum aniversariante nos próximos 31 dias.</p>
+            ) : (
               <div className="space-y-2">
                 {birthdays.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2">
@@ -285,8 +289,8 @@ export default async function DashboardPage({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Alerta: clientes para reativar */}
           {reactCount > 0 && (
@@ -329,16 +333,20 @@ export default async function DashboardPage({
           <TomorrowReminders items={reminderItems} dateLabel={tomorrowLabel} salonName={membership.salons.name} />
 
           {/* Pacotes ativos */}
-          {pkgs.length > 0 && (
-            <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold flex items-center gap-2">
-                  <Package className="h-4 w-4 text-primary" /> Pacotes ativos
-                </h2>
+          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <Package className="h-4 w-4 text-primary" /> Pacotes ativos
+              </h2>
+              {pkgs.length > 0 && (
                 <Link href={`/painel/${slug}/pacotes`} className="text-xs text-primary font-medium">
                   Ver todos
                 </Link>
-              </div>
+              )}
+            </div>
+            {pkgs.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">Nenhum pacote ativo no momento.</p>
+            ) : (
               <div className="space-y-2">
                 {pkgs.map((p) => {
                   const soon = p.dleft <= 3;
@@ -361,8 +369,8 @@ export default async function DashboardPage({
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
       </div>
