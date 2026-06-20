@@ -194,6 +194,8 @@ export default async function FinanceiroPage({
         nextCmes,
         start: periodStartStr,
         end: periodEndStr,
+        startIso: periodStartIso,
+        endIso: periodEndIso,
       }}
     />
   );

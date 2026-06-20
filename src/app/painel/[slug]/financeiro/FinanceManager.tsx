@@ -16,14 +16,15 @@ import {
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
-  type ReceiptData, type SalonInfo,
+  generateCommissionPdf, buildCommissionText,
+  type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData,
 } from "./receipt";
 import { FixedCostsPanel, type FixedCost, type ChairRental, type ActivePackageSummary } from "./FixedCostsPanel";
 
 type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
 type Comm = { member_id: string; name: string; earned: number; paid: number };
-type Period = { label: string; prevCmes: string; nextCmes: string; start: string; end: string };
+type Period = { label: string; prevCmes: string; nextCmes: string; start: string; end: string; startIso: string; endIso: string };
 export type Receivable = { id: string; client: string; member_id: string; total: number; time: string; services: string[] };
 
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
@@ -65,24 +66,8 @@ export function FinanceManager({
   const router = useRouter();
   const pathname = usePathname();
   const [tab, setTab] = useState<"caixa" | "comissoes" | "fixos">(initialTab);
-  const [payingId, setPayingId] = useState<string | null>(null);
+  const [commModal, setCommModal] = useState<Comm | null>(null);
   const [err, setErr] = useState<string | null>(null);
-
-  async function payCommission(c: Comm, outstanding: number) {
-    if (!confirm(`Pagar ${formatBRL(outstanding)} de comissão para ${c.name}?`)) return;
-    setPayingId(c.member_id);
-    setErr(null);
-    const { error } = await supabase.rpc("pay_commission", {
-      p_salon: salonId,
-      p_member: c.member_id,
-      p_amount: outstanding,
-      p_period_start: period.start,
-      p_period_end: period.end,
-    });
-    setPayingId(null);
-    if (error) { setErr("Não foi possível registrar o pagamento da comissão. Tente novamente."); return; }
-    router.refresh();
-  }
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState("0");
   const [closing, setClosing] = useState(false);
@@ -392,6 +377,22 @@ export function FinanceManager({
         )}
       </AnimatePresence>
 
+      {/* Detalhe / pagamento de comissão */}
+      <AnimatePresence>
+        {commModal && (
+          <CommissionModal
+            key="comm"
+            salonId={salonId}
+            comm={commModal}
+            period={period}
+            salon={salon}
+            canManage={canManage}
+            onClose={() => setCommModal(null)}
+            onPaid={() => { setCommModal(null); router.refresh(); }}
+          />
+        )}
+      </AnimatePresence>
+
       {tab === "comissoes" && (
         <div className="space-y-4">
           {/* Navegação de período */}
@@ -427,7 +428,11 @@ export function FinanceManager({
                 const outstanding = Math.max(0, c.earned - c.paid);
                 const settled = outstanding < 0.01;
                 return (
-                  <div key={c.member_id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
+                  <button
+                    key={c.member_id}
+                    onClick={() => setCommModal(c)}
+                    className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4 hover:bg-muted/40 transition"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{c.name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -436,26 +441,20 @@ export function FinanceManager({
                       </p>
                     </div>
                     {settled ? (
-                      <span className="text-xs font-medium rounded-full bg-emerald-500/12 text-emerald-600 px-2.5 py-1 flex items-center gap-1">
+                      <span className="text-xs font-medium rounded-full bg-emerald-500/12 text-emerald-600 px-2.5 py-1 flex items-center gap-1 shrink-0">
                         <Check className="h-3.5 w-3.5" /> Pago
                       </span>
                     ) : (
-                      <>
-                        <span className="font-semibold text-primary text-sm">{formatBRL(outstanding)}</span>
-                        {canManage && (
-                          <Button size="sm" onClick={() => payCommission(c, outstanding)} disabled={payingId === c.member_id}>
-                            {payingId === c.member_id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pagar"}
-                          </Button>
-                        )}
-                      </>
+                      <span className="font-semibold text-primary text-sm shrink-0">{formatBRL(outstanding)}</span>
                     )}
-                  </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
                 );
               })}
             </div>
           )}
           <p className="text-[11px] text-muted-foreground">
-            Ao pagar, o valor entra como saída no caixa (se aberto).
+            Toque em um profissional para ver o detalhe por serviço, gerar comprovante e pagar. Ao pagar, o valor entra como saída no caixa (se aberto).
           </p>
         </div>
       )}
@@ -496,19 +495,22 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
       let items: { name: string; price: number }[] = [];
       let client: string | null = null;
       let phone: string | null = null;
+      let professional: string | null = null;
       if (tx.appointment_id) {
         const [{ data: svcs }, { data: appt }] = await Promise.all([
           supabase.from("appointment_services").select("name, price").eq("appointment_id", tx.appointment_id),
-          supabase.from("appointments").select("clients(full_name, phone)").eq("id", tx.appointment_id).maybeSingle(),
+          supabase.from("appointments").select("clients(full_name, phone), salon_members(display_name)").eq("id", tx.appointment_id).maybeSingle(),
         ]);
         items = (svcs ?? []).map((s) => ({ name: s.name, price: Number(s.price) }));
         const c = appt?.clients as { full_name?: string; phone?: string | null } | null;
         client = c?.full_name ?? null;
         phone = c?.phone ?? null;
+        professional = (appt?.salon_members as { display_name?: string | null } | null)?.display_name ?? null;
       }
       setClientPhone(phone);
       setData({
         client,
+        professional,
         dateTime: `${formatDate(tx.created_at)} ${formatTime(tx.created_at)}`,
         items,
         total: Number(tx.amount),
@@ -547,22 +549,39 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
           <div className="grid place-items-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <>
-            <div className="rounded-[var(--radius)] border border-border p-4 text-sm space-y-1">
-              <p className="font-display font-bold">{salon.name}</p>
-              {(salon.phone || salon.address) && (
-                <p className="text-xs text-muted-foreground">{[salon.phone, salon.address].filter(Boolean).join(" · ")}</p>
-              )}
-              <p className="text-xs text-muted-foreground pt-1">{data.dateTime}{data.client ? ` · ${data.client}` : ""}</p>
-              <div className="border-t border-border my-2" />
-              {data.items.length ? data.items.map((i, idx) => (
-                <div key={idx} className="flex justify-between gap-3"><span className="min-w-0 truncate">{i.name}</span><span className="shrink-0">{formatBRL(i.price)}</span></div>
-              )) : (
-                <div className="flex justify-between gap-3"><span className="min-w-0 truncate">{tx.description || "Recebimento"}</span><span className="shrink-0">{formatBRL(data.total)}</span></div>
-              )}
-              <div className="border-t border-border my-2" />
-              <div className="flex justify-between font-semibold"><span>Total</span><span>{formatBRL(data.total)}</span></div>
-              <p className="text-xs text-muted-foreground">Pagamento: {payLabel(data.paymentMethod)}</p>
-              <p className="text-[10px] text-muted-foreground pt-2">Documento sem valor fiscal</p>
+            <div className="mx-auto max-w-xs rounded-[var(--radius)] border border-dashed border-border bg-card p-4 text-sm">
+              <div className="text-center space-y-0.5">
+                {salon.logo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={salon.logo_url} alt="" className="mx-auto h-12 w-12 rounded-full object-cover mb-1" />
+                )}
+                <p className="font-display font-bold leading-tight">{salon.name}</p>
+                {(salon.phone || salon.address) && (
+                  <p className="text-[11px] text-muted-foreground leading-tight">{[salon.phone, salon.address].filter(Boolean).join(" · ")}</p>
+                )}
+              </div>
+              <div className="border-t border-dashed border-border my-2.5" />
+              <p className="text-center text-[11px] font-semibold tracking-wide text-muted-foreground">COMPROVANTE DE PAGAMENTO</p>
+              <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                <p>Data: {data.dateTime}</p>
+                {data.client && <p>Cliente: {data.client}</p>}
+                {data.professional && <p>Profissional: {data.professional}</p>}
+              </div>
+              <div className="border-t border-dashed border-border my-2.5" />
+              <div className="space-y-1">
+                {data.items.length ? data.items.map((i, idx) => (
+                  <div key={idx} className="flex justify-between gap-3"><span className="min-w-0 truncate">{i.name}</span><span className="shrink-0 tabular-nums">{formatBRL(i.price)}</span></div>
+                )) : (
+                  <div className="flex justify-between gap-3"><span className="min-w-0 truncate">{tx.description || "Recebimento"}</span><span className="shrink-0 tabular-nums">{formatBRL(data.total)}</span></div>
+                )}
+              </div>
+              <div className="border-t border-dashed border-border my-2.5" />
+              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="tabular-nums">{formatBRL(data.total)}</span></div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Forma de pagamento: {payLabel(data.paymentMethod)}</p>
+              <div className="border-t border-dashed border-border my-2.5" />
+              <p className="text-center text-[11px] font-semibold pt-0.5">Obrigado pela preferência!</p>
+              <p className="text-center text-[10px] text-muted-foreground">Te esperamos no próximo horário — agende já!</p>
+              <p className="text-center text-[10px] text-muted-foreground pt-2">Documento sem valor fiscal</p>
             </div>
             <div className="flex gap-2 mt-4">
               <Button onClick={downloadPdf} disabled={busyPdf} className="flex-1">
@@ -586,6 +605,226 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
             )}
           </>
         )}
+      </Card>
+    </MotionModal>
+  );
+}
+
+/* ─────────────────── Detalhe e pagamento de comissão ─────────────────── */
+function CommissionModal({
+  salonId,
+  comm,
+  period,
+  salon,
+  canManage,
+  onClose,
+  onPaid,
+}: {
+  salonId: string;
+  comm: Comm;
+  period: Period;
+  salon: SalonInfo;
+  canManage: boolean;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [lines, setLines] = useState<CommissionLine[]>([]);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [busyPdf, setBusyPdf] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const outstanding = Math.max(0, comm.earned - comm.paid);
+  const settled = outstanding < 0.01;
+
+  useEffect(() => {
+    (async () => {
+      const [{ data: svcRows }, { data: redRows }, { data: details }] = await Promise.all([
+        supabase
+          .from("appointment_services")
+          .select("name, price, commission_amount, commission_percent, appointments!inner(starts_at, member_id, status, clients(full_name))")
+          .eq("salon_id", salonId)
+          .eq("appointments.member_id", comm.member_id)
+          .eq("appointments.status", "completed")
+          .gte("appointments.starts_at", period.startIso)
+          .lte("appointments.starts_at", period.endIso),
+        supabase
+          .from("package_redemptions")
+          .select("used_at, commission_amount, client_packages(name)")
+          .eq("salon_id", salonId)
+          .eq("member_id", comm.member_id)
+          .gte("used_at", period.startIso)
+          .lte("used_at", period.endIso),
+        supabase
+          .from("salon_member_details")
+          .select("personal_phone")
+          .eq("salon_id", salonId)
+          .eq("member_id", comm.member_id)
+          .maybeSingle(),
+      ]);
+
+      const collected: (CommissionLine & { _iso: string })[] = [];
+      for (const r of svcRows ?? []) {
+        const appt = r.appointments as unknown as { starts_at: string; clients: { full_name: string | null } | null };
+        collected.push({
+          _iso: appt.starts_at,
+          date: formatDate(appt.starts_at).slice(0, 5),
+          service: r.name,
+          client: appt.clients?.full_name ?? null,
+          base: Number(r.price),
+          percent: Number(r.commission_percent),
+          commission: Number(r.commission_amount),
+        });
+      }
+      for (const r of redRows ?? []) {
+        const pkg = r.client_packages as unknown as { name: string | null } | null;
+        collected.push({
+          _iso: r.used_at,
+          date: formatDate(r.used_at).slice(0, 5),
+          service: `Pacote: ${pkg?.name ?? "uso"}`,
+          commission: Number(r.commission_amount),
+        });
+      }
+      collected.sort((a, b) => a._iso.localeCompare(b._iso));
+      setLines(collected.map(({ _iso, ...l }) => l));
+      setPhone((details as { personal_phone?: string | null } | null)?.personal_phone ?? null);
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const receiptData = (): CommissionReceiptData => ({
+    professional: comm.name,
+    periodLabel: period.label,
+    issuedAt: formatDate(new Date().toISOString()),
+    lines,
+    total: comm.earned,
+    paid: comm.paid,
+    outstanding,
+    fileBase: `comissao-${comm.name.toLowerCase().replace(/\s+/g, "-")}-${period.start}`,
+  });
+
+  async function confirmPay() {
+    setPaying(true);
+    setErr(null);
+    const { error } = await supabase.rpc("pay_commission", {
+      p_salon: salonId,
+      p_member: comm.member_id,
+      p_amount: outstanding,
+      p_period_start: period.start,
+      p_period_end: period.end,
+    });
+    setPaying(false);
+    if (error) { setErr("Não foi possível registrar o pagamento. Tente novamente."); return; }
+    onPaid();
+  }
+
+  async function downloadPdf() {
+    setBusyPdf(true);
+    try { await generateCommissionPdf(receiptData(), salon); } finally { setBusyPdf(false); }
+  }
+
+  const waHref = (() => {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return null;
+    const full = digits.length <= 11 ? `55${digits}` : digits;
+    return `https://wa.me/${full}?text=${encodeURIComponent(buildCommissionText(receiptData(), salon))}`;
+  })();
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-bold flex items-center gap-2">
+              <Percent className="h-5 w-5 text-primary" /> Comissão
+            </h3>
+            <p className="text-sm text-muted-foreground truncate">{comm.name} · {period.label}</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-5 space-y-3">
+          {err && (
+            <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+              <X className="h-4 w-4 shrink-0" /> {err}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="grid place-items-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhum serviço apurado no período.</p>
+          ) : (
+            <div className="rounded-[var(--radius)] border border-border divide-y divide-border">
+              {lines.map((ln, i) => (
+                <div key={i} className="flex items-start gap-3 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{ln.service}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {ln.date}{ln.client ? ` · ${ln.client}` : ""}
+                      {ln.base != null && <> · base {formatBRL(ln.base)}</>}
+                      {ln.percent != null && <> · {ln.percent}%</>}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-primary shrink-0 tabular-nums">{formatBRL(ln.commission)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Totais */}
+          <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total apurado</span>
+              <span className="font-semibold tabular-nums">{formatBRL(comm.earned)}</span>
+            </div>
+            {comm.paid > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Já pago</span>
+                <span className="tabular-nums">{formatBRL(comm.paid)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-base font-bold pt-1 border-t border-border">
+              <span>A pagar</span>
+              <span className="text-primary tabular-nums">{formatBRL(outstanding)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="p-5 pt-3 border-t border-border space-y-2">
+          {canManage && !settled && (
+            <Button onClick={confirmPay} disabled={paying} className="w-full">
+              {paying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar pagamento de {formatBRL(outstanding)}
+            </Button>
+          )}
+          {settled && (
+            <p className="text-center text-xs font-medium text-emerald-600 flex items-center justify-center gap-1">
+              <Check className="h-4 w-4" /> Comissão deste período já paga
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={downloadPdf} disabled={busyPdf || loading} className="flex-1">
+              {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Comprovante
+            </Button>
+            {waHref ? (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 h-10 flex-1 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                <MessageCircle className="h-4 w-4" /> WhatsApp
+              </a>
+            ) : (
+              <Button variant="ghost" disabled className="flex-1">Sem telefone</Button>
+            )}
+          </div>
+        </div>
       </Card>
     </MotionModal>
   );
