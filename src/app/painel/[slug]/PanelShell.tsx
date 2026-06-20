@@ -56,6 +56,11 @@ export type NavItem = {
   icon: keyof typeof ICONS;
 };
 
+export type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietária",
   manager: "Gerente",
@@ -84,38 +89,47 @@ function Tip({ label }: { label: string }) {
 export function PanelShell({
   salon,
   role,
-  items,
+  groups,
   children,
 }: {
   salon: { name: string; slug: string; niche: string };
   role: string;
-  items: NavItem[];
+  groups: NavGroup[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const base = `/painel/${salon.slug}`;
-  // Agenda (calendário) ocupa toda a largura; demais páginas usam largura padrão
   const fullBleed = pathname === `${base}/agenda`;
+
+  const allItems = groups.flatMap((g) => g.items);
 
   const isActive = (href: string) =>
     href === ""
       ? pathname === base
       : pathname === base + href || pathname.startsWith(base + href + "/");
 
-  // 3 atalhos principais (preferindo Início/Agenda/Clientes) + restante no "Mais"
+  // 3 atalhos fixos na barra inferior mobile
   const primaryItems: NavItem[] = [];
   const usedHrefs = new Set<string>();
   for (const h of PRIMARY_HREFS) {
-    const it = items.find((i) => i.href === h);
+    const it = allItems.find((i) => i.href === h);
     if (it) { primaryItems.push(it); usedHrefs.add(it.href); }
   }
-  for (const it of items) {
+  for (const it of allItems) {
     if (primaryItems.length >= 3) break;
     if (!usedHrefs.has(it.href)) { primaryItems.push(it); usedHrefs.add(it.href); }
   }
-  const moreItems = items.filter((i) => !usedHrefs.has(i.href));
+
+  // Grupos do sheet "Mais" (exclui os itens já na barra primária)
+  const moreGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => !usedHrefs.has(it.href)) }))
+    .filter((g) => g.items.length > 0);
+
+  // Desktop: último grupo (Sistema/Configurações) fica no rodapé da sidebar
+  const mainGroups = groups.length > 1 ? groups.slice(0, -1) : groups;
+  const systemGroup = groups.length > 1 ? groups[groups.length - 1] : null;
 
   function sharePublic() {
     const url = `${window.location.origin}/${salon.slug}`;
@@ -138,32 +152,35 @@ export function PanelShell({
     router.refresh();
   }
 
-  /** Nav usado na sidebar desktop (ícone centrado + tooltip) */
+  function NavLink({ it }: { it: NavItem }) {
+    const href = base + it.href;
+    const active = isActive(it.href);
+    const Icon = ICONS[it.icon];
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 transition",
+          active
+            ? "bg-primary text-primary-foreground"
+            : "text-foreground/60 hover:bg-muted hover:text-foreground",
+        )}
+      >
+        <Icon className="h-[18px] w-[18px] shrink-0" />
+        <Tip label={it.label} />
+      </Link>
+    );
+  }
+
+  /** Nav usado na sidebar desktop — grupos com divisores */
   const desktopNav = (
     <nav className="flex flex-col items-center gap-1 w-full">
-      {items.map((it) => {
-        const href = base + it.href;
-        const active =
-          it.href === ""
-            ? pathname === base
-            : pathname === href || pathname.startsWith(href + "/");
-        const Icon = ICONS[it.icon];
-        return (
-          <Link
-            key={it.href}
-            href={href}
-            className={cn(
-              "group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 transition",
-              active
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/60 hover:bg-muted hover:text-foreground",
-            )}
-          >
-            <Icon className="h-[18px] w-[18px] shrink-0" />
-            <Tip label={it.label} />
-          </Link>
-        );
-      })}
+      {mainGroups.map((group, gi) => (
+        <div key={group.label} className="flex flex-col items-center gap-1 w-full">
+          {gi > 0 && <div className="w-6 h-px bg-border/60 my-1.5" />}
+          {group.items.map((it) => <NavLink key={it.href} it={it} />)}
+        </div>
+      ))}
     </nav>
   );
 
@@ -183,8 +200,14 @@ export function PanelShell({
         {/* Itens de navegação */}
         {desktopNav}
 
-        {/* Ações do rodapé */}
+        {/* Rodapé: Sistema (ex: Configurações) + ações utilitárias */}
         <div className="mt-auto flex flex-col items-center gap-1">
+          {systemGroup && (
+            <>
+              {systemGroup.items.map((it) => <NavLink key={it.href} it={it} />)}
+              <div className="w-6 h-px bg-border/60 my-1.5" />
+            </>
+          )}
           <button
             onClick={sharePublic}
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-primary hover:bg-primary/10 transition"
@@ -308,28 +331,37 @@ export function PanelShell({
               </button>
             </div>
 
-            {moreItems.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {moreItems.map((it) => {
-                  const active = isActive(it.href);
-                  const Icon = ICONS[it.icon];
-                  return (
-                    <Link
-                      key={it.href}
-                      href={base + it.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-3 text-center transition",
-                        active
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border hover:bg-muted text-foreground",
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span className="text-[11px] font-medium leading-tight">{it.label}</span>
-                    </Link>
-                  );
-                })}
+            {moreGroups.length > 0 && (
+              <div className="space-y-3">
+                {moreGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-0.5">
+                      {group.label}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {group.items.map((it) => {
+                        const active = isActive(it.href);
+                        const Icon = ICONS[it.icon];
+                        return (
+                          <Link
+                            key={it.href}
+                            href={base + it.href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              "flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-3 text-center transition",
+                              active
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border hover:bg-muted text-foreground",
+                            )}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="text-[11px] font-medium leading-tight">{it.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
