@@ -1738,125 +1738,136 @@ function CreateAppointment({
     }
   }
 
+  const serviceButtons = services.map(s => {
+    const on = selected.includes(s.id);
+    return (
+      <button
+        key={s.id} type="button"
+        onClick={() => setSelected(p => on ? p.filter(x => x !== s.id) : [...p, s.id])}
+        className={cn(
+          "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition",
+          on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
+        )}
+      >
+        <span className="flex items-center gap-1.5">
+          {s.name}
+          {discOf(s) > 0 && (
+            <span className="rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5">-{discOf(s)}%</span>
+          )}
+        </span>
+        {discOf(s) > 0 ? (
+          <span>
+            <span className="text-muted-foreground line-through mr-1.5">{formatBRL(Number(s.price))}</span>
+            <span className="text-foreground">{formatBRL(effOf(s))}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
+        )}
+      </button>
+    );
+  });
+
   return (
     <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+      <Card className="w-full sm:max-w-2xl mx-auto max-h-[90vh] overflow-auto sm:overflow-hidden p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
 
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Cliente</Label>
-            <Select value={existingClient} onValueChange={setExisting}>
-              <option value="">+ Nova cliente</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-            </Select>
-          </div>
-          {!existingClient && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
-              <Input placeholder="Celular" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
-            </div>
-          )}
+        {/* Desktop: two columns. Mobile: single column */}
+        <div className="sm:flex sm:gap-6 sm:min-h-[440px]">
 
-          <div className="space-y-1.5">
-            <Label>Profissional</Label>
-            <Select value={proId} onValueChange={setProId}>
-              {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Serviços</Label>
-            <div className="space-y-1.5 max-h-44 overflow-auto">
-              {services.map(s => {
-                const on = selected.includes(s.id);
-                return (
-                  <button
-                    key={s.id} type="button"
-                    onClick={() => setSelected(p => on ? p.filter(x => x !== s.id) : [...p, s.id])}
-                    className={cn(
-                      "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition",
-                      on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
-                    )}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {s.name}
-                      {discOf(s) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5">-{discOf(s)}%</span>
-                      )}
-                    </span>
-                    {discOf(s) > 0 ? (
-                      <span>
-                        <span className="text-muted-foreground line-through mr-1.5">{formatBRL(Number(s.price))}</span>
-                        <span className="text-foreground">{formatBRL(effOf(s))}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">{formatBRL(Number(s.price))}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Data</Label>
-            <button
-              type="button"
-              onClick={() => setShowCal(v => !v)}
-              aria-expanded={showCal}
-              className="h-11 w-full flex items-center justify-between rounded-[var(--radius)] border border-border bg-card px-3.5 text-sm text-foreground hover:border-foreground/25 transition"
-            >
-              <span className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                {dateLabel}
-              </span>
-              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
-            </button>
-            {showCal && (
-              <Calendar
-                value={date}
-                onChange={(d) => { setDate(d); setShowCal(false); }}
-                className="mt-1"
-              />
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          {/* Left column — fields */}
+          <div className="space-y-4 sm:w-60 sm:shrink-0 sm:flex sm:flex-col sm:space-y-3">
             <div className="space-y-1.5">
-              <Label>Horário</Label>
-              <Select
-                value={slot}
-                onValueChange={setSlot}
-                disabled={loadingSlots || slots.length === 0}
-                placeholder={
-                  totalDuration <= 0 ? "Escolha serviços"
-                    : loadingSlots ? "Carregando…"
-                      : slots.length === 0 ? "Sem horários" : "Selecione"
-                }
-              >
-                {slots.map(s => <option key={s} value={s}>{slotLabel(s)}</option>)}
+              <Label>Cliente</Label>
+              <Select value={existingClient} onValueChange={setExisting}>
+                <option value="">+ Nova cliente</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
               </Select>
             </div>
+            {!existingClient && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
+                <Input placeholder="Celular" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+              </div>
+            )}
+
             <div className="space-y-1.5">
-              <Label>Total</Label>
-              <div className="h-11 flex items-center font-semibold text-primary">{formatBRL(totalPrice)}</div>
+              <Label>Profissional</Label>
+              <Select value={proId} onValueChange={setProId}>
+                {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
             </div>
+
+            {/* Serviços — mobile only */}
+            <div className="space-y-1.5 sm:hidden">
+              <Label>Serviços</Label>
+              <div className="space-y-1.5 max-h-44 overflow-auto">{serviceButtons}</div>
+            </div>
+
+            {/* Data — mobile: toggle; desktop: calendário fixo */}
+            <div className="space-y-1.5">
+              <Label>Data</Label>
+              <button
+                type="button"
+                onClick={() => setShowCal(v => !v)}
+                aria-expanded={showCal}
+                className="sm:hidden h-11 w-full flex items-center justify-between rounded-[var(--radius)] border border-border bg-card px-3.5 text-sm text-foreground hover:border-foreground/25 transition"
+              >
+                <span className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                  {dateLabel}
+                </span>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
+              </button>
+              {showCal && (
+                <Calendar value={date} onChange={(d) => { setDate(d); setShowCal(false); }} className="mt-1 sm:hidden" />
+              )}
+              <Calendar value={date} onChange={(d) => setDate(d)} className="hidden sm:block" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Horário</Label>
+                <Select
+                  value={slot}
+                  onValueChange={setSlot}
+                  disabled={loadingSlots || slots.length === 0}
+                  placeholder={
+                    totalDuration <= 0 ? "Escolha serviços"
+                      : loadingSlots ? "Carregando…"
+                        : slots.length === 0 ? "Sem horários" : "Selecione"
+                  }
+                >
+                  {slots.map(s => <option key={s} value={s}>{slotLabel(s)}</option>)}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Total</Label>
+                <div className="h-11 flex items-center font-semibold text-primary">{formatBRL(totalPrice)}</div>
+              </div>
+            </div>
+
+            {proId && totalDuration > 0 && !loadingSlots && slots.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Nenhum horário livre nesta data para esta profissional. Verifique os horários de trabalho em Configurações.
+              </p>
+            )}
+
+            {err && <p className="text-sm text-red-600">{err}</p>}
+            <Button className="w-full sm:mt-auto" onClick={create} disabled={busy || selected.length === 0 || !slot}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Criar agendamento
+            </Button>
           </div>
 
-          {proId && totalDuration > 0 && !loadingSlots && slots.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Nenhum horário livre nesta data para esta profissional. Verifique os horários de trabalho em Configurações.
-            </p>
-          )}
+          {/* Right column — services (desktop only) */}
+          <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-w-0">
+            <Label className="mb-2">Serviços</Label>
+            <div className="flex-1 overflow-auto space-y-1.5 pr-0.5">{serviceButtons}</div>
+          </div>
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <Button className="w-full" onClick={create} disabled={busy || selected.length === 0 || !slot}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Criar agendamento
-          </Button>
         </div>
       </Card>
     </MotionModal>
