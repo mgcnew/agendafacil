@@ -945,11 +945,10 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, my
 }
 
 // ── Month View ─────────────────────────────────────────────────
-function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, onApptClick }: {
+function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onDayClick: (d: string) => void;
   onNewAppt: (d: string) => void;
-  onApptClick: (a: Appt) => void;
 }) {
   const d     = parse(date);
   const year  = d.getFullYear();
@@ -1014,23 +1013,20 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, onApp
                   {dayAppts.slice(0, MAX).map(a => {
                     const color = getColor(pros, a.member_id);
                     return (
-                      <button
+                      <div
                         key={a.id}
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onApptClick(a); }}
-                        className="w-full truncate text-left text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-foreground hover:brightness-95 transition"
+                        className="w-full truncate text-left text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] text-foreground pointer-events-none"
                         style={{ background: color + "1f", borderLeft: `2px solid ${color}` }}
-                        title={`${fmtHM(a.starts_at)} · ${a.clients?.full_name ?? "Cliente"} · ${a.salon_members?.display_name ?? ""}`}
                       >
                         {a.clients?.alert_summary && (
                           <AlertTriangle className="inline h-2.5 w-2.5 text-red-500 mr-0.5 -mt-0.5" />
                         )}
                         {fmtHM(a.starts_at)} {a.clients?.full_name ?? "Cliente"}
-                      </button>
+                      </div>
                     );
                   })}
                   {overflow > 0 && (
-                    <p className="text-[11px] text-muted-foreground px-1.5">
+                    <p className="text-[11px] text-muted-foreground px-1.5 pointer-events-none">
                       +{overflow} mais
                     </p>
                   )}
@@ -1319,7 +1315,6 @@ export function AgendaManager({
             date={date} appts={appts} pros={pros} activePros={activePros}
             onDayClick={d => { setDate(d); setView("dia"); }}
             onNewAppt={d => openCreate(d)}
-            onApptClick={a => setDetailAppt(a)}
           />
         ) : view === "semana" ? (
           <WeekView
