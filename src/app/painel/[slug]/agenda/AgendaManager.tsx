@@ -1658,6 +1658,8 @@ function CreateAppointment({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
+  const [svcSearch, setSvcSearch]       = useState("");
+  const [lastSvcs, setLastSvcs]         = useState<{ id: string; name: string }[] | null>(null);
 
   const dateLabel = (() => {
     const d = parse(date);
@@ -1672,6 +1674,28 @@ function CreateAppointment({
   const chosen     = services.filter(s => selected.includes(s.id));
   const totalPrice = chosen.reduce((a, s) => a + effOf(s), 0);
   const totalDuration = chosen.reduce((a, s) => a + s.duration_min, 0);
+
+  // Último serviço do cliente selecionado
+  useEffect(() => {
+    if (!existingClient) { setLastSvcs(null); return; }
+    supabase
+      .from("appointments")
+      .select("id, appointment_services(service_id, services(id, name))")
+      .eq("client_id", existingClient)
+      .eq("salon_id", salonId)
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) { setLastSvcs(null); return; }
+        type AptSvc = { service_id: string; services: { id: string; name: string } | null };
+        const svcs = (data.appointment_services as AptSvc[])
+          .filter(r => r.services)
+          .map(r => ({ id: r.services!.id, name: r.services!.name }));
+        setLastSvcs(svcs.length ? svcs : null);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingClient, salonId]);
 
   useEffect(() => {
     if (!proId || totalDuration <= 0) { setSlots([]); setSlot(""); return; }
@@ -1738,7 +1762,11 @@ function CreateAppointment({
     }
   }
 
-  const serviceButtons = services.map(s => {
+  const filteredServices = svcSearch.trim()
+    ? services.filter(s => s.name.toLowerCase().includes(svcSearch.toLowerCase()))
+    : services;
+
+  const serviceButtons = filteredServices.map(s => {
     const on = selected.includes(s.id);
     return (
       <button
@@ -1782,7 +1810,7 @@ function CreateAppointment({
           <div className="space-y-4 sm:w-60 sm:shrink-0 sm:flex sm:flex-col sm:space-y-3">
             <div className="space-y-1.5">
               <Label>Cliente</Label>
-              <Select value={existingClient} onValueChange={setExisting}>
+              <Select value={existingClient} onValueChange={v => { setExisting(v); setSelected([]); }}>
                 <option value="">+ Nova cliente</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
               </Select>
@@ -1791,6 +1819,20 @@ function CreateAppointment({
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
                 <Input placeholder="Celular" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+              </div>
+            )}
+            {lastSvcs && (
+              <div className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-muted/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground truncate">
+                  Último: <span className="text-foreground font-medium">{lastSvcs.map(s => s.name).join(", ")}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelected(lastSvcs.map(s => s.id).filter(id => services.some(sv => sv.id === id)))}
+                  className="shrink-0 text-xs font-semibold text-primary hover:underline"
+                >
+                  Usar
+                </button>
               </div>
             )}
 
@@ -1804,6 +1846,11 @@ function CreateAppointment({
             {/* Serviços — mobile only */}
             <div className="space-y-1.5 sm:hidden">
               <Label>Serviços</Label>
+              <Input
+                placeholder="Buscar serviço…"
+                value={svcSearch}
+                onChange={e => setSvcSearch(e.target.value)}
+              />
               <div className="space-y-1.5 max-h-44 overflow-auto">{serviceButtons}</div>
             </div>
 
@@ -1865,6 +1912,12 @@ function CreateAppointment({
           {/* Right column — services (desktop only) */}
           <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-w-0">
             <Label className="mb-2">Serviços</Label>
+            <Input
+              placeholder="Buscar serviço…"
+              value={svcSearch}
+              onChange={e => setSvcSearch(e.target.value)}
+              className="mb-2"
+            />
             <div className="flex-1 overflow-auto space-y-1.5 pr-0.5">{serviceButtons}</div>
           </div>
 
