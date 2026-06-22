@@ -427,7 +427,7 @@ export default function Home() {
               Planos que cabem no seu salão
             </h2>
             <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-              Comece com 5 dias grátis. Sem cartão, sem fidelidade — cancele
+              Comece com 14 dias grátis. Sem cartão, sem fidelidade — cancele
               quando quiser.
             </p>
           </div>
@@ -539,7 +539,7 @@ export default function Home() {
                 Sem cartão de crédito · Sem compromisso
               </p>
               <h2 className="font-display text-3xl sm:text-5xl font-bold text-white leading-tight">
-                5 dias grátis.{" "}
+                14 dias grátis.{" "}
                 <br className="hidden sm:block" />
                 Sem compromisso.
               </h2>

@@ -55,7 +55,7 @@ export function Hero() {
             <div className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3">
               <Link href="/criar-salao">
                 <Button size="lg" className="font-semibold">
-                  Começar grátis — 5 dias <ArrowRight className="h-4 w-4" />
+                  Começar grátis — 14 dias <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <a href="#como-funciona">
