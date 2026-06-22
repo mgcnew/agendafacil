@@ -27,6 +27,7 @@ import {
   LogOut,
   ExternalLink,
   Share2,
+  ShieldCheck,
 } from "lucide-react";
 
 /** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
@@ -91,11 +92,13 @@ export function PanelShell({
   role,
   groups,
   children,
+  isPlatformAdmin = false,
 }: {
   salon: { name: string; slug: string; niche: string };
   role: string;
   groups: NavGroup[];
   children: React.ReactNode;
+  isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -207,6 +210,15 @@ export function PanelShell({
               {systemGroup.items.map((it) => <NavLink key={it.href} it={it} />)}
               <div className="w-6 h-px bg-border/60 my-1.5" />
             </>
+          )}
+          {isPlatformAdmin && (
+            <Link
+              href="/admin"
+              className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
+            >
+              <ShieldCheck className="h-[18px] w-[18px]" />
+              <Tip label="Plataforma" />
+            </Link>
           )}
           <button
             onClick={sharePublic}
@@ -366,6 +378,15 @@ export function PanelShell({
             )}
 
             <div className="border-t border-border mt-4 pt-3 space-y-1">
+              {isPlatformAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted"
+                >
+                  <ShieldCheck className="h-4.5 w-4.5" /> Painel da plataforma
+                </Link>
+              )}
               <button
                 onClick={() => { setOpen(false); sharePublic(); }}
                 className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/10"

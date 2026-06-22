@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
+import { createClient } from "@/lib/supabase/server";
 import { planAllowsHref } from "@/lib/plans";
 import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
@@ -70,6 +71,10 @@ export default async function PanelLayout({
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
 
+  // Admin da plataforma? (mostra atalho discreto para /admin)
+  const supabase = await createClient();
+  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin" as never);
+
   // Gate de assinatura: bloqueia o painel se o trial venceu e não há assinatura ativa.
   // Fail-open: se o status não puder ser lido (RPC nulo), libera para não travar por engano.
   const access = await getAccessStatus(slug);
@@ -123,6 +128,7 @@ export default async function PanelLayout({
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
         groups={groups}
+        isPlatformAdmin={!!isPlatformAdmin}
       >
         {children}
       </PanelShell>
