@@ -7,12 +7,23 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { MotionModal } from "@/components/MotionModal";
 import { AnimatePresence } from "framer-motion";
-import { formatBRL, formatDate } from "@/lib/utils";
+import { formatBRL, formatDate, formatTime } from "@/lib/utils";
 import { PLANS, type PlanId } from "@/lib/plans";
 import {
   Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
   Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
+  UserPlus, Trash2, History, Receipt,
 } from "lucide-react";
+import { getSalonBilling } from "./actions";
+
+type BillingPayment = {
+  id: string;
+  status: string;
+  value: number;
+  dueDate: string;
+  paymentDate: string | null;
+  invoiceUrl: string | null;
+};
 
 export type AdminMetrics = {
   mrr: number;
@@ -50,6 +61,22 @@ export type AdminSalon = {
   last_activity: string | null;
 };
 
+export type AdminUser = {
+  profile_id: string;
+  email: string | null;
+  full_name: string | null;
+  created_at: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  actor_email: string | null;
+  action: string;
+  salon_name: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+};
+
 /** Dias desde a última atividade (criação de agendamento). null = nunca. */
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -77,12 +104,27 @@ const statusMeta = (s: string | null) =>
 
 const planName = (p: string | null) => (p && p in PLANS ? PLANS[p as PlanId].name : (p ?? "—"));
 
+const PAYMENT_META: Record<string, { label: string; cls: string }> = {
+  RECEIVED: { label: "Pago", cls: "bg-emerald-500/12 text-emerald-600" },
+  CONFIRMED: { label: "Pago", cls: "bg-emerald-500/12 text-emerald-600" },
+  RECEIVED_IN_CASH: { label: "Pago", cls: "bg-emerald-500/12 text-emerald-600" },
+  PENDING: { label: "Pendente", cls: "bg-amber-500/15 text-amber-600" },
+  OVERDUE: { label: "Vencida", cls: "bg-red-500/12 text-red-600" },
+  REFUNDED: { label: "Estornada", cls: "bg-muted text-muted-foreground" },
+};
+const paymentMeta = (s: string) =>
+  PAYMENT_META[s] ?? { label: s, cls: "bg-muted text-muted-foreground" };
+
 export function AdminDashboard({
   metrics,
   salons,
+  admins,
+  audit,
 }: {
   metrics: AdminMetrics | null;
   salons: AdminSalon[];
+  admins: AdminUser[];
+  audit: AuditEntry[];
 }) {
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
@@ -194,6 +236,12 @@ export function AdminDashboard({
             })
           )}
         </div>
+
+        {/* Admins + Auditoria */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          <AdminsPanel admins={admins} />
+          <AuditPanel audit={audit} />
+        </div>
       </div>
 
       <AnimatePresence>
@@ -221,6 +269,114 @@ function Kpi({
         {label}
         {hint && <span className="ml-1 text-[10px] opacity-70">({hint})</span>}
       </p>
+    </div>
+  );
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  extend_trial: "Estendeu trial",
+  set_plan: "Mudou plano",
+  set_status: "Mudou status",
+  add_admin: "Adicionou admin",
+  remove_admin: "Removeu admin",
+};
+
+function AdminsPanel({ admins }: { admins: AdminUser[] }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function add() {
+    if (!email.trim()) return;
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("admin_add_admin" as never, { p_email: email.trim() } as never);
+    setBusy(false);
+    if (error) { setErr(error.message || "Não foi possível adicionar."); return; }
+    setEmail("");
+    router.refresh();
+  }
+
+  async function remove(id: string) {
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("admin_remove_admin" as never, { p_profile: id } as never);
+    setBusy(false);
+    if (error) { setErr(error.message || "Não foi possível remover."); return; }
+    router.refresh();
+  }
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+      <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+        <ShieldCheck className="h-4 w-4 text-primary" /> Administradores
+      </h2>
+      {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
+      <div className="flex gap-2 mb-3">
+        <Input
+          placeholder="e-mail do novo admin"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          inputMode="email"
+          className="flex-1"
+        />
+        <Button onClick={add} disabled={busy || !email.trim()}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Adicionar
+        </Button>
+      </div>
+      <div className="space-y-1.5">
+        {admins.map((a) => (
+          <div key={a.profile_id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border p-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{a.full_name || a.email || a.profile_id}</p>
+              {a.full_name && a.email && <p className="text-xs text-muted-foreground truncate">{a.email}</p>}
+            </div>
+            <button
+              onClick={() => remove(a.profile_id)}
+              disabled={busy}
+              title="Remover admin"
+              className="grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground mt-2">
+        O e-mail precisa já ter conta no app. Você não pode remover a si mesmo.
+      </p>
+    </div>
+  );
+}
+
+function AuditPanel({ audit }: { audit: AuditEntry[] }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+      <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+        <History className="h-4 w-4 text-primary" /> Atividade recente
+      </h2>
+      {audit.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma ação registrada ainda.</p>
+      ) : (
+        <div className="space-y-1.5 max-h-80 overflow-auto">
+          {audit.map((e) => {
+            const label = ACTION_LABEL[e.action] ?? e.action;
+            const extra = e.detail ? Object.values(e.detail).filter(Boolean).join(" · ") : "";
+            return (
+              <div key={e.id} className="text-sm border-b border-border/60 pb-1.5 last:border-0">
+                <p className="truncate">
+                  <span className="font-medium">{label}</span>
+                  {e.salon_name && <span className="text-muted-foreground"> — {e.salon_name}</span>}
+                  {extra && <span className="text-muted-foreground"> ({extra})</span>}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {e.actor_email ?? "—"} · {formatDate(e.created_at)} {formatTime(e.created_at)}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -285,6 +441,20 @@ function ManageModal({
   const [days, setDays] = useState("7");
   const [plan, setPlan] = useState<string>(salon.plan ?? "basic");
   const meta = statusMeta(salon.status);
+
+  // Cobrança (Asaas) — carregada sob demanda
+  const [billing, setBilling] = useState<BillingPayment[] | null>(null);
+  const [billingMsg, setBillingMsg] = useState<string | null>(null);
+  const [loadingBilling, setLoadingBilling] = useState(false);
+
+  async function loadBilling() {
+    setLoadingBilling(true);
+    setBillingMsg(null);
+    const res = await getSalonBilling(salon.salon_id);
+    setLoadingBilling(false);
+    if (res.ok) setBilling(res.payments);
+    else { setBilling([]); setBillingMsg(res.error); }
+  }
 
   async function run(key: string, fn: () => PromiseLike<{ error: unknown }>) {
     setBusy(key);
@@ -397,6 +567,41 @@ function ManageModal({
                 {busy === "block" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Bloquear
               </Button>
             </div>
+          </div>
+
+          {/* Cobrança (Asaas) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Cobrança</Label>
+              {billing === null && (
+                <button onClick={loadBilling} disabled={loadingBilling} className="text-xs font-medium text-primary hover:underline disabled:opacity-60">
+                  {loadingBilling ? "Carregando…" : "Ver cobranças"}
+                </button>
+              )}
+            </div>
+            {billingMsg && <p className="text-xs text-muted-foreground">{billingMsg}</p>}
+            {billing && billing.length > 0 && (
+              <div className="rounded-[var(--radius)] border border-border divide-y divide-border">
+                {billing.map((p) => {
+                  const pm = paymentMeta(p.status);
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 p-2.5">
+                      <Receipt className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{formatBRL(p.value)}</p>
+                        <p className="text-xs text-muted-foreground">venc. {p.dueDate}{p.paymentDate ? ` · pago ${p.paymentDate}` : ""}</p>
+                      </div>
+                      <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${pm.cls}`}>{pm.label}</span>
+                      {p.invoiceUrl && (
+                        <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer" title="2ª via" className="text-primary hover:underline shrink-0">
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <Link

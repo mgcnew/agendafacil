@@ -80,3 +80,22 @@ export async function asaasSubscriptionCheckoutUrl(
   );
   return data.data?.[0]?.invoiceUrl ?? null;
 }
+
+export type AsaasPayment = {
+  id: string;
+  status: string;        // PENDING | RECEIVED | CONFIRMED | OVERDUE | REFUNDED | ...
+  value: number;
+  dueDate: string;       // YYYY-MM-DD
+  paymentDate: string | null;
+  invoiceUrl: string | null;
+};
+
+/** Lista as cobranças (faturas) de uma assinatura, mais recentes primeiro. */
+export async function asaasListSubscriptionPayments(
+  subscriptionId: string,
+): Promise<AsaasPayment[]> {
+  const data = await asaasFetch<{ data?: AsaasPayment[] }>(
+    `/subscriptions/${subscriptionId}/payments`,
+  );
+  return [...(data.data ?? [])].sort((a, b) => (a.dueDate < b.dueDate ? 1 : -1));
+}
