@@ -12,7 +12,7 @@ import { PLANS, type PlanId } from "@/lib/plans";
 import {
   Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
   Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
-  UserPlus, Trash2, History, Receipt, Download, Megaphone,
+  UserPlus, Trash2, History, Receipt, Download, Megaphone, MessageCircle, Mail,
 } from "lucide-react";
 import { getSalonBilling } from "./actions";
 
@@ -158,17 +158,37 @@ export function AdminDashboard({
   admins,
   audit,
   announcements,
+  mrrHistory,
 }: {
   metrics: AdminMetrics | null;
   salons: AdminSalon[];
   admins: AdminUser[];
   audit: AuditEntry[];
   announcements: Announcement[];
+  mrrHistory: { month: string; mrr: number }[];
 }) {
+  // Usa o histórico real (snapshots) quando há ao menos 2 pontos; senão, a estimativa.
+  const useRealMrr = mrrHistory.length >= 2;
+  const mrrChartSeries = useRealMrr ? mrrHistory : (metrics?.mrr_series ?? []);
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [tab, setTab] = useState<"geral" | "saloes" | "admin" | "avisos">("geral");
+  const [tab, setTab] = useState<"atencao" | "geral" | "saloes" | "admin" | "avisos">("atencao");
+
+  // "Precisa de atenção": trials vencendo, inadimplentes e salões parados.
+  const TRIAL_SOON_DAYS = 3;
+  const INACTIVE_DAYS = 21;
+  const now = Date.now();
+  const trialsEnding = salons.filter(
+    (s) => s.status === "trialing" && s.trial_ends_at &&
+      new Date(s.trial_ends_at).getTime() - now <= TRIAL_SOON_DAYS * 86_400_000,
+  );
+  const overdue = salons.filter((s) => s.status === "past_due");
+  const inactive = salons.filter(
+    (s) => (s.status === "active" || s.status === "trialing") &&
+      (daysSince(s.last_activity) === null || (daysSince(s.last_activity) ?? 0) >= INACTIVE_DAYS),
+  );
+  const attentionCount = trialsEnding.length + overdue.length + inactive.length;
   const router = useRouter();
 
   const filtered = salons.filter((s) => {
@@ -198,7 +218,7 @@ export function AdminDashboard({
 
         {/* Abas */}
         <div className="flex gap-1 border-b border-border">
-          {([["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"]] as const).map(([id, label]) => (
+          {([["atencao", attentionCount > 0 ? `Atenção (${attentionCount})` : "Atenção"], ["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -210,6 +230,15 @@ export function AdminDashboard({
             </button>
           ))}
         </div>
+
+        {tab === "atencao" && (
+          <AttentionPanel
+            trialsEnding={trialsEnding}
+            overdue={overdue}
+            inactive={inactive}
+            onManage={setManaging}
+          />
+        )}
 
         {tab === "geral" && (
         <div className="space-y-7">
@@ -234,7 +263,7 @@ export function AdminDashboard({
 
         {/* Evolução */}
         <div className="grid lg:grid-cols-2 gap-6">
-          <MrrChart series={metrics?.mrr_series ?? []} />
+          <MrrChart series={mrrChartSeries} estimated={!useRealMrr} />
           <GrowthChart series={metrics?.series ?? []} />
         </div>
         </div>
@@ -455,6 +484,89 @@ function AuditPanel({ audit }: { audit: AuditEntry[] }) {
   );
 }
 
+function AttentionGroup({
+  icon: Icon, title, tone, salons, reason, onManage,
+}: {
+  icon: React.ElementType;
+  title: string;
+  tone: string;
+  salons: AdminSalon[];
+  reason: (s: AdminSalon) => string;
+  onManage: (s: AdminSalon) => void;
+}) {
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+      <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+        <Icon className={`h-4 w-4 ${tone}`} /> {title}
+        <span className="ml-auto text-xs font-normal text-muted-foreground">{salons.length}</span>
+      </h2>
+      {salons.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-3 text-center">Nada por aqui. 👍</p>
+      ) : (
+        <div className="space-y-2 max-h-72 overflow-auto">
+          {salons.map((s) => (
+            <div key={s.salon_id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border p-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{s.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{reason(s)}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => onManage(s)} className="shrink-0">Gerenciar</Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttentionPanel({
+  trialsEnding, overdue, inactive, onManage,
+}: {
+  trialsEnding: AdminSalon[];
+  overdue: AdminSalon[];
+  inactive: AdminSalon[];
+  onManage: (s: AdminSalon) => void;
+}) {
+  const total = trialsEnding.length + overdue.length + inactive.length;
+  return (
+    <div className="space-y-4">
+      {total === 0 ? (
+        <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
+          <ShieldCheck className="h-8 w-8 mx-auto text-emerald-500" />
+          <p className="text-sm text-muted-foreground mt-3">Tudo em dia — nada precisa de atenção agora. 🎉</p>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-4">
+          <AttentionGroup
+            icon={Clock} title="Trials vencendo" tone="text-amber-600"
+            salons={trialsEnding} onManage={onManage}
+            reason={(s) => {
+              const d = s.trial_ends_at ? daysSince(s.trial_ends_at) : null;
+              if (d === null) return "sem data de trial";
+              if (d > 0) return `venceu há ${d}d`;
+              if (d === 0) return "vence hoje";
+              return `vence em ${-d}d`;
+            }}
+          />
+          <AttentionGroup
+            icon={AlertTriangle} title="Inadimplentes" tone="text-red-600"
+            salons={overdue} onManage={onManage}
+            reason={(s) => `${planName(s.plan)} · ${formatBRL(s.value ?? 0)}/mês`}
+          />
+          <AttentionGroup
+            icon={TrendingDown} title="Parados (risco de churn)" tone="text-red-600"
+            salons={inactive} onManage={onManage}
+            reason={(s) => {
+              const d = daysSince(s.last_activity);
+              return d === null ? "sem atividade" : `${d}d sem atividade`;
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ANN_KIND: Record<string, { label: string; cls: string }> = {
   info: { label: "Informativo", cls: "bg-blue-500/12 text-blue-600" },
   warning: { label: "Aviso", cls: "bg-amber-500/15 text-amber-600" },
@@ -584,7 +696,7 @@ const monthLabel = (ym: string) => {
   return MONTH_ABBR[(parseInt(mm) || 1) - 1];
 };
 
-function MrrChart({ series }: { series: { month: string; mrr: number }[] }) {
+function MrrChart({ series, estimated = true }: { series: { month: string; mrr: number }[]; estimated?: boolean }) {
   const W = 320, H = 120, padX = 6, baseY = H - 16, topY = 12;
   const max = Math.max(1, ...series.map((s) => s.mrr));
   const n = series.length;
@@ -599,7 +711,7 @@ function MrrChart({ series }: { series: { month: string; mrr: number }[] }) {
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" /> MRR no tempo
-          <span className="text-[10px] font-normal text-muted-foreground">(estimativa)</span>
+          {estimated && <span className="text-[10px] font-normal text-muted-foreground">(estimativa)</span>}
         </h2>
         <span className="text-sm font-bold tabular-nums">{formatBRL(current)}</span>
       </div>
@@ -677,15 +789,38 @@ function ManageModal({
   const [billing, setBilling] = useState<BillingPayment[] | null>(null);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
+  const [contact, setContact] = useState<{ name: string; phone: string | null; email: string | null } | null>(null);
 
   async function loadBilling() {
     setLoadingBilling(true);
     setBillingMsg(null);
     const res = await getSalonBilling(salon.salon_id);
     setLoadingBilling(false);
-    if (res.ok) setBilling(res.payments);
+    if (res.ok) { setBilling(res.payments); setContact(res.contact); }
     else { setBilling([]); setBillingMsg(res.error); }
   }
+
+  // Cobrança em aberto mais relevante (vencida > pendente) para cobrança proativa
+  const duePayment = billing?.find((p) => p.status === "OVERDUE") ?? billing?.find((p) => p.status === "PENDING") ?? null;
+
+  function dunningText() {
+    const link = duePayment?.invoiceUrl ? `\n\nPara regularizar: ${duePayment.invoiceUrl}` : "";
+    const val = duePayment ? ` de ${formatBRL(duePayment.value)}` : "";
+    const venc = duePayment ? ` (venc. ${duePayment.dueDate})` : "";
+    return `Olá! 😊 Passando pra lembrar da sua assinatura do AgendeFácil — há uma cobrança em aberto${val}${venc}.${link}`;
+  }
+
+  const waHref = (() => {
+    if (!contact?.phone) return null;
+    const digits = contact.phone.replace(/\D/g, "");
+    if (!digits) return null;
+    const full = digits.length <= 11 ? `55${digits}` : digits;
+    return `https://wa.me/${full}?text=${encodeURIComponent(dunningText())}`;
+  })();
+
+  const mailHref = contact?.email
+    ? `mailto:${contact.email}?subject=${encodeURIComponent("Sua assinatura do AgendeFácil")}&body=${encodeURIComponent(dunningText())}`
+    : null;
 
   async function run(key: string, fn: () => PromiseLike<{ error: unknown }>) {
     setBusy(key);
@@ -831,6 +966,37 @@ function ManageModal({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Cobrança proativa */}
+            {duePayment && (
+              <div className="space-y-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3">
+                <p className="text-xs font-medium text-amber-800">
+                  Cobrança em aberto{duePayment.status === "OVERDUE" ? " (vencida)" : ""} — {formatBRL(duePayment.value)}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {waHref ? (
+                    <a href={waHref} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700">
+                      <MessageCircle className="h-4 w-4" /> Cobrar no WhatsApp
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">sem telefone do dono</span>
+                  )}
+                  {mailHref && (
+                    <a href={mailHref}
+                      className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border px-3 text-xs font-medium hover:bg-muted">
+                      <Mail className="h-4 w-4" /> E-mail
+                    </a>
+                  )}
+                  {duePayment.invoiceUrl && (
+                    <a href={duePayment.invoiceUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border px-3 text-xs font-medium hover:bg-muted">
+                      <ExternalLink className="h-4 w-4" /> 2ª via
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>

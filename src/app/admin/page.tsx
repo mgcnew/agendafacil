@@ -16,12 +16,13 @@ export default async function AdminPage() {
   const { data: isAdmin } = await supabase.rpc("is_platform_admin" as never);
   if (!isAdmin) redirect("/");
 
-  const [{ data: metrics }, { data: salons }, { data: admins }, { data: audit }, { data: announcements }] = await Promise.all([
+  const [{ data: metrics }, { data: salons }, { data: admins }, { data: audit }, { data: announcements }, { data: mrrHistory }] = await Promise.all([
     supabase.rpc("admin_metrics" as never),
     supabase.rpc("admin_list_salons" as never),
     supabase.rpc("admin_list_admins" as never),
     supabase.rpc("admin_audit" as never, { p_limit: 30 } as never),
     supabase.rpc("admin_list_announcements" as never),
+    supabase.rpc("admin_mrr_history" as never),
   ]);
 
   return (
@@ -31,6 +32,7 @@ export default async function AdminPage() {
       admins={(Array.isArray(admins) ? admins : []) as AdminUser[]}
       audit={(Array.isArray(audit) ? audit : []) as AuditEntry[]}
       announcements={(Array.isArray(announcements) ? announcements : []) as Announcement[]}
+      mrrHistory={(Array.isArray(mrrHistory) ? mrrHistory : []) as { month: string; mrr: number }[]}
     />
   );
 }
