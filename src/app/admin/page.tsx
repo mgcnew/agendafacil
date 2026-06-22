@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AdminDashboard, type AdminOverview, type AdminSalon } from "./AdminDashboard";
+import { AdminDashboard, type AdminMetrics, type AdminSalon } from "./AdminDashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -13,16 +13,14 @@ export default async function AdminPage() {
   const { data: isAdmin } = await supabase.rpc("is_platform_admin" as never);
   if (!isAdmin) redirect("/");
 
-  const [{ data: ov }, { data: salons }] = await Promise.all([
-    supabase.rpc("admin_overview" as never),
+  const [{ data: metrics }, { data: salons }] = await Promise.all([
+    supabase.rpc("admin_metrics" as never),
     supabase.rpc("admin_list_salons" as never),
   ]);
 
-  const overview = (Array.isArray(ov) ? ov[0] : ov) as AdminOverview | null;
-
   return (
     <AdminDashboard
-      overview={overview ?? null}
+      metrics={(metrics ?? null) as AdminMetrics | null}
       salons={(Array.isArray(salons) ? salons : []) as AdminSalon[]}
     />
   );

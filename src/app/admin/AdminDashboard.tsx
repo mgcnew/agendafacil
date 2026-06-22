@@ -10,18 +10,25 @@ import { AnimatePresence } from "framer-motion";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { PLANS, type PlanId } from "@/lib/plans";
 import {
-  Building2, Users, TrendingUp, Clock, AlertTriangle, XCircle,
-  Loader2, X, ExternalLink, Sparkles, ShieldCheck,
+  Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
+  Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
 } from "lucide-react";
 
-export type AdminOverview = {
-  total_salons: number;
-  trialing: number;
+export type AdminMetrics = {
+  mrr: number;
+  arr: number;
+  arpu: number;
   active: number;
+  trialing: number;
   past_due: number;
   canceled: number;
-  mrr: number;
+  total: number;
+  canceled_30d: number;
   new_30d: number;
+  new_this_month: number;
+  conversion: number; // %
+  churn_30d: number; // %
+  series: { month: string; count: number }[];
 };
 
 export type AdminSalon = {
@@ -37,7 +44,26 @@ export type AdminSalon = {
   value: number | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
+  appts_30d: number;
+  clients_count: number;
+  members_count: number;
+  last_activity: string | null;
 };
+
+/** Dias desde a última atividade (criação de agendamento). null = nunca. */
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
+
+/** Saúde por inatividade: verde <7d, âmbar <30d, vermelho 30d+ ou nunca. */
+function healthMeta(lastActivity: string | null): { cls: string; label: string } {
+  const d = daysSince(lastActivity);
+  if (d === null) return { cls: "bg-red-500", label: "sem atividade" };
+  if (d < 7) return { cls: "bg-emerald-500", label: `ativo · ${d}d` };
+  if (d < 30) return { cls: "bg-amber-500", label: `${d}d parado` };
+  return { cls: "bg-red-500", label: `${d}d parado` };
+}
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   active: { label: "Ativo", cls: "bg-emerald-500/12 text-emerald-600" },
@@ -52,10 +78,10 @@ const statusMeta = (s: string | null) =>
 const planName = (p: string | null) => (p && p in PLANS ? PLANS[p as PlanId].name : (p ?? "—"));
 
 export function AdminDashboard({
-  overview,
+  metrics,
   salons,
 }: {
-  overview: AdminOverview | null;
+  metrics: AdminMetrics | null;
   salons: AdminSalon[];
 }) {
   const [managing, setManaging] = useState<AdminSalon | null>(null);
@@ -88,15 +114,27 @@ export function AdminDashboard({
           </div>
         </div>
 
-        {/* KPIs */}
+        {/* Receita */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi icon={TrendingUp} label="MRR (ativos)" value={formatBRL(overview?.mrr ?? 0)} highlight />
-          <Kpi icon={Building2} label="Total de salões" value={String(overview?.total_salons ?? 0)} />
-          <Kpi icon={Clock} label="Em trial" value={String(overview?.trialing ?? 0)} />
-          <Kpi icon={Users} label="Ativos" value={String(overview?.active ?? 0)} />
-          <Kpi icon={AlertTriangle} label="Inadimplentes" value={String(overview?.past_due ?? 0)} />
-          <Kpi icon={Sparkles} label="Novos (30d)" value={String(overview?.new_30d ?? 0)} />
+          <Kpi icon={TrendingUp} label="MRR (ativos)" value={formatBRL(metrics?.mrr ?? 0)} highlight />
+          <Kpi icon={Repeat} label="ARR (anual)" value={formatBRL(metrics?.arr ?? 0)} />
+          <Kpi icon={Users} label="ARPU" value={formatBRL(metrics?.arpu ?? 0)} />
+          <Kpi icon={Percent} label="Conversão trial" value={`${metrics?.conversion ?? 0}%`} hint="estimativa" />
+          <Kpi icon={TrendingDown} label="Churn (30d)" value={`${metrics?.churn_30d ?? 0}%`} hint="estimativa" />
+          <Kpi icon={Sparkles} label="Novos no mês" value={String(metrics?.new_this_month ?? 0)} />
         </div>
+
+        {/* Contagens por status */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Kpi icon={Building2} label="Total de salões" value={String(metrics?.total ?? 0)} />
+          <Kpi icon={Users} label="Ativos" value={String(metrics?.active ?? 0)} />
+          <Kpi icon={Clock} label="Em trial" value={String(metrics?.trialing ?? 0)} />
+          <Kpi icon={AlertTriangle} label="Inadimplentes" value={String(metrics?.past_due ?? 0)} />
+          <Kpi icon={XCircle} label="Cancelados" value={String(metrics?.canceled ?? 0)} />
+        </div>
+
+        {/* Evolução */}
+        <GrowthChart series={metrics?.series ?? []} />
 
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3">
@@ -125,15 +163,17 @@ export function AdminDashboard({
           ) : (
             filtered.map((s) => {
               const meta = statusMeta(s.status);
+              const health = healthMeta(s.last_activity);
               return (
                 <div key={s.salon_id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
+                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${health.cls}`} title={health.label} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium truncate">{s.name}</p>
                       <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${meta.cls}`}>{meta.label}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      /{s.slug} · {s.owner_name || s.owner_email || "sem dono"} · criado {formatDate(s.created_at)}
+                      /{s.slug} · {s.owner_name || s.owner_email || "sem dono"} · {s.appts_30d} agend. (30d) · {health.label}
                     </p>
                   </div>
                   <div className="hidden sm:block text-right shrink-0">
@@ -171,13 +211,67 @@ export function AdminDashboard({
 }
 
 function Kpi({
-  icon: Icon, label, value, highlight,
-}: { icon: React.ElementType; label: string; value: string; highlight?: boolean }) {
+  icon: Icon, label, value, highlight, hint,
+}: { icon: React.ElementType; label: string; value: string; highlight?: boolean; hint?: string }) {
   return (
     <div className={`rounded-[var(--radius)] border bg-card p-4 ${highlight ? "border-primary/40" : "border-border"}`}>
       <Icon className={`h-4 w-4 ${highlight ? "text-primary" : "text-muted-foreground"}`} />
       <p className="font-display text-lg font-bold mt-2 tabular-nums">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground">
+        {label}
+        {hint && <span className="ml-1 text-[10px] opacity-70">({hint})</span>}
+      </p>
+    </div>
+  );
+}
+
+function UsageStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-3 text-center">
+      <p className="font-display text-base font-bold tabular-nums">{value}</p>
+      <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+    </div>
+  );
+}
+
+const MONTH_ABBR = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function GrowthChart({ series }: { series: { month: string; count: number }[] }) {
+  const max = Math.max(1, ...series.map((s) => s.count));
+  const total = series.reduce((a, s) => a + s.count, 0);
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" /> Novos salões — últimos 12 meses
+        </h2>
+        <span className="text-xs text-muted-foreground">{total} no período</span>
+      </div>
+      {series.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Sem dados ainda.</p>
+      ) : (
+        <div className="flex items-end gap-1.5 h-40">
+          {series.map((s) => {
+            const [, mm] = s.month.split("-");
+            const label = MONTH_ABBR[(parseInt(mm) || 1) - 1];
+            const h = Math.round((s.count / max) * 100);
+            return (
+              <div key={s.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                <span className="text-[10px] font-medium tabular-nums text-foreground">{s.count}</span>
+                <div className="w-full flex items-end" style={{ height: "100%" }}>
+                  <div
+                    className="w-full rounded-t bg-primary/80 transition-all"
+                    style={{ height: `${Math.max(h, s.count > 0 ? 6 : 2)}%` }}
+                    title={`${s.count} em ${s.month}`}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground truncate w-full text-center">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -230,6 +324,22 @@ function ManageModal({
             <div className="flex justify-between"><span className="text-muted-foreground">Plano</span><span className="font-medium">{planName(salon.plan)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Trial até</span><span>{salon.trial_ends_at ? formatDate(salon.trial_ends_at) : "—"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Próx. cobrança</span><span>{salon.current_period_end ? formatDate(salon.current_period_end) : "—"}</span></div>
+          </div>
+
+          {/* Uso / saúde */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Uso</p>
+            <div className="grid grid-cols-3 gap-2">
+              <UsageStat label="Agend. (30d)" value={String(salon.appts_30d)} />
+              <UsageStat label="Clientes" value={String(salon.clients_count)} />
+              <UsageStat label="Profissionais" value={String(salon.members_count)} />
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span className={`h-2.5 w-2.5 rounded-full ${healthMeta(salon.last_activity).cls}`} />
+              <span className="text-muted-foreground">
+                Última atividade: {salon.last_activity ? `${formatDate(salon.last_activity)} (${healthMeta(salon.last_activity).label})` : "nenhuma"}
+              </span>
+            </div>
           </div>
 
           {/* Estender trial */}
