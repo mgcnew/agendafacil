@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -87,18 +87,82 @@ function Tip({ label }: { label: string }) {
   );
 }
 
+export type PanelAnnouncement = {
+  id: string;
+  message: string;
+  kind: string;
+  link_url: string | null;
+  link_label: string | null;
+};
+
+const ANN_BANNER: Record<string, string> = {
+  info: "border-blue-300 bg-blue-50 text-blue-800",
+  warning: "border-amber-300 bg-amber-50 text-amber-800",
+  success: "border-emerald-300 bg-emerald-50 text-emerald-800",
+};
+
+function AnnouncementBanner({ announcements }: { announcements: PanelAnnouncement[] }) {
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      setDismissed(JSON.parse(localStorage.getItem("af-ann-dismissed") ?? "[]"));
+    } catch {
+      setDismissed([]);
+    }
+  }, []);
+
+  function dismiss(id: string) {
+    const next = [...dismissed, id];
+    setDismissed(next);
+    try { localStorage.setItem("af-ann-dismissed", JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  const visible = announcements.filter((a) => !dismissed.includes(a.id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="px-4 pt-4 sm:px-6 lg:px-8 space-y-2">
+      {visible.map((a) => (
+        <div
+          key={a.id}
+          className={cn(
+            "flex items-start gap-3 rounded-[var(--radius)] border p-3 text-sm",
+            ANN_BANNER[a.kind] ?? ANN_BANNER.info,
+          )}
+        >
+          <Megaphone className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span>{a.message}</span>
+            {a.link_url && (
+              <a href={a.link_url} target="_blank" rel="noopener noreferrer" className="ml-2 font-semibold underline">
+                {a.link_label || "Saiba mais"}
+              </a>
+            )}
+          </div>
+          <button onClick={() => dismiss(a.id)} aria-label="Dispensar" className="shrink-0 opacity-70 hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PanelShell({
   salon,
   role,
   groups,
   children,
   isPlatformAdmin = false,
+  announcements = [],
 }: {
   salon: { name: string; slug: string; niche: string };
   role: string;
   groups: NavGroup[];
   children: React.ReactNode;
   isPlatformAdmin?: boolean;
+  announcements?: PanelAnnouncement[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -255,6 +319,7 @@ export function PanelShell({
         </header>
 
         <main className="flex-1 overflow-y-auto">
+          <AnnouncementBanner announcements={announcements} />
           <div
             className={cn(
               "w-full",

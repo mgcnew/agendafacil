@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { MotionModal } from "@/components/MotionModal";
 import { AnimatePresence } from "framer-motion";
 import { formatBRL, formatDate, formatTime } from "@/lib/utils";
@@ -12,7 +12,7 @@ import { PLANS, type PlanId } from "@/lib/plans";
 import {
   Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
   Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
-  UserPlus, Trash2, History, Receipt, Download,
+  UserPlus, Trash2, History, Receipt, Download, Megaphone,
 } from "lucide-react";
 import { getSalonBilling } from "./actions";
 
@@ -75,6 +75,16 @@ export type AuditEntry = {
   action: string;
   salon_name: string | null;
   detail: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type Announcement = {
+  id: string;
+  message: string;
+  kind: "info" | "warning" | "success";
+  link_url: string | null;
+  link_label: string | null;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -147,16 +157,18 @@ export function AdminDashboard({
   salons,
   admins,
   audit,
+  announcements,
 }: {
   metrics: AdminMetrics | null;
   salons: AdminSalon[];
   admins: AdminUser[];
   audit: AuditEntry[];
+  announcements: Announcement[];
 }) {
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [tab, setTab] = useState<"geral" | "saloes" | "admin">("geral");
+  const [tab, setTab] = useState<"geral" | "saloes" | "admin" | "avisos">("geral");
   const router = useRouter();
 
   const filtered = salons.filter((s) => {
@@ -186,7 +198,7 @@ export function AdminDashboard({
 
         {/* Abas */}
         <div className="flex gap-1 border-b border-border">
-          {([["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"]] as const).map(([id, label]) => (
+          {([["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -302,6 +314,8 @@ export function AdminDashboard({
           <AuditPanel audit={audit} />
         </div>
         )}
+
+        {tab === "avisos" && <AnnouncementsPanel announcements={announcements} />}
       </div>
 
       <AnimatePresence>
@@ -437,6 +451,119 @@ function AuditPanel({ audit }: { audit: AuditEntry[] }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const ANN_KIND: Record<string, { label: string; cls: string }> = {
+  info: { label: "Informativo", cls: "bg-blue-500/12 text-blue-600" },
+  warning: { label: "Aviso", cls: "bg-amber-500/15 text-amber-600" },
+  success: { label: "Novidade", cls: "bg-emerald-500/12 text-emerald-600" },
+};
+
+function AnnouncementsPanel({ announcements }: { announcements: Announcement[] }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [message, setMessage] = useState("");
+  const [kind, setKind] = useState("info");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function create() {
+    if (!message.trim()) return;
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("admin_create_announcement" as never, {
+      p_message: message.trim(), p_kind: kind, p_link_url: linkUrl, p_link_label: linkLabel,
+    } as never);
+    setBusy(false);
+    if (error) { setErr(error.message || "Não foi possível publicar."); return; }
+    setMessage(""); setLinkUrl(""); setLinkLabel(""); setKind("info");
+    router.refresh();
+  }
+
+  async function toggle(a: Announcement) {
+    const { error } = await supabase.rpc("admin_set_announcement_active" as never, { p_id: a.id, p_active: !a.is_active } as never);
+    if (!error) router.refresh();
+  }
+
+  async function remove(id: string) {
+    const { error } = await supabase.rpc("admin_delete_announcement" as never, { p_id: id } as never);
+    if (!error) router.refresh();
+  }
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      {/* Novo aviso */}
+      <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+        <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+          <Megaphone className="h-4 w-4 text-primary" /> Novo aviso
+        </h2>
+        {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Mensagem</Label>
+            <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ex.: Manutenção programada domingo às 2h." />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tipo</Label>
+            <Select value={kind} onValueChange={setKind}>
+              <option value="info">Informativo</option>
+              <option value="warning">Aviso</option>
+              <option value="success">Novidade</option>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label>Link (opcional)</Label>
+              <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://…" inputMode="url" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Texto do link</Label>
+              <Input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="Saiba mais" />
+            </div>
+          </div>
+          <Button onClick={create} disabled={busy || !message.trim()}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />} Publicar
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Avisos ativos aparecem como banner no painel de todos os salões.
+          </p>
+        </div>
+      </div>
+
+      {/* Avisos existentes */}
+      <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+        <h2 className="text-sm font-semibold mb-3">Avisos publicados</h2>
+        {announcements.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Nenhum aviso ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {announcements.map((a) => {
+              const meta = ANN_KIND[a.kind] ?? ANN_KIND.info;
+              return (
+                <div key={a.id} className="rounded-[var(--radius)] border border-border p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${meta.cls}`}>{meta.label}</span>
+                    {!a.is_active && <span className="text-[11px] text-muted-foreground">inativo</span>}
+                    <span className="ml-auto text-[11px] text-muted-foreground">{formatDate(a.created_at)}</span>
+                  </div>
+                  <p className="text-sm">{a.message}</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button onClick={() => toggle(a)} className="text-xs font-medium text-primary hover:underline">
+                      {a.is_active ? "Desativar" : "Ativar"}
+                    </button>
+                    <button onClick={() => remove(a.id)} className="text-xs font-medium text-red-600 hover:underline inline-flex items-center gap-1">
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
