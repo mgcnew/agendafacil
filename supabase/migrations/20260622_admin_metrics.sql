@@ -11,6 +11,7 @@ declare
   m_mrr numeric; m_active int; m_trialing int; m_past int; m_canceled int; m_total int;
   m_canceled30 int; m_new30 int; m_newmonth int;
   series jsonb;
+  mrr_series jsonb;
 begin
   if not is_platform_admin() then raise exception 'not authorized'; end if;
 
@@ -46,6 +47,25 @@ begin
     into series
   from months left join counts on counts.mth = months.mth;
 
+  -- MRR estimado por mês (12 meses): soma do valor de assinaturas hoje ativas
+  -- cujo trial terminou até o fim de cada mês (≈ quando começaram a pagar).
+  with months as (
+    select date_trunc('month', now()) - (i || ' months')::interval as mth
+    from generate_series(0, 11) as i
+  )
+  select jsonb_agg(
+           jsonb_build_object(
+             'month', to_char(m.mth, 'YYYY-MM'),
+             'mrr', coalesce((
+               select sum(s.value) from salon_subscriptions s
+               where s.status = 'active'
+                 and s.trial_ends_at <= (m.mth + interval '1 month' - interval '1 second')
+             ), 0)
+           ) order by m.mth
+         )
+    into mrr_series
+  from months m;
+
   return jsonb_build_object(
     'mrr', m_mrr,
     'arr', m_mrr * 12,
@@ -64,7 +84,8 @@ begin
     -- churn 30d (estimativa): cancelados no mês / (ativos + cancelados no mês)
     'churn_30d', case when (m_active + m_canceled30) > 0
                       then round(m_canceled30::numeric / (m_active + m_canceled30) * 100, 1) else 0 end,
-    'series', coalesce(series, '[]'::jsonb)
+    'series', coalesce(series, '[]'::jsonb),
+    'mrr_series', coalesce(mrr_series, '[]'::jsonb)
   );
 end;
 $$;

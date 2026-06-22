@@ -12,7 +12,7 @@ import { PLANS, type PlanId } from "@/lib/plans";
 import {
   Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
   Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
-  UserPlus, Trash2, History, Receipt,
+  UserPlus, Trash2, History, Receipt, Download,
 } from "lucide-react";
 import { getSalonBilling } from "./actions";
 
@@ -40,6 +40,7 @@ export type AdminMetrics = {
   conversion: number; // %
   churn_30d: number; // %
   series: { month: string; count: number }[];
+  mrr_series: { month: string; mrr: number }[];
 };
 
 export type AdminSalon = {
@@ -115,6 +116,32 @@ const PAYMENT_META: Record<string, { label: string; cls: string }> = {
 const paymentMeta = (s: string) =>
   PAYMENT_META[s] ?? { label: s, cls: "bg-muted text-muted-foreground" };
 
+/** Exporta a lista (já filtrada) de salões para CSV (delimitador ";" p/ Excel pt-BR). */
+function exportSalonsCsv(rows: AdminSalon[]) {
+  const header = [
+    "Salão", "Link", "Dono", "E-mail", "Plano", "Status", "Valor (R$/mês)",
+    "Criado em", "Agend. 30d", "Clientes", "Profissionais", "Última atividade",
+  ];
+  const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = rows.map((s) =>
+    [
+      s.name, s.slug, s.owner_name ?? "", s.owner_email ?? "",
+      planName(s.plan), statusMeta(s.status).label,
+      (s.value ?? 0).toFixed(2).replace(".", ","),
+      formatDate(s.created_at), s.appts_30d, s.clients_count, s.members_count,
+      s.last_activity ? formatDate(s.last_activity) : "",
+    ].map(cell).join(";"),
+  );
+  const csv = "﻿" + [header.map(cell).join(";"), ...lines].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `saloes-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function AdminDashboard({
   metrics,
   salons,
@@ -129,6 +156,7 @@ export function AdminDashboard({
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tab, setTab] = useState<"geral" | "saloes" | "admin">("geral");
   const router = useRouter();
 
   const filtered = salons.filter((s) => {
@@ -156,6 +184,23 @@ export function AdminDashboard({
           </div>
         </div>
 
+        {/* Abas */}
+        <div className="flex gap-1 border-b border-border">
+          {([["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
+                tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "geral" && (
+        <div className="space-y-7">
         {/* Receita */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <Kpi icon={TrendingUp} label="MRR (ativos)" value={formatBRL(metrics?.mrr ?? 0)} highlight />
@@ -176,8 +221,15 @@ export function AdminDashboard({
         </div>
 
         {/* Evolução */}
-        <GrowthChart series={metrics?.series ?? []} />
+        <div className="grid lg:grid-cols-2 gap-6">
+          <MrrChart series={metrics?.mrr_series ?? []} />
+          <GrowthChart series={metrics?.series ?? []} />
+        </div>
+        </div>
+        )}
 
+        {tab === "saloes" && (
+        <div className="space-y-5">
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3">
           <Input
@@ -197,7 +249,12 @@ export function AdminDashboard({
 
         {/* Lista de salões */}
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">{filtered.length} salão(ões)</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{filtered.length} salão(ões)</p>
+            <Button variant="outline" size="sm" onClick={() => exportSalonsCsv(filtered)} disabled={filtered.length === 0}>
+              <Download className="h-4 w-4" /> Exportar CSV
+            </Button>
+          </div>
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center border border-dashed border-border rounded-[var(--radius)]">
               Nenhum salão encontrado.
@@ -236,12 +293,15 @@ export function AdminDashboard({
             })
           )}
         </div>
+        </div>
+        )}
 
-        {/* Admins + Auditoria */}
+        {tab === "admin" && (
         <div className="grid lg:grid-cols-2 gap-6">
           <AdminsPanel admins={admins} />
           <AuditPanel audit={audit} />
         </div>
+        )}
       </div>
 
       <AnimatePresence>
@@ -391,6 +451,50 @@ function UsageStat({ label, value }: { label: string; value: string }) {
 }
 
 const MONTH_ABBR = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+const monthLabel = (ym: string) => {
+  const [, mm] = ym.split("-");
+  return MONTH_ABBR[(parseInt(mm) || 1) - 1];
+};
+
+function MrrChart({ series }: { series: { month: string; mrr: number }[] }) {
+  const W = 320, H = 120, padX = 6, baseY = H - 16, topY = 12;
+  const max = Math.max(1, ...series.map((s) => s.mrr));
+  const n = series.length;
+  const current = series.length ? series[series.length - 1].mrr : 0;
+  const x = (i: number) => padX + (i * (W - 2 * padX)) / Math.max(1, n - 1);
+  const y = (v: number) => baseY - (v / max) * (baseY - topY);
+  const line = series.map((s, i) => `${x(i)},${y(s.mrr)}`).join(" ");
+  const area = `${x(0)},${baseY} ${line} ${x(n - 1)},${baseY}`;
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-primary" /> MRR no tempo
+          <span className="text-[10px] font-normal text-muted-foreground">(estimativa)</span>
+        </h2>
+        <span className="text-sm font-bold tabular-nums">{formatBRL(current)}</span>
+      </div>
+      {n === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Sem dados ainda.</p>
+      ) : (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40 text-primary" preserveAspectRatio="none">
+          <polygon points={area} fill="currentColor" opacity={0.1} />
+          <polyline points={line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {series.map((s, i) => (
+            <circle key={s.month} cx={x(i)} cy={y(s.mrr)} r={1.8} fill="currentColor" />
+          ))}
+          {series.map((s, i) => (
+            <text key={s.month} x={x(i)} y={H - 4} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 7 }}>
+              {monthLabel(s.month)}
+            </text>
+          ))}
+        </svg>
+      )}
+    </div>
+  );
+}
 
 function GrowthChart({ series }: { series: { month: string; count: number }[] }) {
   const max = Math.max(1, ...series.map((s) => s.count));
