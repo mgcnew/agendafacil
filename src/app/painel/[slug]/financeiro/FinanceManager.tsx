@@ -748,7 +748,7 @@ function PaymentPickerModal({
     try {
       await onConfirm(m, discount);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Não foi possível concluir. Tente novamente.");
+      setErr((e as { message?: string })?.message ?? "Não foi possível concluir.");
       setBusy(null);
     }
   }
@@ -763,7 +763,7 @@ function PaymentPickerModal({
     try {
       await onConfirm("split", discount, parsed);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Não foi possível concluir. Tente novamente.");
+      setErr((e as { message?: string })?.message ?? "Não foi possível concluir.");
       setBusy(null);
     }
   }
