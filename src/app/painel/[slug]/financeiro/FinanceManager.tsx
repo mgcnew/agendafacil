@@ -221,10 +221,11 @@ export function FinanceManager({
             <>
               {canManage && (
                 <>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <ActionTile icon={UsersRound} label="Receber" badge={receivable.length} active={receberOpen} onClick={() => setReceberOpen((v) => !v)} />
                     <ActionTile icon={Boxes} label="Loja" onClick={() => setLojaOpen(true)} />
                     <ActionTile icon={Plus} label="Lançar" onClick={() => setManualModal(true)} />
+                    <ActionTile icon={History} label="Histórico" badge={transactions.length || undefined} onClick={() => setMovementsModal(true)} />
                   </div>
 
                   {/* Receber: expande no lugar */}
@@ -249,36 +250,14 @@ export function FinanceManager({
                       )}
                     </Card>
                   )}
-                </>
-              )}
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-display font-semibold">Movimentações de hoje</h3>
-                  {canManage && (
+                  <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
                       <Lock className="h-4 w-4" /> Fechar caixa
                     </Button>
-                  )}
-                </div>
-                {transactions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-[var(--radius)]">
-                    Nenhuma movimentação ainda.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {transactions.slice(0, 4).map((t) => (
-                      <TxRow key={t.id} t={t} onReceipt={() => setReceiptTx(t)} />
-                    ))}
-                    {transactions.length > 4 && (
-                      <button onClick={() => setMovementsModal(true)}
-                        className="w-full text-sm font-medium text-primary hover:underline py-1">
-                        Ver todas ({transactions.length})
-                      </button>
-                    )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </>
           )}
 
