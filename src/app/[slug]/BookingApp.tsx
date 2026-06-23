@@ -487,39 +487,27 @@ export function BookingApp({ salon }: { salon: Salon }) {
               {anyPro && <Check className="h-5 w-5 text-primary" />}
             </button>
           )}
-          {eligiblePros.map((p) => {
-            const on = !anyPro && pro?.id === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => { setAnyPro(false); setPro(p); setTimeout(() => setStep("time"), 280); }}
-                className={`w-full text-left rounded-[var(--radius)] border p-4 transition flex items-center gap-3 ${
-                  on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
-                }`}
-              >
-                {p.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.photo_url}
-                    alt={p.display_name}
-                    className="h-11 w-11 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <span
-                    className="grid place-items-center h-11 w-11 rounded-full text-white font-semibold shrink-0"
-                    style={{ background: p.color || "var(--primary)" }}
-                  >
-                    {p.display_name?.charAt(0) ?? "?"}
-                  </span>
-                )}
-                <div className="flex-1">
-                  <p className="font-medium">{p.display_name}</p>
-                  {p.bio && <p className="text-xs text-muted-foreground">{p.bio}</p>}
-                </div>
-                {on && <Check className="h-5 w-5 text-primary" />}
-              </button>
-            );
-          })}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {eligiblePros.map((p) => {
+              const on = !anyPro && pro?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setAnyPro(false); setPro(p); setTimeout(() => setStep("time"), 280); }}
+                  className={`relative rounded-[var(--radius)] border p-4 transition flex flex-col items-center text-center gap-2 ${
+                    on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                  }`}
+                >
+                  {on && <Check className="absolute top-2 right-2 h-4 w-4 text-primary" />}
+                  <BookingAvatar p={p} size={72} />
+                  <div className="min-w-0 w-full">
+                    <p className="font-medium text-sm leading-tight truncate">{p.display_name}</p>
+                    {p.bio && <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{p.bio}</p>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 
@@ -625,7 +613,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <CircleCheck className="h-5 w-5 text-primary" /> Revise e confirme
           </h2>
           <Card className="p-6 space-y-4">
-            <Row label="Profissional" value={pro.display_name} />
+            <div className="flex items-center gap-3 pb-1">
+              <BookingAvatar p={pro} size={48} />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Profissional</p>
+                <p className="font-medium truncate">{pro.display_name}</p>
+              </div>
+            </div>
             <Row label="Data" value={<span className="capitalize">{formatDateLong(slot)}</span>} />
             <Row
               label="Horário"
@@ -760,6 +754,22 @@ export function BookingApp({ salon }: { salon: Salon }) {
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">{value}</span>
       </div>
+    );
+  }
+
+  function BookingAvatar({ p, size = 72 }: { p: Professional; size?: number }) {
+    if (p.photo_url) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.photo_url} alt={p.display_name} className="rounded-full object-cover shrink-0"
+          style={{ width: size, height: size }} />
+      );
+    }
+    return (
+      <span className="grid place-items-center rounded-full text-white font-semibold shrink-0"
+        style={{ width: size, height: size, background: p.color || "var(--primary)", fontSize: Math.round(size * 0.4) }}>
+        {p.display_name?.charAt(0) ?? "?"}
+      </span>
     );
   }
 
