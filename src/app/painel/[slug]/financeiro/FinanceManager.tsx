@@ -1345,6 +1345,26 @@ function CommissionModal({
   );
 }
 
+function ConfRow({ label, expected, counted, diff }: { label: string; expected: number; counted: number | null; diff: number | null }) {
+  const d = diff ?? 0;
+  const ok = Math.abs(d) < 0.01;
+  return (
+    <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
+      ok ? "bg-emerald-500/12 text-emerald-600" : d > 0 ? "bg-amber-500/12 text-amber-700" : "bg-red-500/12 text-red-600"
+    }`}>
+      <div className="space-y-0.5">
+        <span className="block">{label}</span>
+        {counted != null && (
+          <span className="block text-[11px] font-normal opacity-75">
+            Contado {formatBRL(counted)} · Esperado {formatBRL(expected)}
+          </span>
+        )}
+      </div>
+      <span className="shrink-0">{ok ? "✓ Conferido" : d > 0 ? `Sobra ${formatBRL(d)}` : `Falta ${formatBRL(Math.abs(d))}`}</span>
+    </div>
+  );
+}
+
 function CloseModal({
   expectedCash,
   incomeByMethod,
@@ -1365,6 +1385,8 @@ function CloseModal({
   onConfirm: (counted: number) => Promise<boolean>;
 }) {
   const [counted, setCounted] = useState("");
+  const [countedCard, setCountedCard] = useState("");
+  const [countedPix, setCountedPix] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [report, setReport] = useState<ClosingReportData | null>(null);
@@ -1372,6 +1394,10 @@ function CloseModal({
 
   const countedNum = parseFloat(counted.replace(",", ".")) || 0;
   const diff = countedNum - expectedCash;
+  const expectedCard = (incomeByMethod.debito ?? 0) + (incomeByMethod.credito ?? 0) + (incomeByMethod.cartao ?? 0);
+  const expectedPix = incomeByMethod.pix ?? 0;
+  const countedCardNum = countedCard !== "" ? (parseFloat(countedCard.replace(",", ".")) || 0) : null;
+  const countedPixNum = countedPix !== "" ? (parseFloat(countedPix.replace(",", ".")) || 0) : null;
 
   const displayMethods = PICKER_METHODS.filter((m) => (incomeByMethod[m] ?? 0) > 0 || m === "dinheiro");
 
@@ -1391,6 +1417,8 @@ function CloseModal({
       expectedCash,
       countedCash: countedNum,
       difference: diff,
+      countedCard: countedCardNum,
+      countedPix: countedPixNum,
       fileBase: `fechamento-${today.toISOString().slice(0, 10)}`,
     });
   }
@@ -1450,13 +1478,14 @@ function CloseModal({
               })}
             </div>
 
-            <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
-              Math.abs(diff) < 0.01 ? "bg-emerald-500/12 text-emerald-600"
-              : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
-              : "bg-red-500/12 text-red-600"
-            }`}>
-              <span>{Math.abs(diff) < 0.01 ? "Caixa conferido" : diff > 0 ? `Sobra ${formatBRL(diff)}` : `Falta ${formatBRL(Math.abs(diff))}`}</span>
-              <span>{Math.abs(diff) < 0.01 ? "✓" : ""}</span>
+            <div className="space-y-2">
+              <ConfRow label="Dinheiro" expected={expectedCash} counted={report.countedCash} diff={report.difference} />
+              {report.countedCard != null && expectedCard > 0 && (
+                <ConfRow label="Maquininha" expected={expectedCard} counted={report.countedCard} diff={report.countedCard - expectedCard} />
+              )}
+              {report.countedPix != null && expectedPix > 0 && (
+                <ConfRow label="PIX" expected={expectedPix} counted={report.countedPix} diff={report.countedPix - expectedPix} />
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -1490,9 +1519,33 @@ function CloseModal({
               Conte o dinheiro na gaveta sem consultar o sistema e informe o total abaixo. O resumo completo aparecerá após o fechamento.
             </p>
 
-            <div className="space-y-1.5 mt-5">
-              <Label htmlFor="counted">Total em dinheiro na gaveta (R$)</Label>
-              <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" inputMode="decimal" />
+            <div className="space-y-4 mt-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="counted">Total em dinheiro na gaveta (R$)</Label>
+                <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" inputMode="decimal" />
+              </div>
+
+              {expectedCard > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="counted-card">
+                    Total na maquininha (R$)
+                    <span className="ml-1 text-[11px] text-muted-foreground font-normal">· opcional</span>
+                  </Label>
+                  <Input id="counted-card" value={countedCard} onChange={(e) => setCountedCard(e.target.value)} placeholder="0,00" inputMode="decimal" />
+                  <p className="text-[11px] text-muted-foreground">Débito + crédito — consulte o relatório da maquininha</p>
+                </div>
+              )}
+
+              {expectedPix > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="counted-pix">
+                    Total recebido em PIX (R$)
+                    <span className="ml-1 text-[11px] text-muted-foreground font-normal">· opcional</span>
+                  </Label>
+                  <Input id="counted-pix" value={countedPix} onChange={(e) => setCountedPix(e.target.value)} placeholder="0,00" inputMode="decimal" />
+                  <p className="text-[11px] text-muted-foreground">Confira no aplicativo do banco ou extrato PIX</p>
+                </div>
+              )}
             </div>
 
             {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
