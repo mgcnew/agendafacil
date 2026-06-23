@@ -18,10 +18,10 @@ export default async function AgendaPage({
   const canManageSchedule = perms.has("schedule.manage");
 
   const supabase = await createClient();
-  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }, { data: salonRow }] = await Promise.all([
+  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }] = await Promise.all([
     supabase
       .from("salon_members")
-      .select("id, display_name, profiles(full_name), commission_percent, color")
+      .select("id, display_name, profiles(full_name), commission_percent, color, photo_url")
       .eq("salon_id", membership.salon_id)
       .eq("is_active", true),
     supabase
@@ -39,16 +39,7 @@ export default async function AgendaPage({
       .from("professional_services")
       .select("member_id")
       .eq("salon_id", membership.salon_id),
-    supabase
-      .from("salons")
-      .select("agenda_color_mode")
-      .eq("id", membership.salon_id)
-      .maybeSingle(),
   ]);
-
-  const colorMode = ((salonRow as { agenda_color_mode?: string } | null)?.agenda_color_mode === "service"
-    ? "service"
-    : "professional") as "professional" | "service";
 
   const discounts: Record<string, number> = {};
   for (const r of (discountRows as { service_id: string; discount_percent: number }[] | null) ?? []) {
@@ -64,6 +55,7 @@ export default async function AgendaPage({
       name: p.display_name ?? (p.profiles as { full_name?: string } | null)?.full_name ?? "—",
       commission_percent: p.commission_percent,
       color: p.color,
+      photo_url: p.photo_url,
     }));
 
   return (
@@ -76,7 +68,6 @@ export default async function AgendaPage({
       discounts={discounts}
       canManageSchedule={canManageSchedule}
       myMemberId={membership.id}
-      colorMode={colorMode}
     />
   );
 }

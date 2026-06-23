@@ -20,9 +20,10 @@ import {
 // ── Types ──────────────────────────────────────────────────────
 type View = "dia" | "semana" | "mes";
 type Status = Enums<"appointment_status">;
-type Pro     = { id: string; name: string; commission_percent: number; color: string | null };
+type Pro     = { id: string; name: string; commission_percent: number; color: string | null; photo_url?: string | null };
 type Service = { id: string; name: string; duration_min: number; price: number; commission_percent: number | null; color?: string | null };
-type ColorMode = "professional" | "service";
+
+const NO_SERVICE_COLOR = "#94a3b8"; // cinza neutro para serviço sem cor
 type Client  = { id: string; full_name: string; phone: string | null };
 type Appt    = {
   id: string;
@@ -180,6 +181,28 @@ function apptH(a: Appt) {
 function getColor(pros: Pro[], memberId: string) {
   const idx = pros.findIndex(p => p.id === memberId);
   return pros[idx]?.color ?? PALETTE[Math.max(0, idx) % PALETTE.length];
+}
+
+function initials(name: string) {
+  const parts = (name || "").trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
+/** Avatar do profissional: foto, ou iniciais sobre a cor do profissional. */
+function ProAvatar({ pro, size = 24 }: { pro: Pro; size?: number }) {
+  if (pro.photo_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={pro.photo_url} alt={pro.name} className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }} />
+    );
+  }
+  return (
+    <span className="rounded-full grid place-items-center text-white font-semibold shrink-0"
+      style={{ width: size, height: size, background: pro.color ?? PALETTE[0], fontSize: Math.round(size * 0.4) }}>
+      {initials(pro.name)}
+    </span>
+  );
 }
 
 // ── Bloqueios de horário (almoço, intervalo, compromisso) ──────
@@ -617,18 +640,15 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
         {/* Sticky column headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
           <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
-          {cols.map((p) => {
-            const color = getColor(pros, p.id);
-            return (
-              <div key={p.id}
-                className="py-2.5 text-center border-l border-border"
-                style={{ minWidth: COL_W_DAY, flex: 1 }}
-              >
-                <span className="inline-block h-2 w-2 rounded-full mr-1.5 align-middle" style={{ background: color }} />
-                <span className="text-sm font-medium truncate">{p.name}</span>
-              </div>
-            );
-          })}
+          {cols.map((p) => (
+            <div key={p.id}
+              className="py-2 px-1 flex items-center justify-center gap-1.5 border-l border-border"
+              style={{ minWidth: COL_W_DAY, flex: 1 }}
+            >
+              <ProAvatar pro={p} size={24} />
+              <span className="text-sm font-medium truncate">{p.name}</span>
+            </div>
+          ))}
         </div>
 
         {/* Time grid */}
@@ -644,7 +664,6 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
           </div>
 
           {cols.map((p) => {
-            const color    = getColor(pros, p.id);
             const proAppts = appts.filter(a => a.member_id === p.id);
             return (
               <div key={p.id}
@@ -682,7 +701,7 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
                   return (
                     <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}
                       onClick={(e) => e.stopPropagation()}>
-                      <ApptCard a={a} color={color} compact={h < 44} onOpen={() => onApptClick(a)} />
+                      <ApptCard a={a} color={a.color ?? NO_SERVICE_COLOR} compact={h < 44} onOpen={() => onApptClick(a)} />
                     </div>
                   );
                 })}
@@ -1046,13 +1065,12 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
-  canManageSchedule = false, myMemberId, colorMode = "professional",
+  canManageSchedule = false, myMemberId,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
   canManageSchedule?: boolean;
   myMemberId?: string;
-  colorMode?: ColorMode;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1104,14 +1122,11 @@ export function AgendaManager({
     return m;
   }, [services]);
 
-  // Cor do evento: por serviço (1º serviço com cor) ou por profissional.
+  // Cor do evento = cor do 1º serviço do atendimento (cinza neutro se sem cor).
   const apptColor = useCallback((a: Appt): string => {
-    if (colorMode === "service") {
-      const sid = a.appointment_services?.find((x) => x.service_id && serviceColor[x.service_id])?.service_id;
-      if (sid) return serviceColor[sid];
-    }
-    return getColor(pros, a.member_id);
-  }, [colorMode, serviceColor, pros]);
+    const sid = a.appointment_services?.find((x) => x.service_id && serviceColor[x.service_id])?.service_id;
+    return (sid && serviceColor[sid]) || NO_SERVICE_COLOR;
+  }, [serviceColor]);
 
   // Sou um profissional com coluna na agenda? (posso bloquear meu próprio horário)
   const iAmPro = !!myMemberId && pros.some(p => p.id === myMemberId);
