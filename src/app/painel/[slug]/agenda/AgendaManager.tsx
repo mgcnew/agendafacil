@@ -1326,12 +1326,12 @@ export function AgendaManager({
                 key={p.id}
                 onClick={() => togglePro(p.id)}
                 className={cn(
-                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition font-medium text-foreground",
+                  "flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border transition font-medium text-foreground",
                   active ? "" : "border-border hover:border-foreground/30",
                 )}
                 style={active ? { background: color + "22", borderColor: color } : {}}
               >
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                <ProAvatar pro={p} size={18} />
                 {p.name}
               </button>
             );
