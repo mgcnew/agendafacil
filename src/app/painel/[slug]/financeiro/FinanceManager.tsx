@@ -221,43 +221,6 @@ export function FinanceManager({
             </Card>
           ) : (
             <>
-              {/* Painel de status do caixa */}
-              <div className="rounded-[var(--radius)] border border-border bg-card p-4 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Aberto às {formatTime(openSession.opened_at)}
-                  {opening0 > 0 && <> · Fundo de caixa {formatBRL(opening0)}</>}
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground mb-0.5">Entradas</p>
-                    <p className="font-display font-bold text-emerald-600">{formatBRL(totalIncome)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground mb-0.5">Saídas</p>
-                    <p className="font-display font-bold text-red-600">{formatBRL(totalExpense)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground mb-0.5">Saldo</p>
-                    <p className="font-display font-bold text-primary">{formatBRL(opening0 + totalIncome - totalExpense)}</p>
-                  </div>
-                </div>
-                {(["dinheiro", "pix", "debito", "credito", "cartao"] as const).some((m) => incomeByMethod[m] > 0) && (
-                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border">
-                    {(["dinheiro", "pix", "debito", "credito", "cartao"] as const)
-                      .filter((m) => incomeByMethod[m] > 0)
-                      .map((m) => {
-                        const Meta = PAY_META[m];
-                        return (
-                          <span key={m} className="inline-flex items-center gap-1 text-[11px] bg-secondary rounded-full px-2.5 py-1">
-                            <Meta.icon className="h-3 w-3 text-primary" />
-                            {Meta.label} <span className="font-medium">{formatBRL(incomeByMethod[m])}</span>
-                          </span>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
               {canManage && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -1515,7 +1478,7 @@ function CloseModal({
             <Button variant="ghost" onClick={onClose} className="w-full">Fechar</Button>
           </div>
         ) : (
-          /* ── formulário de fechamento ── */
+          /* ── formulário de fechamento (cego — sem mostrar valores do sistema) ── */
           <>
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-display text-lg font-bold flex items-center gap-2">
@@ -1523,65 +1486,14 @@ function CloseModal({
               </h3>
               <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Confira o dinheiro na gaveta antes de fechar.
+            <p className="text-sm text-muted-foreground mt-1">
+              Conte o dinheiro na gaveta sem consultar o sistema e informe o total abaixo. O resumo completo aparecerá após o fechamento.
             </p>
 
-            {/* Resumo financeiro */}
-            <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 mt-4 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Entradas</span>
-                <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalIncome)}</span>
-              </div>
-              {totalExpense > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Saídas</span>
-                  <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExpense)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
-                <span>Saldo líquido</span>
-                <span className="tabular-nums">{formatBRL(totalIncome - totalExpense)}</span>
-              </div>
+            <div className="space-y-1.5 mt-5">
+              <Label htmlFor="counted">Total em dinheiro na gaveta (R$)</Label>
+              <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" inputMode="decimal" />
             </div>
-
-            {/* Entradas por forma */}
-            <p className="text-xs text-muted-foreground mt-4 mb-2">Entradas por forma de pagamento</p>
-            <div className="grid grid-cols-2 gap-2">
-              {displayMethods.map((m) => {
-                const Meta = PAY_META[m];
-                return (
-                  <div key={m} className="rounded-[var(--radius)] bg-muted px-3 py-2.5 flex items-center gap-2">
-                    <Meta.icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground">{Meta.label}</p>
-                      <p className="text-sm font-bold tabular-nums">{formatBRL(incomeByMethod[m] ?? 0)}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
-              <span className="text-sm text-muted-foreground">Esperado na gaveta (dinheiro)</span>
-              <span className="font-display text-lg font-bold">{formatBRL(expectedCash)}</span>
-            </div>
-
-            <div className="space-y-1.5 mt-4">
-              <Label htmlFor="counted">Valor contado (R$)</Label>
-              <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" />
-            </div>
-
-            {counted !== "" && (
-              <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 mt-3 text-sm font-semibold ${
-                Math.abs(diff) < 0.01 ? "bg-emerald-500/12 text-emerald-600"
-                : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
-                : "bg-red-500/12 text-red-600"
-              }`}>
-                <span>{Math.abs(diff) < 0.01 ? "Caixa conferido" : diff > 0 ? "Sobra" : "Falta"}</span>
-                <span>{Math.abs(diff) < 0.01 ? "✓" : formatBRL(Math.abs(diff))}</span>
-              </div>
-            )}
 
             {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
 
