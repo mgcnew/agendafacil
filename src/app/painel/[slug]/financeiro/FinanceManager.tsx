@@ -17,7 +17,8 @@ import {
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
   generateCommissionPdf, buildCommissionText,
-  type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData,
+  generateClosingReportPdf, buildClosingReportText,
+  type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData, type ClosingReportData,
 } from "./receipt";
 import { FixedCostsPanel, type FixedCost, type ChairRental, type ActivePackageSummary } from "./FixedCostsPanel";
 
@@ -31,8 +32,12 @@ export type ResaleProduct = { id: string; name: string; sale_price: number; quan
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
   dinheiro: { label: "Dinheiro", icon: Banknote },
   pix: { label: "Pix", icon: Smartphone },
-  cartao: { label: "Cartão", icon: CreditCard },
+  debito: { label: "Débito", icon: CreditCard },
+  credito: { label: "Crédito", icon: CreditCard },
+  cartao: { label: "Cartão", icon: CreditCard }, // legado — exibição de dados antigos
 };
+
+const PICKER_METHODS = ["dinheiro", "pix", "debito", "credito"] as const;
 
 export function FinanceManager({
   salonId,
@@ -127,10 +132,16 @@ export function FinanceManager({
   // totais por forma de pagamento (entradas)
   const sumBy = (t: "income" | "expense", m: string) =>
     transactions.filter((x) => x.type === t && (x.payment_method ?? "dinheiro") === m).reduce((a, x) => a + Number(x.amount), 0);
-  const incomeByMethod = { dinheiro: sumBy("income", "dinheiro"), pix: sumBy("income", "pix"), cartao: sumBy("income", "cartao") };
+  const incomeByMethod = {
+    dinheiro: sumBy("income", "dinheiro"),
+    pix: sumBy("income", "pix"),
+    debito: sumBy("income", "debito"),
+    credito: sumBy("income", "credito"),
+    cartao: sumBy("income", "cartao"), // legado
+  };
   const totalIncome = transactions.filter((x) => x.type === "income").reduce((a, x) => a + Number(x.amount), 0);
   const totalExpense = transactions.filter((x) => x.type === "expense").reduce((a, x) => a + Number(x.amount), 0);
-  // dinheiro físico esperado na gaveta = abertura + entradas$ - saídas$ (só dinheiro)
+  // dinheiro físico esperado na gaveta = abertura + entradas dinheiro - saídas dinheiro
   const expectedCash = opening0 + incomeByMethod.dinheiro - sumBy("expense", "dinheiro");
 
   async function openCash() {
@@ -324,7 +335,9 @@ export function FinanceManager({
             incomeByMethod={incomeByMethod}
             totalIncome={totalIncome}
             totalExpense={totalExpense}
-            onClose={() => setClosing(false)}
+            openingAmount={opening0}
+            salon={salon}
+            onClose={() => { setClosing(false); router.refresh(); }}
             onConfirm={async (counted) => {
               const { error } = await supabase
                 .from("cash_sessions")
@@ -335,9 +348,8 @@ export function FinanceManager({
                   difference: counted - expectedCash,
                 })
                 .eq("id", openSession.id);
-              if (error) { setErr("Não foi possível fechar o caixa. Tente novamente."); return; }
-              setClosing(false);
-              router.refresh();
+              if (error) return false;
+              return true;
             }}
           />
         )}
@@ -421,6 +433,7 @@ export function FinanceManager({
           <SessionDetailModal
             key="session-detail"
             session={selectedSession}
+            salon={salon}
             onClose={() => setSelectedSession(null)}
           />
         )}
@@ -714,7 +727,7 @@ function PaymentPickerModal({
   const troco = receivedNum - net;
 
   const splitMethods = splits.map((sp) => sp.method);
-  const availableSplitMethods = (["dinheiro", "pix", "cartao"] as const).filter((m) => !splitMethods.includes(m));
+  const availableSplitMethods = PICKER_METHODS.filter((m) => !splitMethods.includes(m));
   const splitsTotal = splits.reduce((s, sp) => s + (parseFloat(sp.amount.replace(",", ".")) || 0), 0);
   const splitRemaining = net - splitsTotal;
   const splitReady = splits.length >= 2 && Math.abs(splitRemaining) < 0.01;
@@ -734,8 +747,8 @@ function PaymentPickerModal({
     setErr(null);
     try {
       await onConfirm(m, discount);
-    } catch {
-      setErr("Não foi possível concluir. Tente novamente.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Não foi possível concluir. Tente novamente.");
       setBusy(null);
     }
   }
@@ -749,8 +762,8 @@ function PaymentPickerModal({
     setErr(null);
     try {
       await onConfirm("split", discount, parsed);
-    } catch {
-      setErr("Não foi possível concluir. Tente novamente.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Não foi possível concluir. Tente novamente.");
       setBusy(null);
     }
   }
@@ -920,18 +933,18 @@ function PaymentPickerModal({
           /* ── seleção da forma ── */
           <>
             <p className="text-xs text-muted-foreground mt-4 mb-2">{confirmLabel} — escolha a forma de pagamento:</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(["dinheiro", "pix", "cartao"] as const).map((m) => {
+            <div className="grid grid-cols-2 gap-2">
+              {PICKER_METHODS.map((m) => {
                 const Meta = PAY_META[m];
                 return (
                   <button
                     key={m}
                     onClick={() => pick(m)}
                     disabled={busy !== null}
-                    className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] border border-border p-4 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
+                    className="flex items-center gap-2.5 rounded-[var(--radius)] border border-border p-3.5 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
                   >
-                    {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary" />}
-                    <span className="text-xs font-medium">{Meta.label}</span>
+                    {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary shrink-0" />}
+                    <span className="text-sm font-medium">{Meta.label}</span>
                   </button>
                 );
               })}
@@ -1335,100 +1348,212 @@ function CloseModal({
   incomeByMethod,
   totalIncome,
   totalExpense,
+  openingAmount,
+  salon,
   onClose,
   onConfirm,
 }: {
   expectedCash: number;
-  incomeByMethod: { dinheiro: number; pix: number; cartao: number };
+  incomeByMethod: Record<string, number>;
   totalIncome: number;
   totalExpense: number;
+  openingAmount: number;
+  salon: SalonInfo;
   onClose: () => void;
-  onConfirm: (counted: number) => Promise<void>;
+  onConfirm: (counted: number) => Promise<boolean>;
 }) {
   const [counted, setCounted] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [report, setReport] = useState<ClosingReportData | null>(null);
+  const [busyPdf, setBusyPdf] = useState(false);
+
   const countedNum = parseFloat(counted.replace(",", ".")) || 0;
   const diff = countedNum - expectedCash;
 
+  const displayMethods = PICKER_METHODS.filter((m) => (incomeByMethod[m] ?? 0) > 0 || m === "dinheiro");
+
   async function confirm() {
     setBusy(true);
-    await onConfirm(countedNum);
+    setErr(null);
+    const ok = await onConfirm(countedNum);
     setBusy(false);
+    if (!ok) { setErr("Não foi possível fechar o caixa. Tente novamente."); return; }
+    const today = new Date();
+    setReport({
+      date: today.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }),
+      openingAmount,
+      totalIncome,
+      totalExpense,
+      incomeByMethod,
+      expectedCash,
+      countedCash: countedNum,
+      difference: diff,
+      fileBase: `fechamento-${today.toISOString().slice(0, 10)}`,
+    });
   }
+
+  async function downloadPdf() {
+    if (!report) return;
+    setBusyPdf(true);
+    try { await generateClosingReportPdf(report, salon); } finally { setBusyPdf(false); }
+  }
+
+  const waHref = report
+    ? `https://wa.me/?text=${encodeURIComponent(buildClosingReportText(report, salon))}`
+    : null;
 
   return (
     <MotionModal onClose={onClose}>
       <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" /> Fechar caixa
-          </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Confira o dinheiro na gaveta. Pix e cartão não contam (vão para a conta).
-        </p>
-
-        {/* Resumo financeiro do dia */}
-        <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 mt-4 space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Entradas</span>
-            <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalIncome)}</span>
-          </div>
-          {totalExpense > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Saídas</span>
-              <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExpense)}</span>
+        {report ? (
+          /* ── estado de sucesso ── */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-bold flex items-center gap-2">
+                <Check className="h-5 w-5 text-emerald-500" /> Caixa fechado!
+              </h3>
+              <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
-          )}
-          <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
-            <span>Saldo líquido</span>
-            <span className="tabular-nums">{formatBRL(totalIncome - totalExpense)}</span>
-          </div>
-        </div>
 
-        {/* Totais por forma de pagamento */}
-        <p className="text-xs text-muted-foreground mt-4 mb-2">Entradas por forma de pagamento</p>
-        <div className="grid grid-cols-3 gap-2">
-          {(["dinheiro", "pix", "cartao"] as const).map((m) => {
-            const Meta = PAY_META[m];
-            return (
-              <div key={m} className="rounded-[var(--radius)] bg-muted px-2.5 py-2.5 text-center">
-                <Meta.icon className="h-3.5 w-3.5 mx-auto text-muted-foreground" />
-                <p className="text-[11px] text-muted-foreground mt-1">{Meta.label}</p>
-                <p className="text-xs font-bold tabular-nums mt-0.5">{formatBRL(incomeByMethod[m])}</p>
+            <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Entradas</span>
+                <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalIncome)}</span>
               </div>
-            );
-          })}
-        </div>
+              {totalExpense > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Saídas</span>
+                  <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExpense)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
+                <span>Saldo líquido</span>
+                <span className="tabular-nums">{formatBRL(totalIncome - totalExpense)}</span>
+              </div>
+            </div>
 
-        <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
-          <span className="text-sm text-muted-foreground">Esperado na gaveta</span>
-          <span className="font-display text-lg font-bold">{formatBRL(expectedCash)}</span>
-        </div>
+            <div className="grid grid-cols-2 gap-2">
+              {displayMethods.map((m) => {
+                const Meta = PAY_META[m];
+                return (
+                  <div key={m} className="rounded-[var(--radius)] bg-muted px-3 py-2.5 flex items-center gap-2">
+                    <Meta.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">{Meta.label}</p>
+                      <p className="text-sm font-bold tabular-nums">{formatBRL(incomeByMethod[m] ?? 0)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-        <div className="space-y-1.5 mt-4">
-          <Label htmlFor="counted">Valor contado (R$)</Label>
-          <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" />
-        </div>
+            <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
+              Math.abs(diff) < 0.01 ? "bg-emerald-500/12 text-emerald-600"
+              : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
+              : "bg-red-500/12 text-red-600"
+            }`}>
+              <span>{Math.abs(diff) < 0.01 ? "Caixa conferido" : diff > 0 ? `Sobra ${formatBRL(diff)}` : `Falta ${formatBRL(Math.abs(diff))}`}</span>
+              <span>{Math.abs(diff) < 0.01 ? "✓" : ""}</span>
+            </div>
 
-        {counted !== "" && (
-          <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 mt-3 text-sm font-semibold ${
-            Math.abs(diff) < 0.01 ? "bg-emerald-500/12 text-emerald-600"
-            : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
-            : "bg-red-500/12 text-red-600"
-          }`}>
-            <span>{Math.abs(diff) < 0.01 ? "Caixa conferido" : diff > 0 ? "Sobra" : "Falta"}</span>
-            <span>{Math.abs(diff) < 0.01 ? "✓" : formatBRL(Math.abs(diff))}</span>
+            <div className="flex gap-2">
+              <Button onClick={downloadPdf} disabled={busyPdf} variant="outline" className="flex-1">
+                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+              </Button>
+              {waHref && (
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 flex-1 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                </a>
+              )}
+            </div>
+
+            <Button variant="ghost" onClick={onClose} className="w-full">Fechar</Button>
           </div>
-        )}
+        ) : (
+          /* ── formulário de fechamento ── */
+          <>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-display text-lg font-bold flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" /> Fechar caixa
+              </h3>
+              <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Confira o dinheiro na gaveta antes de fechar.
+            </p>
 
-        <div className="flex gap-2 mt-5">
-          <Button onClick={confirm} disabled={busy || counted === ""} className="flex-1">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar fechamento
-          </Button>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-        </div>
+            {/* Resumo financeiro */}
+            <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 mt-4 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Entradas</span>
+                <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalIncome)}</span>
+              </div>
+              {totalExpense > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Saídas</span>
+                  <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExpense)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
+                <span>Saldo líquido</span>
+                <span className="tabular-nums">{formatBRL(totalIncome - totalExpense)}</span>
+              </div>
+            </div>
+
+            {/* Entradas por forma */}
+            <p className="text-xs text-muted-foreground mt-4 mb-2">Entradas por forma de pagamento</p>
+            <div className="grid grid-cols-2 gap-2">
+              {displayMethods.map((m) => {
+                const Meta = PAY_META[m];
+                return (
+                  <div key={m} className="rounded-[var(--radius)] bg-muted px-3 py-2.5 flex items-center gap-2">
+                    <Meta.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">{Meta.label}</p>
+                      <p className="text-sm font-bold tabular-nums">{formatBRL(incomeByMethod[m] ?? 0)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
+              <span className="text-sm text-muted-foreground">Esperado na gaveta (dinheiro)</span>
+              <span className="font-display text-lg font-bold">{formatBRL(expectedCash)}</span>
+            </div>
+
+            <div className="space-y-1.5 mt-4">
+              <Label htmlFor="counted">Valor contado (R$)</Label>
+              <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" />
+            </div>
+
+            {counted !== "" && (
+              <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 mt-3 text-sm font-semibold ${
+                Math.abs(diff) < 0.01 ? "bg-emerald-500/12 text-emerald-600"
+                : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
+                : "bg-red-500/12 text-red-600"
+              }`}>
+                <span>{Math.abs(diff) < 0.01 ? "Caixa conferido" : diff > 0 ? "Sobra" : "Falta"}</span>
+                <span>{Math.abs(diff) < 0.01 ? "✓" : formatBRL(Math.abs(diff))}</span>
+              </div>
+            )}
+
+            {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+
+            <div className="flex gap-2 mt-5">
+              <Button onClick={confirm} disabled={busy || counted === ""} className="flex-1">
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar fechamento
+              </Button>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            </div>
+          </>
+        )}
       </Card>
     </MotionModal>
   );
@@ -1436,14 +1561,17 @@ function CloseModal({
 
 function SessionDetailModal({
   session,
+  salon,
   onClose,
 }: {
   session: Session;
+  salon: SalonInfo;
   onClose: () => void;
 }) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [txs, setTxs] = useState<Tx[]>([]);
+  const [busyPdf, setBusyPdf] = useState(false);
 
   useEffect(() => {
     supabase
@@ -1461,15 +1589,35 @@ function SessionDetailModal({
   const totalExp = expenses.reduce((s, t) => s + Number(t.amount), 0);
 
   const incByMethod: Record<string, number> = {};
-  for (const m of ["dinheiro", "pix", "cartao"] as const) {
+  for (const m of [...PICKER_METHODS, "cartao"] as const) {
     incByMethod[m] = incomes
       .filter((t) => (t.payment_method ?? "dinheiro") === m)
       .reduce((s, t) => s + Number(t.amount), 0);
   }
+  const displayMethods = PICKER_METHODS.filter((m) => (incByMethod[m] ?? 0) > 0 || m === "dinheiro");
 
   const sessionDate = session.closed_at
-    ? new Date(session.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    ? new Date(session.closed_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })
     : "—";
+
+  const reportData: ClosingReportData = {
+    date: sessionDate,
+    openingAmount: Number(session.opening_amount),
+    totalIncome: totalInc,
+    totalExpense: totalExp,
+    incomeByMethod: incByMethod,
+    expectedCash: session.expected_amount != null ? Number(session.expected_amount) : Number(session.opening_amount) + (incByMethod["dinheiro"] ?? 0),
+    countedCash: session.closing_amount != null ? Number(session.closing_amount) : null,
+    difference: session.difference != null ? Number(session.difference) : null,
+    fileBase: `fechamento-${(session.closed_at ?? "").slice(0, 10)}`,
+  };
+
+  async function downloadPdf() {
+    setBusyPdf(true);
+    try { await generateClosingReportPdf(reportData, salon); } finally { setBusyPdf(false); }
+  }
+
+  const waHref = `https://wa.me/?text=${encodeURIComponent(buildClosingReportText(reportData, salon))}`;
 
   return (
     <MotionModal onClose={onClose}>
@@ -1479,7 +1627,7 @@ function SessionDetailModal({
             <h3 className="font-display text-lg font-bold flex items-center gap-2">
               <BarChart2 className="h-5 w-5 text-primary" /> Relatório do Caixa
             </h3>
-            <p className="text-sm text-muted-foreground">{sessionDate}</p>
+            <p className="text-sm text-muted-foreground truncate">{sessionDate}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5" /></button>
         </div>
@@ -1504,7 +1652,7 @@ function SessionDetailModal({
                 <span>Saldo líquido</span>
                 <span className="tabular-nums">{formatBRL(totalInc - totalExp)}</span>
               </div>
-              <div className="border-t border-border pt-1 space-y-1">
+              <div className="border-t border-border pt-2 space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Abertura</span>
                   <span className="tabular-nums">{formatBRL(Number(session.opening_amount))}</span>
@@ -1537,18 +1685,35 @@ function SessionDetailModal({
             {/* Entradas por forma */}
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2">ENTRADAS POR FORMA</p>
-              <div className="grid grid-cols-3 gap-2">
-                {(["dinheiro", "pix", "cartao"] as const).map((m) => {
+              <div className="grid grid-cols-2 gap-2">
+                {displayMethods.map((m) => {
                   const Meta = PAY_META[m];
                   return (
-                    <div key={m} className="rounded-[var(--radius)] bg-muted px-2.5 py-2.5 text-center">
-                      <Meta.icon className="h-4 w-4 mx-auto text-muted-foreground" />
-                      <p className="text-[11px] text-muted-foreground mt-1">{Meta.label}</p>
-                      <p className="text-sm font-bold tabular-nums mt-0.5">{formatBRL(incByMethod[m] ?? 0)}</p>
+                    <div key={m} className="rounded-[var(--radius)] bg-muted px-3 py-2.5 flex items-center gap-2">
+                      <Meta.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground">{Meta.label}</p>
+                        <p className="text-sm font-bold tabular-nums">{formatBRL(incByMethod[m] ?? 0)}</p>
+                      </div>
                     </div>
                   );
                 })}
               </div>
+            </div>
+
+            {/* Baixar / compartilhar */}
+            <div className="flex gap-2">
+              <Button onClick={downloadPdf} disabled={busyPdf || loading} variant="outline" className="flex-1">
+                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+              </Button>
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 flex-1 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                <MessageCircle className="h-4 w-4" /> WhatsApp
+              </a>
             </div>
 
             {/* Lista de movimentações */}

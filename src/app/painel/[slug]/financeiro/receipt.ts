@@ -41,9 +41,21 @@ export type SalonInfo = {
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
-  dinheiro: "Dinheiro", pix: "Pix", credito: "Crédito", debito: "Débito", cartao: "Cartão",
+  dinheiro: "Dinheiro", pix: "Pix", credito: "Crédito", debito: "Débito", cartao: "Cartão", split: "Divisão",
 };
 export const payLabel = (m: string) => PAYMENT_LABELS[m] ?? m;
+
+export type ClosingReportData = {
+  date: string;
+  openingAmount: number;
+  totalIncome: number;
+  totalExpense: number;
+  incomeByMethod: Record<string, number>;
+  expectedCash: number;
+  countedCash: number | null;
+  difference: number | null;
+  fileBase: string;
+};
 
 /* ────────────────────────── helpers PDF (cupom térmico 80mm) ────────────────────────── */
 
@@ -234,6 +246,97 @@ export async function generateCommissionPdf(d: CommissionReceiptData, salon: Sal
     return y;
   });
   doc.save(`${d.fileBase}.pdf`);
+}
+
+/* ────────────────────────── relatório de fechamento de caixa ────────────────────────── */
+
+const CLOSING_METHODS: { key: string; label: string }[] = [
+  { key: "dinheiro", label: "Dinheiro" },
+  { key: "pix", label: "Pix" },
+  { key: "debito", label: "Débito" },
+  { key: "credito", label: "Crédito" },
+  { key: "cartao", label: "Cartão (leg.)" },
+];
+
+export async function generateClosingReportPdf(d: ClosingReportData, salon: SalonInfo): Promise<void> {
+  const doc = await buildThermal(salon, (p, startY) => {
+    let y = startY;
+    y = para(p, "FECHAMENTO DE CAIXA", y, { size: 9, style: "bold", color: 60, align: "center" });
+    y = para(p, d.date, y - 0.5, { size: 7.5, color: 120, align: "center" });
+    y += 2;
+    divider(p, y);
+    y += 4;
+
+    y = para(p, "RESUMO DO DIA", y, { size: 7.5, style: "bold", color: 80 });
+    y += 1;
+    y = row(p, "Abertura", formatBRL(d.openingAmount), y, { size: 8.5 });
+    y = row(p, "Total entradas", formatBRL(d.totalIncome), y, { size: 8.5 });
+    if (d.totalExpense > 0) y = row(p, "Total saídas", `−${formatBRL(d.totalExpense)}`, y, { size: 8.5 });
+    y = row(p, "Saldo líquido", formatBRL(d.totalIncome - d.totalExpense), y, { size: 9, style: "bold", rightStyle: "bold" });
+    y += 2;
+    divider(p, y);
+    y += 4;
+
+    y = para(p, "ENTRADAS POR FORMA", y, { size: 7.5, style: "bold", color: 80 });
+    y += 1;
+    for (const { key, label } of CLOSING_METHODS) {
+      const v = d.incomeByMethod[key] ?? 0;
+      if (v > 0) y = row(p, label, formatBRL(v), y, { size: 8.5 });
+    }
+    if (!CLOSING_METHODS.some(({ key }) => (d.incomeByMethod[key] ?? 0) > 0)) {
+      y = row(p, "Dinheiro", formatBRL(0), y, { size: 8.5 });
+    }
+
+    y += 2;
+    divider(p, y);
+    y += 4;
+    y = para(p, "CONFERÊNCIA DO DINHEIRO", y, { size: 7.5, style: "bold", color: 80 });
+    y += 1;
+    y = row(p, "Esperado em caixa", formatBRL(d.expectedCash), y, { size: 8.5 });
+    if (d.countedCash != null) {
+      y = row(p, "Contado", formatBRL(d.countedCash), y, { size: 8.5 });
+      const diff = d.difference ?? 0;
+      const diffStr = Math.abs(diff) < 0.01 ? "Conferido ✓" : diff > 0 ? `+${formatBRL(diff)} (sobra)` : `−${formatBRL(Math.abs(diff))} (falta)`;
+      y = row(p, "Diferença", diffStr, y, { size: 8.5, style: Math.abs(diff) < 0.01 ? "normal" : "bold" });
+    }
+
+    y += 3;
+    divider(p, y);
+    y += 4;
+    y = para(p, "Documento sem valor fiscal", y, { size: 7, color: 160, align: "center" });
+    return y;
+  });
+  doc.save(`${d.fileBase}.pdf`);
+}
+
+export function buildClosingReportText(d: ClosingReportData, salon: SalonInfo): string {
+  const lines = [
+    `*Fechamento de Caixa — ${salon.name}*`,
+    `Data: ${d.date}`,
+    "",
+    "*RESUMO DO DIA*",
+    `Abertura: ${formatBRL(d.openingAmount)}`,
+    `Entradas: ${formatBRL(d.totalIncome)}`,
+  ];
+  if (d.totalExpense > 0) lines.push(`Saídas: −${formatBRL(d.totalExpense)}`);
+  lines.push(`*Saldo líquido: ${formatBRL(d.totalIncome - d.totalExpense)}*`);
+  lines.push("");
+  lines.push("*ENTRADAS POR FORMA*");
+  for (const { key, label } of CLOSING_METHODS) {
+    const v = d.incomeByMethod[key] ?? 0;
+    if (v > 0) lines.push(`${label}: ${formatBRL(v)}`);
+  }
+  lines.push("");
+  lines.push("*CONFERÊNCIA DO DINHEIRO*");
+  lines.push(`Esperado: ${formatBRL(d.expectedCash)}`);
+  if (d.countedCash != null) {
+    lines.push(`Contado: ${formatBRL(d.countedCash)}`);
+    const diff = d.difference ?? 0;
+    lines.push(`Diferença: ${Math.abs(diff) < 0.01 ? "Conferido ✓" : diff > 0 ? `+${formatBRL(diff)} (sobra)` : `−${formatBRL(Math.abs(diff))} (falta)`}`);
+  }
+  lines.push("");
+  lines.push("_Documento sem valor fiscal._");
+  return lines.join("\n");
 }
 
 /* ────────────────────────── versões em texto (WhatsApp) ────────────────────────── */
