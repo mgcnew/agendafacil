@@ -12,7 +12,7 @@ import type { Tables } from "@/lib/database.types";
 import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
-  Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search,
+  Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search, BarChart2,
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
@@ -86,14 +86,25 @@ export function FinanceManager({
   const [lojaOpen, setLojaOpen] = useState(false); // modal da loja (venda de produto)
   const [manualModal, setManualModal] = useState(false); // modal de lançamento manual
   const [movementsModal, setMovementsModal] = useState(false); // modal "ver todas" as movimentações
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null); // relatório de sessão fechada
 
-  // Cobra um atendimento do dia com a forma de pagamento (e desconto) escolhidos.
-  async function chargeAppointment(apptId: string, payment: string, discount: number) {
-    const { error } = await supabase.rpc("finalize_appointment" as never, {
+  // Cobra um atendimento do dia com a forma de pagamento (e desconto/splits) escolhidos.
+  async function chargeAppointment(
+    apptId: string,
+    payment: string,
+    discount: number,
+    splits?: { method: string; amount: number }[],
+  ) {
+    const params: Record<string, unknown> = {
       p_appointment: apptId,
-      p_payment_method: payment,
       p_discount: discount || 0,
-    } as never);
+    };
+    if (splits && splits.length > 1) {
+      params.p_splits = splits;
+    } else {
+      params.p_payment_method = payment;
+    }
+    const { error } = await supabase.rpc("finalize_appointment" as never, params as never);
     if (error) throw error;
     router.refresh();
   }
@@ -117,6 +128,8 @@ export function FinanceManager({
   const sumBy = (t: "income" | "expense", m: string) =>
     transactions.filter((x) => x.type === t && (x.payment_method ?? "dinheiro") === m).reduce((a, x) => a + Number(x.amount), 0);
   const incomeByMethod = { dinheiro: sumBy("income", "dinheiro"), pix: sumBy("income", "pix"), cartao: sumBy("income", "cartao") };
+  const totalIncome = transactions.filter((x) => x.type === "income").reduce((a, x) => a + Number(x.amount), 0);
+  const totalExpense = transactions.filter((x) => x.type === "expense").reduce((a, x) => a + Number(x.amount), 0);
   // dinheiro físico esperado na gaveta = abertura + entradas$ - saídas$ (só dinheiro)
   const expectedCash = opening0 + incomeByMethod.dinheiro - sumBy("expense", "dinheiro");
 
@@ -268,7 +281,12 @@ export function FinanceManager({
                 {closedSessions.map((s) => {
                   const diff = s.difference == null ? null : Number(s.difference);
                   return (
-                    <div key={s.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedSession(s)}
+                      className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition"
+                    >
+                      <BarChart2 className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">
                           {s.closed_at ? new Date(s.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
@@ -280,7 +298,7 @@ export function FinanceManager({
                         </p>
                       </div>
                       {diff != null && (
-                        <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${
+                        <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${
                           diff === 0 ? "bg-muted text-muted-foreground"
                           : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
                           : "bg-red-500/12 text-red-600"
@@ -288,7 +306,7 @@ export function FinanceManager({
                           {diff === 0 ? "Conferido" : `${diff > 0 ? "Sobra" : "Falta"} ${formatBRL(Math.abs(diff))}`}
                         </span>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -304,6 +322,8 @@ export function FinanceManager({
             key="close"
             expectedCash={expectedCash}
             incomeByMethod={incomeByMethod}
+            totalIncome={totalIncome}
+            totalExpense={totalExpense}
             onClose={() => setClosing(false)}
             onConfirm={async (counted) => {
               const { error } = await supabase
@@ -341,8 +361,9 @@ export function FinanceManager({
             confirmLabel="Receber"
             allowDiscount={canDiscount}
             maxDiscountPercent={maxDiscountPercent}
+            allowSplit
             onClose={() => setCharging(null)}
-            onConfirm={async (pay, discount) => { await chargeAppointment(charging.id, pay, discount); setCharging(null); }}
+            onConfirm={async (pay, discount, splits) => { await chargeAppointment(charging.id, pay, discount, splits); setCharging(null); }}
           />
         )}
       </AnimatePresence>
@@ -390,6 +411,17 @@ export function FinanceManager({
             transactions={transactions}
             onReceipt={(t) => { setMovementsModal(false); setReceiptTx(t); }}
             onClose={() => setMovementsModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Relatório de sessão fechada */}
+      <AnimatePresence>
+        {selectedSession && (
+          <SessionDetailModal
+            key="session-detail"
+            session={selectedSession}
+            onClose={() => setSelectedSession(null)}
           />
         )}
       </AnimatePresence>
@@ -508,7 +540,7 @@ function ActionTile({
   );
 }
 
-function TxRow({ t, onReceipt }: { t: Tx; onReceipt: () => void }) {
+function TxRow({ t, onReceipt }: { t: Tx; onReceipt?: () => void }) {
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
       <span className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
@@ -521,7 +553,7 @@ function TxRow({ t, onReceipt }: { t: Tx; onReceipt: () => void }) {
       <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
         {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
       </span>
-      {t.type === "income" && (
+      {t.type === "income" && onReceipt && (
         <button onClick={onReceipt} title="Emitir cupom"
           className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground">
           <Receipt className="h-4 w-4" />
@@ -646,7 +678,10 @@ function MovementsModal({
 
 /* ─────────── Escolha da forma de pagamento (cobrar cliente / vender) ─────────── */
 function PaymentPickerModal({
-  title, subtitle, total, confirmLabel, extra, allowDiscount = false, maxDiscountPercent = 0, onClose, onConfirm,
+  title, subtitle, total, confirmLabel, extra,
+  allowDiscount = false, maxDiscountPercent = 0,
+  allowSplit = false,
+  onClose, onConfirm,
 }: {
   title: string;
   subtitle?: string;
@@ -655,15 +690,18 @@ function PaymentPickerModal({
   extra?: React.ReactNode;
   allowDiscount?: boolean;
   maxDiscountPercent?: number;
+  allowSplit?: boolean;
   onClose: () => void;
-  onConfirm: (payment: string, discount: number) => Promise<void>;
+  onConfirm: (payment: string, discount: number, splits?: { method: string; amount: number }[]) => Promise<void>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [discMode, setDiscMode] = useState<"percent" | "value">("percent");
   const [discInput, setDiscInput] = useState("");
-  const [cashMode, setCashMode] = useState(false); // sub-etapa "valor recebido / troco"
+  const [cashMode, setCashMode] = useState(false);
   const [received, setReceived] = useState("");
+  const [splitMode, setSplitMode] = useState(false);
+  const [splits, setSplits] = useState<{ method: string; amount: string }[]>([]);
 
   const showDiscount = allowDiscount && maxDiscountPercent > 0;
   const maxValue = total * maxDiscountPercent / 100;
@@ -674,6 +712,22 @@ function PaymentPickerModal({
   const net = total - discount;
   const receivedNum = parseFloat(received.replace(",", ".")) || 0;
   const troco = receivedNum - net;
+
+  const splitMethods = splits.map((sp) => sp.method);
+  const availableSplitMethods = (["dinheiro", "pix", "cartao"] as const).filter((m) => !splitMethods.includes(m));
+  const splitsTotal = splits.reduce((s, sp) => s + (parseFloat(sp.amount.replace(",", ".")) || 0), 0);
+  const splitRemaining = net - splitsTotal;
+  const splitReady = splits.length >= 2 && Math.abs(splitRemaining) < 0.01;
+
+  function addSplit(method: string) {
+    setSplits((prev) => [...prev, { method, amount: "" }]);
+  }
+  function removeSplit(i: number) {
+    setSplits((prev) => prev.filter((_, j) => j !== i));
+  }
+  function updateSplitAmount(i: number, amount: string) {
+    setSplits((prev) => prev.map((sp, j) => (j === i ? { ...sp, amount } : sp)));
+  }
 
   async function confirm(m: string) {
     setBusy(m);
@@ -686,7 +740,21 @@ function PaymentPickerModal({
     }
   }
 
-  // Dinheiro abre a sub-etapa de troco; pix/cartão confirmam direto.
+  async function confirmSplits() {
+    const parsed = splits
+      .map((sp) => ({ method: sp.method, amount: parseFloat(sp.amount.replace(",", ".")) || 0 }))
+      .filter((sp) => sp.amount > 0);
+    if (parsed.length < 2) return;
+    setBusy("split");
+    setErr(null);
+    try {
+      await onConfirm("split", discount, parsed);
+    } catch {
+      setErr("Não foi possível concluir. Tente novamente.");
+      setBusy(null);
+    }
+  }
+
   function pick(m: string) {
     if (m === "dinheiro") { setCashMode(true); return; }
     confirm(m);
@@ -742,7 +810,90 @@ function PaymentPickerModal({
         </div>
         {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
 
-        {cashMode ? (
+        {/* ── modo split ── */}
+        {splitMode ? (
+          <div className="mt-4 space-y-3">
+            <button
+              onClick={() => { setSplitMode(false); setSplits([]); }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" /> voltar
+            </button>
+
+            {availableSplitMethods.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Adicionar forma:</p>
+                <div className="flex gap-2 flex-wrap">
+                  {availableSplitMethods.map((m) => {
+                    const Meta = PAY_META[m];
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => addSplit(m)}
+                        className="flex items-center gap-1.5 text-xs border border-border rounded-[var(--radius)] px-3 py-1.5 hover:border-primary hover:bg-primary/5 transition"
+                      >
+                        <Meta.icon className="h-3.5 w-3.5 text-primary" /> + {Meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {splits.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">Adicione ao menos duas formas de pagamento.</p>
+            ) : (
+              <div className="space-y-2">
+                {splits.map((sp, i) => {
+                  const Meta = PAY_META[sp.method];
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 w-24 shrink-0">
+                        <Meta.icon className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-sm font-medium">{Meta.label}</span>
+                      </div>
+                      <Input
+                        value={sp.amount}
+                        onChange={(e) => updateSplitAmount(i, e.target.value)}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        className="flex-1"
+                      />
+                      <button
+                        onClick={() => removeSplit(i)}
+                        className="h-9 w-9 grid place-items-center rounded-[var(--radius)] hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {splits.length > 0 && (
+              <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
+                Math.abs(splitRemaining) < 0.01
+                  ? "bg-emerald-500/12 text-emerald-600"
+                  : splitRemaining > 0
+                  ? "bg-amber-500/12 text-amber-700"
+                  : "bg-red-500/12 text-red-600"
+              }`}>
+                <span>{Math.abs(splitRemaining) < 0.01 ? "Divisão completa" : splitRemaining > 0 ? "Falta" : "Excede"}</span>
+                <span className="font-display text-base">
+                  {Math.abs(splitRemaining) < 0.01 ? "✓" : formatBRL(Math.abs(splitRemaining))}
+                </span>
+              </div>
+            )}
+
+            <Button onClick={confirmSplits} disabled={busy !== null || !splitReady} className="w-full">
+              {busy === "split" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Confirmar divisão
+            </Button>
+          </div>
+
+        ) : cashMode ? (
+          /* ── sub-etapa dinheiro: troco ── */
           <div className="mt-4 space-y-3">
             <button onClick={() => { setCashMode(false); setReceived(""); }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -764,7 +915,9 @@ function PaymentPickerModal({
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />} Confirmar em dinheiro
             </Button>
           </div>
+
         ) : (
+          /* ── seleção da forma ── */
           <>
             <p className="text-xs text-muted-foreground mt-4 mb-2">{confirmLabel} — escolha a forma de pagamento:</p>
             <div className="grid grid-cols-3 gap-2">
@@ -783,6 +936,11 @@ function PaymentPickerModal({
                 );
               })}
             </div>
+            {allowSplit && (
+              <button onClick={() => setSplitMode(true)} className="w-full mt-3 text-xs text-primary hover:underline py-1">
+                Dividir entre formas de pagamento
+              </button>
+            )}
           </>
         )}
       </Card>
@@ -1175,11 +1333,15 @@ function CommissionModal({
 function CloseModal({
   expectedCash,
   incomeByMethod,
+  totalIncome,
+  totalExpense,
   onClose,
   onConfirm,
 }: {
   expectedCash: number;
   incomeByMethod: { dinheiro: number; pix: number; cartao: number };
+  totalIncome: number;
+  totalExpense: number;
   onClose: () => void;
   onConfirm: (counted: number) => Promise<void>;
 }) {
@@ -1207,14 +1369,34 @@ function CloseModal({
           Confira o dinheiro na gaveta. Pix e cartão não contam (vão para a conta).
         </p>
 
-        {/* Totais por forma */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        {/* Resumo financeiro do dia */}
+        <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 mt-4 space-y-1.5">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Entradas</span>
+            <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalIncome)}</span>
+          </div>
+          {totalExpense > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Saídas</span>
+              <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExpense)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
+            <span>Saldo líquido</span>
+            <span className="tabular-nums">{formatBRL(totalIncome - totalExpense)}</span>
+          </div>
+        </div>
+
+        {/* Totais por forma de pagamento */}
+        <p className="text-xs text-muted-foreground mt-4 mb-2">Entradas por forma de pagamento</p>
+        <div className="grid grid-cols-3 gap-2">
           {(["dinheiro", "pix", "cartao"] as const).map((m) => {
             const Meta = PAY_META[m];
             return (
-              <div key={m} className="rounded-[var(--radius)] bg-muted px-2.5 py-2 text-center">
+              <div key={m} className="rounded-[var(--radius)] bg-muted px-2.5 py-2.5 text-center">
                 <Meta.icon className="h-3.5 w-3.5 mx-auto text-muted-foreground" />
-                <p className="text-xs font-semibold mt-1">{formatBRL(incomeByMethod[m])}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{Meta.label}</p>
+                <p className="text-xs font-bold tabular-nums mt-0.5">{formatBRL(incomeByMethod[m])}</p>
               </div>
             );
           })}
@@ -1247,6 +1429,139 @@ function CloseModal({
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+function SessionDetailModal({
+  session,
+  onClose,
+}: {
+  session: Session;
+  onClose: () => void;
+}) {
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [txs, setTxs] = useState<Tx[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("cash_transactions")
+      .select("*")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { setTxs(data ?? []); setLoading(false); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
+
+  const incomes = txs.filter((t) => t.type === "income");
+  const expenses = txs.filter((t) => t.type === "expense");
+  const totalInc = incomes.reduce((s, t) => s + Number(t.amount), 0);
+  const totalExp = expenses.reduce((s, t) => s + Number(t.amount), 0);
+
+  const incByMethod: Record<string, number> = {};
+  for (const m of ["dinheiro", "pix", "cartao"] as const) {
+    incByMethod[m] = incomes
+      .filter((t) => (t.payment_method ?? "dinheiro") === m)
+      .reduce((s, t) => s + Number(t.amount), 0);
+  }
+
+  const sessionDate = session.closed_at
+    ? new Date(session.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    : "—";
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-bold flex items-center gap-2">
+              <BarChart2 className="h-5 w-5 text-primary" /> Relatório do Caixa
+            </h3>
+            <p className="text-sm text-muted-foreground">{sessionDate}</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5" /></button>
+        </div>
+
+        {loading ? (
+          <div className="grid place-items-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="flex-1 overflow-auto p-5 space-y-4">
+            {/* Resumo financeiro */}
+            <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Total entradas</span>
+                <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalInc)}</span>
+              </div>
+              {totalExp > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Total saídas</span>
+                  <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExp)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
+                <span>Saldo líquido</span>
+                <span className="tabular-nums">{formatBRL(totalInc - totalExp)}</span>
+              </div>
+              <div className="border-t border-border pt-1 space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Abertura</span>
+                  <span className="tabular-nums">{formatBRL(Number(session.opening_amount))}</span>
+                </div>
+                {session.expected_amount != null && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Esperado em caixa</span>
+                    <span className="tabular-nums">{formatBRL(Number(session.expected_amount))}</span>
+                  </div>
+                )}
+                {session.closing_amount != null && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Contado</span>
+                    <span className="tabular-nums">{formatBRL(Number(session.closing_amount))}</span>
+                  </div>
+                )}
+                {session.difference != null && (
+                  <div className={`flex justify-between text-xs font-semibold ${
+                    Number(session.difference) === 0 ? "text-emerald-600"
+                    : Number(session.difference) > 0 ? "text-emerald-600"
+                    : "text-red-600"
+                  }`}>
+                    <span>{Number(session.difference) === 0 ? "Conferido" : Number(session.difference) > 0 ? "Sobra" : "Falta"}</span>
+                    <span className="tabular-nums">{Number(session.difference) === 0 ? "✓" : formatBRL(Math.abs(Number(session.difference)))}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Entradas por forma */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">ENTRADAS POR FORMA</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["dinheiro", "pix", "cartao"] as const).map((m) => {
+                  const Meta = PAY_META[m];
+                  return (
+                    <div key={m} className="rounded-[var(--radius)] bg-muted px-2.5 py-2.5 text-center">
+                      <Meta.icon className="h-4 w-4 mx-auto text-muted-foreground" />
+                      <p className="text-[11px] text-muted-foreground mt-1">{Meta.label}</p>
+                      <p className="text-sm font-bold tabular-nums mt-0.5">{formatBRL(incByMethod[m] ?? 0)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Lista de movimentações */}
+            {txs.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">MOVIMENTAÇÕES</p>
+                <div className="space-y-2">
+                  {txs.map((t) => <TxRow key={t.id} t={t} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </MotionModal>
   );
