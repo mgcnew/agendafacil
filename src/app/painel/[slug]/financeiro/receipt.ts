@@ -124,8 +124,16 @@ function divider(doc: JsPDF, y: number) {
 function drawHeader(doc: JsPDF, salon: SalonInfo, logo: Logo | null, y: number): number {
   if (logo) {
     try {
-      doc.addImage(logo.data, logo.format, (W - 14) / 2, y, 14, 14);
-      y += 17;
+      const size = 16;
+      const cx = W / 2;
+      const cy = y + size / 2;
+      const r = size / 2;
+      doc.saveGraphicsState();
+      doc.circle(cx, cy, r, "n"); // define path sem pintar
+      doc.clip();                  // clip para o círculo
+      doc.addImage(logo.data, logo.format, cx - r, cy - r, size, size);
+      doc.restoreGraphicsState();
+      y += size + 3;
     } catch {
       y += 1;
     }
@@ -274,7 +282,7 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
     y += 1;
     y = row(p, "Abertura", formatBRL(d.openingAmount), y, { size: 8.5 });
     y = row(p, "Total entradas", formatBRL(d.totalIncome), y, { size: 8.5 });
-    if (d.totalExpense > 0) y = row(p, "Total saídas", `−${formatBRL(d.totalExpense)}`, y, { size: 8.5 });
+    if (d.totalExpense > 0) y = row(p, "Total saídas", `-${formatBRL(d.totalExpense)}`, y, { size: 8.5 });
     y = row(p, "Saldo líquido", formatBRL(d.totalIncome - d.totalExpense), y, { size: 9, style: "bold", rightStyle: "bold" });
     y += 2;
     divider(p, y);
@@ -299,8 +307,9 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
     if (d.countedCash != null) {
       y = row(p, "Contado", formatBRL(d.countedCash), y, { size: 8.5 });
       const diff = d.difference ?? 0;
-      const diffStr = Math.abs(diff) < 0.01 ? "Conferido ✓" : diff > 0 ? `+${formatBRL(diff)} (sobra)` : `−${formatBRL(Math.abs(diff))} (falta)`;
-      y = row(p, "Diferença", diffStr, y, { size: 8.5, style: Math.abs(diff) < 0.01 ? "normal" : "bold" });
+      const diffStr = Math.abs(diff) < 0.01 ? "Conferido ✓" : diff > 0 ? `+${formatBRL(diff)}` : `-${formatBRL(Math.abs(diff))}`;
+      const diffLabel = Math.abs(diff) < 0.01 ? "Diferença" : diff > 0 ? "Diferença (sobra)" : "Diferença (falta)";
+      y = row(p, diffLabel, diffStr, y, { size: 8.5, style: Math.abs(diff) < 0.01 ? "normal" : "bold" });
     }
 
     const confItems: { title: string; expected: number; counted: number | null | undefined }[] = [
@@ -318,8 +327,9 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
       y = row(p, "Registrado", formatBRL(item.expected), y, { size: 8.5 });
       y = row(p, "Informado",  formatBRL(item.counted),  y, { size: 8.5 });
       const d2 = item.counted - item.expected;
-      const s = Math.abs(d2) < 0.01 ? "Conferido ✓" : d2 > 0 ? `+${formatBRL(d2)} (sobra)` : `−${formatBRL(Math.abs(d2))} (falta)`;
-      y = row(p, "Diferença", s, y, { size: 8.5, style: Math.abs(d2) < 0.01 ? "normal" : "bold" });
+      const s = Math.abs(d2) < 0.01 ? "Conferido ✓" : d2 > 0 ? `+${formatBRL(d2)}` : `-${formatBRL(Math.abs(d2))}`;
+      const lbl = Math.abs(d2) < 0.01 ? "Diferença" : d2 > 0 ? "Diferença (sobra)" : "Diferença (falta)";
+      y = row(p, lbl, s, y, { size: 8.5, style: Math.abs(d2) < 0.01 ? "normal" : "bold" });
     }
 
     y += 3;
