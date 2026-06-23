@@ -129,6 +129,16 @@ export default async function FinanceiroPage({
   } as never);
   const receivable = (Array.isArray(receivableRaw) ? receivableRaw : []) as Receivable[];
 
+  // Produtos de revenda (atalho de venda no caixa)
+  const { data: resaleRaw } = await supabase
+    .from("products")
+    .select("id, name, sale_price, quantity")
+    .eq("salon_id", salonId)
+    .eq("is_active", true)
+    .eq("is_resale", true)
+    .order("name");
+  const resaleProducts = (resaleRaw ?? []) as { id: string; name: string; sale_price: number; quantity: number }[];
+
   // ── fixos ──
   const [{ data: fixedCostsRaw }, { data: chairRaw }, { data: pkgsRaw }] = await Promise.all([
     supabase
@@ -178,6 +188,7 @@ export default async function FinanceiroPage({
       commissions={commissions}
       closedSessions={closedSessions ?? []}
       receivable={receivable}
+      resaleProducts={resaleProducts}
       salon={{
         name: membership.salons.name,
         phone: membership.salons.phone,

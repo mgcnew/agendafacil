@@ -12,7 +12,7 @@ import type { Tables } from "@/lib/database.types";
 import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
-  Receipt, MessageCircle, Download,
+  Receipt, MessageCircle, Download, UsersRound, Boxes, ChevronDown, Minus,
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
@@ -26,6 +26,7 @@ type Tx = Tables<"cash_transactions">;
 type Comm = { member_id: string; name: string; earned: number; paid: number };
 type Period = { label: string; prevCmes: string; nextCmes: string; start: string; end: string; startIso: string; endIso: string };
 export type Receivable = { id: string; client: string; member_id: string; total: number; time: string; services: string[] };
+export type ResaleProduct = { id: string; name: string; sale_price: number; quantity: number };
 
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
   dinheiro: { label: "Dinheiro", icon: Banknote },
@@ -41,6 +42,7 @@ export function FinanceManager({
   commissions,
   closedSessions,
   receivable,
+  resaleProducts,
   salon,
   initialTab,
   period,
@@ -55,6 +57,7 @@ export function FinanceManager({
   commissions: Comm[];
   closedSessions: Session[];
   receivable: Receivable[];
+  resaleProducts: ResaleProduct[];
   salon: SalonInfo;
   initialTab: "caixa" | "comissoes" | "fixos";
   period: Period;
@@ -79,11 +82,34 @@ export function FinanceManager({
   const [method, setMethod] = useState("dinheiro");
   const [selectedAppt, setSelectedAppt] = useState(""); // recebimento vinculado a um atendimento
   const [receiptTx, setReceiptTx] = useState<Tx | null>(null); // cupom não fiscal aberto
+  const [charging, setCharging] = useState<Receivable | null>(null); // cobrança de cliente
+  const [selling, setSelling] = useState<ResaleProduct | null>(null); // venda de produto
+  const [manualOpen, setManualOpen] = useState(false); // lançamento manual (colapsável)
 
-  const income = transactions.filter((t) => t.type === "income").reduce((a, t) => a + Number(t.amount), 0);
-  const expense = transactions.filter((t) => t.type === "expense").reduce((a, t) => a + Number(t.amount), 0);
+  // Cobra um atendimento do dia com a forma de pagamento escolhida.
+  async function chargeAppointment(apptId: string, payment: string) {
+    const { error } = await supabase.rpc("finalize_appointment", {
+      p_appointment: apptId,
+      p_payment_method: payment,
+    });
+    if (error) throw error;
+    router.refresh();
+  }
+
+  // Vende um produto de revenda (entrada + baixa de estoque, sem comissão).
+  async function sellProduct(productId: string, qty: number, payment: string) {
+    if (!openSession) throw new Error("Caixa fechado.");
+    const { error } = await supabase.rpc("cash_sell_product" as never, {
+      p_session: openSession.id,
+      p_product: productId,
+      p_qty: qty,
+      p_payment_method: payment,
+    } as never);
+    if (error) throw error;
+    router.refresh();
+  }
+
   const opening0 = openSession ? Number(openSession.opening_amount) : 0;
-  const balance = opening0 + income - expense;
 
   // totais por forma de pagamento (entradas)
   const sumBy = (t: "income" | "expense", m: string) =>
@@ -185,91 +211,98 @@ export function FinanceManager({
             </Card>
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Stat icon={Wallet} label="Movimento total" value={formatBRL(balance)} />
-                <Stat icon={TrendingUp} label="Entradas" value={formatBRL(income)} />
-                <Stat icon={TrendingDown} label="Saídas" value={formatBRL(expense)} />
-                <Stat icon={Banknote} label="Esperado na gaveta" value={formatBRL(expectedCash)} />
-              </div>
-
-              {/* Entradas por forma de pagamento */}
-              <div className="grid grid-cols-3 gap-3">
-                {(["dinheiro", "pix", "cartao"] as const).map((m) => {
-                  const Meta = PAY_META[m];
-                  return (
-                    <div key={m} className="rounded-[var(--radius)] border border-border bg-card p-3.5">
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Meta.icon className="h-3.5 w-3.5" /> {Meta.label}
-                      </span>
-                      <p className="font-display text-base font-bold mt-1">{formatBRL(incomeByMethod[m])}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
               {canManage && (
-                <Card className="p-6 space-y-4">
-                  <h3 className="font-display font-semibold flex items-center gap-2"><Plus className="h-4 w-4" /> Nova movimentação</h3>
-
-                  {/* Receber de uma cliente (atendimentos a receber hoje) */}
-                  {type === "income" && receivable.length > 0 && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="receber">Receber de uma cliente ({receivable.length} a receber)</Label>
-                      <Select
-                        id="receber"
-                        value={selectedAppt}
-                        onValueChange={(v) => {
-                          setSelectedAppt(v);
-                          const r = receivable.find((x) => x.id === v);
-                          if (r) {
-                            setAmount(String(Number(r.total)).replace(".", ","));
-                            setDesc(`Atendimento · ${r.client}`);
-                          } else {
-                            setAmount(""); setDesc("");
-                          }
-                        }}
-                      >
-                        <option value="">Lançamento avulso</option>
-                        {receivable.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.time} · {r.client} · {formatBRL(Number(r.total))}
-                          </option>
-                        ))}
-                      </Select>
-                      {selectedAppt && (
-                        <p className="text-xs text-muted-foreground">
-                          Ao lançar, o atendimento é finalizado — comissão e baixa de estoque são lançadas automaticamente.
-                        </p>
+                <div className="space-y-4">
+                  {/* Atalhos rápidos */}
+                  <div className="grid lg:grid-cols-2 gap-4">
+                    {/* Receber cliente */}
+                    <Card className="p-5">
+                      <h3 className="font-display font-semibold flex items-center gap-2 mb-3">
+                        <UsersRound className="h-4 w-4 text-primary" /> Receber cliente
+                        <span className="ml-auto text-xs font-normal text-muted-foreground">{receivable.length}</span>
+                      </h3>
+                      {receivable.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-3 text-center">Nenhum cliente a receber agora.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-72 overflow-auto">
+                          {receivable.map((r) => (
+                            <button key={r.id} onClick={() => setCharging(r)}
+                              className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border p-3 hover:bg-muted/40 transition">
+                              <span className="font-display font-bold tabular-nums text-sm w-12 shrink-0">{r.time}</span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{r.client}</p>
+                                {r.services.length > 0 && <p className="text-xs text-muted-foreground truncate">{r.services.join(", ")}</p>}
+                              </div>
+                              <span className="text-sm font-semibold text-primary shrink-0">{formatBRL(Number(r.total))}</span>
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>
-                  )}
+                    </Card>
 
-                  <div className="grid sm:grid-cols-4 gap-3">
-                    <Select value={type} onValueChange={(v) => { setType(v as "income" | "expense"); if (v === "expense") { setSelectedAppt(""); } }}>
-                      <option value="income">Entrada</option>
-                      <option value="expense">Saída</option>
-                    </Select>
-                    <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!!selectedAppt} />
-                    <Select value={method} onValueChange={setMethod}>
-                      <option value="dinheiro">Dinheiro</option>
-                      <option value="pix">Pix</option>
-                      <option value="cartao">Cartão</option>
-                    </Select>
-                    <Input placeholder="Descrição" value={desc} onChange={(e) => setDesc(e.target.value)} disabled={!!selectedAppt} />
+                    {/* Vender produto */}
+                    <Card className="p-5">
+                      <h3 className="font-display font-semibold flex items-center gap-2 mb-3">
+                        <Boxes className="h-4 w-4 text-primary" /> Vender produto
+                      </h3>
+                      {resaleProducts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-3 text-center">
+                          Nenhum produto de revenda. Cadastre no Estoque marcando &ldquo;para revenda&rdquo;.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 max-h-72 overflow-auto">
+                          {resaleProducts.map((p) => (
+                            <button key={p.id} onClick={() => setSelling(p)}
+                              className="text-left rounded-[var(--radius)] border border-border p-3 hover:bg-muted/40 transition">
+                              <p className="text-sm font-medium truncate">{p.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatBRL(Number(p.sale_price))} · {Number(p.quantity)} em estoque</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </Card>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <Button onClick={addTx} disabled={busy || (!amount && !selectedAppt)}>
-                      {busy && <Loader2 className="h-4 w-4 animate-spin" />} {selectedAppt ? "Receber" : "Lançar"}
-                    </Button>
-                    <Button variant="outline" onClick={() => setClosing(true)}>
-                      <Lock className="h-4 w-4" /> Fechar caixa
-                    </Button>
+
+                  {/* Lançamento manual (avulso) + fechar caixa */}
+                  <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden">
+                    <button onClick={() => setManualOpen((v) => !v)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition">
+                      <span className="flex items-center gap-2 text-sm font-medium"><Plus className="h-4 w-4 text-primary" /> Lançamento manual (entrada/saída)</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${manualOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {manualOpen && (
+                      <div className="border-t border-border p-4 space-y-3">
+                        <div className="grid sm:grid-cols-4 gap-3">
+                          <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+                            <option value="income">Entrada</option>
+                            <option value="expense">Saída</option>
+                          </Select>
+                          <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+                          <Select value={method} onValueChange={setMethod}>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="pix">Pix</option>
+                            <option value="cartao">Cartão</option>
+                          </Select>
+                          <Input placeholder="Descrição" value={desc} onChange={(e) => setDesc(e.target.value)} />
+                        </div>
+                        <Button onClick={addTx} disabled={busy || !amount}>
+                          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Lançar
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </Card>
+                </div>
               )}
 
               <div>
-                <h3 className="font-display font-semibold mb-3">Movimentações de hoje</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display font-semibold">Movimentações de hoje</h3>
+                  {canManage && (
+                    <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
+                      <Lock className="h-4 w-4" /> Fechar caixa
+                    </Button>
+                  )}
+                </div>
                 {transactions.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-[var(--radius)]">
                     Nenhuma movimentação ainda.
@@ -377,6 +410,33 @@ export function FinanceManager({
         )}
       </AnimatePresence>
 
+      {/* Cobrar cliente (escolha da forma de pagamento) */}
+      <AnimatePresence>
+        {charging && (
+          <PaymentPickerModal
+            key="charge"
+            title={charging.client}
+            subtitle={charging.services.join(", ")}
+            total={Number(charging.total)}
+            confirmLabel="Receber"
+            onClose={() => setCharging(null)}
+            onConfirm={async (pay) => { await chargeAppointment(charging.id, pay); setCharging(null); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Vender produto (quantidade + forma de pagamento) */}
+      <AnimatePresence>
+        {selling && (
+          <SellProductModal
+            key="sell"
+            product={selling}
+            onClose={() => setSelling(null)}
+            onConfirm={async (qty, pay) => { await sellProduct(selling.id, qty, pay); setSelling(null); }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Detalhe / pagamento de comissão */}
       <AnimatePresence>
         {commModal && (
@@ -471,13 +531,98 @@ export function FinanceManager({
   );
 }
 
-function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+/* ─────────── Escolha da forma de pagamento (cobrar cliente / vender) ─────────── */
+function PaymentPickerModal({
+  title, subtitle, total, confirmLabel, extra, onClose, onConfirm,
+}: {
+  title: string;
+  subtitle?: string;
+  total: number;
+  confirmLabel: string;
+  extra?: React.ReactNode;
+  onClose: () => void;
+  onConfirm: (payment: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function pick(m: string) {
+    setBusy(m);
+    setErr(null);
+    try {
+      await onConfirm(m);
+    } catch {
+      setErr("Não foi possível concluir. Tente novamente.");
+      setBusy(null);
+    }
+  }
+
   return (
-    <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-      <Icon className="h-4 w-4 text-primary" />
-      <p className="font-display text-lg font-bold mt-2">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg font-bold truncate">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5" /></button>
+        </div>
+        {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
+        {extra}
+        <div className="flex items-baseline justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
+          <span className="text-sm text-muted-foreground">Total</span>
+          <span className="font-display text-2xl font-bold">{formatBRL(total)}</span>
+        </div>
+        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+        <p className="text-xs text-muted-foreground mt-4 mb-2">{confirmLabel} — escolha a forma de pagamento:</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(["dinheiro", "pix", "cartao"] as const).map((m) => {
+            const Meta = PAY_META[m];
+            return (
+              <button
+                key={m}
+                onClick={() => pick(m)}
+                disabled={busy !== null}
+                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] border border-border p-4 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
+              >
+                {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary" />}
+                <span className="text-xs font-medium">{Meta.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+function SellProductModal({
+  product, onClose, onConfirm,
+}: {
+  product: ResaleProduct;
+  onClose: () => void;
+  onConfirm: (qty: number, payment: string) => Promise<void>;
+}) {
+  const [qty, setQty] = useState(1);
+  const price = Number(product.sale_price);
+  return (
+    <PaymentPickerModal
+      title={product.name}
+      subtitle={`${formatBRL(price)} cada · ${Number(product.quantity)} em estoque`}
+      total={price * qty}
+      confirmLabel="Vender"
+      onClose={onClose}
+      onConfirm={(pay) => onConfirm(qty, pay)}
+      extra={
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-sm text-muted-foreground">Quantidade</span>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))}
+              className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted"><Minus className="h-4 w-4" /></button>
+            <span className="font-display font-bold w-6 text-center tabular-nums">{qty}</span>
+            <button onClick={() => setQty((q) => q + 1)}
+              className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted"><Plus className="h-4 w-4" /></button>
+          </div>
+        </div>
+      }
+    />
   );
 }
 
