@@ -92,6 +92,8 @@ export function FinanceManager({
   const [manualModal, setManualModal] = useState(false); // modal de lançamento manual
   const [movementsModal, setMovementsModal] = useState(false); // modal "ver todas" as movimentações
   const [selectedSession, setSelectedSession] = useState<Session | null>(null); // relatório de sessão fechada
+  const [toast, setToast] = useState<string | null>(null);
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3500); }
 
   // Cobra um atendimento do dia com a forma de pagamento (e desconto/splits) escolhidos.
   async function chargeAppointment(
@@ -219,6 +221,43 @@ export function FinanceManager({
             </Card>
           ) : (
             <>
+              {/* Painel de status do caixa */}
+              <div className="rounded-[var(--radius)] border border-border bg-card p-4 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Aberto às {formatTime(openSession.opened_at)}
+                  {opening0 > 0 && <> · Fundo de caixa {formatBRL(opening0)}</>}
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-0.5">Entradas</p>
+                    <p className="font-display font-bold text-emerald-600">{formatBRL(totalIncome)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-0.5">Saídas</p>
+                    <p className="font-display font-bold text-red-600">{formatBRL(totalExpense)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-0.5">Saldo</p>
+                    <p className="font-display font-bold text-primary">{formatBRL(opening0 + totalIncome - totalExpense)}</p>
+                  </div>
+                </div>
+                {(["dinheiro", "pix", "debito", "credito", "cartao"] as const).some((m) => incomeByMethod[m] > 0) && (
+                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border">
+                    {(["dinheiro", "pix", "debito", "credito", "cartao"] as const)
+                      .filter((m) => incomeByMethod[m] > 0)
+                      .map((m) => {
+                        const Meta = PAY_META[m];
+                        return (
+                          <span key={m} className="inline-flex items-center gap-1 text-[11px] bg-secondary rounded-full px-2.5 py-1">
+                            <Meta.icon className="h-3 w-3 text-primary" />
+                            {Meta.label} <span className="font-medium">{formatBRL(incomeByMethod[m])}</span>
+                          </span>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
               {canManage && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -354,7 +393,7 @@ export function FinanceManager({
             maxDiscountPercent={maxDiscountPercent}
             allowSplit
             onClose={() => setCharging(null)}
-            onConfirm={async (pay, discount, splits) => { await chargeAppointment(charging.id, pay, discount, splits); setCharging(null); }}
+            onConfirm={async (pay, discount, splits) => { await chargeAppointment(charging.id, pay, discount, splits); showToast(`✓ ${formatBRL(Number(charging.total))} recebido de ${charging.client}`); setCharging(null); }}
           />
         )}
       </AnimatePresence>
@@ -366,7 +405,7 @@ export function FinanceManager({
             key="sell"
             product={selling}
             onClose={() => setSelling(null)}
-            onConfirm={async (qty, pay) => { await sellProduct(selling.id, qty, pay); setSelling(null); }}
+            onConfirm={async (qty, pay) => { await sellProduct(selling.id, qty, pay); showToast(`✓ ${selling.name} vendido`); setSelling(null); }}
           />
         )}
       </AnimatePresence>
@@ -508,6 +547,15 @@ export function FinanceManager({
           activePackages={activePackages}
         />
       )}
+
+      {/* Toast de sucesso */}
+      <AnimatePresence>
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background shadow-lg whitespace-nowrap">
+            <Check className="h-4 w-4 text-emerald-400 shrink-0" /> {toast}
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -540,7 +588,7 @@ function TxRow({ t, onReceipt }: { t: Tx; onReceipt?: () => void }) {
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{t.description || (t.type === "income" ? "Entrada" : "Saída")}</p>
-        <p className="text-xs text-muted-foreground">{t.payment_method} · {formatTime(t.created_at)}</p>
+        <p className="text-xs text-muted-foreground">{PAY_META[t.payment_method ?? "dinheiro"]?.label ?? (t.payment_method ?? "—")} · {formatTime(t.created_at)}</p>
       </div>
       <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
         {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
@@ -894,6 +942,18 @@ function PaymentPickerModal({
             <div className="space-y-1.5">
               <Label htmlFor="received">Valor recebido (R$)</Label>
               <Input id="received" autoFocus value={received} onChange={(e) => setReceived(e.target.value)} inputMode="decimal" placeholder={formatBRL(net)} />
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {[net, 50, 100, 200].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setReceived(v === net ? net.toFixed(2).replace(".", ",") : String(v))}
+                  className="flex-1 min-w-[4rem] rounded-[var(--radius)] border border-border px-2 py-1.5 text-xs font-medium hover:border-primary hover:bg-primary/5 transition"
+                >
+                  {v === net ? "Exato" : formatBRL(v)}
+                </button>
+              ))}
             </div>
             {received !== "" && (
               <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
