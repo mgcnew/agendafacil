@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
-import { formatServicePrice, formatDuration } from "@/lib/utils";
+import { formatServicePrice, formatDuration, formatBRL } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
@@ -14,7 +14,7 @@ import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check
 
 type Service = Tables<"services">;
 type PriceType = "fixed" | "from" | "on_request";
-type Prod = { id: string; name: string; unit: string | null };
+type Prod = { id: string; name: string; unit: string | null; cost_price?: number };
 type SP = { service_id: string; product_id: string; quantity: number };
 type RecipeRow = { product_id: string; quantity: string };
 type Category = { id: string; name: string; sort_order: number };
@@ -64,6 +64,26 @@ export function ServicesManager({
   const [err, setErr] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  // Custo de insumos por serviço → margem (preço − comissão − insumos).
+  const productCost = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of products) m[p.id] = Number(p.cost_price ?? 0);
+    return m;
+  }, [products]);
+
+  function insumoCostOf(serviceId: string) {
+    return svcProducts
+      .filter((sp) => sp.service_id === serviceId)
+      .reduce((s, sp) => s + sp.quantity * (productCost[sp.product_id] ?? 0), 0);
+  }
+
+  function marginOf(s: Service): number | null {
+    if (s.price_type === "on_request") return null;
+    const price = Number(s.price);
+    const commission = price * ((s.commission_percent ?? 0) / 100);
+    return price - commission - insumoCostOf(s.id);
+  }
 
   function resetForm() {
     setName(""); setPrice(""); setDuration("30"); setCommission("");
@@ -238,6 +258,15 @@ export function ServicesManager({
     const { error } = await supabase.from("services").update({ is_active: !svc.is_active }).eq("id", svc.id);
     if (error) setServices(prev); // desfaz se o banco recusar
   }
+
+  // Margem ao vivo no editor (a partir do formulário aberto).
+  const livePrice = priceType === "on_request" ? 0 : parseFloat(price.replace(",", ".")) || 0;
+  const liveCommission = livePrice * ((parseFloat(commission.replace(",", ".")) || 0) / 100);
+  const liveInsumo = recipe.reduce(
+    (s, r) => s + (parseFloat(r.quantity.replace(",", ".")) || 0) * (productCost[r.product_id] ?? 0),
+    0,
+  );
+  const liveMargin = livePrice - liveCommission - liveInsumo;
 
   return (
     <div className="space-y-6 af-rise">
@@ -490,6 +519,24 @@ export function ServicesManager({
             )}
           </div>
 
+          {/* Margem estimada do serviço */}
+          {priceType !== "on_request" && (
+            <div className="rounded-[var(--radius)] border border-border p-4 bg-secondary/40">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <Percent className="h-4 w-4 text-primary" /> Lucro estimado por atendimento
+              </p>
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Preço</span><span>{formatBRL(livePrice)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">− Comissão</span><span>{formatBRL(liveCommission)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">− Insumos</span><span>{formatBRL(liveInsumo)}</span></div>
+                <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                  <span>Lucro</span>
+                  <span className={liveMargin < 0 ? "text-red-600" : "text-emerald-600"}>{formatBRL(liveMargin)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {err && <p className="text-sm text-red-600">{err}</p>}
 
           <div className="flex gap-2 mt-2">
@@ -510,7 +557,7 @@ export function ServicesManager({
           <p className="text-sm text-muted-foreground mt-3">Nenhum serviço cadastrado ainda.</p>
         </div>
       ) : categories.length === 0 ? (
-        <ServiceList services={services} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
+        <ServiceList services={services} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} margin={marginOf} />
       ) : (
         <div className="space-y-4">
           {[...categories, { id: "__none__", name: "Sem categoria", sort_order: 9999 }].map((cat) => {
@@ -523,7 +570,7 @@ export function ServicesManager({
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
                   <Tag className="h-3 w-3" /> {cat.name}
                 </p>
-                <ServiceList services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
+                <ServiceList services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} margin={marginOf} />
               </div>
             );
           })}
@@ -539,11 +586,13 @@ function ServiceList({
   onEdit,
   onRemove,
   onToggle,
+  margin,
 }: {
   services: Tables<"services">[];
   onEdit: (s: Tables<"services">) => void;
   onRemove: (id: string) => void;
   onToggle: (s: Tables<"services">) => void;
+  margin?: (s: Tables<"services">) => number | null;
 }) {
   return (
     <div className="space-y-2">
@@ -563,6 +612,15 @@ function ServiceList({
               {s.processing_time_min > 0 && (
                 <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
               )}
+              {(() => {
+                const m = margin?.(s);
+                if (m == null) return null;
+                return (
+                  <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                    <Percent className="h-3 w-3" /> lucro {formatBRL(m)}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <span className="font-semibold text-primary text-sm text-right">

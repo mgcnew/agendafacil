@@ -23,7 +23,7 @@ export default async function ServicosPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("products")
-      .select("id, name, unit")
+      .select("id, name, unit, cost_price")
       .eq("salon_id", membership.salon_id)
       .eq("is_active", true)
       .order("name"),

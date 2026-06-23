@@ -38,6 +38,7 @@ export function InventoryManager({
   const [min, setMin] = useState("0");
   const [cost, setCost] = useState("");
   const [sale, setSale] = useState("");
+  const [isResale, setIsResale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -53,7 +54,8 @@ export function InventoryManager({
         quantity: parseFloat(qty.replace(",", ".")) || 0,
         min_quantity: parseFloat(min.replace(",", ".")) || 0,
         cost_price: parseFloat(cost.replace(",", ".")) || 0,
-        sale_price: parseFloat(sale.replace(",", ".")) || 0,
+        sale_price: isResale ? parseFloat(sale.replace(",", ".")) || 0 : 0,
+        is_resale: isResale,
       })
       .select()
       .single();
@@ -63,7 +65,7 @@ export function InventoryManager({
       return;
     }
     setProducts((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
-    setName(""); setQty("0"); setMin("0"); setCost(""); setSale(""); setAdding(false);
+    setName(""); setQty("0"); setMin("0"); setCost(""); setSale(""); setIsResale(false); setAdding(false);
   }
 
   async function adjust(p: Product, delta: number) {
@@ -154,9 +156,29 @@ export function InventoryManager({
                   <Label htmlFor="pc">Custo (R$)</Label>
                   <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ps">Venda (R$)</Label>
-                  <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
+                {isResale && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ps">Preço de venda (R$)</Label>
+                    <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-start gap-3 rounded-[var(--radius)] border border-border p-4 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsResale((v) => !v)}
+                  aria-pressed={isResale}
+                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${isResale ? "bg-primary" : "bg-muted-foreground/30"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${isResale ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <div>
+                  <p className="text-sm font-medium">Produto para revenda?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Ligue se você vende este produto direto à cliente (balcão). Desligado, é
+                    um <b>insumo</b> — usado nos serviços e contabilizado só pelo custo.
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2 mt-5">
@@ -182,9 +204,15 @@ export function InventoryManager({
             return (
               <div key={p.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{p.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium truncate">{p.name}</p>
+                    <span className={`text-[10px] font-medium rounded-full px-1.5 py-0.5 shrink-0 ${p.is_resale ? "bg-emerald-500/12 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
+                      {p.is_resale ? "revenda" : "insumo"}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {formatBRL(Number(p.sale_price))} · custo {formatBRL(Number(p.cost_price))}
+                    custo {formatBRL(Number(p.cost_price))}
+                    {p.is_resale && <> · venda {formatBRL(Number(p.sale_price))}</>}
                   </p>
                 </div>
                 {canManage && (
