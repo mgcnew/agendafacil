@@ -25,11 +25,12 @@ import {
   Upload,
   Trash2,
   CreditCard,
+  Wallet,
 } from "lucide-react";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
-type TabId = "estabelecimento" | "horarios" | "agendamento" | "aparencia" | "acessos" | "assinatura";
+type TabId = "estabelecimento" | "horarios" | "agendamento" | "caixa" | "aparencia" | "acessos" | "assinatura";
 type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
@@ -38,6 +39,7 @@ const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | 
   { id: "estabelecimento", label: "Estabelecimento", icon: Store, need: "salon" },
   { id: "horarios", label: "Horários", icon: Clock, need: "schedule" },
   { id: "agendamento", label: "Agendamento", icon: Link2, need: "salon" },
+  { id: "caixa", label: "Caixa", icon: Wallet, need: "salon" },
   { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
   { id: "assinatura", label: "Assinatura", icon: CreditCard, need: "salon" },
@@ -141,6 +143,9 @@ export function SettingsTabs({
       )}
       {active === "agendamento" && (
         <BookingPanel salon={salon} canEdit={canEditSalon} />
+      )}
+      {active === "caixa" && (
+        <CashSettingsPanel salon={salon} canEdit={canEditSalon} />
       )}
       {active === "aparencia" && (
         <AppearancePanel salon={salon} canEdit={canEditSalon} />
@@ -735,6 +740,89 @@ function LogoCard({
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </Card>
+  );
+}
+
+/* ───────────────────────── Caixa ───────────────────────── */
+
+function CashSettingsPanel({
+  salon,
+  canEdit,
+}: {
+  salon: Tables<"salons">;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [enabled, setEnabled] = useState(salon.cash_discount_enabled);
+  const [maxPct, setMaxPct] = useState(String(salon.cash_max_discount_percent ?? 0));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true); setSaved(false); setError(null);
+    const pct = Math.min(100, Math.max(0, parseFloat(maxPct.replace(",", ".")) || 0));
+    const supabase = createClient();
+    const { error: e } = await supabase
+      .from("salons")
+      .update({ cash_discount_enabled: enabled, cash_max_discount_percent: pct })
+      .eq("id", salon.id);
+    setSaving(false);
+    if (e) { setError("Não foi possível salvar. Tente novamente."); return; }
+    setMaxPct(String(pct));
+    setSaved(true);
+    router.refresh();
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="p-6">
+        <h2 className="font-display font-semibold flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-primary" /> Descontos no caixa
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Permite dar desconto ao receber um atendimento. A comissão do profissional
+          continua sobre o preço cheio — o desconto sai do resultado do salão.
+        </p>
+
+        <div className="flex items-start gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => canEdit && setEnabled((v) => !v)}
+            disabled={!canEdit}
+            aria-pressed={enabled}
+            className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 disabled:opacity-60 ${enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${enabled ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+          <div>
+            <p className="text-sm font-medium">Habilitar descontos</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Quem pode dar desconto é definido por profissional na aba <b>Acessos</b> (permissão
+              &ldquo;Dar desconto no caixa&rdquo;). A proprietária sempre pode.
+            </p>
+          </div>
+        </div>
+
+        {enabled && (
+          <div className="space-y-1.5 mt-4 max-w-[200px]">
+            <Label htmlFor="maxpct">Desconto máximo (%)</Label>
+            <Input
+              id="maxpct"
+              value={maxPct}
+              onChange={(e) => setMaxPct(e.target.value)}
+              inputMode="decimal"
+              disabled={!canEdit}
+              placeholder="Ex: 10"
+            />
+            <p className="text-xs text-muted-foreground">Teto do desconto que pode ser aplicado.</p>
+          </div>
+        )}
+      </Card>
+
+      {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
+    </div>
   );
 }
 

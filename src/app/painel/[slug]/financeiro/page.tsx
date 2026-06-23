@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
@@ -139,6 +139,16 @@ export default async function FinanceiroPage({
     .order("name");
   const resaleProducts = (resaleRaw ?? []) as { id: string; name: string; sale_price: number; quantity: number }[];
 
+  // ── desconto no caixa (config do salão + permissão do usuário) ──
+  const { data: salonCfg } = await supabase
+    .from("salons")
+    .select("cash_discount_enabled, cash_max_discount_percent")
+    .eq("id", salonId)
+    .maybeSingle();
+  const perms = await getEffectivePermissions(salonId, membership);
+  const canDiscount = !!salonCfg?.cash_discount_enabled && perms.has("cash.discount");
+  const maxDiscountPercent = Number(salonCfg?.cash_max_discount_percent ?? 0);
+
   // ── fixos ──
   const [{ data: fixedCostsRaw }, { data: chairRaw }, { data: pkgsRaw }] = await Promise.all([
     supabase
@@ -189,6 +199,8 @@ export default async function FinanceiroPage({
       closedSessions={closedSessions ?? []}
       receivable={receivable}
       resaleProducts={resaleProducts}
+      canDiscount={canDiscount}
+      maxDiscountPercent={maxDiscountPercent}
       salon={{
         name: membership.salons.name,
         phone: membership.salons.phone,

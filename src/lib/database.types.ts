@@ -1685,6 +1685,8 @@ export type Database = {
           address: string | null
           agenda_color_mode: string
           allow_simultaneous: boolean
+          cash_discount_enabled: boolean
+          cash_max_discount_percent: number
           color_theme: string
           created_at: string
           email: string | null
@@ -1704,6 +1706,8 @@ export type Database = {
           address?: string | null
           agenda_color_mode?: string
           allow_simultaneous?: boolean
+          cash_discount_enabled?: boolean
+          cash_max_discount_percent?: number
           color_theme?: string
           created_at?: string
           email?: string | null
@@ -1723,6 +1727,8 @@ export type Database = {
           address?: string | null
           agenda_color_mode?: string
           allow_simultaneous?: boolean
+          cash_discount_enabled?: boolean
+          cash_max_discount_percent?: number
           color_theme?: string
           created_at?: string
           email?: string | null

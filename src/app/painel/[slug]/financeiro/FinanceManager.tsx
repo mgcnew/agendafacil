@@ -12,7 +12,7 @@ import type { Tables } from "@/lib/database.types";
 import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
-  Receipt, MessageCircle, Download, UsersRound, Boxes, ChevronDown, Minus,
+  Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search,
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
@@ -43,6 +43,8 @@ export function FinanceManager({
   closedSessions,
   receivable,
   resaleProducts,
+  canDiscount,
+  maxDiscountPercent,
   salon,
   initialTab,
   period,
@@ -58,6 +60,8 @@ export function FinanceManager({
   closedSessions: Session[];
   receivable: Receivable[];
   resaleProducts: ResaleProduct[];
+  canDiscount: boolean;
+  maxDiscountPercent: number;
   salon: SalonInfo;
   initialTab: "caixa" | "comissoes" | "fixos";
   period: Period;
@@ -75,23 +79,21 @@ export function FinanceManager({
   const [opening, setOpening] = useState("0");
   const [closing, setClosing] = useState(false);
 
-  // form transação
-  const [type, setType] = useState<"income" | "expense">("income");
-  const [amount, setAmount] = useState("");
-  const [desc, setDesc] = useState("");
-  const [method, setMethod] = useState("dinheiro");
-  const [selectedAppt, setSelectedAppt] = useState(""); // recebimento vinculado a um atendimento
   const [receiptTx, setReceiptTx] = useState<Tx | null>(null); // cupom não fiscal aberto
   const [charging, setCharging] = useState<Receivable | null>(null); // cobrança de cliente
   const [selling, setSelling] = useState<ResaleProduct | null>(null); // venda de produto
-  const [manualOpen, setManualOpen] = useState(false); // lançamento manual (colapsável)
+  const [receberOpen, setReceberOpen] = useState(false); // lista de recebíveis (expande no lugar)
+  const [lojaOpen, setLojaOpen] = useState(false); // modal da loja (venda de produto)
+  const [manualModal, setManualModal] = useState(false); // modal de lançamento manual
+  const [movementsModal, setMovementsModal] = useState(false); // modal "ver todas" as movimentações
 
-  // Cobra um atendimento do dia com a forma de pagamento escolhida.
-  async function chargeAppointment(apptId: string, payment: string) {
-    const { error } = await supabase.rpc("finalize_appointment", {
+  // Cobra um atendimento do dia com a forma de pagamento (e desconto) escolhidos.
+  async function chargeAppointment(apptId: string, payment: string, discount: number) {
+    const { error } = await supabase.rpc("finalize_appointment" as never, {
       p_appointment: apptId,
       p_payment_method: payment,
-    });
+      p_discount: discount || 0,
+    } as never);
     if (error) throw error;
     router.refresh();
   }
@@ -130,36 +132,18 @@ export function FinanceManager({
     router.refresh();
   }
 
-  async function addTx() {
-    if (!openSession) return;
-    setBusy(true);
-    setErr(null);
-
-    // Recebimento de um atendimento → finaliza (lança entrada + comissão + estoque)
-    if (type === "income" && selectedAppt) {
-      const { error } = await supabase.rpc("finalize_appointment", {
-        p_appointment: selectedAppt,
-        p_payment_method: method,
-      });
-      setBusy(false);
-      if (error) { setErr("Não foi possível registrar o recebimento. Tente novamente."); return; }
-      setSelectedAppt(""); setAmount(""); setDesc("");
-      router.refresh();
-      return;
-    }
-
-    if (!amount) { setBusy(false); return; }
+  // Lançamento manual avulso (entrada/saída) — usado pelo ManualModal.
+  async function launchManual(t: "income" | "expense", amt: number, m: string, d: string) {
+    if (!openSession || amt <= 0) return;
     const { error } = await supabase.from("cash_transactions").insert({
       salon_id: salonId,
       session_id: openSession.id,
-      type,
-      amount: parseFloat(amount.replace(",", ".")) || 0,
-      description: desc || null,
-      payment_method: method,
+      type: t,
+      amount: amt,
+      description: d || null,
+      payment_method: m,
     });
-    setBusy(false);
-    if (error) { setErr("Não foi possível registrar o lançamento. Tente novamente."); return; }
-    setAmount(""); setDesc("");
+    if (error) throw error;
     router.refresh();
   }
 
@@ -212,19 +196,20 @@ export function FinanceManager({
           ) : (
             <>
               {canManage && (
-                <div className="space-y-4">
-                  {/* Atalhos rápidos */}
-                  <div className="grid lg:grid-cols-2 gap-4">
-                    {/* Receber cliente */}
-                    <Card className="p-5">
-                      <h3 className="font-display font-semibold flex items-center gap-2 mb-3">
-                        <UsersRound className="h-4 w-4 text-primary" /> Receber cliente
-                        <span className="ml-auto text-xs font-normal text-muted-foreground">{receivable.length}</span>
-                      </h3>
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <ActionTile icon={UsersRound} label="Receber" badge={receivable.length} active={receberOpen} onClick={() => setReceberOpen((v) => !v)} />
+                    <ActionTile icon={Boxes} label="Loja" onClick={() => setLojaOpen(true)} />
+                    <ActionTile icon={Plus} label="Lançar" onClick={() => setManualModal(true)} />
+                  </div>
+
+                  {/* Receber: expande no lugar */}
+                  {receberOpen && (
+                    <Card className="p-4">
                       {receivable.length === 0 ? (
                         <p className="text-sm text-muted-foreground py-3 text-center">Nenhum cliente a receber agora.</p>
                       ) : (
-                        <div className="space-y-2 max-h-72 overflow-auto">
+                        <div className="space-y-2 max-h-80 overflow-auto">
                           {receivable.map((r) => (
                             <button key={r.id} onClick={() => setCharging(r)}
                               className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border p-3 hover:bg-muted/40 transition">
@@ -239,59 +224,8 @@ export function FinanceManager({
                         </div>
                       )}
                     </Card>
-
-                    {/* Vender produto */}
-                    <Card className="p-5">
-                      <h3 className="font-display font-semibold flex items-center gap-2 mb-3">
-                        <Boxes className="h-4 w-4 text-primary" /> Vender produto
-                      </h3>
-                      {resaleProducts.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-3 text-center">
-                          Nenhum produto de revenda. Cadastre no Estoque marcando &ldquo;para revenda&rdquo;.
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2 max-h-72 overflow-auto">
-                          {resaleProducts.map((p) => (
-                            <button key={p.id} onClick={() => setSelling(p)}
-                              className="text-left rounded-[var(--radius)] border border-border p-3 hover:bg-muted/40 transition">
-                              <p className="text-sm font-medium truncate">{p.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatBRL(Number(p.sale_price))} · {Number(p.quantity)} em estoque</p>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </Card>
-                  </div>
-
-                  {/* Lançamento manual (avulso) + fechar caixa */}
-                  <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden">
-                    <button onClick={() => setManualOpen((v) => !v)}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition">
-                      <span className="flex items-center gap-2 text-sm font-medium"><Plus className="h-4 w-4 text-primary" /> Lançamento manual (entrada/saída)</span>
-                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${manualOpen ? "rotate-180" : ""}`} />
-                    </button>
-                    {manualOpen && (
-                      <div className="border-t border-border p-4 space-y-3">
-                        <div className="grid sm:grid-cols-4 gap-3">
-                          <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
-                            <option value="income">Entrada</option>
-                            <option value="expense">Saída</option>
-                          </Select>
-                          <Input placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-                          <Select value={method} onValueChange={setMethod}>
-                            <option value="dinheiro">Dinheiro</option>
-                            <option value="pix">Pix</option>
-                            <option value="cartao">Cartão</option>
-                          </Select>
-                          <Input placeholder="Descrição" value={desc} onChange={(e) => setDesc(e.target.value)} />
-                        </div>
-                        <Button onClick={addTx} disabled={busy || !amount}>
-                          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Lançar
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  )}
+                </>
               )}
 
               <div>
@@ -309,29 +243,15 @@ export function FinanceManager({
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {transactions.map((t) => (
-                      <div key={t.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
-                        <span className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
-                          {t.type === "income" ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{t.description || (t.type === "income" ? "Entrada" : "Saída")}</p>
-                          <p className="text-xs text-muted-foreground">{t.payment_method} · {formatTime(t.created_at)}</p>
-                        </div>
-                        <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                          {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
-                        </span>
-                        {t.type === "income" && (
-                          <button
-                            onClick={() => setReceiptTx(t)}
-                            title="Emitir cupom"
-                            className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <Receipt className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+                    {transactions.slice(0, 4).map((t) => (
+                      <TxRow key={t.id} t={t} onReceipt={() => setReceiptTx(t)} />
                     ))}
+                    {transactions.length > 4 && (
+                      <button onClick={() => setMovementsModal(true)}
+                        className="w-full text-sm font-medium text-primary hover:underline py-1">
+                        Ver todas ({transactions.length})
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -419,8 +339,10 @@ export function FinanceManager({
             subtitle={charging.services.join(", ")}
             total={Number(charging.total)}
             confirmLabel="Receber"
+            allowDiscount={canDiscount}
+            maxDiscountPercent={maxDiscountPercent}
             onClose={() => setCharging(null)}
-            onConfirm={async (pay) => { await chargeAppointment(charging.id, pay); setCharging(null); }}
+            onConfirm={async (pay, discount) => { await chargeAppointment(charging.id, pay, discount); setCharging(null); }}
           />
         )}
       </AnimatePresence>
@@ -433,6 +355,41 @@ export function FinanceManager({
             product={selling}
             onClose={() => setSelling(null)}
             onConfirm={async (qty, pay) => { await sellProduct(selling.id, qty, pay); setSelling(null); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Loja (venda de produto com busca) */}
+      <AnimatePresence>
+        {lojaOpen && (
+          <LojaModal
+            key="loja"
+            products={resaleProducts}
+            onPick={(p) => { setLojaOpen(false); setSelling(p); }}
+            onClose={() => setLojaOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Lançamento manual */}
+      <AnimatePresence>
+        {manualModal && (
+          <ManualModal
+            key="manual"
+            onClose={() => setManualModal(false)}
+            onLaunch={launchManual}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Todas as movimentações */}
+      <AnimatePresence>
+        {movementsModal && (
+          <MovementsModal
+            key="movs"
+            transactions={transactions}
+            onReceipt={(t) => { setMovementsModal(false); setReceiptTx(t); }}
+            onClose={() => setMovementsModal(false)}
           />
         )}
       </AnimatePresence>
@@ -531,30 +488,208 @@ export function FinanceManager({
   );
 }
 
+/* ─────────── Caixa: tiles de ação, linha de movimentação e modais ─────────── */
+function ActionTile({
+  icon: Icon, label, badge, active, onClick,
+}: { icon: React.ElementType; label: string; badge?: number; active?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center justify-center gap-1.5 rounded-[var(--radius)] border p-4 transition ${
+        active ? "border-primary bg-primary/5" : "border-border bg-card hover:border-foreground/20"
+      }`}
+    >
+      {badge != null && badge > 0 && (
+        <span className="absolute top-1.5 right-1.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground min-w-[18px] h-[18px] px-1 grid place-items-center">{badge}</span>
+      )}
+      <Icon className="h-5 w-5 text-primary" />
+      <span className="text-xs font-medium">{label}</span>
+    </button>
+  );
+}
+
+function TxRow({ t, onReceipt }: { t: Tx; onReceipt: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
+      <span className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
+        {t.type === "income" ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{t.description || (t.type === "income" ? "Entrada" : "Saída")}</p>
+        <p className="text-xs text-muted-foreground">{t.payment_method} · {formatTime(t.created_at)}</p>
+      </div>
+      <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+        {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
+      </span>
+      {t.type === "income" && (
+        <button onClick={onReceipt} title="Emitir cupom"
+          className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Receipt className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LojaModal({
+  products, onPick, onClose,
+}: { products: ResaleProduct[]; onPick: (p: ResaleProduct) => void; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const filtered = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Boxes className="h-5 w-5 text-primary" /> Loja</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-3 overflow-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar produto…" className="pl-9" />
+          </div>
+          {products.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhum produto de revenda. Cadastre no Estoque marcando &ldquo;para revenda&rdquo;.</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nada encontrado.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {filtered.map((p) => (
+                <button key={p.id} onClick={() => onPick(p)}
+                  className="text-left rounded-[var(--radius)] border border-border p-3 hover:border-primary hover:bg-primary/5 transition">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatBRL(Number(p.sale_price))} · {Number(p.quantity)} est.</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+function ManualModal({
+  onClose, onLaunch,
+}: { onClose: () => void; onLaunch: (t: "income" | "expense", amt: number, m: string, d: string) => Promise<void> }) {
+  const [type, setType] = useState<"income" | "expense">("income");
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("dinheiro");
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    const amt = parseFloat(amount.replace(",", ".")) || 0;
+    if (amt <= 0) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onLaunch(type, amt, method, desc);
+      onClose();
+    } catch {
+      setErr("Não foi possível lançar. Tente novamente.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Lançamento manual</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+              <option value="income">Entrada</option>
+              <option value="expense">Saída</option>
+            </Select>
+            <Select value={method} onValueChange={setMethod}>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">Pix</option>
+              <option value="cartao">Cartão</option>
+            </Select>
+          </div>
+          <Input placeholder="Valor (R$)" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+          <Input placeholder="Descrição (ex.: pagamento de fornecedor)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          <Button onClick={submit} disabled={busy || !amount} className="w-full">
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Lançar
+          </Button>
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+function MovementsModal({
+  transactions, onReceipt, onClose,
+}: { transactions: Tx[]; onReceipt: (t: Tx) => void; onClose: () => void }) {
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <h3 className="font-display text-lg font-bold">Movimentações de hoje</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-5 space-y-2 overflow-auto">
+          {transactions.map((t) => (
+            <TxRow key={t.id} t={t} onReceipt={() => onReceipt(t)} />
+          ))}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
 /* ─────────── Escolha da forma de pagamento (cobrar cliente / vender) ─────────── */
 function PaymentPickerModal({
-  title, subtitle, total, confirmLabel, extra, onClose, onConfirm,
+  title, subtitle, total, confirmLabel, extra, allowDiscount = false, maxDiscountPercent = 0, onClose, onConfirm,
 }: {
   title: string;
   subtitle?: string;
   total: number;
   confirmLabel: string;
   extra?: React.ReactNode;
+  allowDiscount?: boolean;
+  maxDiscountPercent?: number;
   onClose: () => void;
-  onConfirm: (payment: string) => Promise<void>;
+  onConfirm: (payment: string, discount: number) => Promise<void>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [discMode, setDiscMode] = useState<"percent" | "value">("percent");
+  const [discInput, setDiscInput] = useState("");
+  const [cashMode, setCashMode] = useState(false); // sub-etapa "valor recebido / troco"
+  const [received, setReceived] = useState("");
 
-  async function pick(m: string) {
+  const showDiscount = allowDiscount && maxDiscountPercent > 0;
+  const maxValue = total * maxDiscountPercent / 100;
+  const rawDisc = discMode === "percent"
+    ? total * (parseFloat(discInput.replace(",", ".")) || 0) / 100
+    : parseFloat(discInput.replace(",", ".")) || 0;
+  const discount = showDiscount ? Math.min(Math.max(0, rawDisc), maxValue, total) : 0;
+  const net = total - discount;
+  const receivedNum = parseFloat(received.replace(",", ".")) || 0;
+  const troco = receivedNum - net;
+
+  async function confirm(m: string) {
     setBusy(m);
     setErr(null);
     try {
-      await onConfirm(m);
+      await onConfirm(m, discount);
     } catch {
       setErr("Não foi possível concluir. Tente novamente.");
       setBusy(null);
     }
+  }
+
+  // Dinheiro abre a sub-etapa de troco; pix/cartão confirmam direto.
+  function pick(m: string) {
+    if (m === "dinheiro") { setCashMode(true); return; }
+    confirm(m);
   }
 
   return (
@@ -566,28 +701,90 @@ function PaymentPickerModal({
         </div>
         {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
         {extra}
+
+        {showDiscount && (
+          <div className="mt-4 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Desconto</Label>
+              <div className="inline-flex rounded-[var(--radius)] border border-border p-0.5">
+                {(["percent", "value"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setDiscMode(mode)}
+                    className={`px-2.5 py-0.5 text-xs font-medium rounded-[calc(var(--radius)-0.2rem)] transition ${
+                      discMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {mode === "percent" ? "%" : "R$"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Input
+              value={discInput}
+              onChange={(e) => setDiscInput(e.target.value)}
+              inputMode="decimal"
+              placeholder={discMode === "percent" ? "0" : "0,00"}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Máx {maxDiscountPercent}% ({formatBRL(maxValue)}){discount > 0 ? ` · aplicado −${formatBRL(discount)}` : ""}
+            </p>
+          </div>
+        )}
+
         <div className="flex items-baseline justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
           <span className="text-sm text-muted-foreground">Total</span>
-          <span className="font-display text-2xl font-bold">{formatBRL(total)}</span>
+          <span className="font-display text-2xl font-bold">
+            {discount > 0 && <span className="line-through text-muted-foreground text-base font-normal mr-2">{formatBRL(total)}</span>}
+            {formatBRL(net)}
+          </span>
         </div>
         {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
-        <p className="text-xs text-muted-foreground mt-4 mb-2">{confirmLabel} — escolha a forma de pagamento:</p>
-        <div className="grid grid-cols-3 gap-2">
-          {(["dinheiro", "pix", "cartao"] as const).map((m) => {
-            const Meta = PAY_META[m];
-            return (
-              <button
-                key={m}
-                onClick={() => pick(m)}
-                disabled={busy !== null}
-                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] border border-border p-4 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
-              >
-                {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary" />}
-                <span className="text-xs font-medium">{Meta.label}</span>
-              </button>
-            );
-          })}
-        </div>
+
+        {cashMode ? (
+          <div className="mt-4 space-y-3">
+            <button onClick={() => { setCashMode(false); setReceived(""); }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-3.5 w-3.5" /> outras formas
+            </button>
+            <div className="space-y-1.5">
+              <Label htmlFor="received">Valor recebido (R$)</Label>
+              <Input id="received" autoFocus value={received} onChange={(e) => setReceived(e.target.value)} inputMode="decimal" placeholder={formatBRL(net)} />
+            </div>
+            {received !== "" && (
+              <div className={`flex items-center justify-between rounded-[var(--radius)] px-4 py-3 text-sm font-semibold ${
+                troco < 0 ? "bg-red-50 text-red-700" : "bg-emerald-500/12 text-emerald-600"
+              }`}>
+                <span>{troco < 0 ? "Falta" : "Troco"}</span>
+                <span className="font-display text-base">{formatBRL(Math.abs(troco))}</span>
+              </div>
+            )}
+            <Button onClick={() => confirm("dinheiro")} disabled={busy !== null} className="w-full">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />} Confirmar em dinheiro
+            </Button>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground mt-4 mb-2">{confirmLabel} — escolha a forma de pagamento:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["dinheiro", "pix", "cartao"] as const).map((m) => {
+                const Meta = PAY_META[m];
+                return (
+                  <button
+                    key={m}
+                    onClick={() => pick(m)}
+                    disabled={busy !== null}
+                    className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] border border-border p-4 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
+                  >
+                    {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary" />}
+                    <span className="text-xs font-medium">{Meta.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </Card>
     </MotionModal>
   );
