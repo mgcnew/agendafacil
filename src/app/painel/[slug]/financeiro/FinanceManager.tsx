@@ -1385,7 +1385,8 @@ function CloseModal({
   onConfirm: (counted: number) => Promise<boolean>;
 }) {
   const [counted, setCounted] = useState("");
-  const [countedCard, setCountedCard] = useState("");
+  const [countedDebito, setCountedDebito] = useState("");
+  const [countedCredito, setCountedCredito] = useState("");
   const [countedPix, setCountedPix] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -1394,10 +1395,13 @@ function CloseModal({
 
   const countedNum = parseFloat(counted.replace(",", ".")) || 0;
   const diff = countedNum - expectedCash;
-  const expectedCard = (incomeByMethod.debito ?? 0) + (incomeByMethod.credito ?? 0) + (incomeByMethod.cartao ?? 0);
-  const expectedPix = incomeByMethod.pix ?? 0;
-  const countedCardNum = countedCard !== "" ? (parseFloat(countedCard.replace(",", ".")) || 0) : null;
-  const countedPixNum = countedPix !== "" ? (parseFloat(countedPix.replace(",", ".")) || 0) : null;
+  const expectedDebito  = incomeByMethod.debito  ?? 0;
+  const expectedCredito = incomeByMethod.credito ?? 0;
+  const expectedPix     = incomeByMethod.pix     ?? 0;
+  const toNum = (s: string) => s !== "" ? (parseFloat(s.replace(",", ".")) || 0) : null;
+  const countedDebitoNum  = toNum(countedDebito);
+  const countedCreditoNum = toNum(countedCredito);
+  const countedPixNum     = toNum(countedPix);
 
   const displayMethods = PICKER_METHODS.filter((m) => (incomeByMethod[m] ?? 0) > 0 || m === "dinheiro");
 
@@ -1417,8 +1421,9 @@ function CloseModal({
       expectedCash,
       countedCash: countedNum,
       difference: diff,
-      countedCard: countedCardNum,
-      countedPix: countedPixNum,
+      countedDebito:  countedDebitoNum,
+      countedCredito: countedCreditoNum,
+      countedPix:     countedPixNum,
       fileBase: `fechamento-${today.toISOString().slice(0, 10)}`,
     });
   }
@@ -1480,8 +1485,11 @@ function CloseModal({
 
             <div className="space-y-2">
               <ConfRow label="Dinheiro" expected={expectedCash} counted={report.countedCash} diff={report.difference} />
-              {report.countedCard != null && expectedCard > 0 && (
-                <ConfRow label="Maquininha" expected={expectedCard} counted={report.countedCard} diff={report.countedCard - expectedCard} />
+              {report.countedDebito != null && expectedDebito > 0 && (
+                <ConfRow label="Débito" expected={expectedDebito} counted={report.countedDebito} diff={report.countedDebito - expectedDebito} />
+              )}
+              {report.countedCredito != null && expectedCredito > 0 && (
+                <ConfRow label="Crédito" expected={expectedCredito} counted={report.countedCredito} diff={report.countedCredito - expectedCredito} />
               )}
               {report.countedPix != null && expectedPix > 0 && (
                 <ConfRow label="PIX" expected={expectedPix} counted={report.countedPix} diff={report.countedPix - expectedPix} />
@@ -1525,14 +1533,25 @@ function CloseModal({
                 <Input id="counted" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" inputMode="decimal" />
               </div>
 
-              {expectedCard > 0 && (
+              {expectedDebito > 0 && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="counted-card">
-                    Total na maquininha (R$)
+                  <Label htmlFor="counted-debito">
+                    Total débito (R$)
                     <span className="ml-1 text-[11px] text-muted-foreground font-normal">· opcional</span>
                   </Label>
-                  <Input id="counted-card" value={countedCard} onChange={(e) => setCountedCard(e.target.value)} placeholder="0,00" inputMode="decimal" />
-                  <p className="text-[11px] text-muted-foreground">Débito + crédito — consulte o relatório da maquininha</p>
+                  <Input id="counted-debito" value={countedDebito} onChange={(e) => setCountedDebito(e.target.value)} placeholder="0,00" inputMode="decimal" />
+                  <p className="text-[11px] text-muted-foreground">Consulte o relatório de débito da maquininha</p>
+                </div>
+              )}
+
+              {expectedCredito > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="counted-credito">
+                    Total crédito (R$)
+                    <span className="ml-1 text-[11px] text-muted-foreground font-normal">· opcional</span>
+                  </Label>
+                  <Input id="counted-credito" value={countedCredito} onChange={(e) => setCountedCredito(e.target.value)} placeholder="0,00" inputMode="decimal" />
+                  <p className="text-[11px] text-muted-foreground">Consulte o relatório de crédito da maquininha</p>
                 </div>
               )}
 

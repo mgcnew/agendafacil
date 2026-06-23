@@ -54,7 +54,8 @@ export type ClosingReportData = {
   expectedCash: number;
   countedCash: number | null;
   difference: number | null;
-  countedCard?: number | null;
+  countedDebito?: number | null;
+  countedCredito?: number | null;
   countedPix?: number | null;
   fileBase: string;
 };
@@ -302,33 +303,23 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
       y = row(p, "Diferença", diffStr, y, { size: 8.5, style: Math.abs(diff) < 0.01 ? "normal" : "bold" });
     }
 
-    const expectedCard = (d.incomeByMethod["debito"] ?? 0) + (d.incomeByMethod["credito"] ?? 0) + (d.incomeByMethod["cartao"] ?? 0);
-    const expectedPix = d.incomeByMethod["pix"] ?? 0;
-
-    if (d.countedCard != null && expectedCard > 0) {
+    const confItems: { title: string; expected: number; counted: number | null | undefined }[] = [
+      { title: "CONFERÊNCIA DÉBITO",  expected: d.incomeByMethod["debito"] ?? 0,  counted: d.countedDebito },
+      { title: "CONFERÊNCIA CRÉDITO", expected: d.incomeByMethod["credito"] ?? 0, counted: d.countedCredito },
+      { title: "CONFERÊNCIA PIX",     expected: d.incomeByMethod["pix"] ?? 0,     counted: d.countedPix },
+    ];
+    for (const item of confItems) {
+      if (item.counted == null || item.expected <= 0) continue;
       y += 2;
       divider(p, y);
       y += 4;
-      y = para(p, "CONFERÊNCIA DA MAQUININHA", y, { size: 7.5, style: "bold", color: 80 });
+      y = para(p, item.title, y, { size: 7.5, style: "bold", color: 80 });
       y += 1;
-      y = row(p, "Registrado", formatBRL(expectedCard), y, { size: 8.5 });
-      y = row(p, "Informado", formatBRL(d.countedCard), y, { size: 8.5 });
-      const cardDiff = d.countedCard - expectedCard;
-      const cardStr = Math.abs(cardDiff) < 0.01 ? "Conferido ✓" : cardDiff > 0 ? `+${formatBRL(cardDiff)} (sobra)` : `−${formatBRL(Math.abs(cardDiff))} (falta)`;
-      y = row(p, "Diferença", cardStr, y, { size: 8.5, style: Math.abs(cardDiff) < 0.01 ? "normal" : "bold" });
-    }
-
-    if (d.countedPix != null && expectedPix > 0) {
-      y += 2;
-      divider(p, y);
-      y += 4;
-      y = para(p, "CONFERÊNCIA DO PIX", y, { size: 7.5, style: "bold", color: 80 });
-      y += 1;
-      y = row(p, "Registrado", formatBRL(expectedPix), y, { size: 8.5 });
-      y = row(p, "Informado", formatBRL(d.countedPix), y, { size: 8.5 });
-      const pixDiff = d.countedPix - expectedPix;
-      const pixStr = Math.abs(pixDiff) < 0.01 ? "Conferido ✓" : pixDiff > 0 ? `+${formatBRL(pixDiff)} (sobra)` : `−${formatBRL(Math.abs(pixDiff))} (falta)`;
-      y = row(p, "Diferença", pixStr, y, { size: 8.5, style: Math.abs(pixDiff) < 0.01 ? "normal" : "bold" });
+      y = row(p, "Registrado", formatBRL(item.expected), y, { size: 8.5 });
+      y = row(p, "Informado",  formatBRL(item.counted),  y, { size: 8.5 });
+      const d2 = item.counted - item.expected;
+      const s = Math.abs(d2) < 0.01 ? "Conferido ✓" : d2 > 0 ? `+${formatBRL(d2)} (sobra)` : `−${formatBRL(Math.abs(d2))} (falta)`;
+      y = row(p, "Diferença", s, y, { size: 8.5, style: Math.abs(d2) < 0.01 ? "normal" : "bold" });
     }
 
     y += 3;
@@ -366,25 +357,19 @@ export function buildClosingReportText(d: ClosingReportData, salon: SalonInfo): 
     lines.push(`Diferença: ${Math.abs(diff) < 0.01 ? "Conferido ✓" : diff > 0 ? `+${formatBRL(diff)} (sobra)` : `−${formatBRL(Math.abs(diff))} (falta)`}`);
   }
 
-  const expectedCard = (d.incomeByMethod["debito"] ?? 0) + (d.incomeByMethod["credito"] ?? 0) + (d.incomeByMethod["cartao"] ?? 0);
-  const expectedPix = d.incomeByMethod["pix"] ?? 0;
-
-  if (d.countedCard != null && expectedCard > 0) {
+  const confItems2: { title: string; expected: number; counted: number | null | undefined }[] = [
+    { title: "CONFERÊNCIA DÉBITO",  expected: d.incomeByMethod["debito"] ?? 0,  counted: d.countedDebito },
+    { title: "CONFERÊNCIA CRÉDITO", expected: d.incomeByMethod["credito"] ?? 0, counted: d.countedCredito },
+    { title: "CONFERÊNCIA PIX",     expected: d.incomeByMethod["pix"] ?? 0,     counted: d.countedPix },
+  ];
+  for (const item of confItems2) {
+    if (item.counted == null || item.expected <= 0) continue;
+    const d2 = item.counted - item.expected;
     lines.push("");
-    lines.push("*CONFERÊNCIA DA MAQUININHA*");
-    lines.push(`Registrado: ${formatBRL(expectedCard)}`);
-    lines.push(`Informado: ${formatBRL(d.countedCard)}`);
-    const cardDiff = d.countedCard - expectedCard;
-    lines.push(`Diferença: ${Math.abs(cardDiff) < 0.01 ? "Conferido ✓" : cardDiff > 0 ? `+${formatBRL(cardDiff)} (sobra)` : `−${formatBRL(Math.abs(cardDiff))} (falta)`}`);
-  }
-
-  if (d.countedPix != null && expectedPix > 0) {
-    lines.push("");
-    lines.push("*CONFERÊNCIA DO PIX*");
-    lines.push(`Registrado: ${formatBRL(expectedPix)}`);
-    lines.push(`Informado: ${formatBRL(d.countedPix)}`);
-    const pixDiff = d.countedPix - expectedPix;
-    lines.push(`Diferença: ${Math.abs(pixDiff) < 0.01 ? "Conferido ✓" : pixDiff > 0 ? `+${formatBRL(pixDiff)} (sobra)` : `−${formatBRL(Math.abs(pixDiff))} (falta)`}`);
+    lines.push(`*${item.title}*`);
+    lines.push(`Registrado: ${formatBRL(item.expected)}`);
+    lines.push(`Informado: ${formatBRL(item.counted)}`);
+    lines.push(`Diferença: ${Math.abs(d2) < 0.01 ? "Conferido ✓" : d2 > 0 ? `+${formatBRL(d2)} (sobra)` : `−${formatBRL(Math.abs(d2))} (falta)`}`);
   }
 
   lines.push("");
