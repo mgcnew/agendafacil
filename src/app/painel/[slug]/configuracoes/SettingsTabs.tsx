@@ -749,6 +749,9 @@ function BookingPanel({
 }) {
   const router = useRouter();
   const [simultaneous, setSimultaneous] = useState(salon.allow_simultaneous);
+  const [colorMode, setColorMode] = useState<"professional" | "service">(
+    salon.agenda_color_mode === "service" ? "service" : "professional",
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -772,7 +775,7 @@ function BookingPanel({
     const supabase = createClient();
     const { error: e } = await supabase
       .from("salons")
-      .update({ allow_simultaneous: simultaneous })
+      .update({ allow_simultaneous: simultaneous, agenda_color_mode: colorMode })
       .eq("id", salon.id);
     setSaving(false);
     if (e) {
@@ -830,6 +833,29 @@ function BookingPanel({
               profissional nunca é marcada em dois lugares; isso libera apenas a
               mesma cliente em mais de um serviço ao mesmo tempo.
             </p>
+          </div>
+        </div>
+
+        <div className="border-t border-border mt-5 pt-5">
+          <p className="text-sm font-medium">Cor dos eventos na agenda</p>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+            Por profissional (cada profissional uma cor) ou por serviço (cada serviço uma cor —
+            ótimo pra reconhecer o serviço de relance).
+          </p>
+          <div className="inline-flex rounded-[var(--radius)] border border-border p-0.5">
+            {([["professional", "Profissional"], ["service", "Serviço"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => canEdit && setColorMode(id)}
+                disabled={!canEdit}
+                className={`px-4 py-1.5 text-sm font-medium rounded-[calc(var(--radius)-0.15rem)] transition disabled:opacity-60 ${
+                  colorMode === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </Card>

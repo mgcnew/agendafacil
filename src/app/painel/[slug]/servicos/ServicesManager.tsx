@@ -9,6 +9,7 @@ import { formatServicePrice, formatDuration } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
+import { SERVICE_COLORS, defaultServiceColor } from "@/lib/serviceColors";
 import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil, Boxes, Tag, ChevronDown } from "lucide-react";
 
 type Service = Tables<"services">;
@@ -54,6 +55,7 @@ export function ServicesManager({
   const [price, setPrice] = useState("");
   const [priceType, setPriceType] = useState<PriceType>("fixed");
   const [commission, setCommission] = useState("");
+  const [color, setColor] = useState<string>(SERVICE_COLORS[0]);
   const [hasProcessing, setHasProcessing] = useState(false);
   const [processing, setProcessing] = useState("30");
   const [finish, setFinish] = useState("15");
@@ -66,6 +68,7 @@ export function ServicesManager({
   function resetForm() {
     setName(""); setPrice(""); setDuration("30"); setCommission("");
     setPriceType("fixed"); setCategoryId(null);
+    setColor(defaultServiceColor(services.length));
     setHasProcessing(false); setProcessing("30"); setFinish("15");
     setRecipe([]);
     setEditingId(null);
@@ -83,6 +86,7 @@ export function ServicesManager({
     setPrice(svc.price ? String(svc.price).replace(".", ",") : "");
     setPriceType((svc.price_type as PriceType) ?? "fixed");
     setCommission(svc.commission_percent != null ? String(svc.commission_percent) : "");
+    setColor(svc.color ?? defaultServiceColor(0));
     setHasProcessing(svc.processing_time_min > 0);
     setProcessing(String(svc.processing_time_min || 30));
     setFinish(String(svc.finish_time_min || 15));
@@ -116,6 +120,7 @@ export function ServicesManager({
       price: priceType === "on_request" ? 0 : parseFloat(price.replace(",", ".")) || 0,
       price_type: priceType,
       commission_percent: commission ? parseFloat(commission.replace(",", ".")) : null,
+      color,
       processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
       finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
     };
@@ -179,12 +184,13 @@ export function ServicesManager({
       setPresetOpen(false);
       return;
     }
-    const rows = picked.map((p) => ({
+    const rows = picked.map((p, i) => ({
       salon_id: salonId,
       name: p.name,
       duration_min: p.duration,
       price: 0,
       commission_percent: null,
+      color: defaultServiceColor(services.length + i),
       processing_time_min: 0,
       finish_time_min: 0,
     }));
@@ -373,6 +379,24 @@ export function ServicesManager({
                 <p className="text-xs text-muted-foreground">A cliente vê &ldquo;Sob consulta&rdquo;.</p>
               )}
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Cor na agenda</Label>
+              <div className="flex flex-wrap gap-2">
+                {SERVICE_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    aria-label={`Cor ${c}`}
+                    className={`h-7 w-7 rounded-full transition ${color === c ? "ring-2 ring-offset-2 ring-foreground/60" : "hover:scale-110"}`}
+                    style={{ background: c }}
+                  >
+                    {color === c && <Check className="h-4 w-4 text-white mx-auto" />}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Usada para identificar o serviço na agenda (quando a cor está por serviço).</p>
+            </div>
           </div>
           {/* Tempo de pausa (química / coloração) */}
           <div className="rounded-[var(--radius)] border border-border p-4">
@@ -528,6 +552,7 @@ function ServiceList({
           key={s.id}
           className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${!s.is_active ? "opacity-60" : ""}`}
         >
+          <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
           <div className="flex-1 min-w-0">
             <p className="font-medium">{s.name}</p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">

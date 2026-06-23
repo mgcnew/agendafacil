@@ -21,7 +21,8 @@ import {
 type View = "dia" | "semana" | "mes";
 type Status = Enums<"appointment_status">;
 type Pro     = { id: string; name: string; commission_percent: number; color: string | null };
-type Service = { id: string; name: string; duration_min: number; price: number; commission_percent: number | null };
+type Service = { id: string; name: string; duration_min: number; price: number; commission_percent: number | null; color?: string | null };
+type ColorMode = "professional" | "service";
 type Client  = { id: string; full_name: string; phone: string | null };
 type Appt    = {
   id: string;
@@ -34,6 +35,8 @@ type Appt    = {
   notes: string | null;
   clients: { full_name: string; phone: string | null; alert_summary: string | null } | null;
   salon_members: { display_name: string | null } | null;
+  appointment_services?: { service_id: string | null }[] | null;
+  color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
 type Block = { id: string; member_id: string | null; starts_at: string; ends_at: string; reason: string | null };
@@ -762,7 +765,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
                 );
               }
               const a = row.appt;
-              const color = getColor(pros, a.member_id);
+              const color = a.color ?? getColor(pros, a.member_id);
               const st = STATUS_META[a.status];
               return (
                 <li key={a.id}>
@@ -922,7 +925,7 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, my
                   </div>
                 ))}
                 {dayAppts.map(a => {
-                  const color = getColor(pros, a.member_id);
+                  const color = a.color ?? getColor(pros, a.member_id);
                   const top   = apptTop(a, bounds.start);
                   const h     = apptH(a);
                   return (
@@ -1011,7 +1014,7 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 
                 <div className="space-y-0.5">
                   {dayAppts.slice(0, MAX).map(a => {
-                    const color = getColor(pros, a.member_id);
+                    const color = a.color ?? getColor(pros, a.member_id);
                     return (
                       <div
                         key={a.id}
@@ -1043,12 +1046,13 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
-  canManageSchedule = false, myMemberId,
+  canManageSchedule = false, myMemberId, colorMode = "professional",
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
   canManageSchedule?: boolean;
   myMemberId?: string;
+  colorMode?: ColorMode;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1093,6 +1097,22 @@ export function AgendaManager({
     [pros, selectedPros],
   );
 
+  // Cor de cada serviço, para colorir os eventos por serviço.
+  const serviceColor = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of services) if (s.color) m[s.id] = s.color;
+    return m;
+  }, [services]);
+
+  // Cor do evento: por serviço (1º serviço com cor) ou por profissional.
+  const apptColor = useCallback((a: Appt): string => {
+    if (colorMode === "service") {
+      const sid = a.appointment_services?.find((x) => x.service_id && serviceColor[x.service_id])?.service_id;
+      if (sid) return serviceColor[sid];
+    }
+    return getColor(pros, a.member_id);
+  }, [colorMode, serviceColor, pros]);
+
   // Sou um profissional com coluna na agenda? (posso bloquear meu próprio horário)
   const iAmPro = !!myMemberId && pros.some(p => p.id === myMemberId);
   const canBlock = canManageSchedule || iAmPro;
@@ -1115,7 +1135,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)
@@ -1127,10 +1147,10 @@ export function AgendaManager({
         .lte("starts_at", end)
         .gte("ends_at", start),
     ]);
-    setAppts((data as Appt[]) ?? []);
+    setAppts(((data as Appt[]) ?? []).map((a) => ({ ...a, color: apptColor(a) })));
     setBlocks((blockData as Block[]) ?? []);
     setLoading(false);
-  }, [supabase, salonId, date, view]);
+  }, [supabase, salonId, date, view, apptColor]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1207,7 +1227,7 @@ export function AgendaManager({
     return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
   }, [view, date]);
 
-  const detailColor = detailAppt ? getColor(pros, detailAppt.member_id) : "#6366f1";
+  const detailColor = detailAppt ? (detailAppt.color ?? getColor(pros, detailAppt.member_id)) : "#6366f1";
 
   return (
     <div className="flex flex-col gap-3 h-full af-rise">

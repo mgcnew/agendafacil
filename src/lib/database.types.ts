@@ -1680,6 +1680,7 @@ export type Database = {
       salons: {
         Row: {
           address: string | null
+          agenda_color_mode: string
           allow_simultaneous: boolean
           color_theme: string
           created_at: string
@@ -1698,6 +1699,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          agenda_color_mode?: string
           allow_simultaneous?: boolean
           color_theme?: string
           created_at?: string
@@ -1716,6 +1718,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          agenda_color_mode?: string
           allow_simultaneous?: boolean
           color_theme?: string
           created_at?: string
