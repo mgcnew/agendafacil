@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Oswald } from "next/font/google";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
+import { MotionProvider } from "@/components/MotionProvider";
 
 // Fonte padrão do produto — moderna, levemente arredondada e familiar.
 const jakarta = Plus_Jakarta_Sans({
@@ -99,7 +100,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${jakarta.variable} ${oswald.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-body">
-        {children}
+        <MotionProvider>{children}</MotionProvider>
         <PWARegister />
       </body>
     </html>

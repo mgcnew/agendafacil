@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 export function MotionModal({
   onClose,
@@ -30,7 +30,7 @@ export function MotionModal({
       data-color={attrs.color}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center text-foreground bg-transparent"
     >
-      <motion.div
+      <m.div
         className="absolute inset-0 bg-black/50"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -39,7 +39,7 @@ export function MotionModal({
         onClick={onClose}
         aria-hidden
       />
-      <motion.div
+      <m.div
         className="relative w-full"
         initial={{ opacity: 0, y: 16, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -47,7 +47,7 @@ export function MotionModal({
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
         {children}
-      </motion.div>
+      </m.div>
     </div>,
     document.body,
   );
