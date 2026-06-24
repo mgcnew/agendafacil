@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import NextImage from "next/image";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -143,12 +144,11 @@ function LightboxModal({
               key={p.id}
               onClick={() => setIdx(i)}
               className={cn(
-                "shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition",
+                "relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition",
                 i === idx ? "border-primary opacity-100" : "border-transparent opacity-50 hover:opacity-75",
               )}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" className="w-full h-full object-cover" />
+              <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
             </button>
           ))}
         </div>
@@ -275,11 +275,12 @@ export function GaleriaManager({
         >
           {photos.map((p, i) => (
             <div key={p.id} className="group relative aspect-square rounded-[var(--radius)] overflow-hidden bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <NextImage
                 src={p.url}
                 alt={p.caption ?? `Foto ${i + 1}`}
-                className="w-full h-full object-cover transition group-hover:scale-105 duration-300"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-cover transition group-hover:scale-105 duration-300"
               />
               {/* overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
