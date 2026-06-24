@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui";
-import { PLANS, priceLabel } from "@/lib/plans";
+import { PLANS, priceLabel, SUBSCRIBABLE_PLANS } from "@/lib/plans";
 import { Hero } from "@/components/landing/Hero";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
@@ -16,7 +17,24 @@ import {
   Wallet,
   ArrowRight,
   Star,
+  CalendarCheck,
+  Clock3,
+  ShieldCheck,
+  Ban,
 } from "lucide-react";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+
+// SEO específico da home — sobrescreve o default do layout com foco nas
+// buscas que a dona de salão/barbearia faz no Google.
+export const metadata: Metadata = {
+  title:
+    "Sistema de agendamento online para salões de beleza e barbearias",
+  description:
+    "AgendeFácil é o sistema de agendamento online para salões de beleza, barbearias e estética. A cliente agenda pelo seu link, recebe confirmação automática e você gerencia agenda, comissões, caixa e estoque. Teste grátis por 14 dias, sem cartão.",
+  alternates: { canonical: "/" },
+};
 
 // ── Dados ──────────────────────────────────────────────────────────────────
 
@@ -268,36 +286,172 @@ function OrangeDots({
   );
 }
 
+// ── Dados estruturados (JSON-LD) p/ rich results do Google ──────────────────
+
+function StructuredData() {
+  const offers = SUBSCRIBABLE_PLANS.map((p) => ({
+    "@type": "Offer",
+    name: `Plano ${p.name}`,
+    price: p.value.toFixed(2),
+    priceCurrency: "BRL",
+    url: `${SITE_URL}/criar-salao`,
+    availability: "https://schema.org/InStock",
+  }));
+
+  const graph = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#organization`,
+        name: "AgendeFácil",
+        url: SITE_URL,
+        logo: `${SITE_URL}/icon-512.png`,
+        description:
+          "Software de agendamento online para salões de beleza, barbearias e clínicas de estética.",
+        sameAs: [],
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: "AgendeFácil",
+        inLanguage: "pt-BR",
+        publisher: { "@id": `${SITE_URL}/#organization` },
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "AgendeFácil",
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web, Android, iOS",
+        url: SITE_URL,
+        inLanguage: "pt-BR",
+        description:
+          "Sistema de agendamento online para salões de beleza, barbearias e estética: agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios.",
+        offers: {
+          "@type": "AggregateOffer",
+          priceCurrency: "BRL",
+          lowPrice: Math.min(...SUBSCRIBABLE_PLANS.map((p) => p.value)).toFixed(2),
+          highPrice: Math.max(...SUBSCRIBABLE_PLANS.map((p) => p.value)).toFixed(2),
+          offerCount: offers.length,
+          offers,
+        },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${SITE_URL}/#faq`,
+        mainEntity: OBJECTIONS.map((o) => ({
+          "@type": "Question",
+          name: o.title,
+          acceptedAnswer: { "@type": "Answer", text: o.answer },
+        })),
+      },
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
+    />
+  );
+}
+
+// ── Barra de confiança (stats acima da dobra) ──────────────────────────────
+
+const TRUST_STATS = [
+  { icon: Clock3, value: "2 min", label: "para configurar o salão" },
+  { icon: CalendarCheck, value: "24/7", label: "clientes agendam sozinhas" },
+  { icon: ShieldCheck, value: "LGPD", label: "dados protegidos" },
+  { icon: Ban, value: "0%", label: "fidelidade ou multa" },
+];
+
+function TrustBar() {
+  return (
+    <section
+      aria-label="Por que confiar no AgendeFácil"
+      className="border-y border-border bg-card"
+    >
+      <div className="mx-auto max-w-6xl px-5">
+        <ul className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+          {TRUST_STATS.map((s) => (
+            <li key={s.label} className="group">
+              <div className="flex items-center gap-3.5 px-4 py-6 sm:px-6">
+                <span className="grid place-items-center h-11 w-11 shrink-0 rounded-xl bg-secondary text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <span className="leading-tight">
+                  <span className="block font-display text-xl font-bold tracking-tight">
+                    {s.value}
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    {s.label}
+                  </span>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+// ── CTA fixo no rodapé (mobile) — alto impacto em conversão ─────────────────
+
+function StickyMobileCTA() {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 lg:hidden">
+      <Link href="/criar-salao" className="block">
+        <Button size="lg" className="w-full font-bold">
+          Criar meu salão grátis <ArrowRight className="h-4 w-4" />
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
 // ── Página ─────────────────────────────────────────────────────────────────
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-full bg-background text-foreground overflow-x-hidden">
+    <div className="flex flex-col min-h-full bg-background text-foreground overflow-x-hidden pb-20 lg:pb-0">
+      <StructuredData />
 
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between gap-6">
-          <Link href="/" className="flex items-center gap-2 font-display font-bold text-lg shrink-0">
-            <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
-              <Scissors className="h-5 w-5" />
-            </span>
-            AgendeFácil
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-7">
+      {/* ── HEADER — logo central ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto max-w-6xl px-5 h-16 flex items-center gap-4">
+          {/* Esquerda — navegação (reserva o mesmo espaço da direita p/ centrar a logo) */}
+          <nav className="flex-1 hidden md:flex items-center gap-7">
             {NAV_LINKS.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
+                className="text-sm font-medium text-foreground/65 hover:text-foreground transition-colors"
               >
                 {l.label}
               </a>
             ))}
           </nav>
+          {/* Espaçador esquerdo no mobile (mantém a logo centrada) */}
+          <div className="flex-1 md:hidden" />
 
-          <div className="flex items-center gap-2 shrink-0">
-            <LoginButton />
+          {/* Centro — logo */}
+          <Link
+            href="/"
+            className="shrink-0 flex items-center gap-2 font-display font-bold text-lg tracking-tight"
+          >
+            <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm">
+              <Scissors className="h-5 w-5" />
+            </span>
+            AgendeFácil
+          </Link>
+
+          {/* Direita — ações */}
+          <div className="flex-1 flex items-center justify-end gap-2">
+            <span className="hidden md:inline-flex">
+              <LoginButton />
+            </span>
             <Link href="/criar-salao">
               <Button size="sm">Teste grátis</Button>
             </Link>
@@ -308,47 +462,106 @@ export default function Home() {
       {/* ── HERO ───────────────────────────────────────────────────────── */}
       <Hero />
 
+      {/* ── BARRA DE CONFIANÇA ────────────────────────────────────────── */}
+      <TrustBar />
+
       {/* ── COMO FUNCIONA — multi-device ──────────────────────────────── */}
       <section id="como-funciona" className="relative bg-background py-20 sm:py-28 overflow-hidden">
-        {/* Formas geométricas */}
-        <OrangeRing size={360} opacity={0.12} style={{ top: -100, left: -100 }} />
-        <OrangeBlob size={280} opacity={0.06} style={{ top: -40, left: -60 }} />
-        <OrangeDots cols={6} rows={5} opacity={0.14} style={{ bottom: 40, right: 20 }} />
-        <OrangeTriangle size={56} opacity={0.13} rotate={-20} style={{ bottom: 60, left: "45%" }} />
+        {/* Atmosfera única e intencional (sem ruído de formas) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -z-0 inset-0"
+          style={{
+            background:
+              "radial-gradient(60% 50% at 85% 30%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)",
+          }}
+        />
 
         <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
             {/* Texto */}
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-primary mb-3">
-                Acesse de onde estiver
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+                <span className="h-px w-8 bg-primary" />
+                Um sistema, dois lados do balcão
               </p>
-              <h2 className="font-display text-3xl sm:text-4xl leading-tight">
-                No computador da recepção,<br className="hidden sm:block" />
-                no celular da profissional.
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.08] tracking-tight">
+                No computador da recepção,<br className="hidden sm:block" />{" "}
+                <span className="text-primary">no celular da profissional.</span>
               </h2>
               <p className="mt-4 text-muted-foreground leading-relaxed max-w-md">
-                O painel administrativo funciona em qualquer dispositivo — sem instalar app.
-                Sua equipe gerencia a agenda no computador e a cliente agenda diretamente
-                pelo celular pelo link personalizado do seu salão.
+                Mesma agenda, telas diferentes. A recepção organiza no desktop, a
+                profissional confere pelo celular e a cliente agenda pelo link —
+                tudo em tempo real, sem instalar nada.
               </p>
-              <ul className="mt-6 space-y-3">
+
+              {/* Capacidades — tabela editorial com etiqueta de contexto */}
+              <ul className="mt-8 border-t border-border">
                 {[
-                  "Agenda em tempo real, atualizada para toda a equipe",
-                  "Link da cliente funciona em qualquer celular, sem cadastro",
-                  "Painel responsivo para tablet e desktop",
-                  "Acesso com permissões por cargo — cada um vê o que precisa",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2.5 text-sm">
-                    <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    {t}
+                  {
+                    tag: "Recepção",
+                    label: "Agenda em tempo real",
+                    desc: "Toda a equipe vê a mesma agenda, atualizada na hora.",
+                  },
+                  {
+                    tag: "Celular",
+                    label: "Link sem cadastro",
+                    desc: "A cliente agenda de qualquer celular — nada para instalar.",
+                  },
+                  {
+                    tag: "Qualquer tela",
+                    label: "Painel que se adapta",
+                    desc: "Do caixa ao tablet, a interface se ajusta sozinha.",
+                  },
+                  {
+                    tag: "Equipe",
+                    label: "Acesso por cargo",
+                    desc: "Cada pessoa enxerga só o que precisa para o trabalho dela.",
+                  },
+                ].map((c) => (
+                  <li
+                    key={c.label}
+                    className="grid grid-cols-[92px_1fr] sm:grid-cols-[120px_1fr] gap-4 sm:gap-6 py-5 border-b border-border"
+                  >
+                    <span className="pt-0.5">
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                        style={{
+                          background: "var(--secondary)",
+                          color: "var(--primary)",
+                        }}
+                      >
+                        {c.tag}
+                      </span>
+                    </span>
+                    <span>
+                      <span className="block font-display font-semibold leading-snug">
+                        {c.label}
+                      </span>
+                      <span className="block text-sm text-muted-foreground mt-1 leading-relaxed">
+                        {c.desc}
+                      </span>
+                    </span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <DevicesShowcase />
+            {/* Device showcase emoldurado */}
+            <div className="relative">
+              <div
+                aria-hidden
+                className="absolute -inset-4 sm:-inset-8 -z-10 rounded-[2.5rem] af-grain"
+                style={{
+                  background:
+                    "linear-gradient(155deg, var(--secondary), transparent 65%)",
+                  boxShadow:
+                    "inset 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent)",
+                }}
+              />
+              <DevicesShowcase />
+            </div>
           </div>
         </div>
       </section>
@@ -366,15 +579,18 @@ export default function Home() {
         <OrangeTriangle size={72} opacity={0.12} rotate={30} style={{ top: 40, left: "38%" }} />
 
         <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: "#f23c10" }}>
-              Benefícios reais
+          <div className="max-w-2xl mb-12 sm:mb-16">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] mb-4" style={{ color: "#f23c10" }}>
+              <span className="h-px w-8" style={{ background: "#f23c10" }} />
+              Problemas reais, resolvidos
             </p>
-            <h2 className="font-display text-3xl sm:text-4xl">
-              Por que salões escolhem o AgendeFácil?
+            <h2 className="font-display text-3xl sm:text-5xl leading-[1.05] tracking-tight">
+              O que tomava seu tempo,<br className="hidden sm:block" />{" "}
+              <span className="text-primary">agora roda sozinho.</span>
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Clique em cada pergunta para ver a resposta. Cada recurso nasceu de um problema real.
+            <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl">
+              Seis dores do dia a dia de um salão — e exatamente como o
+              AgendeFácil resolve cada uma.
             </p>
           </div>
 
@@ -382,39 +598,109 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── QUEBRA DE OBJEÇÕES ────────────────────────────────────────── */}
-      <section className="relative bg-background py-20 sm:py-28 overflow-hidden">
-        {/* Formas geométricas */}
-        <OrangeBlob size={400} opacity={0.05} style={{ bottom: -120, right: -100 }} />
-        <OrangeRing size={220} opacity={0.13} style={{ bottom: 40, right: 60 }} />
-        <OrangeDots cols={4} rows={4} opacity={0.12} style={{ top: 30, left: "50%" }} />
+      {/* ── QUEBRA DE OBJEÇÕES / FAQ ──────────────────────────────────── */}
+      <section id="duvidas" aria-labelledby="duvidas-titulo" className="relative bg-background py-20 sm:py-28 overflow-hidden">
+        {/* Atmosfera única (sem ruído de formas) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2"
+          style={{
+            background:
+              "radial-gradient(50% 70% at 50% 100%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%)",
+          }}
+        />
 
-        <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary mb-3">
-              Sem mistério
+        <div className="mx-auto max-w-5xl px-5 relative">
+          <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16">
+            <p className="inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+              <span className="h-px w-8 bg-primary" />
+              Sem letra miúda
+              <span className="h-px w-8 bg-primary" />
             </p>
-            <h2 className="font-display text-3xl sm:text-4xl">
-              Suas dúvidas respondidas
+            <h2 id="duvidas-titulo" className="font-display text-3xl sm:text-5xl tracking-tight">
+              Perguntas frequentes
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Antes de começar, é natural ter perguntas. Aqui vão as mais comuns.
+            <p className="mt-4 text-muted-foreground text-base sm:text-lg">
+              Toda dúvida que costuma aparecer antes de começar — respondida sem
+              rodeios.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {OBJECTIONS.map((o) => (
-              <div
-                key={o.title}
-                className="rounded-[var(--radius)] border border-border bg-card p-6 hover:shadow-card transition-shadow group"
-              >
-                <span className="grid place-items-center h-11 w-11 rounded-xl bg-secondary text-secondary-foreground mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  <o.icon className="h-5 w-5" />
+          {/* Receio → resposta (editorial, sem caixas) */}
+          <div className="grid sm:grid-cols-2 gap-x-10 lg:gap-x-14 gap-y-10">
+            {OBJECTIONS.map((o, i) => (
+              <div key={o.title} className="group relative pl-5 sm:pl-6">
+                {/* Trilho de acento */}
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-border transition-colors duration-300 group-hover:bg-primary"
+                />
+
+                {/* O receio (a pergunta) */}
+                <div className="flex items-start gap-3">
+                  <span
+                    className="grid place-items-center h-9 w-9 rounded-xl shrink-0 transition-colors duration-300"
+                    style={{ background: "var(--secondary)", color: "var(--primary)" }}
+                  >
+                    <o.icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <h3 className="font-display text-lg font-semibold leading-snug tracking-tight pt-1">
+                    {o.title}
+                  </h3>
+                </div>
+
+                {/* A resposta */}
+                <div className="mt-3 flex items-start gap-2.5">
+                  <span
+                    className="grid place-items-center h-5 w-5 rounded-full shrink-0 mt-0.5"
+                    style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+                  >
+                    <Check className="h-3 w-3" strokeWidth={3} />
+                  </span>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {o.answer}
+                  </p>
+                </div>
+
+                {/* Índice discreto */}
+                <span
+                  aria-hidden
+                  className="absolute -top-1 right-0 font-display text-xs font-bold tabular-nums"
+                  style={{ color: "color-mix(in srgb, var(--foreground) 14%, transparent)" }}
+                >
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                <h3 className="font-display text-base font-semibold mb-2">{o.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{o.answer}</p>
               </div>
             ))}
+          </div>
+
+          {/* Faixa de garantia — fecha a objeção e empurra pro CTA */}
+          <div
+            className="mt-14 sm:mt-16 rounded-[1.75rem] px-6 py-8 sm:px-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left"
+            style={{ background: "var(--secondary)" }}
+          >
+            <div className="flex items-start gap-4">
+              <span
+                className="hidden sm:grid place-items-center h-12 w-12 rounded-2xl shrink-0"
+                style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+              >
+                <ShieldCheck className="h-6 w-6" />
+              </span>
+              <div>
+                <p className="font-display text-lg font-semibold tracking-tight">
+                  Ainda na dúvida? O risco é zero.
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground max-w-md">
+                  14 dias grátis, sem cartão. Se não for pra você, é só cancelar —
+                  sem multa, sem ligação de retenção.
+                </p>
+              </div>
+            </div>
+            <Link href="/criar-salao" className="shrink-0">
+              <Button size="lg" className="font-semibold whitespace-nowrap">
+                Começar grátis <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -694,6 +980,9 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* ── CTA FIXO (mobile) ─────────────────────────────────────────── */}
+      <StickyMobileCTA />
 
     </div>
   );

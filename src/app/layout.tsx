@@ -18,10 +18,61 @@ const oswald = Oswald({
   display: "swap",
 });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+
 export const metadata: Metadata = {
-  title: "AgendeFácil — Agendamento para salões e barbearias",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "AgendeFácil — Sistema de agendamento online para salões e barbearias",
+    template: "%s · AgendeFácil",
+  },
   description:
-    "Sistema completo de agendamento, equipe, comissões, caixa e estoque para salões de beleza, barbearias e estética.",
+    "Software de agendamento online para salões de beleza, barbearias e clínicas de estética. Agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios. Teste grátis por 14 dias, sem cartão.",
+  applicationName: "AgendeFácil",
+  keywords: [
+    "sistema de agendamento para salão",
+    "agendamento online salão de beleza",
+    "software para barbearia",
+    "app de agendamento para barbearia",
+    "agenda online para salão",
+    "sistema para salão de beleza",
+    "controle de comissão salão",
+    "caixa e estoque para salão",
+    "agendamento para estética",
+    "link de agendamento WhatsApp",
+  ],
+  authors: [{ name: "AgendeFácil" }],
+  creator: "AgendeFácil",
+  publisher: "AgendeFácil",
+  category: "business",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: SITE_URL,
+    siteName: "AgendeFácil",
+    title: "AgendeFácil — Agendamento online para salões e barbearias",
+    description:
+      "A cliente agenda pelo seu link, recebe confirmação automática e você só aparece para atender. Agenda, comissões, caixa e estoque. Teste grátis por 14 dias.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AgendeFácil — Agendamento online para salões e barbearias",
+    description:
+      "Menos WhatsApp, mais clientes na cadeira. Agenda online, comissões, caixa e estoque. Teste grátis por 14 dias.",
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "AgendeFácil", statusBarStyle: "default" },
   icons: {
