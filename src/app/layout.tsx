@@ -16,6 +16,9 @@ const oswald = Oswald({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   display: "swap",
+  // Só é usada em títulos de barbearia — não pré-carregar (peso morto na
+  // landing/SEO). Carrega sob demanda (swap) quando uma página de barbearia usa.
+  preload: false,
 });
 
 const SITE_URL =
