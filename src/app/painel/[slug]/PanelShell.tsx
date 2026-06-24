@@ -318,7 +318,7 @@ export function PanelShell({
           </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <AnnouncementBanner announcements={announcements} />
           <div
             className={cn(
@@ -332,8 +332,8 @@ export function PanelShell({
           </div>
         </main>
 
-        {/* ── Bottom navigation (mobile) ─────────────────────────── */}
-        <nav className="lg:hidden shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
+        {/* ── Bottom navigation (mobile) — fixa na viewport ───────── */}
+        <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
           <div className="grid grid-cols-4 h-16">
             {primaryItems.map((it) => {
               const active = isActive(it.href);
