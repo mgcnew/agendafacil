@@ -807,7 +807,7 @@ function ManageModal({
     const link = duePayment?.invoiceUrl ? `\n\nPara regularizar: ${duePayment.invoiceUrl}` : "";
     const val = duePayment ? ` de ${formatBRL(duePayment.value)}` : "";
     const venc = duePayment ? ` (venc. ${duePayment.dueDate})` : "";
-    return `Olá! 😊 Passando pra lembrar da sua assinatura do AgendeFácil — há uma cobrança em aberto${val}${venc}.${link}`;
+    return `Olá! 😊 Passando pra lembrar da sua assinatura do Zulan — há uma cobrança em aberto${val}${venc}.${link}`;
   }
 
   const waHref = (() => {
@@ -819,7 +819,7 @@ function ManageModal({
   })();
 
   const mailHref = contact?.email
-    ? `mailto:${contact.email}?subject=${encodeURIComponent("Sua assinatura do AgendeFácil")}&body=${encodeURIComponent(dunningText())}`
+    ? `mailto:${contact.email}?subject=${encodeURIComponent("Sua assinatura do Zulan")}&body=${encodeURIComponent(dunningText())}`
     : null;
 
   async function run(key: string, fn: () => PromiseLike<{ error: unknown }>) {

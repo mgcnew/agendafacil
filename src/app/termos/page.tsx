@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { LegalShell, LegalSection } from "@/components/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso — AgendeFácil",
-  description: "Termos e condições de uso da plataforma AgendeFácil.",
+  title: "Termos de Uso — Zulan",
+  description: "Termos e condições de uso da plataforma Zulan.",
 };
 
 export default function TermosPage() {
   return (
     <LegalShell title="Termos de Uso" updatedAt="17 de junho de 2026">
       <p>
-        Estes Termos regem o uso da plataforma <strong>AgendeFácil</strong>,
+        Estes Termos regem o uso da plataforma <strong>Zulan</strong>,
         operada por <strong>[RAZÃO SOCIAL]</strong>, CNPJ <strong>[CNPJ]</strong>{" "}
         (&quot;nós&quot;). Ao criar uma conta ou usar a plataforma, você
         (&quot;Estabelecimento&quot; ou &quot;Usuário&quot;) concorda com estes
@@ -19,7 +19,7 @@ export default function TermosPage() {
 
       <LegalSection heading="1. O serviço">
         <p>
-          O AgendeFácil oferece ferramentas de agendamento, gestão de equipe,
+          O Zulan oferece ferramentas de agendamento, gestão de equipe,
           comissões, caixa, estoque, campanhas e relatórios para salões,
           barbearias e profissionais de estética, disponibilizadas via web.
         </p>
@@ -64,7 +64,7 @@ export default function TermosPage() {
 
       <LegalSection heading="5. Propriedade intelectual">
         <p>
-          O software, marca e materiais do AgendeFácil são de nossa titularidade.
+          O software, marca e materiais do Zulan são de nossa titularidade.
           Os dados inseridos pelo Estabelecimento permanecem de sua propriedade;
           concedemos a você uma licença de uso da plataforma, não exclusiva e
           intransferível, enquanto durar a contratação.

@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { LegalShell, LegalSection } from "@/components/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Política de Cookies — AgendeFácil",
-  description: "Como o AgendeFácil usa cookies e tecnologias semelhantes.",
+  title: "Política de Cookies — Zulan",
+  description: "Como o Zulan usa cookies e tecnologias semelhantes.",
 };
 
 export default function CookiesPage() {
   return (
     <LegalShell title="Política de Cookies" updatedAt="17 de junho de 2026">
       <p>
-        Esta Política explica como o <strong>AgendeFácil</strong> usa cookies e
+        Esta Política explica como o <strong>Zulan</strong> usa cookies e
         tecnologias de armazenamento local no navegador.
       </p>
 

@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 // Facebook, X, LinkedIn). Mantém a identidade laranja da marca.
 export const runtime = "edge";
 export const alt =
-  "AgendeFácil — sistema de agendamento online para salões e barbearias";
+  "Zulan — sistema de agendamento online para salões e barbearias";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,7 +41,7 @@ export default function OpengraphImage() {
           >
             ✂️
           </div>
-          <div style={{ fontSize: 40, fontWeight: 800 }}>AgendeFácil</div>
+          <div style={{ fontSize: 40, fontWeight: 800 }}>Zulan</div>
         </div>
 
         {/* Mensagem principal */}

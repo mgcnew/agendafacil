@@ -24,7 +24,7 @@ type Item = {
 const ITEMS: Item[] = [
   {
     q: "Sua cliente ainda agenda pelo WhatsApp?",
-    a: "Com o AgendeFácil, cada salão tem um link único. A cliente abre, escolhe serviço, profissional e horário disponível — sem precisar te chamar no WhatsApp. Sua agenda fica sempre organizada, sem mensagem no meio da madrugada.",
+    a: "Com o Zulan, cada salão tem um link único. A cliente abre, escolhe serviço, profissional e horário disponível — sem precisar te chamar no WhatsApp. Sua agenda fica sempre organizada, sem mensagem no meio da madrugada.",
     win: "Agenda cheia sem você tocar no celular.",
     icon: MessageSquareOff,
   },

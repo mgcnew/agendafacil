@@ -24,12 +24,12 @@ const SITE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "AgendeFácil — Sistema de agendamento online para salões e barbearias",
-    template: "%s · AgendeFácil",
+    default: "Zulan — Sistema de agendamento online para salões e barbearias",
+    template: "%s · Zulan",
   },
   description:
     "Software de agendamento online para salões de beleza, barbearias e clínicas de estética. Agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios. Teste grátis por 14 dias, sem cartão.",
-  applicationName: "AgendeFácil",
+  applicationName: "Zulan",
   keywords: [
     "sistema de agendamento para salão",
     "agendamento online salão de beleza",
@@ -42,9 +42,9 @@ export const metadata: Metadata = {
     "agendamento para estética",
     "link de agendamento WhatsApp",
   ],
-  authors: [{ name: "AgendeFácil" }],
-  creator: "AgendeFácil",
-  publisher: "AgendeFácil",
+  authors: [{ name: "Zulan" }],
+  creator: "Zulan",
+  publisher: "Zulan",
   category: "business",
   alternates: { canonical: "/" },
   robots: {
@@ -62,19 +62,19 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     url: SITE_URL,
-    siteName: "AgendeFácil",
-    title: "AgendeFácil — Agendamento online para salões e barbearias",
+    siteName: "Zulan",
+    title: "Zulan — Agendamento online para salões e barbearias",
     description:
       "A cliente agenda pelo seu link, recebe confirmação automática e você só aparece para atender. Agenda, comissões, caixa e estoque. Teste grátis por 14 dias.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AgendeFácil — Agendamento online para salões e barbearias",
+    title: "Zulan — Agendamento online para salões e barbearias",
     description:
       "Menos WhatsApp, mais clientes na cadeira. Agenda online, comissões, caixa e estoque. Teste grátis por 14 dias.",
   },
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "AgendeFácil", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Zulan", statusBarStyle: "default" },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

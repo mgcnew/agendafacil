@@ -86,7 +86,7 @@ export function AuthShell({
           <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
             <Scissors className="h-5 w-5" />
           </span>
-          AgendeFácil
+          Zulan
         </Link>
 
         {/* Conteúdo central */}
@@ -167,7 +167,7 @@ export function AuthShell({
             <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
               <Scissors className="h-5 w-5" />
             </span>
-            AgendeFácil
+            Zulan
           </Link>
 
           <h1 className="font-display text-2xl sm:text-3xl">{title}</h1>

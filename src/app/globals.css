@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   AgendeFácil — sistema de temas por nicho + variante de cor
+   Zulan — sistema de temas por nicho + variante de cor
 
    Estrutura:
    • :root              → padrão global (laranja) para landing/sem tema
@@ -35,7 +35,7 @@
    e páginas sem data-niche/data-color definidos.
    ============================================================ */
 :root {
-  /* Colors — marca AgendeFácil (petróleo + dourado) */
+  /* Colors — marca Zulan (petróleo + dourado) */
   --background: #f4f9f9;
   --foreground: #0b2127;
   --card: #ffffff;
@@ -413,8 +413,23 @@
 }
 .af-float { animation: af-float 6s ease-in-out infinite; }
 
+/* Scroll reveal — itens surgem ao entrar na viewport (ativado via JS) */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .af-rise, .af-float { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
   * { scroll-behavior: auto !important; }
 }
 

@@ -36,7 +36,7 @@ export function LegalShell({
         </div>
 
         <p className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
-          AgendeFácil — agendamento para salões e barbearias. Em caso de dúvidas
+          Zulan — agendamento para salões e barbearias. Em caso de dúvidas
           sobre este documento, escreva para{" "}
           <a href="mailto:contato@agendefacil.com.br" className="text-primary">
             contato@agendefacil.com.br

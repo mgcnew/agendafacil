@@ -110,7 +110,7 @@ export function Hero() {
             />
             <Image
               src="/hero-device.webp"
-              alt="AgendeFácil em uso — agenda no tablet e app no celular, num salão de beleza"
+              alt="Zulan em uso — agenda no tablet e app no celular, num salão de beleza"
               width={2508}
               height={2508}
               quality={92}

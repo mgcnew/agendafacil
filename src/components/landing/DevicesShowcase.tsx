@@ -1,6 +1,6 @@
 /**
  * DevicesShowcase — representação estilizada do painel em laptop + celular.
- * Cores alinhadas ao tema petróleo (#0e6f78) da marca AgendeFácil.
+ * Cores alinhadas ao tema petróleo (#0e6f78) da marca Zulan.
  */
 
 const P = "#0e6f78";   // primary (petróleo)
@@ -24,7 +24,7 @@ export function DevicesShowcase() {
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#febc2e" }} />
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#28c840" }} />
               <div className="flex-1 mx-2 rounded-full flex items-center px-2 gap-1" style={{ background: "#fff", height: 18, border: "1px solid #ddd" }}>
-                <span style={{ fontSize: 7, color: "#999" }}>🔒 agendefacil.app/painel/meu-salao/agenda</span>
+                <span style={{ fontSize: 7, color: "#999" }}>🔒 zulan.app/painel/meu-salao/agenda</span>
               </div>
             </div>
 

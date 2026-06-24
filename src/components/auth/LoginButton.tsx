@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { Scissors, X } from "lucide-react";
+import { X } from "lucide-react";
 
 /**
  * Botão "Entrar" da landing que abre um modal de login, evitando uma
@@ -60,12 +61,14 @@ export function LoginButton() {
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-2 font-display font-bold text-lg">
-              <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
-                <Scissors className="h-5 w-5" />
-              </span>
-              AgendeFácil
-            </div>
+            <Image
+              src="/logo-landing.webp"
+              alt="Zulan"
+              width={1396}
+              height={373}
+              unoptimized
+              className="h-8 w-auto"
+            />
 
             <h2 id="login-modal-title" className="font-display text-xl mt-4">
               Bem-vinda de volta

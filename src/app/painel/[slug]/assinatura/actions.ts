@@ -74,7 +74,7 @@ export async function createCheckout(
         customer: customerId,
         value,
         nextDueDate: firstDueDate(sub.trial_ends_at),
-        description: `Assinatura AgendeFácil — ${salon.name}`,
+        description: `Assinatura Zulan — ${salon.name}`,
         externalReference: salon.id,
       });
       subscriptionId = subscription.id;

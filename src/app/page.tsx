@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui";
 import { PLANS, priceLabel, SUBSCRIBABLE_PLANS } from "@/lib/plans";
 import { Hero } from "@/components/landing/Hero";
-import { LoginButton } from "@/components/auth/LoginButton";
+import { SiteHeader } from "@/components/landing/SiteHeader";
+import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { BenefitsQA } from "@/components/landing/BenefitsQA";
 import {
-  Scissors,
   Smartphone,
   Zap,
   Check,
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
   title:
     "Sistema de agendamento online para salões de beleza e barbearias",
   description:
-    "AgendeFácil é o sistema de agendamento online para salões de beleza, barbearias e estética. A cliente agenda pelo seu link, recebe confirmação automática e você gerencia agenda, comissões, caixa e estoque. Teste grátis por 14 dias, sem cartão.",
+    "Zulan é o sistema de agendamento online para salões de beleza, barbearias e estética. A cliente agenda pelo seu link, recebe confirmação automática e você gerencia agenda, comissões, caixa e estoque. Teste grátis por 14 dias, sem cartão.",
   alternates: { canonical: "/" },
 };
 
@@ -140,12 +141,6 @@ const TESTIMONIALS = [
     text: "Minha cliente mais velha aprendeu a usar o link em cinco minutos. A ficha de anamnese online foi o que me convenceu — é exatamente o que eu precisava.",
     stars: 5,
   },
-];
-
-const NAV_LINKS = [
-  { label: "Funcionalidades", href: "#funcionalidades" },
-  { label: "Como funciona", href: "#como-funciona" },
-  { label: "Planos", href: "#planos" },
 ];
 
 const FOOTER_COLS = [
@@ -304,7 +299,7 @@ function StructuredData() {
       {
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
-        name: "AgendeFácil",
+        name: "Zulan",
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         description:
@@ -315,13 +310,13 @@ function StructuredData() {
         "@type": "WebSite",
         "@id": `${SITE_URL}/#website`,
         url: SITE_URL,
-        name: "AgendeFácil",
+        name: "Zulan",
         inLanguage: "pt-BR",
         publisher: { "@id": `${SITE_URL}/#organization` },
       },
       {
         "@type": "SoftwareApplication",
-        name: "AgendeFácil",
+        name: "Zulan",
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web, Android, iOS",
         url: SITE_URL,
@@ -369,13 +364,17 @@ const TRUST_STATS = [
 function TrustBar() {
   return (
     <section
-      aria-label="Por que confiar no AgendeFácil"
+      aria-label="Por que confiar no Zulan"
       className="border-y border-border bg-card"
     >
       <div className="mx-auto max-w-6xl px-5">
         <ul className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
-          {TRUST_STATS.map((s) => (
-            <li key={s.label} className="group">
+          {TRUST_STATS.map((s, i) => (
+            <li
+              key={s.label}
+              className="group reveal"
+              style={{ transitionDelay: `${i * 70}ms` }}
+            >
               <div className="flex items-center gap-3.5 px-4 py-6 sm:px-6">
                 <span className="grid place-items-center h-11 w-11 shrink-0 rounded-xl bg-secondary text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
                   <s.icon className="h-5 w-5" />
@@ -415,49 +414,16 @@ function StickyMobileCTA() {
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-full bg-background text-foreground overflow-x-hidden pb-20 lg:pb-0">
+    <div className="flex flex-col min-h-full bg-background text-foreground overflow-x-clip pb-20 lg:pb-0">
       <StructuredData />
+      <ScrollReveal />
+      {/* Fallback sem JS: garante que o conteúdo apareça mesmo sem o observador */}
+      <noscript>
+        <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
+      </noscript>
 
-      {/* ── HEADER — logo central ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-5 h-16 flex items-center gap-4">
-          {/* Esquerda — navegação (reserva o mesmo espaço da direita p/ centrar a logo) */}
-          <nav className="flex-1 hidden md:flex items-center gap-7">
-            {NAV_LINKS.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="text-sm font-medium text-foreground/65 hover:text-foreground transition-colors"
-              >
-                {l.label}
-              </a>
-            ))}
-          </nav>
-          {/* Espaçador esquerdo no mobile (mantém a logo centrada) */}
-          <div className="flex-1 md:hidden" />
-
-          {/* Centro — logo */}
-          <Link
-            href="/"
-            className="shrink-0 flex items-center gap-2 font-display font-bold text-lg tracking-tight"
-          >
-            <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <Scissors className="h-5 w-5" />
-            </span>
-            AgendeFácil
-          </Link>
-
-          {/* Direita — ações */}
-          <div className="flex-1 flex items-center justify-end gap-2">
-            <span className="hidden md:inline-flex">
-              <LoginButton />
-            </span>
-            <Link href="/criar-salao">
-              <Button size="sm">Teste grátis</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <SiteHeader />
 
       {/* ── HERO ───────────────────────────────────────────────────────── */}
       <Hero />
@@ -481,7 +447,7 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
             {/* Texto */}
-            <div>
+            <div className="reveal">
               <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
                 <span className="h-px w-8 bg-primary" />
                 Um sistema, dois lados do balcão
@@ -549,7 +515,7 @@ export default function Home() {
             </div>
 
             {/* Device showcase emoldurado */}
-            <div className="relative">
+            <div className="relative reveal" style={{ transitionDelay: "120ms" }}>
               <div
                 aria-hidden
                 className="absolute -inset-4 sm:-inset-8 -z-10 rounded-[2.5rem] af-grain"
@@ -579,7 +545,7 @@ export default function Home() {
         <OrangeTriangle size={72} opacity={0.12} rotate={30} style={{ top: 40, left: "38%" }} />
 
         <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="max-w-2xl mb-12 sm:mb-16">
+          <div className="max-w-2xl mb-12 sm:mb-16 reveal">
             <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] mb-4" style={{ color: "#0e6f78" }}>
               <span className="h-px w-8" style={{ background: "#0e6f78" }} />
               Problemas reais, resolvidos
@@ -590,11 +556,13 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl">
               Seis dores do dia a dia de um salão — e exatamente como o
-              AgendeFácil resolve cada uma.
+              Zulan resolve cada uma.
             </p>
           </div>
 
-          <BenefitsQA />
+          <div className="reveal" style={{ transitionDelay: "100ms" }}>
+            <BenefitsQA />
+          </div>
         </div>
       </section>
 
@@ -611,7 +579,7 @@ export default function Home() {
         />
 
         <div className="mx-auto max-w-5xl px-5 relative">
-          <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16">
+          <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16 reveal">
             <p className="inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
               <span className="h-px w-8 bg-primary" />
               Sem letra miúda
@@ -629,7 +597,11 @@ export default function Home() {
           {/* Receio → resposta (editorial, sem caixas) */}
           <div className="grid sm:grid-cols-2 gap-x-10 lg:gap-x-14 gap-y-10">
             {OBJECTIONS.map((o, i) => (
-              <div key={o.title} className="group relative pl-5 sm:pl-6">
+              <div
+                key={o.title}
+                className="group relative pl-5 sm:pl-6 reveal"
+                style={{ transitionDelay: `${(i % 2) * 80 + Math.floor(i / 2) * 60}ms` }}
+              >
                 {/* Trilho de acento */}
                 <span
                   aria-hidden
@@ -676,7 +648,7 @@ export default function Home() {
 
           {/* Faixa de garantia — fecha a objeção e empurra pro CTA */}
           <div
-            className="mt-14 sm:mt-16 rounded-[1.75rem] px-6 py-8 sm:px-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left"
+            className="mt-14 sm:mt-16 rounded-[1.75rem] px-6 py-8 sm:px-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left reveal"
             style={{ background: "var(--secondary)" }}
           >
             <div className="flex items-start gap-4">
@@ -708,7 +680,7 @@ export default function Home() {
       {/* ── PLANOS / PREÇOS ──────────────────────────────────────────── */}
       <section id="planos" className="px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center">
+          <div className="text-center reveal">
             <h2 className="font-display text-3xl sm:text-4xl font-bold">
               Planos que cabem no seu salão
             </h2>
@@ -719,15 +691,16 @@ export default function Home() {
           </div>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {PLAN_CARDS.map((card) => {
+            {PLAN_CARDS.map((card, i) => {
               const plan = PLANS[card.id];
               const highlight = card.highlight;
               const soon = !!plan.comingSoon;
               return (
                 <div
                   key={plan.id}
+                  style={{ transitionDelay: `${i * 80}ms` }}
                   className={[
-                    "relative flex flex-col rounded-[var(--radius)] border bg-card p-6 shadow-card",
+                    "relative flex flex-col rounded-[var(--radius)] border bg-card p-6 shadow-card reveal",
                     highlight ? "border-primary ring-2 ring-primary/30" : "border-border",
                     soon ? "opacity-80" : "",
                   ].join(" ")}
@@ -790,7 +763,7 @@ export default function Home() {
       {/* ── BANNER TRIAL ─────────────────────────────────────────────── */}
       <section className="px-5 py-6">
         <div
-          className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20"
+          className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20 reveal"
           style={{
             background: "linear-gradient(120deg, #0a565d 0%, #0e6f78 48%, #138a93 100%)",
           }}
@@ -868,7 +841,7 @@ export default function Home() {
         <OrangeTriangle size={60} opacity={0.11} rotate={-10} style={{ top: 50, right: "30%" }} />
 
         <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="text-center max-w-xl mx-auto mb-14">
+          <div className="text-center max-w-xl mx-auto mb-14 reveal">
             <p className="text-sm font-semibold uppercase tracking-widest text-primary mb-3">
               Depoimentos
             </p>
@@ -878,10 +851,11 @@ export default function Home() {
           </div>
 
           <div className="grid sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t) => (
+            {TESTIMONIALS.map((t, i) => (
               <div
                 key={t.name}
-                className="rounded-[var(--radius)] border border-border bg-background p-6 flex flex-col gap-4"
+                style={{ transitionDelay: `${i * 80}ms` }}
+                className="rounded-[var(--radius)] border border-border bg-background p-6 flex flex-col gap-4 reveal"
               >
                 {/* Aspas laranja */}
                 <p
@@ -932,11 +906,15 @@ export default function Home() {
 
             {/* Marca */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 font-display font-bold text-lg">
-                <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
-                  <Scissors className="h-5 w-5" />
-                </span>
-                AgendeFácil
+              <Link href="/" className="flex items-center" aria-label="Zulan — página inicial">
+                <Image
+                  src="/logo-landing.webp"
+                  alt="Zulan"
+                  width={1396}
+                  height={373}
+                  unoptimized
+                  className="h-8 w-auto"
+                />
               </Link>
               <p className="mt-3 text-sm text-muted-foreground max-w-xs leading-relaxed">
                 Software de agendamento para salões de beleza, barbearias e
@@ -975,7 +953,7 @@ export default function Home() {
 
         <div className="relative border-t border-border">
           <div className="mx-auto max-w-6xl px-5 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
-            <p>© 2026 AgendeFácil · Todos os direitos reservados.</p>
+            <p>© 2026 Zulan · Todos os direitos reservados.</p>
             <p>Feito para salões de beleza brasileiros 🇧🇷</p>
           </div>
         </div>

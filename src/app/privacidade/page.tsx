@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { LegalShell, LegalSection } from "@/components/LegalShell";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — AgendeFácil",
+  title: "Política de Privacidade — Zulan",
   description:
-    "Como o AgendeFácil coleta, usa e protege dados pessoais, em conformidade com a LGPD.",
+    "Como o Zulan coleta, usa e protege dados pessoais, em conformidade com a LGPD.",
 };
 
 export default function PrivacidadePage() {
   return (
     <LegalShell title="Política de Privacidade" updatedAt="17 de junho de 2026">
       <p>
-        Esta Política descreve como o <strong>AgendeFácil</strong>{" "}
+        Esta Política descreve como o <strong>Zulan</strong>{" "}
         (&quot;nós&quot;, operado por <strong>[RAZÃO SOCIAL]</strong>, CNPJ{" "}
         <strong>[CNPJ]</strong>) trata dados pessoais de quem usa a plataforma,
         em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados
@@ -20,7 +20,7 @@ export default function PrivacidadePage() {
 
       <LegalSection heading="1. Quem somos e papéis (LGPD)">
         <p>
-          O AgendeFácil é uma plataforma de agendamento usada por salões,
+          O Zulan é uma plataforma de agendamento usada por salões,
           barbearias e profissionais de estética (&quot;Estabelecimentos&quot;).
         </p>
         <ul className="list-disc pl-5 space-y-1.5">
@@ -98,9 +98,9 @@ export default function PrivacidadePage() {
           Você pode solicitar acesso, correção, anonimização, portabilidade ou
           exclusão dos seus dados, bem como informações sobre o tratamento.
           Clientes finais devem dirigir suas solicitações ao Estabelecimento
-          (Controlador) que cadastrou seus dados; o AgendeFácil dará suporte ao
+          (Controlador) que cadastrou seus dados; o Zulan dará suporte ao
           Estabelecimento para atendê-las. Solicitações relativas à sua conta de
-          usuário do AgendeFácil podem ser enviadas para{" "}
+          usuário do Zulan podem ser enviadas para{" "}
           <a href="mailto:contato@agendefacil.com.br" className="text-primary">
             contato@agendefacil.com.br
           </a>

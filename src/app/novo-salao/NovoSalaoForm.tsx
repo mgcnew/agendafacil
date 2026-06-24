@@ -199,7 +199,7 @@ export default function NovoSalaoPage() {
           <span className="grid place-items-center h-9 w-9 rounded-xl bg-primary text-primary-foreground">
             <Scissors className="h-5 w-5" />
           </span>
-          AgendeFácil
+          Zulan
         </div>
 
         <div className="grid lg:grid-cols-[1.25fr_1fr] gap-8 items-start">
@@ -230,7 +230,7 @@ export default function NovoSalaoPage() {
                   <Label htmlFor="slug">Link de agendamento</Label>
                   <div className="flex items-center rounded-[var(--radius)] border border-border bg-card overflow-hidden">
                     <span className="px-3 text-sm text-muted-foreground bg-muted h-11 flex items-center whitespace-nowrap">
-                      agendefacil.app/
+                      zulan.app/
                     </span>
                     <input
                       id="slug"
