@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     qualities: [75, 92],
   },
   experimental: {
+    // Melhora o tree-shaking do framer-motion (usado em ~12 telas do painel).
+    optimizePackageImports: ["framer-motion"],
     staleTimes: {
       dynamic: 0,
       static: 300,
