@@ -78,7 +78,7 @@
 }
 
 [data-niche="barbearia"] {
-  --radius: 0.25rem;
+  --radius: 0.5rem;
   --display-tracking: 0.05em;
   --display-transform: uppercase;
   --display-weight: 600;
