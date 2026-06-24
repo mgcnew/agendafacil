@@ -18,14 +18,14 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(100% 60% at 70% 0%, rgba(242,60,16,0.08), transparent 60%)",
+            "radial-gradient(100% 60% at 70% 0%, rgba(14,111,120,0.08), transparent 60%)",
         }}
       />
       {/* Blob decorativo */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-24 -right-24 h-[460px] w-[460px] rounded-full opacity-[0.10]"
-        style={{ background: "radial-gradient(circle, #ffa504, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #c9a24a, transparent 70%)" }}
       />
 
       <div className="relative mx-auto max-w-6xl px-5 py-14 sm:py-20 lg:py-24">
@@ -105,7 +105,7 @@ export function Hero() {
               className="pointer-events-none absolute inset-0 -z-10"
               style={{
                 background:
-                  "radial-gradient(55% 55% at 55% 45%, rgba(255,165,4,0.18), transparent 70%)",
+                  "radial-gradient(55% 55% at 55% 45%, rgba(201,162,74,0.20), transparent 70%)",
               }}
             />
             <Image

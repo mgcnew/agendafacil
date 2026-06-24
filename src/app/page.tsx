@@ -187,7 +187,7 @@ function OrangeRing({
       style={{
         width: size,
         height: size,
-        border: "2.5px solid #f23c10",
+        border: "2.5px solid #0e6f78",
         opacity,
         ...style,
       }}
@@ -212,7 +212,7 @@ function OrangeBlob({
       style={{
         width: size,
         height: size,
-        background: "radial-gradient(circle, #f23c10, transparent 70%)",
+        background: "radial-gradient(circle, #0e6f78, transparent 70%)",
         opacity,
         ...style,
       }}
@@ -242,7 +242,7 @@ function OrangeTriangle({
       className="absolute pointer-events-none"
       style={{ opacity, transform: `rotate(${rotate}deg)`, ...style }}
     >
-      <polygon points="40,4 76,72 4,72" stroke="#f23c10" strokeWidth="3" fill="none" strokeLinejoin="round" />
+      <polygon points="40,4 76,72 4,72" stroke="#0e6f78" strokeWidth="3" fill="none" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -278,7 +278,7 @@ function OrangeDots({
             cx={6 + c * gap}
             cy={6 + r * gap}
             r={2.5}
-            fill="#f23c10"
+            fill="#0e6f78"
           />
         )),
       )}
@@ -580,8 +580,8 @@ export default function Home() {
 
         <div className="mx-auto max-w-6xl px-5 relative">
           <div className="max-w-2xl mb-12 sm:mb-16">
-            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] mb-4" style={{ color: "#f23c10" }}>
-              <span className="h-px w-8" style={{ background: "#f23c10" }} />
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] mb-4" style={{ color: "#0e6f78" }}>
+              <span className="h-px w-8" style={{ background: "#0e6f78" }} />
               Problemas reais, resolvidos
             </p>
             <h2 className="font-display text-3xl sm:text-5xl leading-[1.05] tracking-tight">
@@ -792,7 +792,7 @@ export default function Home() {
         <div
           className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20"
           style={{
-            background: "linear-gradient(120deg, #e8330a 0%, #f23c10 48%, #ff5e1a 100%)",
+            background: "linear-gradient(120deg, #0a565d 0%, #0e6f78 48%, #138a93 100%)",
           }}
         >
           {/* Brilhos suaves — branco + dourado, decorativos */}
@@ -804,7 +804,7 @@ export default function Home() {
           <span
             aria-hidden
             className="absolute pointer-events-none rounded-full"
-            style={{ width: 320, height: 320, bottom: -150, left: -90, background: "radial-gradient(closest-side, rgba(255,165,4,0.40), transparent)" }}
+            style={{ width: 320, height: 320, bottom: -150, left: -90, background: "radial-gradient(closest-side, rgba(201,162,74,0.45), transparent)" }}
           />
           {/* Anéis brancos sutis */}
           <span
@@ -840,7 +840,7 @@ export default function Home() {
               <Link href="/criar-salao">
                 <Button
                   size="lg"
-                  className="bg-white text-[#e8330a] hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base shadow-lg"
+                  className="bg-white text-[#0a565d] hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base shadow-lg"
                 >
                   Criar meu salão grátis <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -886,7 +886,7 @@ export default function Home() {
                 {/* Aspas laranja */}
                 <p
                   className="font-display text-5xl leading-none select-none"
-                  style={{ color: "#f23c10", opacity: 0.35 }}
+                  style={{ color: "#0e6f78", opacity: 0.35 }}
                 >
                   &ldquo;
                 </p>
@@ -906,7 +906,7 @@ export default function Home() {
                 <div className="flex items-center gap-3 border-t border-border pt-4">
                   <div
                     className="grid place-items-center h-10 w-10 rounded-full font-display font-bold text-sm shrink-0"
-                    style={{ background: "#f23c10", color: "#fff" }}
+                    style={{ background: "#0e6f78", color: "#fff" }}
                   >
                     {t.initials}
                   </div>

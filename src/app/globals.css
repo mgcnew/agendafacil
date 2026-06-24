@@ -35,25 +35,25 @@
    e páginas sem data-niche/data-color definidos.
    ============================================================ */
 :root {
-  /* Colors — neutro laranja */
-  --background: #fffbf7;
-  --foreground: #1a0c04;
+  /* Colors — marca AgendeFácil (petróleo + dourado) */
+  --background: #f4f9f9;
+  --foreground: #0b2127;
   --card: #ffffff;
-  --card-foreground: #1a0c04;
-  --primary: #f23c10;
+  --card-foreground: #0b2127;
+  --primary: #0e6f78;
   --primary-foreground: #ffffff;
-  --secondary: #fff1e6;
-  --secondary-foreground: #9a2a08;
-  --accent: #ffa504;
-  --accent-foreground: #3d2600;
-  --muted: #fef3e8;
-  --muted-foreground: #78716c;
-  --border: #f0ddd0;
-  --ring: #f23c10;
+  --secondary: #d9efef;
+  --secondary-foreground: #0a565d;
+  --accent: #c9a24a;
+  --accent-foreground: #2c2105;
+  --muted: #e6f3f3;
+  --muted-foreground: #5a6e70;
+  --border: #d2e8e8;
+  --ring: #0e6f78;
 
   /* Shape */
   --radius: 0.85rem;
-  --shadow-card: 0 1px 2px rgba(26,12,4,.06), 0 8px 24px -12px rgba(242,60,16,.12);
+  --shadow-card: 0 1px 2px rgba(11,33,39,.06), 0 8px 24px -12px rgba(14,111,120,.18);
 
   /* Typography — fonte única (Plus Jakarta Sans) */
   --display-tracking: -0.02em;
