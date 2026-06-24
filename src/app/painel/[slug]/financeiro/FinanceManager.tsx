@@ -47,6 +47,7 @@ export function FinanceManager({
   transactions,
   commissions,
   closedSessions,
+  operatorNames,
   receivable,
   resaleProducts,
   canDiscount,
@@ -64,6 +65,7 @@ export function FinanceManager({
   transactions: Tx[];
   commissions: Comm[];
   closedSessions: Session[];
+  operatorNames: Record<string, string>;
   receivable: Receivable[];
   resaleProducts: ResaleProduct[];
   canDiscount: boolean;
@@ -168,12 +170,21 @@ export function FinanceManager({
   async function openCash() {
     setBusy(true);
     setErr(null);
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("cash_sessions").insert({
       salon_id: salonId,
       opening_amount: parseFloat(opening.replace(",", ".")) || 0,
+      opened_by: user?.id ?? null,
     });
     setBusy(false);
     if (error) { setErr("Não foi possível abrir o caixa. Tente novamente."); return; }
+    router.refresh();
+  }
+
+  // Reabre o último caixa fechado (se não houver caixa aberto).
+  async function reopenSession(sessionId: string) {
+    const { error } = await supabase.rpc("reopen_cash_session" as never, { p_session: sessionId } as never);
+    if (error) throw error;
     router.refresh();
   }
 
@@ -241,6 +252,11 @@ export function FinanceManager({
             </Card>
           ) : (
             <>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Unlock className="h-3.5 w-3.5 text-emerald-600" />
+                Caixa aberto às {formatTime(openSession.opened_at)}
+                {openSession.opened_by && operatorNames[openSession.opened_by] && <> · por {operatorNames[openSession.opened_by]}</>}
+              </p>
               {canManage && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -342,6 +358,7 @@ export function FinanceManager({
             salon={salon}
             onClose={() => { setClosing(false); router.refresh(); }}
             onConfirm={async (counted) => {
+              const { data: { user } } = await supabase.auth.getUser();
               const { error } = await supabase
                 .from("cash_sessions")
                 .update({
@@ -349,6 +366,7 @@ export function FinanceManager({
                   closing_amount: counted,
                   expected_amount: expectedCash,
                   difference: counted - expectedCash,
+                  closed_by: user?.id ?? null,
                 })
                 .eq("id", openSession.id);
               if (error) return false;
@@ -454,6 +472,13 @@ export function FinanceManager({
             key="session-detail"
             session={selectedSession}
             salon={salon}
+            operatorNames={operatorNames}
+            canReopen={canManage && !openSession && selectedSession.id === closedSessions[0]?.id}
+            onReopen={async () => {
+              await reopenSession(selectedSession.id);
+              showToast("✓ Caixa reaberto");
+              setSelectedSession(null);
+            }}
             onClose={() => setSelectedSession(null)}
           />
         )}
@@ -1744,16 +1769,24 @@ function CloseModal({
 function SessionDetailModal({
   session,
   salon,
+  operatorNames,
+  canReopen,
+  onReopen,
   onClose,
 }: {
   session: Session;
   salon: SalonInfo;
+  operatorNames: Record<string, string>;
+  canReopen?: boolean;
+  onReopen?: () => Promise<void>;
   onClose: () => void;
 }) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [busyPdf, setBusyPdf] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -1765,10 +1798,13 @@ function SessionDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  const incomes = txs.filter((t) => t.type === "income");
-  const expenses = txs.filter((t) => t.type === "expense");
+  const isCashMove = (t: Tx) => t.category === "sangria" || t.category === "suprimento";
+  const incomes = txs.filter((t) => t.type === "income" && !isCashMove(t));
+  const expenses = txs.filter((t) => t.type === "expense" && !isCashMove(t));
   const totalInc = incomes.reduce((s, t) => s + Number(t.amount), 0);
   const totalExp = expenses.reduce((s, t) => s + Number(t.amount), 0);
+  const suprimentoTotal = txs.filter((t) => t.category === "suprimento").reduce((s, t) => s + Number(t.amount), 0);
+  const sangriaTotal = txs.filter((t) => t.category === "sangria").reduce((s, t) => s + Number(t.amount), 0);
 
   const incByMethod: Record<string, number> = {};
   for (const m of [...PICKER_METHODS, "cartao"] as const) {
@@ -1782,6 +1818,9 @@ function SessionDetailModal({
     ? new Date(session.closed_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })
     : "—";
 
+  const openedByName = session.opened_by ? operatorNames[session.opened_by] : null;
+  const closedByName = session.closed_by ? operatorNames[session.closed_by] : null;
+
   const reportData: ClosingReportData = {
     date: sessionDate,
     openingAmount: Number(session.opening_amount),
@@ -1791,12 +1830,26 @@ function SessionDetailModal({
     expectedCash: session.expected_amount != null ? Number(session.expected_amount) : Number(session.opening_amount) + (incByMethod["dinheiro"] ?? 0),
     countedCash: session.closing_amount != null ? Number(session.closing_amount) : null,
     difference: session.difference != null ? Number(session.difference) : null,
+    suprimentoTotal,
+    sangriaTotal,
     fileBase: `fechamento-${(session.closed_at ?? "").slice(0, 10)}`,
   };
 
   async function downloadPdf() {
     setBusyPdf(true);
     try { await generateClosingReportPdf(reportData, salon); } finally { setBusyPdf(false); }
+  }
+
+  async function reopen() {
+    if (!onReopen) return;
+    setReopening(true);
+    setErr(null);
+    try {
+      await onReopen();
+    } catch (e) {
+      setErr((e as { message?: string })?.message ?? "Não foi possível reabrir o caixa.");
+      setReopening(false);
+    }
   }
 
   const waHref = `https://wa.me/?text=${encodeURIComponent(buildClosingReportText(reportData, salon))}`;
@@ -1861,6 +1914,22 @@ function SessionDetailModal({
                     <span className="tabular-nums">{Number(session.difference) === 0 ? "✓" : formatBRL(Math.abs(Number(session.difference)))}</span>
                   </div>
                 )}
+                {(openedByName || closedByName) && (
+                  <div className="pt-1 mt-1 border-t border-border space-y-0.5">
+                    {openedByName && (
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Aberto por</span>
+                        <span>{openedByName}{session.opened_at && ` · ${formatTime(session.opened_at)}`}</span>
+                      </div>
+                    )}
+                    {closedByName && (
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>Fechado por</span>
+                        <span>{closedByName}{session.closed_at && ` · ${formatTime(session.closed_at)}`}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1905,6 +1974,19 @@ function SessionDetailModal({
                 <div className="space-y-2">
                   {txs.map((t) => <TxRow key={t.id} t={t} />)}
                 </div>
+              </div>
+            )}
+
+            {/* Reabrir caixa (só o último fechado, sem caixa aberto) */}
+            {canReopen && (
+              <div className="pt-2 border-t border-border">
+                {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+                <Button onClick={reopen} disabled={reopening} variant="outline" className="w-full">
+                  {reopening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />} Reabrir este caixa
+                </Button>
+                <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
+                  Reabre o caixa para corrigir lançamentos. Só disponível para o último caixa fechado.
+                </p>
               </div>
             )}
           </div>

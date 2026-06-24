@@ -70,6 +70,25 @@ export default async function FinanceiroPage({
     .order("closed_at", { ascending: false })
     .limit(8);
 
+  // ── nomes dos operadores que abriram/fecharam caixas ──
+  const operatorIds = new Set<string>();
+  if (openSession?.opened_by) operatorIds.add(openSession.opened_by);
+  for (const s of closedSessions ?? []) {
+    if (s.opened_by) operatorIds.add(s.opened_by);
+    if (s.closed_by) operatorIds.add(s.closed_by);
+  }
+  const operatorNames: Record<string, string> = {};
+  if (operatorIds.size > 0) {
+    const { data: ops } = await supabase
+      .from("salon_members")
+      .select("profile_id, display_name")
+      .eq("salon_id", salonId)
+      .in("profile_id", Array.from(operatorIds));
+    for (const o of ops ?? []) {
+      if (o.profile_id) operatorNames[o.profile_id] = o.display_name ?? "—";
+    }
+  }
+
   // ── comissões apuradas no período (atendimentos concluídos) ──
   const { data: commRows } = await supabase
     .from("appointment_services")
@@ -197,6 +216,7 @@ export default async function FinanceiroPage({
       transactions={transactions}
       commissions={commissions}
       closedSessions={closedSessions ?? []}
+      operatorNames={operatorNames}
       receivable={receivable}
       resaleProducts={resaleProducts}
       canDiscount={canDiscount}
