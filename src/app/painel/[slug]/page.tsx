@@ -5,7 +5,7 @@ import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
-import { CalendarDays, Wallet, Clock, Users, Plus, Package, UserRoundCheck, ChevronRight, History, Cake } from "lucide-react";
+import { CalendarDots, Wallet, Clock, Users, Plus, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
@@ -179,9 +179,9 @@ export default async function DashboardPage({
   });
 
   const stats = [
-    { icon: CalendarDays, label: "Agendamentos hoje", value: String(appts.length) },
+    { icon: CalendarDots, label: "Agendamentos hoje", value: String(appts.length) },
     { icon: Wallet, label: "Previsão de hoje", value: formatBRL(revenue) },
-    { icon: Sparkles2, label: "Serviços ativos", value: String(servicesCount ?? 0) },
+    { icon: Sparkle, label: "Serviços ativos", value: String(servicesCount ?? 0) },
     { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
   ];
 
@@ -239,7 +239,7 @@ export default async function DashboardPage({
           {/* Últimos atendimentos */}
           <div className="rounded-[var(--radius)] border border-border bg-card p-4">
             <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <History className="h-4 w-4 text-primary" /> Últimos atendimentos
+              <ClockCounterClockwise className="h-4 w-4 text-primary" /> Últimos atendimentos
             </h2>
             {recentAppts.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">Nenhum atendimento concluído ainda.</p>
@@ -299,7 +299,7 @@ export default async function DashboardPage({
               className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
-                <UserRoundCheck className="h-4 w-4" />
+                <UserCheck className="h-4 w-4" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm">
@@ -309,7 +309,7 @@ export default async function DashboardPage({
                   {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno.
                 </p>
               </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Link>
           )}
 
@@ -375,13 +375,5 @@ export default async function DashboardPage({
 
       </div>
     </div>
-  );
-}
-
-function Sparkles2(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-    </svg>
   );
 }

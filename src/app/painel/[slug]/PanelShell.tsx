@@ -7,45 +7,45 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
   House,
-  CalendarDays,
+  CalendarDots,
   Clock,
-  Sparkles,
-  UserRoundCog,
-  UsersRound,
-  Banknote,
-  Boxes,
+  Sparkle,
+  UserGear,
+  Users,
+  Money,
+  Stack,
   Package,
-  Settings,
+  Gear,
   Scissors,
-  BadgePercent,
-  BarChart3,
+  SealPercent,
+  ChartBar,
   CreditCard,
   Megaphone,
   Images,
-  Ellipsis,
+  DotsThree,
   X,
-  LogOut,
-  ExternalLink,
-  Share2,
+  SignOut,
+  ArrowSquareOut,
+  ShareNetwork,
   ShieldCheck,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 
 /** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
 const PRIMARY_HREFS = ["", "/agenda", "/clientes"];
 
 const ICONS = {
   House,
-  CalendarDays,
+  CalendarDays: CalendarDots,
   Clock,
-  Sparkles,
-  UserRoundCog,
-  UsersRound,
-  Banknote,
-  Boxes,
+  Sparkles: Sparkle,
+  UserRoundCog: UserGear,
+  UsersRound: Users,
+  Banknote: Money,
+  Boxes: Stack,
   Package,
-  Settings,
-  BadgePercent,
-  BarChart3,
+  Settings: Gear,
+  BadgePercent: SealPercent,
+  BarChart3: ChartBar,
   CreditCard,
   Megaphone,
   Images,
@@ -288,7 +288,7 @@ export function PanelShell({
             onClick={sharePublic}
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-primary hover:bg-primary/10 transition"
           >
-            <Share2 className="h-[18px] w-[18px]" />
+            <ShareNetwork className="h-[18px] w-[18px]" />
             <Tip label="Compartilhar link" />
           </button>
           <a
@@ -296,14 +296,14 @@ export function PanelShell({
             target="_blank"
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
           >
-            <ExternalLink className="h-[18px] w-[18px]" />
+            <ArrowSquareOut className="h-[18px] w-[18px]" />
             <Tip label="Ver página pública" />
           </a>
           <button
             onClick={logout}
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
           >
-            <LogOut className="h-[18px] w-[18px]" />
+            <SignOut className="h-[18px] w-[18px]" />
             <Tip label="Sair" />
           </button>
         </div>
@@ -354,7 +354,7 @@ export function PanelShell({
                         : "text-muted-foreground",
                     )}
                   >
-                    <Icon className="h-[22px] w-[22px] shrink-0" strokeWidth={active ? 2.4 : 2} />
+                    <Icon className="h-[22px] w-[22px] shrink-0" weight={active ? "bold" : "regular"} />
                   </span>
                   <span
                     className={cn(
@@ -377,7 +377,7 @@ export function PanelShell({
                   open ? "bg-primary/15 text-primary" : "text-muted-foreground",
                 )}
               >
-                <Ellipsis className="h-[22px] w-[22px]" strokeWidth={open ? 2.4 : 2} />
+                <DotsThree className="h-[22px] w-[22px]" weight={open ? "bold" : "regular"} />
               </span>
               <span
                 className={cn(
@@ -456,20 +456,20 @@ export function PanelShell({
                 onClick={() => { setOpen(false); sharePublic(); }}
                 className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/10"
               >
-                <Share2 className="h-4.5 w-4.5" /> Compartilhar link
+                <ShareNetwork className="h-4.5 w-4.5" /> Compartilhar link
               </button>
               <a
                 href={`/${salon.slug}`}
                 target="_blank"
                 className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
               >
-                <ExternalLink className="h-4.5 w-4.5" /> Página pública
+                <ArrowSquareOut className="h-4.5 w-4.5" /> Página pública
               </a>
               <button
                 onClick={logout}
                 className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
               >
-                <LogOut className="h-4.5 w-4.5" /> Sair
+                <SignOut className="h-4.5 w-4.5" /> Sair
               </button>
             </div>
           </div>
