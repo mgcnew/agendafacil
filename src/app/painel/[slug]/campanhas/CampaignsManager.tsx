@@ -9,8 +9,17 @@ import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  Plus, Loader2, Tag, Trash2, Pencil, X, Calendar, Check, AlertTriangle, Power,
-} from "lucide-react";
+  Calendar,
+  Check,
+  CircleNotch,
+  PencilSimple,
+  Plus,
+  Power,
+  Tag,
+  Trash,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Campaign = Tables<"campaigns">;
 type Svc = { id: string; name: string; price: number; price_type: string | null };
@@ -106,7 +115,7 @@ export function CampaignsManager({
 
       {err && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -150,10 +159,10 @@ export function CampaignsManager({
                   <Power className="h-4 w-4" />
                 </button>
                 <button onClick={() => { setEditing(c); setErr(null); }} className="p-2 text-muted-foreground hover:text-foreground">
-                  <Pencil className="h-4 w-4" />
+                  <PencilSimple className="h-4 w-4" />
                 </button>
                 <button onClick={() => remove(c)} className="p-2 text-muted-foreground hover:text-red-600">
-                  <Trash2 className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </button>
               </Card>
             );
@@ -360,7 +369,7 @@ function CampaignEditor({
 
           <div className="flex gap-2 pt-1">
             <Button onClick={save} disabled={busy} className="flex-1">
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} {campaign ? "Salvar" : "Criar campanha"}
+              {busy && <CircleNotch className="h-4 w-4 animate-spin" />} {campaign ? "Salvar" : "Criar campanha"}
             </Button>
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           </div>

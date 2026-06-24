@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  CaretLeft,
+  CaretRight,
+} from "@phosphor-icons/react/dist/ssr";
 
 const WEEKDAYS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 const MONTHS = [
@@ -60,7 +63,7 @@ export function Calendar({
           className="h-8 w-8 grid place-items-center rounded-[var(--radius)] hover:bg-muted transition"
           aria-label="Mês anterior"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <CaretLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-semibold capitalize">{MONTHS[month]} {year}</span>
         <button
@@ -69,7 +72,7 @@ export function Calendar({
           className="h-8 w-8 grid place-items-center rounded-[var(--radius)] hover:bg-muted transition"
           aria-label="Próximo mês"
         >
-          <ChevronRight className="h-4 w-4" />
+          <CaretRight className="h-4 w-4" />
         </button>
       </div>
 

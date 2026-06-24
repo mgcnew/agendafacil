@@ -6,7 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { X } from "lucide-react";
+import {
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * Botão "Entrar" da landing que abre um modal de login, evitando uma
@@ -66,7 +68,6 @@ export function LoginButton() {
               alt="Zulan"
               width={1396}
               height={373}
-              unoptimized
               className="h-8 w-auto"
             />
 

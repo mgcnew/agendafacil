@@ -10,11 +10,35 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL, formatTime, formatDate } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
-  Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
-  Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search, BarChart2,
-  ArrowDownToLine, ArrowUpFromLine, RotateCcw, AlertTriangle,
-} from "lucide-react";
+  ArrowCounterClockwise,
+  ArrowLineDown,
+  ArrowLineUp,
+  CaretLeft,
+  CaretRight,
+  ChartBar,
+  ChatCircle,
+  Check,
+  CircleNotch,
+  ClockCounterClockwise,
+  CreditCard,
+  DeviceMobile,
+  DownloadSimple,
+  Lock,
+  LockOpen,
+  MagnifyingGlass,
+  Minus,
+  Money,
+  Percent,
+  Plus,
+  Receipt,
+  Stack,
+  TrendDown,
+  TrendUp,
+  Users,
+  Wallet,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
   generateCommissionPdf, buildCommissionText,
@@ -31,8 +55,8 @@ export type Receivable = { id: string; client: string; member_id: string; total:
 export type ResaleProduct = { id: string; name: string; sale_price: number; quantity: number };
 
 const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
-  dinheiro: { label: "Dinheiro", icon: Banknote },
-  pix: { label: "Pix", icon: Smartphone },
+  dinheiro: { label: "Dinheiro", icon: Money },
+  pix: { label: "Pix", icon: DeviceMobile },
   debito: { label: "Débito", icon: CreditCard },
   credito: { label: "Crédito", icon: CreditCard },
   cartao: { label: "Cartão", icon: CreditCard }, // legado — exibição de dados antigos
@@ -245,7 +269,7 @@ export function FinanceManager({
                     <Input id="op" value={opening} onChange={(e) => setOpening(e.target.value)} className="w-40" />
                   </div>
                   <Button onClick={openCash} disabled={busy}>
-                    {busy && <Loader2 className="h-4 w-4 animate-spin" />} <Unlock className="h-4 w-4" /> Abrir caixa
+                    {busy && <CircleNotch className="h-4 w-4 animate-spin" />} <LockOpen className="h-4 w-4" /> Abrir caixa
                   </Button>
                 </div>
               )}
@@ -253,17 +277,17 @@ export function FinanceManager({
           ) : (
             <>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Unlock className="h-3.5 w-3.5 text-emerald-600" />
+                <LockOpen className="h-3.5 w-3.5 text-emerald-600" />
                 Caixa aberto às {formatTime(openSession.opened_at)}
                 {openSession.opened_by && operatorNames[openSession.opened_by] && <> · por {operatorNames[openSession.opened_by]}</>}
               </p>
               {canManage && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
-                    <ActionTile icon={UsersRound} label="Receber" badge={receivable.length} active={receberOpen} onClick={() => setReceberOpen((v) => !v)} />
-                    <ActionTile icon={Boxes} label="Loja" onClick={() => setLojaOpen(true)} />
+                    <ActionTile icon={Users} label="Receber" badge={receivable.length} active={receberOpen} onClick={() => setReceberOpen((v) => !v)} />
+                    <ActionTile icon={Stack} label="Loja" onClick={() => setLojaOpen(true)} />
                     <ActionTile icon={Plus} label="Lançar" onClick={() => setManualModal(true)} />
-                    <ActionTile icon={History} label="Histórico" badge={transactions.length || undefined} onClick={() => setMovementsModal(true)} />
+                    <ActionTile icon={ClockCounterClockwise} label="Histórico" badge={transactions.length || undefined} onClick={() => setMovementsModal(true)} />
                   </div>
 
                   {/* Receber: expande no lugar */}
@@ -303,7 +327,7 @@ export function FinanceManager({
           {closedSessions.length > 0 && (
             <div>
               <h3 className="font-display font-semibold mb-3 flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" /> Caixas anteriores
+                <ClockCounterClockwise className="h-4 w-4 text-primary" /> Caixas anteriores
               </h3>
               <div className="space-y-2">
                 {closedSessions.map((s) => {
@@ -314,7 +338,7 @@ export function FinanceManager({
                       onClick={() => setSelectedSession(s)}
                       className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition"
                     >
-                      <BarChart2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <ChartBar className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">
                           {s.closed_at ? new Date(s.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
@@ -512,14 +536,14 @@ export function FinanceManager({
                 href={`${pathname}?tab=comissoes&cmes=${period.prevCmes}`}
                 className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <CaretLeft className="h-4 w-4" />
               </Link>
               <span className="text-sm font-medium px-2 min-w-[120px] text-center capitalize">{period.label}</span>
               <Link
                 href={`${pathname}?tab=comissoes&cmes=${period.nextCmes}`}
                 className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
               >
-                <ChevronRight className="h-4 w-4" />
+                <CaretRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -554,7 +578,7 @@ export function FinanceManager({
                     ) : (
                       <span className="font-semibold text-primary text-sm shrink-0">{formatBRL(outstanding)}</span>
                     )}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <CaretRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 );
               })}
@@ -609,9 +633,9 @@ function ActionTile({
 
 function TxRow({ t, onReceipt, onReverse }: { t: Tx; onReceipt?: () => void; onReverse?: () => void }) {
   const isCashMove = t.category === "sangria" || t.category === "suprimento";
-  const Icon = t.category === "sangria" ? ArrowUpFromLine
-    : t.category === "suprimento" ? ArrowDownToLine
-    : t.type === "income" ? TrendingUp : TrendingDown;
+  const Icon = t.category === "sangria" ? ArrowLineUp
+    : t.category === "suprimento" ? ArrowLineDown
+    : t.type === "income" ? TrendUp : TrendDown;
   const subtitle = isCashMove
     ? `${t.category === "sangria" ? "Sangria" : "Suprimento"} · ${formatTime(t.created_at)}`
     : `${PAY_META[t.payment_method ?? "dinheiro"]?.label ?? (t.payment_method ?? "—")} · ${formatTime(t.created_at)}`;
@@ -636,7 +660,7 @@ function TxRow({ t, onReceipt, onReverse }: { t: Tx; onReceipt?: () => void; onR
       {onReverse && (
         <button onClick={onReverse} title="Estornar"
           className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
-          <RotateCcw className="h-4 w-4" />
+          <ArrowCounterClockwise className="h-4 w-4" />
         </button>
       )}
     </div>
@@ -652,12 +676,12 @@ function LojaModal({
     <MotionModal onClose={onClose}>
       <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Boxes className="h-5 w-5 text-primary" /> Loja</h3>
+          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Stack className="h-5 w-5 text-primary" /> Loja</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-3 overflow-auto">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar produto…" className="pl-9" />
           </div>
           {products.length === 0 ? (
@@ -683,8 +707,8 @@ function LojaModal({
 
 type ManualOp = "suprimento" | "sangria" | "income" | "expense";
 const MANUAL_OPS: { key: ManualOp; label: string; hint: string; icon: React.ElementType }[] = [
-  { key: "suprimento", label: "Suprimento", hint: "Colocar troco na gaveta", icon: ArrowDownToLine },
-  { key: "sangria",    label: "Sangria",    hint: "Retirar dinheiro da gaveta", icon: ArrowUpFromLine },
+  { key: "suprimento", label: "Suprimento", hint: "Colocar troco na gaveta", icon: ArrowLineDown },
+  { key: "sangria",    label: "Sangria",    hint: "Retirar dinheiro da gaveta", icon: ArrowLineUp },
   { key: "income",     label: "Entrada",    hint: "Outra entrada avulsa", icon: Plus },
   { key: "expense",    label: "Saída",      hint: "Despesa / pagamento", icon: Minus },
 ];
@@ -767,7 +791,7 @@ function ManualModal({
           )}
           {err && <p className="text-sm text-red-600">{err}</p>}
           <Button onClick={submit} disabled={busy || !amount} className="w-full">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} <current.icon className="h-4 w-4" /> Confirmar {current.label.toLowerCase()}
+            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} <current.icon className="h-4 w-4" /> Confirmar {current.label.toLowerCase()}
           </Button>
         </div>
       </Card>
@@ -820,7 +844,7 @@ function ReverseModal({
       <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <RotateCcw className="h-5 w-5 text-red-600" /> Estornar movimentação
+            <ArrowCounterClockwise className="h-5 w-5 text-red-600" /> Estornar movimentação
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
@@ -836,7 +860,7 @@ function ReverseModal({
         </div>
 
         <div className="flex items-start gap-2 rounded-[var(--radius)] bg-amber-500/10 text-amber-800 p-3 mt-3 text-xs">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <Warning className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
             {isCharge
               ? "A cobrança será desfeita e o atendimento voltará para a lista de “Receber”, pronto para ser cobrado novamente com a forma correta."
@@ -849,7 +873,7 @@ function ReverseModal({
         <div className="flex gap-2 mt-4">
           <Button variant="ghost" onClick={onClose} className="flex-1">Cancelar</Button>
           <Button onClick={confirm} disabled={busy} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Estornar
+            {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <ArrowCounterClockwise className="h-4 w-4" />} Estornar
           </Button>
         </div>
       </Card>
@@ -998,7 +1022,7 @@ function PaymentPickerModal({
               onClick={() => { setSplitMode(false); setSplits([]); }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              <ChevronLeft className="h-3.5 w-3.5" /> voltar
+              <CaretLeft className="h-3.5 w-3.5" /> voltar
             </button>
 
             {availableSplitMethods.length > 0 && (
@@ -1068,7 +1092,7 @@ function PaymentPickerModal({
             )}
 
             <Button onClick={confirmSplits} disabled={busy !== null || !splitReady} className="w-full">
-              {busy === "split" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {busy === "split" ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               Confirmar divisão
             </Button>
           </div>
@@ -1078,7 +1102,7 @@ function PaymentPickerModal({
           <div className="mt-4 space-y-3">
             <button onClick={() => { setCashMode(false); setReceived(""); }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              <ChevronLeft className="h-3.5 w-3.5" /> outras formas
+              <CaretLeft className="h-3.5 w-3.5" /> outras formas
             </button>
             <div className="space-y-1.5">
               <Label htmlFor="received">Valor recebido (R$)</Label>
@@ -1105,7 +1129,7 @@ function PaymentPickerModal({
               </div>
             )}
             <Button onClick={() => confirm("dinheiro")} disabled={busy !== null} className="w-full">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />} Confirmar em dinheiro
+              {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Money className="h-4 w-4" />} Confirmar em dinheiro
             </Button>
           </div>
 
@@ -1123,7 +1147,7 @@ function PaymentPickerModal({
                     disabled={busy !== null}
                     className="flex items-center gap-2.5 rounded-[var(--radius)] border border-border p-3.5 hover:border-primary hover:bg-primary/5 transition disabled:opacity-60"
                   >
-                    {busy === m ? <Loader2 className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary shrink-0" />}
+                    {busy === m ? <CircleNotch className="h-5 w-5 animate-spin" /> : <Meta.icon className="h-5 w-5 text-primary shrink-0" />}
                     <span className="text-sm font-medium">{Meta.label}</span>
                   </button>
                 );
@@ -1239,7 +1263,7 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
         {loading || !data ? (
-          <div className="grid place-items-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <div className="grid place-items-center py-10"><CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <>
             <div className="mx-auto max-w-xs rounded-[var(--radius)] border border-dashed border-border bg-card p-4 text-sm">
@@ -1278,7 +1302,7 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
             </div>
             <div className="flex gap-2 mt-4">
               <Button onClick={downloadPdf} disabled={busyPdf} className="flex-1">
-                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+                {busyPdf ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />} Baixar PDF
               </Button>
               {waHref && (
                 <a
@@ -1287,7 +1311,7 @@ function ReceiptModal({ tx, salon, onClose }: { tx: Tx; salon: SalonInfo; onClos
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-1.5 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
                 >
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                  <ChatCircle className="h-4 w-4" /> WhatsApp
                 </a>
               )}
             </div>
@@ -1448,7 +1472,7 @@ function CommissionModal({
           )}
 
           {loading ? (
-            <div className="grid place-items-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="grid place-items-center py-10"><CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : lines.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">Nenhum serviço apurado no período.</p>
           ) : (
@@ -1492,7 +1516,7 @@ function CommissionModal({
         <div className="p-5 pt-3 border-t border-border space-y-2">
           {canManage && !settled && (
             <Button onClick={confirmPay} disabled={paying} className="w-full">
-              {paying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar pagamento de {formatBRL(outstanding)}
+              {paying ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar pagamento de {formatBRL(outstanding)}
             </Button>
           )}
           {settled && (
@@ -1502,7 +1526,7 @@ function CommissionModal({
           )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={downloadPdf} disabled={busyPdf || loading} className="flex-1">
-              {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Comprovante
+              {busyPdf ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />} Comprovante
             </Button>
             {waHref ? (
               <a
@@ -1511,7 +1535,7 @@ function CommissionModal({
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-1.5 h-10 flex-1 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                <MessageCircle className="h-4 w-4" /> WhatsApp
+                <ChatCircle className="h-4 w-4" /> WhatsApp
               </a>
             ) : (
               <Button variant="ghost" disabled className="flex-1">Sem telefone</Button>
@@ -1682,7 +1706,7 @@ function CloseModal({
 
             <div className="flex gap-2">
               <Button onClick={downloadPdf} disabled={busyPdf} variant="outline" className="flex-1">
-                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+                {busyPdf ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />} Baixar PDF
               </Button>
               {waHref && (
                 <a
@@ -1691,7 +1715,7 @@ function CloseModal({
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-1.5 flex-1 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
                 >
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                  <ChatCircle className="h-4 w-4" /> WhatsApp
                 </a>
               )}
             </div>
@@ -1755,7 +1779,7 @@ function CloseModal({
 
             <div className="flex gap-2 mt-5">
               <Button onClick={confirm} disabled={busy || counted === ""} className="flex-1">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar fechamento
+                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar fechamento
               </Button>
               <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             </div>
@@ -1860,7 +1884,7 @@ function SessionDetailModal({
         <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
           <div className="min-w-0">
             <h3 className="font-display text-lg font-bold flex items-center gap-2">
-              <BarChart2 className="h-5 w-5 text-primary" /> Relatório do Caixa
+              <ChartBar className="h-5 w-5 text-primary" /> Relatório do Caixa
             </h3>
             <p className="text-sm text-muted-foreground truncate">{sessionDate}</p>
           </div>
@@ -1868,18 +1892,18 @@ function SessionDetailModal({
         </div>
 
         {loading ? (
-          <div className="grid place-items-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <div className="grid place-items-center py-16"><CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="flex-1 overflow-auto p-5 space-y-4">
             {/* Resumo financeiro */}
             <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Total entradas</span>
+                <span className="text-muted-foreground flex items-center gap-1.5"><TrendUp className="h-3.5 w-3.5 text-emerald-500" /> Total entradas</span>
                 <span className="font-semibold text-emerald-600 tabular-nums">{formatBRL(totalInc)}</span>
               </div>
               {totalExp > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Total saídas</span>
+                  <span className="text-muted-foreground flex items-center gap-1.5"><TrendDown className="h-3.5 w-3.5 text-red-500" /> Total saídas</span>
                   <span className="font-semibold text-red-600 tabular-nums">−{formatBRL(totalExp)}</span>
                 </div>
               )}
@@ -1955,7 +1979,7 @@ function SessionDetailModal({
             {/* Baixar / compartilhar */}
             <div className="flex gap-2">
               <Button onClick={downloadPdf} disabled={busyPdf || loading} variant="outline" className="flex-1">
-                {busyPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar PDF
+                {busyPdf ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />} Baixar PDF
               </Button>
               <a
                 href={waHref}
@@ -1963,7 +1987,7 @@ function SessionDetailModal({
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-1.5 flex-1 h-10 rounded-[var(--radius)] bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                <MessageCircle className="h-4 w-4" /> WhatsApp
+                <ChatCircle className="h-4 w-4" /> WhatsApp
               </a>
             </div>
 
@@ -1982,7 +2006,7 @@ function SessionDetailModal({
               <div className="pt-2 border-t border-border">
                 {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
                 <Button onClick={reopen} disabled={reopening} variant="outline" className="w-full">
-                  {reopening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />} Reabrir este caixa
+                  {reopening ? <CircleNotch className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />} Reabrir este caixa
                 </Button>
                 <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
                   Reabre o caixa para corrigir lançamentos. Só disponível para o último caixa fechado.

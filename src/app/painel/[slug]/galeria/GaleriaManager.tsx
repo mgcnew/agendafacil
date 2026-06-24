@@ -4,8 +4,16 @@ import { useRef, useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
-  Plus, Loader2, Trash2, AlertTriangle, Images, X, ChevronLeft, ChevronRight, ZoomIn,
-} from "lucide-react";
+  CaretLeft,
+  CaretRight,
+  CircleNotch,
+  Images,
+  MagnifyingGlassPlus,
+  Plus,
+  Trash,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import { uploadGalleryPhoto, deleteGalleryPhoto } from "./actions";
 
 type Photo = { id: string; url: string; caption: string | null };
@@ -104,7 +112,7 @@ function LightboxModal({
             onClick={prev}
             className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <CaretLeft className="h-6 w-6" />
           </button>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -119,7 +127,7 @@ function LightboxModal({
             onClick={next}
             className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
           >
-            <ChevronRight className="h-6 w-6" />
+            <CaretRight className="h-6 w-6" />
           </button>
         )}
       </div>
@@ -213,7 +221,7 @@ export function GaleriaManager({
         </div>
         {canManage && (
           <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {uploading ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Adicionar fotos
           </Button>
         )}
@@ -229,7 +237,7 @@ export function GaleriaManager({
 
       {err && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -280,7 +288,7 @@ export function GaleriaManager({
                   className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
                   title="Ampliar"
                 >
-                  <ZoomIn className="h-4 w-4" />
+                  <MagnifyingGlassPlus className="h-4 w-4" />
                 </button>
                 {canManage && (
                   <button
@@ -288,7 +296,7 @@ export function GaleriaManager({
                     className="p-2 rounded-full bg-white/20 hover:bg-red-500/80 text-white transition"
                     title="Remover"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash className="h-4 w-4" />
                   </button>
                 )}
               </div>
@@ -303,7 +311,7 @@ export function GaleriaManager({
               className="aspect-square rounded-[var(--radius)] border-2 border-dashed border-border hover:border-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition"
             >
               {uploading
-                ? <Loader2 className="h-6 w-6 animate-spin" />
+                ? <CircleNotch className="h-6 w-6 animate-spin" />
                 : <><Plus className="h-6 w-6" /><span className="text-xs font-medium">Adicionar</span></>
               }
             </button>

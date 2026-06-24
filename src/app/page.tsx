@@ -9,20 +9,20 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { BenefitsQA } from "@/components/landing/BenefitsQA";
 import {
-  Smartphone,
-  Zap,
-  Check,
-  Lock,
-  HeartHandshake,
-  BadgeCheck,
-  Wallet,
   ArrowRight,
-  Star,
   CalendarCheck,
-  Clock3,
+  Check,
+  Clock,
+  DeviceMobile,
+  Handshake,
+  Lightning,
+  Lock,
+  Prohibit,
+  SealCheck,
   ShieldCheck,
-  Ban,
-} from "lucide-react";
+  Star,
+  Wallet,
+} from "@phosphor-icons/react/dist/ssr";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
@@ -82,13 +82,13 @@ const PLAN_CARDS: {
 
 const OBJECTIONS = [
   {
-    icon: Smartphone,
+    icon: DeviceMobile,
     title: "Minha cliente vai conseguir usar?",
     answer:
       "Funciona no navegador do celular, sem instalar nada. A cliente clica no link e agenda em menos de 1 minuto — sem cadastro complicado.",
   },
   {
-    icon: Zap,
+    icon: Lightning,
     title: "É complicado de configurar?",
     answer:
       "Em 2 minutos você cadastra o salão, adiciona serviços e já tem seu link compartilhável. Nenhuma integração técnica, nenhum arquivo para instalar.",
@@ -100,7 +100,7 @@ const OBJECTIONS = [
       "Servidor com criptografia SSL, backups automáticos diários e conformidade com a LGPD. Seus dados e os das clientes protegidos por padrão.",
   },
   {
-    icon: HeartHandshake,
+    icon: Handshake,
     title: "E se eu precisar de ajuda?",
     answer:
       "Suporte por WhatsApp e central de ajuda com tutoriais em vídeo. Você não fica sozinha em nenhum momento do processo.",
@@ -112,7 +112,7 @@ const OBJECTIONS = [
       "Não. Plano mensal, cancele quando quiser sem multa. Você continua porque quer — não porque é obrigada.",
   },
   {
-    icon: BadgeCheck,
+    icon: SealCheck,
     title: "Funciona para barbearia também?",
     answer:
       "Sim. O sistema tem temas e lógica específica para salão feminino, barbearia, estética e negócios mistos.",
@@ -355,10 +355,10 @@ function StructuredData() {
 // ── Barra de confiança (stats acima da dobra) ──────────────────────────────
 
 const TRUST_STATS = [
-  { icon: Clock3, value: "2 min", label: "para configurar o salão" },
+  { icon: Clock, value: "2 min", label: "para configurar o salão" },
   { icon: CalendarCheck, value: "24/7", label: "clientes agendam sozinhas" },
   { icon: ShieldCheck, value: "LGPD", label: "dados protegidos" },
-  { icon: Ban, value: "0%", label: "fidelidade ou multa" },
+  { icon: Prohibit, value: "0%", label: "fidelidade ou multa" },
 ];
 
 function TrustBar() {
@@ -912,7 +912,6 @@ export default function Home() {
                   alt="Zulan"
                   width={1396}
                   height={373}
-                  unoptimized
                   className="h-8 w-auto"
                 />
               </Link>

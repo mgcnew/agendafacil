@@ -4,7 +4,13 @@ import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Label, Select } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
-import { Clock, Loader2, Check, Copy, AlertTriangle } from "lucide-react";
+import {
+  Check,
+  CircleNotch,
+  Clock,
+  Copy,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
 
 type WH = Tables<"working_hours">;
 type Pro = { id: string; name: string };
@@ -190,13 +196,13 @@ export function HoursManager({
 
       {err && (
         <p className="text-sm text-red-600 flex items-center gap-1.5">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </p>
       )}
 
       <div className="flex items-center gap-3">
         <Button onClick={save} disabled={saving}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
+          {saving ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
           Salvar horários
         </Button>
         {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}

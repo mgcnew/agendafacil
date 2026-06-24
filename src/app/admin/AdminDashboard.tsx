@@ -10,10 +10,30 @@ import { AnimatePresence } from "framer-motion";
 import { formatBRL, formatDate, formatTime } from "@/lib/utils";
 import { PLANS, type PlanId } from "@/lib/plans";
 import {
-  Building2, Users, TrendingUp, TrendingDown, Clock, AlertTriangle, XCircle,
-  Loader2, X, ExternalLink, Sparkles, ShieldCheck, Repeat, Percent, BarChart3,
-  UserPlus, Trash2, History, Receipt, Download, Megaphone, MessageCircle, Mail,
-} from "lucide-react";
+  ArrowSquareOut,
+  Buildings,
+  ChartBar,
+  ChatCircle,
+  CircleNotch,
+  Clock,
+  ClockCounterClockwise,
+  DownloadSimple,
+  Envelope,
+  Megaphone,
+  Percent,
+  Receipt,
+  Repeat,
+  ShieldCheck,
+  Sparkle,
+  Trash,
+  TrendDown,
+  TrendUp,
+  UserPlus,
+  Users,
+  Warning,
+  X,
+  XCircle,
+} from "@phosphor-icons/react/dist/ssr";
 import { getSalonBilling } from "./actions";
 
 type BillingPayment = {
@@ -244,20 +264,20 @@ export function AdminDashboard({
         <div className="space-y-7">
         {/* Receita */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Kpi icon={TrendingUp} label="MRR (ativos)" value={formatBRL(metrics?.mrr ?? 0)} highlight />
+          <Kpi icon={TrendUp} label="MRR (ativos)" value={formatBRL(metrics?.mrr ?? 0)} highlight />
           <Kpi icon={Repeat} label="ARR (anual)" value={formatBRL(metrics?.arr ?? 0)} />
           <Kpi icon={Users} label="ARPU" value={formatBRL(metrics?.arpu ?? 0)} />
           <Kpi icon={Percent} label="Conversão trial" value={`${metrics?.conversion ?? 0}%`} hint="estimativa" />
-          <Kpi icon={TrendingDown} label="Churn (30d)" value={`${metrics?.churn_30d ?? 0}%`} hint="estimativa" />
-          <Kpi icon={Sparkles} label="Novos no mês" value={String(metrics?.new_this_month ?? 0)} />
+          <Kpi icon={TrendDown} label="Churn (30d)" value={`${metrics?.churn_30d ?? 0}%`} hint="estimativa" />
+          <Kpi icon={Sparkle} label="Novos no mês" value={String(metrics?.new_this_month ?? 0)} />
         </div>
 
         {/* Contagens por status */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <Kpi icon={Building2} label="Total de salões" value={String(metrics?.total ?? 0)} />
+          <Kpi icon={Buildings} label="Total de salões" value={String(metrics?.total ?? 0)} />
           <Kpi icon={Users} label="Ativos" value={String(metrics?.active ?? 0)} />
           <Kpi icon={Clock} label="Em trial" value={String(metrics?.trialing ?? 0)} />
-          <Kpi icon={AlertTriangle} label="Inadimplentes" value={String(metrics?.past_due ?? 0)} />
+          <Kpi icon={Warning} label="Inadimplentes" value={String(metrics?.past_due ?? 0)} />
           <Kpi icon={XCircle} label="Cancelados" value={String(metrics?.canceled ?? 0)} />
         </div>
 
@@ -293,7 +313,7 @@ export function AdminDashboard({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">{filtered.length} salão(ões)</p>
             <Button variant="outline" size="sm" onClick={() => exportSalonsCsv(filtered)} disabled={filtered.length === 0}>
-              <Download className="h-4 w-4" /> Exportar CSV
+              <DownloadSimple className="h-4 w-4" /> Exportar CSV
             </Button>
           </div>
           {filtered.length === 0 ? (
@@ -424,7 +444,7 @@ function AdminsPanel({ admins }: { admins: AdminUser[] }) {
           className="flex-1"
         />
         <Button onClick={add} disabled={busy || !email.trim()}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Adicionar
+          {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Adicionar
         </Button>
       </div>
       <div className="space-y-1.5">
@@ -440,7 +460,7 @@ function AdminsPanel({ admins }: { admins: AdminUser[] }) {
               title="Remover admin"
               className="grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-50 hover:text-red-600"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash className="h-4 w-4" />
             </button>
           </div>
         ))}
@@ -456,7 +476,7 @@ function AuditPanel({ audit }: { audit: AuditEntry[] }) {
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card p-5">
       <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-        <History className="h-4 w-4 text-primary" /> Atividade recente
+        <ClockCounterClockwise className="h-4 w-4 text-primary" /> Atividade recente
       </h2>
       {audit.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma ação registrada ainda.</p>
@@ -549,12 +569,12 @@ function AttentionPanel({
             }}
           />
           <AttentionGroup
-            icon={AlertTriangle} title="Inadimplentes" tone="text-red-600"
+            icon={Warning} title="Inadimplentes" tone="text-red-600"
             salons={overdue} onManage={onManage}
             reason={(s) => `${planName(s.plan)} · ${formatBRL(s.value ?? 0)}/mês`}
           />
           <AttentionGroup
-            icon={TrendingDown} title="Parados (risco de churn)" tone="text-red-600"
+            icon={TrendDown} title="Parados (risco de churn)" tone="text-red-600"
             salons={inactive} onManage={onManage}
             reason={(s) => {
               const d = daysSince(s.last_activity);
@@ -637,7 +657,7 @@ function AnnouncementsPanel({ announcements }: { announcements: Announcement[] }
             </div>
           </div>
           <Button onClick={create} disabled={busy || !message.trim()}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />} Publicar
+            {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />} Publicar
           </Button>
           <p className="text-[11px] text-muted-foreground">
             Avisos ativos aparecem como banner no painel de todos os salões.
@@ -667,7 +687,7 @@ function AnnouncementsPanel({ announcements }: { announcements: Announcement[] }
                       {a.is_active ? "Desativar" : "Ativar"}
                     </button>
                     <button onClick={() => remove(a.id)} className="text-xs font-medium text-red-600 hover:underline inline-flex items-center gap-1">
-                      <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      <Trash className="h-3.5 w-3.5" /> Excluir
                     </button>
                   </div>
                 </div>
@@ -710,7 +730,7 @@ function MrrChart({ series, estimated = true }: { series: { month: string; mrr: 
     <div className="rounded-[var(--radius)] border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-primary" /> MRR no tempo
+          <TrendUp className="h-4 w-4 text-primary" /> MRR no tempo
           {estimated && <span className="text-[10px] font-normal text-muted-foreground">(estimativa)</span>}
         </h2>
         <span className="text-sm font-bold tabular-nums">{formatBRL(current)}</span>
@@ -743,7 +763,7 @@ function GrowthChart({ series }: { series: { month: string; count: number }[] })
     <div className="rounded-[var(--radius)] border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary" /> Novos salões — últimos 12 meses
+          <ChartBar className="h-4 w-4 text-primary" /> Novos salões — últimos 12 meses
         </h2>
         <span className="text-xs text-muted-foreground">{total} no período</span>
       </div>
@@ -889,7 +909,7 @@ function ManageModal({
                 disabled={busy !== null}
                 className="flex-1"
               >
-                {busy === "trial" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />} Estender {parseInt(days) || 0} dia(s)
+                {busy === "trial" ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />} Estender {parseInt(days) || 0} dia(s)
               </Button>
             </div>
           </div>
@@ -908,7 +928,7 @@ function ManageModal({
                 onClick={() => run("plan", () => supabase.rpc("admin_set_plan" as never, { p_salon: salon.salon_id, p_plan: plan } as never))}
                 disabled={busy !== null || plan === salon.plan}
               >
-                {busy === "plan" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                {busy === "plan" ? <CircleNotch className="h-4 w-4 animate-spin" /> : "Aplicar"}
               </Button>
             </div>
           </div>
@@ -922,7 +942,7 @@ function ManageModal({
                 onClick={() => run("active", () => supabase.rpc("admin_set_status" as never, { p_salon: salon.salon_id, p_status: "active" } as never))}
                 disabled={busy !== null || salon.status === "active"}
               >
-                {busy === "active" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />} Ativar (cortesia)
+                {busy === "active" ? <CircleNotch className="h-4 w-4 animate-spin" /> : <TrendUp className="h-4 w-4" />} Ativar (cortesia)
               </Button>
               <Button
                 variant="outline"
@@ -930,7 +950,7 @@ function ManageModal({
                 disabled={busy !== null || salon.status === "canceled"}
                 className="text-red-600 hover:bg-red-50"
               >
-                {busy === "block" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Bloquear
+                {busy === "block" ? <CircleNotch className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Bloquear
               </Button>
             </div>
           </div>
@@ -960,7 +980,7 @@ function ManageModal({
                       <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${pm.cls}`}>{pm.label}</span>
                       {p.invoiceUrl && (
                         <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer" title="2ª via" className="text-primary hover:underline shrink-0">
-                          <ExternalLink className="h-4 w-4" />
+                          <ArrowSquareOut className="h-4 w-4" />
                         </a>
                       )}
                     </div>
@@ -979,7 +999,7 @@ function ManageModal({
                   {waHref ? (
                     <a href={waHref} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700">
-                      <MessageCircle className="h-4 w-4" /> Cobrar no WhatsApp
+                      <ChatCircle className="h-4 w-4" /> Cobrar no WhatsApp
                     </a>
                   ) : (
                     <span className="text-xs text-muted-foreground">sem telefone do dono</span>
@@ -987,13 +1007,13 @@ function ManageModal({
                   {mailHref && (
                     <a href={mailHref}
                       className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border px-3 text-xs font-medium hover:bg-muted">
-                      <Mail className="h-4 w-4" /> E-mail
+                      <Envelope className="h-4 w-4" /> E-mail
                     </a>
                   )}
                   {duePayment.invoiceUrl && (
                     <a href={duePayment.invoiceUrl} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border px-3 text-xs font-medium hover:bg-muted">
-                      <ExternalLink className="h-4 w-4" /> 2ª via
+                      <ArrowSquareOut className="h-4 w-4" /> 2ª via
                     </a>
                   )}
                 </div>
@@ -1006,7 +1026,7 @@ function ManageModal({
             target="_blank"
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
           >
-            <ExternalLink className="h-4 w-4" /> Abrir painel do salão
+            <ArrowSquareOut className="h-4 w-4" /> Abrir painel do salão
           </Link>
         </div>
       </Card>

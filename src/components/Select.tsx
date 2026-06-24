@@ -3,7 +3,10 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Check } from "lucide-react";
+import {
+  CaretDown,
+  Check,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Opt = { value: string; label: React.ReactNode; disabled?: boolean };
 
@@ -121,7 +124,7 @@ export function Select({
         <span className={cn("truncate", !selected && "text-muted-foreground")}>
           {selected ? selected.label : placeholder ?? "Selecione"}
         </span>
-        <ChevronDown
+        <CaretDown
           className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", open && "rotate-180")}
         />
       </button>

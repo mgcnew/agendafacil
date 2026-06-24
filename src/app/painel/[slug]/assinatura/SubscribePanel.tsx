@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, AlertCircle, Check, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import {
+  ArrowCircleDown,
+  ArrowCircleUp,
+  Check,
+  CircleNotch,
+  CreditCard,
+  WarningCircle,
+} from "@phosphor-icons/react/dist/ssr";
 import { Button, Card, Input } from "@/components/ui";
 import { createCheckout, changePlan } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
@@ -148,7 +155,7 @@ export function SubscribePanel({
                         disabled={pending}
                         className="shrink-0"
                       >
-                        {isUpgrade ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                        {isUpgrade ? <ArrowCircleUp className="h-4 w-4" /> : <ArrowCircleDown className="h-4 w-4" />}
                         {isUpgrade ? "Subir" : "Descer"}
                       </Button>
                     )}
@@ -173,7 +180,7 @@ export function SubscribePanel({
         )}
         {error && (
           <div className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -261,14 +268,14 @@ export function SubscribePanel({
 
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <Button onClick={subscribe} disabled={pending} className="mt-5 w-full" size="lg">
         {pending ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <CircleNotch className="h-5 w-5 animate-spin" />
         ) : (
           <>
             <CreditCard className="h-5 w-5" />

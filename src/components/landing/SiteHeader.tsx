@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import {
+  List,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import { LoginButton } from "@/components/auth/LoginButton";
 
 const NAV_LINKS = [
@@ -68,7 +71,7 @@ export function SiteHeader() {
             aria-expanded={open}
             className="md:hidden grid place-items-center h-10 w-10 -ml-2 rounded-lg text-foreground hover:bg-muted transition-colors"
           >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {open ? <X className="h-5 w-5" /> : <List className="h-5 w-5" />}
           </button>
         </div>
 
@@ -85,7 +88,6 @@ export function SiteHeader() {
             width={1396}
             height={373}
             priority
-            unoptimized
             className="h-7 w-auto"
           />
         </Link>

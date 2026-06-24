@@ -5,27 +5,27 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui";
 import { cn, formatBRL, monthRangeBR } from "@/lib/utils";
 import {
-  BarChart3,
-  Wallet,
-  TrendingDown,
+  CaretDown,
+  CaretLeft,
+  CaretRight,
+  ChartBar,
+  ChatCircle,
+  CircleNotch,
   Coins,
-  Receipt,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Sparkles,
-  UsersRound,
-  Download,
-  ChevronDown,
+  DownloadSimple,
   FileText,
-  FileSpreadsheet,
-  UserRoundCheck,
-  MessageCircle,
-  Thermometer,
+  FileXls,
   Flame,
+  Receipt,
+  SealPercent,
   Snowflake,
-  BadgePercent,
-} from "lucide-react";
+  Sparkle,
+  Thermometer,
+  TrendDown,
+  UserCheck,
+  Users,
+  Wallet,
+} from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
 
@@ -209,7 +209,7 @@ export function ReportsView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" /> Relatórios
+            <ChartBar className="h-6 w-6 text-primary" /> Relatórios
           </h1>
           <p className="text-muted-foreground text-sm">Desempenho do seu salão no período.</p>
         </div>
@@ -223,9 +223,9 @@ export function ReportsView({
             onClick={() => setMenuOpen((v) => !v)}
             className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-40"
           >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar</span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
           {menuOpen && (
             <>
@@ -235,7 +235,7 @@ export function ReportsView({
                   <FileText className="h-4 w-4 text-red-600" /> PDF
                 </button>
                 <button onClick={handleCsv} className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted">
-                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel (CSV)
+                  <FileXls className="h-4 w-4 text-emerald-600" /> Excel (CSV)
                 </button>
               </div>
             </>
@@ -249,7 +249,7 @@ export function ReportsView({
             className="grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground hover:bg-muted"
             aria-label="Mês anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <CaretLeft className="h-4 w-4" />
           </button>
           <span className="min-w-[7.5rem] text-center text-sm font-medium capitalize">
             {monthLabel(cmes)}
@@ -260,7 +260,7 @@ export function ReportsView({
             className="grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground hover:bg-muted disabled:opacity-40"
             aria-label="Próximo mês"
           >
-            <ChevronRight className="h-4 w-4" />
+            <CaretRight className="h-4 w-4" />
           </button>
         </div>
         </div>
@@ -270,9 +270,9 @@ export function ReportsView({
       <div className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
         {([
           { id: "financeiro", label: "Financeiro", icon: Wallet },
-          { id: "operacional", label: "Serviços & Profissionais", icon: Sparkles },
+          { id: "operacional", label: "Serviços & Profissionais", icon: Sparkle },
           { id: "temperatura", label: "Temperatura", icon: Thermometer },
-          { id: "reativacao", label: "Reativação", icon: UserRoundCheck },
+          { id: "reativacao", label: "Reativação", icon: UserCheck },
         ] as const).map((t) => {
           const on = tab === t.id;
           return (
@@ -303,11 +303,11 @@ export function ReportsView({
         <ReativacaoTab clients={react} loading={reactLoading} salonName={salonName} slug={slug} />
       ) : loading ? (
         <div className="grid place-items-center py-20 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin" />
+          <CircleNotch className="h-6 w-6 animate-spin" />
         </div>
       ) : isEmpty ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-          <BarChart3 className="mx-auto h-8 w-8 text-muted-foreground/50" />
+          <ChartBar className="mx-auto h-8 w-8 text-muted-foreground/50" />
           <p className="mt-3 font-medium">Sem dados neste período</p>
           <p className="text-sm text-muted-foreground mt-1">
             Os relatórios aparecem conforme os atendimentos são concluídos.
@@ -327,7 +327,7 @@ export function ReportsView({
 function FinanceiroTab({ d }: { d: ReportData }) {
   const kpis = [
     { icon: Wallet, label: "Faturamento", value: formatBRL(d.faturamento), tone: "text-primary" },
-    { icon: TrendingDown, label: "Despesas", value: formatBRL(d.despesas), tone: "text-red-600" },
+    { icon: TrendDown, label: "Despesas", value: formatBRL(d.despesas), tone: "text-red-600" },
     { icon: Coins, label: "Líquido", value: formatBRL(d.liquido), tone: d.liquido >= 0 ? "text-emerald-600" : "text-red-600" },
     { icon: Receipt, label: "Ticket médio", value: formatBRL(d.ticket_medio), sub: `${d.atendimentos} atendimento${d.atendimentos === 1 ? "" : "s"}` },
   ];
@@ -427,14 +427,14 @@ function ReativacaoTab({
   if (loading || clients === null) {
     return (
       <div className="grid place-items-center py-20 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <CircleNotch className="h-6 w-6 animate-spin" />
       </div>
     );
   }
   if (clients.length === 0) {
     return (
       <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-        <UserRoundCheck className="mx-auto h-8 w-8 text-muted-foreground/50" />
+        <UserCheck className="mx-auto h-8 w-8 text-muted-foreground/50" />
         <p className="mt-3 font-medium">Ninguém para reativar 🎉</p>
         <p className="text-sm text-muted-foreground mt-1">
           Suas clientes estão em dia com o ritmo habitual de retorno.
@@ -479,7 +479,7 @@ function ReativacaoTab({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
                   >
-                    <MessageCircle className="h-4 w-4" /> WhatsApp
+                    <ChatCircle className="h-4 w-4" /> WhatsApp
                   </a>
                 ) : (
                   <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>
@@ -528,7 +528,7 @@ function TemperaturaTab({
   if (loading || data === null) {
     return (
       <div className="grid place-items-center py-20 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <CircleNotch className="h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -593,7 +593,7 @@ function TemperaturaTab({
                     href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent(`Esquenta ${WEEKDAYS[w.weekday]}`)}&desconto=15`}
                     className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                   >
-                    <BadgePercent className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia
+                    <SealPercent className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia
                   </Link>
                 )}
               </div>
@@ -655,7 +655,7 @@ function OperacionalTab({ d }: { d: ReportData }) {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card className="p-5 min-w-0">
         <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
-          <Sparkles className="h-4.5 w-4.5 text-primary" /> Serviços mais vendidos
+          <Sparkle className="h-4.5 w-4.5 text-primary" /> Serviços mais vendidos
         </h2>
         {d.services.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sem dados.</p>
@@ -678,7 +678,7 @@ function OperacionalTab({ d }: { d: ReportData }) {
 
       <Card className="p-5 min-w-0">
         <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
-          <UsersRound className="h-4.5 w-4.5 text-primary" /> Desempenho por profissional
+          <Users className="h-4.5 w-4.5 text-primary" /> Desempenho por profissional
         </h2>
         {d.professionals.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sem dados.</p>

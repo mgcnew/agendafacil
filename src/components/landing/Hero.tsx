@@ -1,7 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui";
-import { ArrowRight, Check, Star, CalendarCheck } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarCheck,
+  Check,
+  Star,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * Hero da landing — layout dividido: texto/CTA à esquerda, foto do produto

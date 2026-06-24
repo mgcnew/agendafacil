@@ -9,8 +9,15 @@ import { MotionModal } from "@/components/MotionModal";
 import { formatBRL } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  Package, Plus, Trash2, X, Loader2, Pencil, ShoppingCart, CalendarClock,
-} from "lucide-react";
+  CalendarDots,
+  CircleNotch,
+  Package,
+  PencilSimple,
+  Plus,
+  ShoppingCart,
+  Trash,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 export type Svc = { id: string; name: string; price: number; commission_percent: number | null };
 type TemplateItem = { id: string; service_id: string; quantity: number; services: { name: string } | null };
@@ -198,7 +205,7 @@ function SoldList({
 
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <CalendarClock className="h-3.5 w-3.5" />
+                <CalendarDots className="h-3.5 w-3.5" />
                 {active
                   ? dleft >= 0 ? `Vence em ${dleft} dia${dleft === 1 ? "" : "s"}` : "Vencido"
                   : `Validade: ${new Date(p.expires_at).toLocaleDateString("pt-BR")}`}
@@ -257,10 +264,10 @@ function TemplatesList({
           {canManage && (
             <>
               <button onClick={() => onEdit(t)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-                <Pencil className="h-4 w-4" />
+                <PencilSimple className="h-4 w-4" />
               </button>
               <button onClick={() => remove(t)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
-                <Trash2 className="h-4 w-4" />
+                <Trash className="h-4 w-4" />
               </button>
             </>
           )}
@@ -417,7 +424,7 @@ function TemplateEditor({
 
         <div className="flex gap-2 pt-1">
           <Button onClick={save} disabled={busy || !name.trim()}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
+            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
@@ -506,7 +513,7 @@ function SellModal({
         {err && <p className="text-sm text-red-600">{err}</p>}
         <div className="flex gap-2">
           <Button onClick={sell} disabled={busy || !clientId || !templateId}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar venda
+            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar venda
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
@@ -561,7 +568,7 @@ function RedeemModal({
         {err && <p className="text-sm text-red-600">{err}</p>}
         <div className="flex gap-2">
           <Button onClick={use} disabled={busy}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Registrar uso
+            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Registrar uso
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>

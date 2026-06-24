@@ -2,23 +2,23 @@
 
 import { useState } from "react";
 import {
-  MessageSquareOff,
+  ArrowUpRight,
+  ChatCircleSlash,
   Clock,
   Percent,
-  Boxes,
-  Users,
-  ShieldCheck,
   Plus,
-  ArrowUpRight,
-  type LucideIcon,
-} from "lucide-react";
+  ShieldCheck,
+  Stack,
+  Users,
+} from "@phosphor-icons/react/dist/ssr";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 type Item = {
   q: string;
   a: string;
   /** O ganho concreto — frase curta de resultado */
   win: string;
-  icon: LucideIcon;
+  icon: PhosphorIcon;
 };
 
 const ITEMS: Item[] = [
@@ -26,7 +26,7 @@ const ITEMS: Item[] = [
     q: "Sua cliente ainda agenda pelo WhatsApp?",
     a: "Com o Zulan, cada salão tem um link único. A cliente abre, escolhe serviço, profissional e horário disponível — sem precisar te chamar no WhatsApp. Sua agenda fica sempre organizada, sem mensagem no meio da madrugada.",
     win: "Agenda cheia sem você tocar no celular.",
-    icon: MessageSquareOff,
+    icon: ChatCircleSlash,
   },
   {
     q: "Quanto tempo gasta confirmando agendamento?",
@@ -44,7 +44,7 @@ const ITEMS: Item[] = [
     q: "Controla o estoque sem anotar num caderno?",
     a: "O sistema baixa os produtos usados em cada serviço automaticamente. Emite alerta quando o estoque mínimo é atingido, antes de acabar na hora errada. Chega de ser pego de surpresa durante o atendimento.",
     win: "Alerta antes do produto faltar.",
-    icon: Boxes,
+    icon: Stack,
   },
   {
     q: "Sabe o histórico completo de cada cliente?",

@@ -8,9 +8,21 @@ import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorThe
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
-  Scissors, Loader2, Check, Clock, Upload, Phone, MapPin,
-  ArrowLeft, ArrowRight, Store, Star, X, Plus, Sparkles,
-} from "lucide-react";
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CircleNotch,
+  Clock,
+  MapPin,
+  Phone,
+  Plus,
+  Scissors,
+  Sparkle,
+  Star,
+  Storefront,
+  UploadSimple,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 async function compressImage(file: File, maxDim = 512, quality = 0.9): Promise<File> {
   try {
@@ -340,12 +352,12 @@ export default function NovoSalaoPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={logoPreview} alt="Prévia da logo" className="h-full w-full object-cover" />
                     ) : (
-                      <Store className="h-8 w-8 text-muted-foreground" />
+                      <Storefront className="h-8 w-8 text-muted-foreground" />
                     )}
                   </div>
                   <div className="space-y-2">
                     <label className="inline-flex items-center gap-2 h-11 px-5 rounded-[var(--radius)] border border-border bg-card hover:bg-muted cursor-pointer text-sm font-medium transition">
-                      <Upload className="h-4 w-4" /> Escolher imagem
+                      <UploadSimple className="h-4 w-4" /> Escolher imagem
                       <input
                         type="file"
                         accept="image/*"
@@ -369,7 +381,7 @@ export default function NovoSalaoPage() {
               <div className="space-y-5 af-rise">
                 <div>
                   <h1 className="font-display text-2xl flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" /> Serviços que você oferece
+                    <Sparkle className="h-5 w-5 text-primary" /> Serviços que você oferece
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
                     Marque os principais — já deixamos os mais comuns selecionados. Preço e novos serviços você ajusta depois.
@@ -457,7 +469,7 @@ export default function NovoSalaoPage() {
                 </Button>
               ) : (
                 <Button className="ml-auto" size="lg" onClick={finish} disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 animate-spin" />} Criar salão
+                  {loading && <CircleNotch className="h-4 w-4 animate-spin" />} Criar salão
                 </Button>
               )}
             </div>

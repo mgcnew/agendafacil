@@ -10,7 +10,22 @@ import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import { SERVICE_COLORS, defaultServiceColor } from "@/lib/serviceColors";
-import { Plus, Trash2, Clock, Percent, Loader2, Sparkles, Timer, Wand2, X, Check, Pencil, Boxes, Tag, ChevronDown } from "lucide-react";
+import {
+  CaretDown,
+  Check,
+  CircleNotch,
+  Clock,
+  MagicWand,
+  PencilSimple,
+  Percent,
+  Plus,
+  Sparkle,
+  Stack,
+  Tag,
+  Timer,
+  Trash,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Service = Tables<"services">;
 type PriceType = "fixed" | "from" | "on_request";
@@ -277,7 +292,7 @@ export function ServicesManager({
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setPresetOpen(true)}>
-            <Wand2 className="h-4 w-4" /> Serviços comuns
+            <MagicWand className="h-4 w-4" /> Serviços comuns
           </Button>
           <Button onClick={openNew}>
             <Plus className="h-4 w-4" /> Novo serviço
@@ -298,7 +313,7 @@ export function ServicesManager({
               <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">{categories.length}</span>
             )}
           </span>
-          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${catOpen ? "rotate-180" : ""}`} />
+          <CaretDown className={`h-4 w-4 text-muted-foreground transition-transform ${catOpen ? "rotate-180" : ""}`} />
         </button>
         {catOpen && (
           <div className="border-t border-border p-4 space-y-3">
@@ -331,7 +346,7 @@ export function ServicesManager({
                 className="flex-1"
               />
               <Button onClick={addCategory} disabled={catBusy || !newCatName.trim()} variant="outline">
-                {catBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {catBusy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 Adicionar
               </Button>
             </div>
@@ -473,7 +488,7 @@ export function ServicesManager({
           {/* Insumos consumidos por atendimento (estoque inteligente) */}
           <div className="rounded-[var(--radius)] border border-border p-4">
             <p className="text-sm font-medium flex items-center gap-1.5">
-              <Boxes className="h-4 w-4 text-primary" /> Insumos consumidos por atendimento
+              <Stack className="h-4 w-4 text-primary" /> Insumos consumidos por atendimento
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Ao finalizar o atendimento, estes produtos são descontados do estoque automaticamente.
@@ -541,7 +556,7 @@ export function ServicesManager({
 
           <div className="flex gap-2 mt-2">
             <Button onClick={save} disabled={busy || !name} className="flex-1">
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {busy && <CircleNotch className="h-4 w-4 animate-spin" />}
               {editingId ? "Salvar" : "Adicionar"}
             </Button>
             <Button variant="ghost" onClick={closeForm}>Cancelar</Button>
@@ -553,7 +568,7 @@ export function ServicesManager({
 
       {services.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
-          <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+          <Sparkle className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhum serviço cadastrado ainda.</p>
         </div>
       ) : categories.length === 0 ? (
@@ -633,10 +648,10 @@ function ServiceList({
             {s.is_active ? "Ativo" : "Inativo"}
           </button>
           <button onClick={() => onEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-            <Pencil className="h-4 w-4" />
+            <PencilSimple className="h-4 w-4" />
           </button>
           <button onClick={() => onRemove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
-            <Trash2 className="h-4 w-4" />
+            <Trash className="h-4 w-4" />
           </button>
         </div>
       ))}
@@ -688,7 +703,7 @@ function PresetPicker({
       <Card className="w-full sm:max-w-lg mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-primary" /> Serviços comuns
+            <MagicWand className="h-5 w-5 text-primary" /> Serviços comuns
           </h3>
           <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
         </div>
@@ -731,7 +746,7 @@ function PresetPicker({
 
         <div className="flex gap-2 mt-6 sticky bottom-0 bg-card pt-3">
           <Button onClick={confirm} disabled={busy || selected.size === 0}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {busy && <CircleNotch className="h-4 w-4 animate-spin" />}
             Adicionar {selected.size > 0 ? `(${selected.size})` : ""}
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>

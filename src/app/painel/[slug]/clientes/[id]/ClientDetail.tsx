@@ -17,9 +17,21 @@ import {
   type Niche,
 } from "@/lib/anamnesis";
 import {
-  ArrowLeft, AlertTriangle, User, HeartPulse, History, Loader2,
-  Check, ShieldCheck, Phone, Mail, Calendar, Cake, MessageCircle, CalendarPlus,
-} from "lucide-react";
+  ArrowLeft,
+  Cake,
+  Calendar,
+  CalendarPlus,
+  ChatCircle,
+  Check,
+  CircleNotch,
+  ClockCounterClockwise,
+  Envelope,
+  Heartbeat,
+  Phone,
+  ShieldCheck,
+  User,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Client = Tables<"clients">;
 type HistoryItem = {
@@ -80,7 +92,7 @@ export function ClientDetail({
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
               <Button variant="outline" className="w-full text-emerald-600 border-emerald-200 hover:bg-emerald-50">
-                <MessageCircle className="h-4 w-4" /> WhatsApp
+                <ChatCircle className="h-4 w-4" /> WhatsApp
               </Button>
             </a>
           )}
@@ -101,7 +113,7 @@ export function ClientDetail({
       {/* Alerta de segurança */}
       {alert && (
         <div className="flex items-start gap-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-800 p-4">
-          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+          <Warning className="h-5 w-5 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-sm">Atenção — anamnese</p>
             <p className="text-sm">{alert}</p>
@@ -113,8 +125,8 @@ export function ClientDetail({
       <div className="flex gap-1 border-b border-border">
         {([
           ["dados", "Dados", User],
-          ["anamnese", "Anamnese", HeartPulse],
-          ["historico", "Histórico", History],
+          ["anamnese", "Anamnese", Heartbeat],
+          ["historico", "Histórico", ClockCounterClockwise],
         ] as const).map(([key, label, Icon]) => (
           <button
             key={key}
@@ -195,7 +207,7 @@ function DadosTab({
           <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canManage} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="e"><Mail className="inline h-3.5 w-3.5 mr-1" />E-mail</Label>
+          <Label htmlFor="e"><Envelope className="inline h-3.5 w-3.5 mr-1" />E-mail</Label>
           <Input id="e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!canManage} />
         </div>
         <div className="space-y-1.5">
@@ -214,7 +226,7 @@ function DadosTab({
       {canManage && (
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
+            {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar
           </Button>
           {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
           {err && <span className="text-sm text-red-600">{err}</span>}
@@ -290,7 +302,7 @@ function AnamneseTab({
     <div className="space-y-5 max-w-2xl">
       {/* Condições de saúde */}
       <Card className="p-6">
-        <h3 className="font-display font-semibold flex items-center gap-2"><HeartPulse className="h-5 w-5 text-primary" /> Condições de saúde</h3>
+        <h3 className="font-display font-semibold flex items-center gap-2"><Heartbeat className="h-5 w-5 text-primary" /> Condições de saúde</h3>
         <p className="text-xs text-muted-foreground mt-1">Marque o que se aplica. Itens críticos geram alerta automático.</p>
         <div className="grid sm:grid-cols-2 gap-2 mt-4">
           {cfg.conditions.map((c) => {
@@ -364,7 +376,7 @@ function AnamneseTab({
       {canManage && (
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar anamnese
+            {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar anamnese
           </Button>
           {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
           {err && <span className="text-sm text-red-600">{err}</span>}

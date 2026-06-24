@@ -7,9 +7,18 @@ import { Button, Card, Input, Label } from "@/components/ui";
 import { waLink, formatDate, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
-  Plus, Loader2, Phone, Trash2, Contact, Search, AlertTriangle, ChevronRight, X, MessageCircle,
-  ChevronLeft,
-} from "lucide-react";
+  AddressBook,
+  CaretLeft,
+  CaretRight,
+  ChatCircle,
+  CircleNotch,
+  MagnifyingGlass,
+  Phone,
+  Plus,
+  Trash,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 
@@ -155,7 +164,7 @@ export function ClientsManager({
               </p>
               <div className="flex gap-2 mt-5">
                 <Button onClick={add} disabled={busy || !name} className="flex-1">
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
+                  {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Adicionar
                 </Button>
                 <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
               </div>
@@ -166,12 +175,12 @@ export function ClientsManager({
 
       {err && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} placeholder="Buscar por nome ou telefone" className="pl-9" />
       </div>
 
@@ -206,7 +215,7 @@ export function ClientsManager({
 
       {filtered.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
-          <Contact className="h-8 w-8 mx-auto text-muted-foreground" />
+          <AddressBook className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhuma cliente encontrada.</p>
         </div>
       ) : (
@@ -224,7 +233,7 @@ export function ClientsManager({
                     {c.full_name}
                     {c.alert_summary && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium">
-                        <AlertTriangle className="h-3 w-3" /> alerta
+                        <Warning className="h-3 w-3" /> alerta
                       </span>
                     )}
                   </p>
@@ -239,7 +248,7 @@ export function ClientsManager({
                     </span>
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                <CaretRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
               {c.phone && (
                 <a
@@ -250,12 +259,12 @@ export function ClientsManager({
                   className="p-2 text-emerald-600 hover:text-emerald-700 shrink-0"
                   title="Chamar no WhatsApp"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <ChatCircle className="h-4 w-4" />
                 </a>
               )}
               {canManage && (
                 <button onClick={() => remove(c.id)} className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
-                  <Trash2 className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -271,7 +280,7 @@ export function ClientsManager({
             disabled={page === 0}
             className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
-            <ChevronLeft className="h-4 w-4" /> Anterior
+            <CaretLeft className="h-4 w-4" /> Anterior
           </button>
           <span className="text-xs text-muted-foreground">
             {page + 1} de {totalPages} &middot; {filtered.length} clientes
@@ -281,7 +290,7 @@ export function ClientsManager({
             disabled={page >= totalPages - 1}
             className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
-            Próxima <ChevronRight className="h-4 w-4" />
+            Próxima <CaretRight className="h-4 w-4" />
           </button>
         </div>
       )}

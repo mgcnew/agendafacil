@@ -13,9 +13,21 @@ import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
 import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
 import {
-  Plus, Loader2, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, X,
-  AlertTriangle, CalendarOff, Phone, ExternalLink, Scissors, MessageCircle, Lock,
-} from "lucide-react";
+  ArrowSquareOut,
+  CalendarDots,
+  CalendarX,
+  CaretDown,
+  CaretLeft,
+  CaretRight,
+  ChatCircle,
+  CircleNotch,
+  Lock,
+  Phone,
+  Plus,
+  Scissors,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 // ── Types ──────────────────────────────────────────────────────
 type View = "dia" | "semana" | "mes";
@@ -287,7 +299,7 @@ function ApptCard({ a, color, compact = false, onOpen }: {
           </span>
         )}
         {a.clients?.alert_summary && (
-          <AlertTriangle className="h-2.5 w-2.5 text-red-500 mt-0.5 shrink-0" aria-label="Restrição" />
+          <Warning className="h-2.5 w-2.5 text-red-500 mt-0.5 shrink-0" aria-label="Restrição" />
         )}
       </div>
     </button>
@@ -401,7 +413,7 @@ function ApptDetailModal({
                 className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
                 onClick={onClose}
               >
-                Ver ficha <ExternalLink className="h-3 w-3" />
+                Ver ficha <ArrowSquareOut className="h-3 w-3" />
               </Link>
             )}
           </div>
@@ -409,7 +421,7 @@ function ApptDetailModal({
           {/* ── Alerta de anamnese ──────────────────────────── */}
           {appt.clients?.alert_summary && (
             <div className="flex items-start gap-2 rounded-[var(--radius)] bg-red-500/10 border border-red-300/40 text-red-700 px-3 py-2.5">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <Warning className="h-4 w-4 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-semibold mb-0.5">Atenção — restrições</p>
                 <p className="text-xs">{appt.clients.alert_summary}</p>
@@ -446,7 +458,7 @@ function ApptDetailModal({
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Serviços</p>
             {services === null ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando…
+                <CircleNotch className="h-3.5 w-3.5 animate-spin" /> Carregando…
               </div>
             ) : services.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">Sem serviços registrados.</p>
@@ -485,7 +497,7 @@ function ApptDetailModal({
               <div className="grid grid-cols-1 gap-2">
                 {appt.clients?.phone && (
                   <Button variant="outline" onClick={remindWhatsApp} className="w-full">
-                    <MessageCircle className="h-4 w-4" /> Lembrar pelo WhatsApp
+                    <ChatCircle className="h-4 w-4" /> Lembrar pelo WhatsApp
                   </Button>
                 )}
                 <Button onClick={onFinalize} className="w-full">
@@ -504,14 +516,14 @@ function ApptDetailModal({
                 className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
               >
                 <span>Histórico da cliente</span>
-                <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showHistory && "rotate-90")} />
+                <CaretRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showHistory && "rotate-90")} />
               </button>
 
               {showHistory && (
                 <div className="mt-3 space-y-1.5">
                   {history === null ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
+                      <CircleNotch className="h-3 w-3 animate-spin" /> Carregando…
                     </div>
                   ) : history.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Sem atendimentos anteriores.</p>
@@ -548,14 +560,14 @@ function ApptDetailModal({
                 className="w-full flex items-center justify-between text-sm font-medium hover:text-foreground/80"
               >
                 <span>Anamnese</span>
-                <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showAnam && "rotate-90")} />
+                <CaretRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showAnam && "rotate-90")} />
               </button>
 
               {showAnam && (
                 <div className="mt-3 space-y-3">
                   {anamnesis === null ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
+                      <CircleNotch className="h-3 w-3 animate-spin" /> Carregando…
                     </div>
                   ) : anamnesis === "empty" ? (
                     <p className="text-xs text-muted-foreground">Anamnese não preenchida.</p>
@@ -576,7 +588,7 @@ function ApptDetailModal({
                                   : "bg-amber-500/10 text-amber-700 border border-amber-300/40",
                               )}
                             >
-                              {c.critical && <AlertTriangle className="h-2.5 w-2.5" />}
+                              {c.critical && <Warning className="h-2.5 w-2.5" />}
                               {c.label}
                             </span>
                           );
@@ -746,7 +758,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
       <div className="flex-1 min-h-0 overflow-auto scroll-thin">
         {rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center px-6 py-16">
-            <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
+            <CalendarX className="h-8 w-8 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
               <Plus className="h-4 w-4" /> Novo agendamento
@@ -802,7 +814,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
                     <span className="h-9 w-1 rounded-full shrink-0" style={{ background: color }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate flex items-center gap-1">
-                        {a.clients?.alert_summary && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                        {a.clients?.alert_summary && <Warning className="h-3.5 w-3.5 text-red-500 shrink-0" />}
                         {a.clients?.full_name ?? "Cliente"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
@@ -830,7 +842,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
 function EmptyDay() {
   return (
     <div className="pointer-events-none absolute inset-0 top-12 flex flex-col items-center justify-center text-center px-6">
-      <CalendarOff className="h-8 w-8 text-muted-foreground/50" />
+      <CalendarX className="h-8 w-8 text-muted-foreground/50" />
       <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
       <p className="text-xs text-muted-foreground/70">Clique em "Novo agendamento" para começar.</p>
     </div>
@@ -1041,7 +1053,7 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
                         style={{ background: color + "1f", borderLeft: `2px solid ${color}` }}
                       >
                         {a.clients?.alert_summary && (
-                          <AlertTriangle className="inline h-2.5 w-2.5 text-red-500 mr-0.5 -mt-0.5" />
+                          <Warning className="inline h-2.5 w-2.5 text-red-500 mr-0.5 -mt-0.5" />
                         )}
                         {fmtHM(a.starts_at)} {a.clients?.full_name ?? "Cliente"}
                       </div>
@@ -1276,7 +1288,7 @@ export function AgendaManager({
               onClick={() => navigate(-1)}
               className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <CaretLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setDate(toStr(new Date()))}
@@ -1288,7 +1300,7 @@ export function AgendaManager({
               onClick={() => navigate(1)}
               className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
             >
-              <ChevronRight className="h-4 w-4" />
+              <CaretRight className="h-4 w-4" />
             </button>
           </div>
 
@@ -1343,7 +1355,7 @@ export function AgendaManager({
       <div className="flex-1 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : view === "mes" ? (
           <MonthView
@@ -1501,7 +1513,7 @@ function FinalizeModal({
         {warn ? (
           <div className="mt-4 space-y-4">
             <div className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <Warning className="h-4 w-4 shrink-0 mt-0.5" />
               <div>
                 Atendimento finalizado. O estoque ficou negativo de:{" "}
                 <b>{warn.join(", ")}</b>. Reponha quando puder.
@@ -1541,7 +1553,7 @@ function FinalizeModal({
 
             <div className="flex gap-2 mt-5">
               <Button onClick={finalize} disabled={busy} className="flex-1">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar e receber
+                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar e receber
               </Button>
               <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             </div>
@@ -1651,7 +1663,7 @@ function BlockModal({
 
           <div className="flex gap-2 pt-1">
             <Button onClick={save} disabled={busy} className="flex-1">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} Bloquear
+              {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} Bloquear
             </Button>
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           </div>
@@ -1894,10 +1906,10 @@ function CreateAppointment({
                 className="sm:hidden h-11 w-full flex items-center justify-between rounded-[var(--radius)] border border-border bg-card px-3.5 text-sm text-foreground hover:border-foreground/25 transition"
               >
                 <span className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <CalendarDots className="h-4 w-4 text-muted-foreground shrink-0" />
                   {dateLabel}
                 </span>
-                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
+                <CaretDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
               </button>
               {showCal && (
                 <Calendar value={date} onChange={(d) => { setDate(d); setShowCal(false); }} className="mt-1 sm:hidden" />
@@ -1935,7 +1947,7 @@ function CreateAppointment({
 
             {err && <p className="text-sm text-red-600">{err}</p>}
             <Button className="w-full sm:mt-auto" onClick={create} disabled={busy || selected.length === 0 || !slot}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Criar agendamento
+              {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Criar agendamento
             </Button>
           </div>
 

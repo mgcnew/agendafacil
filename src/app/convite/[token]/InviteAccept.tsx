@@ -7,7 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label, Textarea } from "@/components/ui";
 import type { Enums } from "@/lib/database.types";
-import { Loader2, Mail, AlertTriangle } from "lucide-react";
+import {
+  CircleNotch,
+  Envelope,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Invite = {
   salon_name: string;
@@ -205,7 +209,7 @@ export function InviteAccept({
         <div className="space-y-1.5">
           <Label>E-mail do convite</Label>
           <div className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-muted px-3.5 h-11 text-sm text-muted-foreground">
-            <Mail className="h-4 w-4 shrink-0" />
+            <Envelope className="h-4 w-4 shrink-0" />
             <span className="truncate">{invite.email}</span>
           </div>
         </div>
@@ -241,7 +245,7 @@ export function InviteAccept({
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
           {authed ? "Concluir cadastro" : "Entrar na equipe"}
         </Button>
         <p className="text-xs text-muted-foreground text-center">
@@ -265,7 +269,7 @@ function InvalidState({
     <AuthShell title={title}>
       <div className="text-center">
         <span className="grid place-items-center h-14 w-14 rounded-2xl bg-secondary text-primary mx-auto">
-          <AlertTriangle className="h-7 w-7" />
+          <Warning className="h-7 w-7" />
         </span>
         <p className="text-sm text-muted-foreground mt-5">{message}</p>
         {action && (

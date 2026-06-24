@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label } from "@/components/ui";
-import { Loader2, Check, MailCheck } from "lucide-react";
+import {
+  Check,
+  CircleNotch,
+  EnvelopeSimpleOpen,
+} from "@phosphor-icons/react/dist/ssr";
 
 const REMEMBER_KEY = "agendefacil:lastEmail";
 
@@ -90,7 +94,7 @@ export function LoginForm({
     return (
       <div className="text-center py-2">
         <span className="grid place-items-center h-12 w-12 rounded-2xl bg-secondary text-primary mx-auto">
-          <MailCheck className="h-6 w-6" />
+          <EnvelopeSimpleOpen className="h-6 w-6" />
         </span>
         <p className="text-sm text-muted-foreground mt-4">
           Enviamos um link de redefinição para{" "}
@@ -129,7 +133,7 @@ export function LoginForm({
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={resetting}>
-          {resetting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {resetting && <CircleNotch className="h-4 w-4 animate-spin" />}
           Enviar link de recuperação
         </Button>
         <button
@@ -198,7 +202,7 @@ export function LoginForm({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" size="lg" className="w-full" disabled={loading}>
-        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
         Entrar
       </Button>
     </form>

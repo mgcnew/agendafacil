@@ -6,7 +6,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
-import { Loader2, Check } from "lucide-react";
+import {
+  Check,
+  CircleNotch,
+} from "@phosphor-icons/react/dist/ssr";
 
 export default function RedefinirSenhaPage() {
   const router = useRouter();
@@ -101,7 +104,7 @@ export default function RedefinirSenhaPage() {
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
           Salvar nova senha
         </Button>
       </form>

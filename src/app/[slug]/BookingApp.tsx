@@ -9,21 +9,21 @@ import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import { NICHES, type Niche } from "@/lib/themes";
 import {
+  CalendarDots,
+  CaretLeft,
+  CaretRight,
   Check,
+  CheckCircle,
+  CircleNotch,
   Clock,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  CalendarDays,
-  User,
-  Sparkles,
-  Phone,
-  CircleCheck,
-  History,
-  MapPin,
+  ClockCounterClockwise,
   Images,
+  MapPin,
+  Phone,
+  Sparkle,
+  User,
   X,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 
 type Salon = {
   id: string;
@@ -333,7 +333,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 onClick={loadMine}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
               >
-                <History className="h-3.5 w-3.5" /> Meus
+                <ClockCounterClockwise className="h-3.5 w-3.5" /> Meus
               </button>
             )}
           </div>
@@ -366,7 +366,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {step === "services" && (
         <section className="space-y-3 af-rise">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> Escolha os serviços
+            <Sparkle className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
 
           {/* Pills de categoria — sticky com fade nas bordas */}
@@ -408,7 +408,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
           {loadingServices ? (
             <div className="py-10 grid place-items-center text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <CircleNotch className="h-6 w-6 animate-spin" />
             </div>
           ) : services.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -515,7 +515,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {step === "time" && (
         <section className="space-y-4 af-rise">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-primary" /> Escolha o horário
+            <CalendarDots className="h-5 w-5 text-primary" /> Escolha o horário
           </h2>
           <div className="space-y-1.5">
             <Label>Data</Label>
@@ -528,7 +528,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <p className="text-sm text-muted-foreground capitalize">{formatDateLong(date + "T12:00:00")}</p>
           {loadingSlots ? (
             <div className="py-10 grid place-items-center text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <CircleNotch className="h-6 w-6 animate-spin" />
             </div>
           ) : slots.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -600,7 +600,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               onClick={() => setStep("time")}
               className="flex items-center justify-center gap-1 w-full text-sm text-muted-foreground hover:text-foreground transition"
             >
-              <ChevronLeft className="h-4 w-4" /> Voltar
+              <CaretLeft className="h-4 w-4" /> Voltar
             </button>
           </Card>
         </section>
@@ -610,7 +610,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {step === "confirm" && pro && slot && (
         <section className="space-y-4 af-rise">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <CircleCheck className="h-5 w-5 text-primary" /> Revise e confirme
+            <CheckCircle className="h-5 w-5 text-primary" /> Revise e confirme
           </h2>
           <Card className="p-6 space-y-4">
             <div className="flex items-center gap-3 pb-1">
@@ -655,10 +655,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
           {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
           <div className="flex gap-3">
             <Button variant="outline" size="lg" onClick={() => setStep("time")} disabled={booking}>
-              <ChevronLeft className="h-4 w-4" /> Voltar
+              <CaretLeft className="h-4 w-4" /> Voltar
             </Button>
             <Button className="flex-1" size="lg" onClick={confirmBooking} disabled={booking}>
-              {booking && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar agendamento
+              {booking && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar agendamento
             </Button>
           </div>
         </section>
@@ -683,7 +683,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
           </p>
           <div className="flex flex-col gap-2 mt-8">
             <Button onClick={loadMine}>
-              <History className="h-4 w-4" /> Ver meus agendamentos
+              <ClockCounterClockwise className="h-4 w-4" /> Ver meus agendamentos
             </Button>
             <Button
               variant="outline"
@@ -728,7 +728,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur p-4">
           <div className="max-w-xl mx-auto">
             <Button variant="ghost" onClick={() => setStep("time")}>
-              <ChevronLeft className="h-4 w-4" /> Voltar
+              <CaretLeft className="h-4 w-4" /> Voltar
             </Button>
           </div>
         </div>
@@ -866,7 +866,7 @@ function GalleryModal({
             onClick={prev}
             className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <CaretLeft className="h-6 w-6" />
           </button>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -882,7 +882,7 @@ function GalleryModal({
             onClick={next}
             className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
           >
-            <ChevronRight className="h-6 w-6" />
+            <CaretRight className="h-6 w-6" />
           </button>
         )}
       </div>
@@ -960,7 +960,7 @@ function BottomBar({
       <div className="p-4 max-w-xl mx-auto flex items-center gap-3">
         {step !== "services" && (
           <Button variant="outline" size="md" onClick={onBack}>
-            <ChevronLeft className="h-4 w-4" />
+            <CaretLeft className="h-4 w-4" />
           </Button>
         )}
         <Button className="flex-1" size="lg" onClick={onNext} disabled={!canNext}>

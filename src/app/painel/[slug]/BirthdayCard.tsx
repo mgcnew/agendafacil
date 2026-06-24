@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui";
-import { Cake, MessageCircle } from "lucide-react";
+import {
+  Cake,
+  ChatCircle,
+} from "@phosphor-icons/react/dist/ssr";
 
 export type BirthdayClient = {
   id: string;
@@ -62,7 +65,7 @@ export function BirthdayCard({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 h-8 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-2.5 text-xs font-medium text-white hover:bg-emerald-700"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" /> Parabenizar
+                  <ChatCircle className="h-3.5 w-3.5" /> Parabenizar
                 </a>
               ) : (
                 <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>

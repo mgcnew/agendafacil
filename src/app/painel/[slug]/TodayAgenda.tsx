@@ -9,8 +9,15 @@ import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
-  AlertTriangle, ChevronDown, Sparkles, Scissors, UserX, Loader2, X, Clock,
-} from "lucide-react";
+  CaretDown,
+  CircleNotch,
+  Clock,
+  Scissors,
+  Sparkle,
+  UserMinus,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 const STATUS: Record<string, { label: string; dot: string }> = {
   pending:     { label: "Aguardando",   dot: "#f59e0b" },
@@ -80,7 +87,7 @@ function FinalizeModal({
         {warn ? (
           <div className="mt-4 space-y-4">
             <div className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <Warning className="h-4 w-4 shrink-0 mt-0.5" />
               <div>
                 Atendimento finalizado. Estoque negativo:{" "}
                 <b>{warn.join(", ")}</b>. Reponha quando puder.
@@ -115,7 +122,7 @@ function FinalizeModal({
             {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
             <div className="flex gap-2 mt-5">
               <Button onClick={finalize} disabled={busy} className="flex-1">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirmar e receber
+                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar e receber
               </Button>
               <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             </div>
@@ -166,7 +173,7 @@ function ItemCard({
                 title={item.alert}
                 className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-600 px-2 py-0.5 text-[10px] font-medium shrink-0"
               >
-                <AlertTriangle className="h-3 w-3" /> alerta
+                <Warning className="h-3 w-3" /> alerta
               </span>
             )}
           </p>
@@ -185,7 +192,7 @@ function ItemCard({
         </span>
 
         <span className="font-semibold text-primary text-sm shrink-0">{formatBRL(item.price)}</span>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")} />
+        <CaretDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")} />
       </button>
 
       {expanded && (
@@ -198,7 +205,7 @@ function ItemCard({
               {item.services.map((s, i) => (
                 <div key={i} className="flex items-center justify-between gap-3 text-sm">
                   <span className="flex items-center gap-2 min-w-0">
-                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <Sparkle className="h-3.5 w-3.5 text-primary shrink-0" />
                     <span className="truncate">{s.name}</span>
                   </span>
                   <span className="flex items-center gap-3 shrink-0 text-xs">
@@ -213,7 +220,7 @@ function ItemCard({
           {/* Alerta de anamnese em detalhe */}
           {item.alert && (
             <div className="flex items-start gap-2 rounded-[var(--radius)] bg-red-500/10 border border-red-300/30 text-red-700 px-3 py-2 text-xs">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <Warning className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               {item.alert}
             </div>
           )}
@@ -229,7 +236,7 @@ function ItemCard({
                 onClick={onNoShow}
                 className="flex items-center gap-1.5 px-3 h-9 rounded-[var(--radius)] border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"
               >
-                <UserX className="h-3.5 w-3.5" />
+                <UserMinus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Faltou</span>
               </button>
             </div>
@@ -341,7 +348,7 @@ export function TodayAgenda({
             <span className="text-[11px] text-amber-600 font-medium bg-amber-500/15 px-2 py-0.5 rounded-full shrink-0">
               {pastPending.length}
             </span>
-            <ChevronDown className={cn("h-4 w-4 text-amber-600 shrink-0 transition-transform", showPast && "rotate-180")} />
+            <CaretDown className={cn("h-4 w-4 text-amber-600 shrink-0 transition-transform", showPast && "rotate-180")} />
           </button>
 
           {showPast && (

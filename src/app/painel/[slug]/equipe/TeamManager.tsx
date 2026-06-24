@@ -11,11 +11,28 @@ import type { SalonInfo } from "../financeiro/receipt";
 import { formatBRL, currentMonthBR, monthRangeBR, cn } from "@/lib/utils";
 import type { Tables, Enums } from "@/lib/database.types";
 import {
-  Loader2, ShieldCheck, X, UserPlus, Crown,
-  Check, Link2, Trash2, Mail, Scissors, AlertTriangle,
-  Pencil, Camera, Wallet, Download, Share2,
-  Briefcase, MapPin, FileText, Armchair, User,
-} from "lucide-react";
+  Armchair,
+  Briefcase,
+  Camera,
+  Check,
+  CircleNotch,
+  Crown,
+  DownloadSimple,
+  Envelope,
+  FileText,
+  LinkSimple,
+  MapPin,
+  PencilSimple,
+  Scissors,
+  ShareNetwork,
+  ShieldCheck,
+  Trash,
+  User,
+  UserPlus,
+  Wallet,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Role = Enums<"member_role">;
 type Member = Tables<"salon_members"> & {
@@ -156,7 +173,7 @@ export function TeamManager({
       {/* Erros de ações fora do formulário (revogar, cargo, remover) */}
       {err && !adding && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -203,7 +220,7 @@ export function TeamManager({
               {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
               <div className="flex gap-2 mt-5">
                 <Button onClick={createInvite} disabled={busy || !email} className="flex-1">
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                  {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <LinkSimple className="h-4 w-4" />}
                   Gerar link de convite
                 </Button>
                 <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
@@ -225,7 +242,7 @@ export function TeamManager({
               className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border border-dashed border-border bg-card p-3.5"
             >
               <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground shrink-0">
-                <Mail className="h-4.5 w-4.5" />
+                <Envelope className="h-4.5 w-4.5" />
               </span>
               <div className="flex-1 min-w-[140px]">
                 <p className="text-sm font-medium truncate">{inv.email}</p>
@@ -236,14 +253,14 @@ export function TeamManager({
               {canManage && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
                   <Button variant="outline" size="sm" onClick={() => shareWhatsApp(inv)}>
-                    <Share2 className="h-4 w-4" /> WhatsApp
+                    <ShareNetwork className="h-4 w-4" /> WhatsApp
                   </Button>
                   <button
                     onClick={() => revokeInvite(inv)}
                     className="p-2 text-muted-foreground hover:text-red-600"
                     title="Cancelar convite"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -277,7 +294,7 @@ export function TeamManager({
                   </span>
                   {canManage && (
                     <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
-                      <Pencil className="h-4 w-4" /> Editar
+                      <PencilSimple className="h-4 w-4" /> Editar
                     </Button>
                   )}
                 </>
@@ -299,7 +316,7 @@ export function TeamManager({
                   {canManage && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
-                        <Pencil className="h-4 w-4" /> Editar
+                        <PencilSimple className="h-4 w-4" /> Editar
                       </Button>
                       <button
                         onClick={() => deactivate(m)}
@@ -546,13 +563,13 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
         )}
         <div className="flex flex-col gap-1.5">
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm hover:bg-muted">
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            {uploading ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             {photoUrl ? "Trocar foto" : "Enviar foto"}
             <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} disabled={uploading} />
           </label>
           {photoUrl && (
             <button onClick={removePhoto} disabled={uploading} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 disabled:opacity-50">
-              <Trash2 className="h-3.5 w-3.5" /> Remover foto
+              <Trash className="h-3.5 w-3.5" /> Remover foto
             </button>
           )}
         </div>
@@ -590,7 +607,7 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving || uploading}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar dados
+          {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar dados
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>
@@ -725,7 +742,7 @@ function CadastroPanel({ member, salonId }: { member: Member; salonId: string })
   }
 
   if (!loaded) {
-    return <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    return <div className="py-10 grid place-items-center"><CircleNotch className="h-6 w-6 animate-spin" /></div>;
   }
 
   const isChairRent = form.employment_type === "chair_rent";
@@ -826,7 +843,7 @@ function CadastroPanel({ member, salonId }: { member: Member; salonId: string })
                 onBlur={(e) => lookupCep(e.target.value)}
                 placeholder="00000-000"
               />
-              {cepLoading && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+              {cepLoading && <CircleNotch className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
           </div>
           <div className="space-y-1.5 sm:col-span-4">
@@ -888,7 +905,7 @@ function CadastroPanel({ member, salonId }: { member: Member; salonId: string })
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar cadastro
+          {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar cadastro
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>
@@ -1031,7 +1048,7 @@ function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: st
       </p>
 
       {loading ? (
-        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        <div className="py-10 grid place-items-center"><CircleNotch className="h-6 w-6 animate-spin" /></div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
@@ -1058,7 +1075,7 @@ function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: st
                 />
               </div>
               <Button onClick={pay} disabled={paying || toReceive <= 0}>
-                {paying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {paying ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Pagar
               </Button>
             </div>
@@ -1074,7 +1091,7 @@ function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: st
                     onClick={() => downloadReceipt(lastPaid, new Date().toLocaleDateString("pt-BR"), monthLabel)}
                     className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                   >
-                    <Download className="h-4 w-4" /> Baixar recibo
+                    <DownloadSimple className="h-4 w-4" /> Baixar recibo
                   </button>
                 )}
               </div>
@@ -1101,7 +1118,7 @@ function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: st
                       className="text-muted-foreground hover:text-primary"
                       title="Baixar recibo"
                     >
-                      <Download className="h-4 w-4" />
+                      <DownloadSimple className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -1263,7 +1280,7 @@ function ServicesPanel({
       </div>
 
       {!loaded ? (
-        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        <div className="py-10 grid place-items-center"><CircleNotch className="h-6 w-6 animate-spin" /></div>
       ) : services.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
           Nenhum serviço cadastrado. Crie serviços primeiro.
@@ -1304,7 +1321,7 @@ function ServicesPanel({
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
+          {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>
@@ -1382,7 +1399,7 @@ function PermissionsPanel({
       </p>
 
       {!loaded ? (
-        <div className="py-10 grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        <div className="py-10 grid place-items-center"><CircleNotch className="h-6 w-6 animate-spin" /></div>
       ) : (
         <div className="space-y-5">
           {Object.entries(grouped).map(([cat, perms]) => (
@@ -1416,7 +1433,7 @@ function PermissionsPanel({
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar permissões
+          {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar permissões
         </Button>
         {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
       </div>

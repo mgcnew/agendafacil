@@ -5,7 +5,18 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
-import { Plus, Loader2, Boxes, Trash2, Minus, AlertTriangle, History, ArrowDown, ArrowUp, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleNotch,
+  ClockCounterClockwise,
+  Minus,
+  Plus,
+  Stack,
+  Trash,
+  Warning,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 
@@ -118,14 +129,14 @@ export function InventoryManager({
 
       {lowStock.length > 0 && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 text-amber-800 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <Warning className="h-4 w-4 shrink-0" />
           {lowStock.length} produto(s) no estoque mínimo: {lowStock.map((p) => p.name).join(", ")}
         </div>
       )}
 
       {err && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {err}
+          <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -183,7 +194,7 @@ export function InventoryManager({
               </div>
               <div className="flex gap-2 mt-5">
                 <Button onClick={add} disabled={busy || !name} className="flex-1">
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />} Adicionar
+                  {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Adicionar
                 </Button>
                 <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
               </div>
@@ -194,7 +205,7 @@ export function InventoryManager({
 
       {products.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
-          <Boxes className="h-8 w-8 mx-auto text-muted-foreground" />
+          <Stack className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhum produto cadastrado.</p>
         </div>
       ) : (
@@ -230,7 +241,7 @@ export function InventoryManager({
                 )}
                 {canManage && (
                   <button onClick={() => remove(p.id)} className="p-2 text-muted-foreground hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
+                    <Trash className="h-4 w-4" />
                   </button>
                 )}
               </div>
@@ -243,7 +254,7 @@ export function InventoryManager({
       {movements.length > 0 && (
         <div>
           <h2 className="font-display font-semibold mb-3 flex items-center gap-2">
-            <History className="h-5 w-5 text-primary" /> Movimentações recentes
+            <ClockCounterClockwise className="h-5 w-5 text-primary" /> Movimentações recentes
           </h2>
           <div className="space-y-1.5">
             {movements.map((m) => {

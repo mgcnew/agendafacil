@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { NICHE_LIST, patternClass, type Niche } from "@/lib/themes";
 import { formatBRL } from "@/lib/utils";
-import { Clock, Star, Type } from "lucide-react";
+import {
+  Clock,
+  Star,
+  TextT,
+} from "@phosphor-icons/react/dist/ssr";
 
 const DEMO_NAME: Record<Niche, string> = {
   feminino: "Studio Bella",
@@ -55,7 +59,7 @@ export function NicheShowcase() {
                   {n.tagline}
                 </p>
                 <p className={`text-[11px] mt-2 flex items-center gap-1 ${isActive ? "text-white/70" : "text-muted-foreground/70"}`}>
-                  <Type className="h-3 w-3" /> {n.fontLabel}
+                  <TextT className="h-3 w-3" /> {n.fontLabel}
                 </p>
               </button>
             );

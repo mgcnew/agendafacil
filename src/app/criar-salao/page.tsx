@@ -7,18 +7,18 @@ import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
 import {
-  Loader2,
-  MailCheck,
-  Check,
   CalendarCheck,
+  Check,
+  CircleNotch,
+  EnvelopeSimpleOpen,
   Percent,
-  Boxes,
-} from "lucide-react";
+  Stack,
+} from "@phosphor-icons/react/dist/ssr";
 
 const MOBILE_BENEFITS = [
   { icon: CalendarCheck, text: "A cliente agenda sozinha pelo seu link" },
   { icon: Percent, text: "Comissões e caixa no automático" },
-  { icon: Boxes, text: "Estoque com baixa por serviço" },
+  { icon: Stack, text: "Estoque com baixa por serviço" },
 ];
 
 const TRUST_BADGES = [
@@ -76,7 +76,7 @@ export default function CriarSalaoPage() {
       <AuthShell title="Confirme seu e-mail">
         <div className="text-center">
           <span className="grid place-items-center h-14 w-14 rounded-2xl bg-secondary text-primary mx-auto">
-            <MailCheck className="h-7 w-7" />
+            <EnvelopeSimpleOpen className="h-7 w-7" />
           </span>
           <p className="text-sm text-muted-foreground mt-5">
             Enviamos um link de confirmação para <b className="text-foreground">{email}</b>.
@@ -132,7 +132,7 @@ export default function CriarSalaoPage() {
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
           Criar conta
         </Button>
 

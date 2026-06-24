@@ -6,9 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import {
-  Plus, Trash2, TrendingUp, TrendingDown, Loader2, X,
-  Building2, Package, Edit2, Check,
-} from "lucide-react";
+  Buildings,
+  Check,
+  CircleNotch,
+  Package,
+  PencilSimple,
+  Plus,
+  Trash,
+  TrendDown,
+  TrendUp,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 
 export type FixedCost = {
   id: string;
@@ -131,12 +139,12 @@ export function FixedCostsPanel({
       {/* Resultado mensal */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-          <TrendingUp className="h-4 w-4 text-emerald-600" />
+          <TrendUp className="h-4 w-4 text-emerald-600" />
           <p className="font-display text-lg font-bold mt-2 text-emerald-600">{formatBRL(totalRevenues)}</p>
           <p className="text-xs text-muted-foreground">Receitas previstas</p>
         </div>
         <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-          <TrendingDown className="h-4 w-4 text-red-600" />
+          <TrendDown className="h-4 w-4 text-red-600" />
           <p className="font-display text-lg font-bold mt-2 text-red-600">{formatBRL(totalExpenses)}</p>
           <p className="text-xs text-muted-foreground">Despesas fixas</p>
         </div>
@@ -153,7 +161,7 @@ export function FixedCostsPanel({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display font-semibold flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-red-500" /> Despesas fixas
+            <TrendDown className="h-4 w-4 text-red-500" /> Despesas fixas
           </h3>
           {addingType !== "expense" && (
             <Button variant="outline" size="sm" onClick={() => { setAddingType("expense"); setEditingId(null); }}>
@@ -203,7 +211,7 @@ export function FixedCostsPanel({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-emerald-600" /> Receitas previstas
+            <TrendUp className="h-4 w-4 text-emerald-600" /> Receitas previstas
           </h3>
           {addingType !== "revenue" && (
             <Button variant="outline" size="sm" onClick={() => { setAddingType("revenue"); setEditingId(null); }}>
@@ -227,7 +235,7 @@ export function FixedCostsPanel({
           {/* Auto: aluguel de cadeira */}
           {chairRentals.map((r, i) => (
             <div key={i} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
-              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{r.member_name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -323,7 +331,7 @@ function AddForm({
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={onSave} disabled={busy || !name.trim() || !amount}>
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
+          {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancelar</Button>
       </div>
@@ -362,7 +370,7 @@ function CostRow({
         </div>
         <div className="flex gap-2">
           <Button size="sm" onClick={onSave} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
+            {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>Cancelar</Button>
         </div>
@@ -383,14 +391,14 @@ function CostRow({
         onClick={onEdit}
         className="grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground"
       >
-        <Edit2 className="h-4 w-4" />
+        <PencilSimple className="h-4 w-4" />
       </button>
       <button
         onClick={onRemove}
         disabled={busy}
         className="grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-50 hover:text-red-600"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash className="h-4 w-4" />
       </button>
     </div>
   );

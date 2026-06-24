@@ -1,19 +1,19 @@
 import Link from "next/link";
 import {
-  Scissors,
   CalendarCheck,
-  Percent,
-  ShieldCheck,
-  Boxes,
-  Star,
   Check,
-} from "lucide-react";
+  Percent,
+  Scissors,
+  ShieldCheck,
+  Stack,
+  Star,
+} from "@phosphor-icons/react/dist/ssr";
 
 const BENEFITS = [
   { icon: CalendarCheck, text: "A cliente agenda sozinha pelo seu link" },
   { icon: Percent, text: "Comissões e caixa calculados automaticamente" },
   { icon: ShieldCheck, text: "Equipe com permissões sob o seu controle" },
-  { icon: Boxes, text: "Estoque com baixa automática por serviço" },
+  { icon: Stack, text: "Estoque com baixa automática por serviço" },
 ];
 
 const TRUST = [

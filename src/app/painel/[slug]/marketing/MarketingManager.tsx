@@ -14,14 +14,25 @@ import {
 } from "@/lib/marketing/prompts";
 import type { Credits } from "@/lib/marketing/credits";
 import {
-  ArrowLeft, ArrowRight, Loader2, Sparkles, Camera, BadgePercent,
-  Download, Copy, Check, Share2, RefreshCw, Wand2, AlertTriangle,
-} from "lucide-react";
+  ArrowLeft,
+  ArrowRight,
+  ArrowsClockwise,
+  Camera,
+  Check,
+  CircleNotch,
+  Copy,
+  DownloadSimple,
+  MagicWand,
+  SealPercent,
+  ShareNetwork,
+  Sparkle,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
 
 type Svc = { id: string; name: string; price: number; price_type: string | null };
 type Camp = { id: string; name: string; discount_percent: number };
 
-const TYPE_ICON = { BadgePercent, Sparkles, Camera } as const;
+const TYPE_ICON = { SealPercent, Sparkle, Camera } as const;
 
 type Overlay = {
   title: string;
@@ -142,7 +153,7 @@ export function MarketingManager({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
-            <Wand2 className="h-6 w-6 text-primary" /> Divulgação
+            <MagicWand className="h-6 w-6 text-primary" /> Divulgação
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Crie artes prontas para o status do WhatsApp, Instagram e Facebook.
@@ -326,7 +337,7 @@ export function MarketingManager({
             </Button>
           ) : (
             <Button onClick={generate} disabled={loading || credits.remaining <= 0}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              {loading ? <CircleNotch className="h-4 w-4 animate-spin" /> : <MagicWand className="h-4 w-4" />}
               {credits.remaining <= 0 ? "Sem créditos" : "Gerar arte"}
             </Button>
           )}
@@ -442,7 +453,7 @@ function Banner({ tone, children }: { tone: "info" | "error"; children: React.Re
           : "border-blue-500/30 bg-blue-500/10 text-blue-700",
       )}
     >
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <Warning className="mt-0.5 h-4 w-4 shrink-0" />
       <div>{children}</div>
     </div>
   );
@@ -584,13 +595,13 @@ function ResultView({
 
         <div className="flex flex-wrap justify-center gap-2">
           <Button onClick={download} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Baixar
+            {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />} Baixar
           </Button>
           <Button variant="outline" onClick={share} disabled={busy}>
-            <Share2 className="h-4 w-4" /> Compartilhar
+            <ShareNetwork className="h-4 w-4" /> Compartilhar
           </Button>
           <Button variant="ghost" onClick={onRefresh}>
-            <RefreshCw className="h-4 w-4" /> Gerar outra
+            <ArrowsClockwise className="h-4 w-4" /> Gerar outra
           </Button>
         </div>
       </div>

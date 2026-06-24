@@ -13,20 +13,20 @@ import { uploadLogo, removeLogo } from "./actions";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
-  Store,
-  Clock,
-  Link2,
-  Palette,
-  Copy,
   Check,
-  Loader2,
-  ImageIcon,
-  ShieldCheck,
-  Upload,
-  Trash2,
+  CircleNotch,
+  Clock,
+  Copy,
   CreditCard,
+  Image as ImageIcon,
+  LinkSimple,
+  Palette,
+  ShieldCheck,
+  Storefront,
+  Trash,
+  UploadSimple,
   Wallet,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
@@ -35,10 +35,10 @@ type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
 
-const TAB_META: { id: TabId; label: string; icon: typeof Store; need: "salon" | "schedule" | "team" }[] = [
-  { id: "estabelecimento", label: "Estabelecimento", icon: Store, need: "salon" },
+const TAB_META: { id: TabId; label: string; icon: typeof Storefront; need: "salon" | "schedule" | "team" }[] = [
+  { id: "estabelecimento", label: "Estabelecimento", icon: Storefront, need: "salon" },
   { id: "horarios", label: "Horários", icon: Clock, need: "schedule" },
-  { id: "agendamento", label: "Agendamento", icon: Link2, need: "salon" },
+  { id: "agendamento", label: "Agendamento", icon: LinkSimple, need: "salon" },
   { id: "caixa", label: "Caixa", icon: Wallet, need: "salon" },
   { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
@@ -328,7 +328,7 @@ function SaveBar({
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <Button onClick={onSave} disabled={saving || disabled}>
-        {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar alterações
+        {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar alterações
       </Button>
       {saved && (
         <span className="text-sm text-emerald-600 flex items-center gap-1">
@@ -534,7 +534,7 @@ function LinkCard({
   return (
     <Card className="p-6">
       <h2 className="font-display font-semibold flex items-center gap-2">
-        <Link2 className="h-5 w-5 text-primary" /> Link de agendamento
+        <LinkSimple className="h-5 w-5 text-primary" /> Link de agendamento
       </h2>
       <p className="text-xs text-muted-foreground mt-1">
         É o endereço que suas clientes usam para agendar.
@@ -566,7 +566,7 @@ function LinkCard({
 
       {canEdit && (
         <Button onClick={save} disabled={saving || !changed} className="mt-4">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {saving ? <CircleNotch className="h-4 w-4 animate-spin" /> : null}
           Salvar link
         </Button>
       )}
@@ -718,9 +718,9 @@ function LogoCard({
               disabled={busy}
             >
               {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <CircleNotch className="h-4 w-4 animate-spin" />
               ) : (
-                <Upload className="h-4 w-4" />
+                <UploadSimple className="h-4 w-4" />
               )}
               {logoUrl ? "Trocar logo" : "Enviar logo"}
             </Button>
@@ -731,7 +731,7 @@ function LogoCard({
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-50"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Remover
+                <Trash className="h-3.5 w-3.5" /> Remover
               </button>
             )}
           </div>
@@ -877,7 +877,7 @@ function BookingPanel({
       <div className="grid lg:grid-cols-2 gap-5 items-start">
       <Card className="p-6">
         <h2 className="font-display font-semibold flex items-center gap-2">
-          <Link2 className="h-5 w-5 text-primary" /> Link de agendamento
+          <LinkSimple className="h-5 w-5 text-primary" /> Link de agendamento
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Compartilhe com suas clientes. É por aqui que elas agendam.

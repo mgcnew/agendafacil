@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { NICHE_LIST, patternClass, type Niche } from "@/lib/themes";
 import { formatBRL } from "@/lib/utils";
-import { Star, Clock, BadgeCheck } from "lucide-react";
+import {
+  Clock,
+  SealCheck,
+  Star,
+} from "@phosphor-icons/react/dist/ssr";
 
 const DEMO: Record<Niche, { name: string; services: [string, number, number][] }> = {
   feminino: {
@@ -106,7 +110,7 @@ export function PhoneMockup() {
       {/* selo flutuante de credibilidade (tema da marca, neutro) */}
       <div className="absolute -bottom-3 -left-3 flex items-center gap-2 rounded-2xl bg-card border border-border shadow-card px-3 py-2">
         <span className="grid place-items-center h-7 w-7 rounded-full bg-primary/10 text-primary">
-          <BadgeCheck className="h-4 w-4" />
+          <SealCheck className="h-4 w-4" />
         </span>
         <div className="leading-tight">
           <p className="text-[11px] font-semibold">Agendamento confirmado</p>
