@@ -13,7 +13,7 @@ import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
   Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search, BarChart2,
-  ArrowDownToLine, ArrowUpFromLine,
+  ArrowDownToLine, ArrowUpFromLine, RotateCcw, AlertTriangle,
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
@@ -93,8 +93,16 @@ export function FinanceManager({
   const [manualModal, setManualModal] = useState(false); // modal de lançamento manual
   const [movementsModal, setMovementsModal] = useState(false); // modal "ver todas" as movimentações
   const [selectedSession, setSelectedSession] = useState<Session | null>(null); // relatório de sessão fechada
+  const [reverseTx, setReverseTx] = useState<Tx | null>(null); // confirmação de estorno
   const [toast, setToast] = useState<string | null>(null);
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3500); }
+
+  // Estorna uma movimentação (cobrança de atendimento volta para "Receber"; avulso é removido).
+  async function reverseTransaction(t: Tx) {
+    const { error } = await supabase.rpc("reverse_cash_transaction" as never, { p_tx: t.id } as never);
+    if (error) throw error;
+    router.refresh();
+  }
 
   // Cobra um atendimento do dia com a forma de pagamento (e desconto/splits) escolhidos.
   async function chargeAppointment(
@@ -417,7 +425,24 @@ export function FinanceManager({
             key="movs"
             transactions={transactions}
             onReceipt={(t) => { setMovementsModal(false); setReceiptTx(t); }}
+            onReverse={canManage ? (t) => { setMovementsModal(false); setReverseTx(t); } : undefined}
             onClose={() => setMovementsModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Confirmação de estorno */}
+      <AnimatePresence>
+        {reverseTx && (
+          <ReverseModal
+            key="reverse"
+            tx={reverseTx}
+            onClose={() => setReverseTx(null)}
+            onConfirm={async () => {
+              await reverseTransaction(reverseTx);
+              showToast("✓ Movimentação estornada");
+              setReverseTx(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -557,7 +582,7 @@ function ActionTile({
   );
 }
 
-function TxRow({ t, onReceipt }: { t: Tx; onReceipt?: () => void }) {
+function TxRow({ t, onReceipt, onReverse }: { t: Tx; onReceipt?: () => void; onReverse?: () => void }) {
   const isCashMove = t.category === "sangria" || t.category === "suprimento";
   const Icon = t.category === "sangria" ? ArrowUpFromLine
     : t.category === "suprimento" ? ArrowDownToLine
@@ -581,6 +606,12 @@ function TxRow({ t, onReceipt }: { t: Tx; onReceipt?: () => void }) {
         <button onClick={onReceipt} title="Emitir cupom"
           className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground">
           <Receipt className="h-4 w-4" />
+        </button>
+      )}
+      {onReverse && (
+        <button onClick={onReverse} title="Estornar"
+          className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
+          <RotateCcw className="h-4 w-4" />
         </button>
       )}
     </div>
@@ -720,8 +751,8 @@ function ManualModal({
 }
 
 function MovementsModal({
-  transactions, onReceipt, onClose,
-}: { transactions: Tx[]; onReceipt: (t: Tx) => void; onClose: () => void }) {
+  transactions, onReceipt, onReverse, onClose,
+}: { transactions: Tx[]; onReceipt: (t: Tx) => void; onReverse?: (t: Tx) => void; onClose: () => void }) {
   return (
     <MotionModal onClose={onClose}>
       <Card className="w-full sm:max-w-md mx-auto max-h-[90vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
@@ -730,9 +761,71 @@ function MovementsModal({
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-2 overflow-auto">
-          {transactions.map((t) => (
-            <TxRow key={t.id} t={t} onReceipt={() => onReceipt(t)} />
+          {transactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma movimentação ainda.</p>
+          ) : transactions.map((t) => (
+            <TxRow key={t.id} t={t} onReceipt={() => onReceipt(t)} onReverse={onReverse ? () => onReverse(t) : undefined} />
           ))}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+function ReverseModal({
+  tx, onClose, onConfirm,
+}: { tx: Tx; onClose: () => void; onConfirm: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const isCharge = !!tx.appointment_id && tx.type === "income";
+
+  async function confirm() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onConfirm();
+    } catch (e) {
+      setErr((e as { message?: string })?.message ?? "Não foi possível estornar.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-red-600" /> Estornar movimentação
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="rounded-[var(--radius)] bg-secondary border border-border p-3.5 mt-2">
+          <p className="text-sm font-medium truncate">{tx.description || (tx.type === "income" ? "Entrada" : "Saída")}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {PAY_META[tx.payment_method ?? "dinheiro"]?.label ?? tx.payment_method} · {formatTime(tx.created_at)}
+          </p>
+          <p className={`font-display text-xl font-bold mt-1 ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+            {tx.type === "income" ? "+" : "-"}{formatBRL(Number(tx.amount))}
+          </p>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-[var(--radius)] bg-amber-500/10 text-amber-800 p-3 mt-3 text-xs">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            {isCharge
+              ? "A cobrança será desfeita e o atendimento voltará para a lista de “Receber”, pronto para ser cobrado novamente com a forma correta."
+              : "Este lançamento será removido do caixa. Esta ação não pode ser desfeita."}
+          </span>
+        </div>
+
+        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+
+        <div className="flex gap-2 mt-4">
+          <Button variant="ghost" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button onClick={confirm} disabled={busy} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Estornar
+          </Button>
         </div>
       </Card>
     </MotionModal>
