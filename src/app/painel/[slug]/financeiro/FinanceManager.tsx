@@ -13,6 +13,7 @@ import {
   Wallet, Loader2, TrendingUp, TrendingDown, Lock, Unlock, Percent, Plus,
   Banknote, Smartphone, CreditCard, History, X, ChevronLeft, ChevronRight, Check,
   Receipt, MessageCircle, Download, UsersRound, Boxes, Minus, Search, BarChart2,
+  ArrowDownToLine, ArrowUpFromLine,
 } from "lucide-react";
 import {
   generateReceiptPdf, buildReceiptText, payLabel,
@@ -131,9 +132,12 @@ export function FinanceManager({
 
   const opening0 = openSession ? Number(openSession.opening_amount) : 0;
 
-  // totais por forma de pagamento (entradas)
+  // Sangria/Suprimento movem dinheiro físico mas NÃO são receita/despesa: ficam fora do resultado.
+  const isCashMove = (x: Tx) => x.category === "sangria" || x.category === "suprimento";
+
+  // totais por forma de pagamento (entradas reais — exclui movimentações de gaveta)
   const sumBy = (t: "income" | "expense", m: string) =>
-    transactions.filter((x) => x.type === t && (x.payment_method ?? "dinheiro") === m).reduce((a, x) => a + Number(x.amount), 0);
+    transactions.filter((x) => x.type === t && !isCashMove(x) && (x.payment_method ?? "dinheiro") === m).reduce((a, x) => a + Number(x.amount), 0);
   const incomeByMethod = {
     dinheiro: sumBy("income", "dinheiro"),
     pix: sumBy("income", "pix"),
@@ -141,10 +145,17 @@ export function FinanceManager({
     credito: sumBy("income", "credito"),
     cartao: sumBy("income", "cartao"), // legado
   };
-  const totalIncome = transactions.filter((x) => x.type === "income").reduce((a, x) => a + Number(x.amount), 0);
-  const totalExpense = transactions.filter((x) => x.type === "expense").reduce((a, x) => a + Number(x.amount), 0);
-  // dinheiro físico esperado na gaveta = abertura + entradas dinheiro - saídas dinheiro
-  const expectedCash = opening0 + incomeByMethod.dinheiro - sumBy("expense", "dinheiro");
+  const totalIncome = transactions.filter((x) => x.type === "income" && !isCashMove(x)).reduce((a, x) => a + Number(x.amount), 0);
+  const totalExpense = transactions.filter((x) => x.type === "expense" && !isCashMove(x)).reduce((a, x) => a + Number(x.amount), 0);
+
+  // movimentações de gaveta (afetam só o dinheiro físico)
+  const suprimentoTotal = transactions.filter((x) => x.category === "suprimento").reduce((a, x) => a + Number(x.amount), 0);
+  const sangriaTotal = transactions.filter((x) => x.category === "sangria").reduce((a, x) => a + Number(x.amount), 0);
+
+  // dinheiro físico esperado na gaveta = abertura + TODAS entradas dinheiro - TODAS saídas dinheiro (inclui sangria/suprimento)
+  const cashIn = transactions.filter((x) => x.type === "income" && (x.payment_method ?? "dinheiro") === "dinheiro").reduce((a, x) => a + Number(x.amount), 0);
+  const cashOut = transactions.filter((x) => x.type === "expense" && (x.payment_method ?? "dinheiro") === "dinheiro").reduce((a, x) => a + Number(x.amount), 0);
+  const expectedCash = opening0 + cashIn - cashOut;
 
   async function openCash() {
     setBusy(true);
@@ -158,8 +169,8 @@ export function FinanceManager({
     router.refresh();
   }
 
-  // Lançamento manual avulso (entrada/saída) — usado pelo ManualModal.
-  async function launchManual(t: "income" | "expense", amt: number, m: string, d: string) {
+  // Lançamento manual avulso (entrada/saída/sangria/suprimento) — usado pelo ManualModal.
+  async function launchManual(t: "income" | "expense", amt: number, m: string, d: string, category?: string) {
     if (!openSession || amt <= 0) return;
     const { error } = await supabase.from("cash_transactions").insert({
       salon_id: salonId,
@@ -168,6 +179,7 @@ export function FinanceManager({
       amount: amt,
       description: d || null,
       payment_method: m,
+      category: category || null,
     });
     if (error) throw error;
     router.refresh();
@@ -317,6 +329,8 @@ export function FinanceManager({
             totalIncome={totalIncome}
             totalExpense={totalExpense}
             openingAmount={opening0}
+            suprimentoTotal={suprimentoTotal}
+            sangriaTotal={sangriaTotal}
             salon={salon}
             onClose={() => { setClosing(false); router.refresh(); }}
             onConfirm={async (counted) => {
@@ -544,19 +558,26 @@ function ActionTile({
 }
 
 function TxRow({ t, onReceipt }: { t: Tx; onReceipt?: () => void }) {
+  const isCashMove = t.category === "sangria" || t.category === "suprimento";
+  const Icon = t.category === "sangria" ? ArrowUpFromLine
+    : t.category === "suprimento" ? ArrowDownToLine
+    : t.type === "income" ? TrendingUp : TrendingDown;
+  const subtitle = isCashMove
+    ? `${t.category === "sangria" ? "Sangria" : "Suprimento"} · ${formatTime(t.created_at)}`
+    : `${PAY_META[t.payment_method ?? "dinheiro"]?.label ?? (t.payment_method ?? "—")} · ${formatTime(t.created_at)}`;
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
       <span className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
-        {t.type === "income" ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+        <Icon className="h-4 w-4" />
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{t.description || (t.type === "income" ? "Entrada" : "Saída")}</p>
-        <p className="text-xs text-muted-foreground">{PAY_META[t.payment_method ?? "dinheiro"]?.label ?? (t.payment_method ?? "—")} · {formatTime(t.created_at)}</p>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
       </div>
       <span className={`font-semibold text-sm ${t.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
         {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
       </span>
-      {t.type === "income" && onReceipt && (
+      {t.type === "income" && !isCashMove && onReceipt && (
         <button onClick={onReceipt} title="Emitir cupom"
           className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground">
           <Receipt className="h-4 w-4" />
@@ -604,15 +625,29 @@ function LojaModal({
   );
 }
 
+type ManualOp = "suprimento" | "sangria" | "income" | "expense";
+const MANUAL_OPS: { key: ManualOp; label: string; hint: string; icon: React.ElementType }[] = [
+  { key: "suprimento", label: "Suprimento", hint: "Colocar troco na gaveta", icon: ArrowDownToLine },
+  { key: "sangria",    label: "Sangria",    hint: "Retirar dinheiro da gaveta", icon: ArrowUpFromLine },
+  { key: "income",     label: "Entrada",    hint: "Outra entrada avulsa", icon: Plus },
+  { key: "expense",    label: "Saída",      hint: "Despesa / pagamento", icon: Minus },
+];
+
 function ManualModal({
   onClose, onLaunch,
-}: { onClose: () => void; onLaunch: (t: "income" | "expense", amt: number, m: string, d: string) => Promise<void> }) {
-  const [type, setType] = useState<"income" | "expense">("income");
+}: { onClose: () => void; onLaunch: (t: "income" | "expense", amt: number, m: string, d: string, category?: string) => Promise<void> }) {
+  const [op, setOp] = useState<ManualOp>("suprimento");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("dinheiro");
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // sangria/suprimento são sempre em dinheiro físico
+  const isCashMove = op === "sangria" || op === "suprimento";
+  const txType: "income" | "expense" = op === "suprimento" || op === "income" ? "income" : "expense";
+  const category = isCashMove ? op : undefined;
+  const current = MANUAL_OPS.find((o) => o.key === op)!;
 
   async function submit() {
     const amt = parseFloat(amount.replace(",", ".")) || 0;
@@ -620,7 +655,7 @@ function ManualModal({
     setBusy(true);
     setErr(null);
     try {
-      await onLaunch(type, amt, method, desc);
+      await onLaunch(txType, amt, isCashMove ? "dinheiro" : method, desc || current.label, category);
       onClose();
     } catch {
       setErr("Não foi possível lançar. Tente novamente.");
@@ -632,26 +667,51 @@ function ManualModal({
     <MotionModal onClose={onClose}>
       <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Lançamento manual</h3>
+          <h3 className="font-display text-lg font-bold flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" /> Movimentar caixa</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
-              <option value="income">Entrada</option>
-              <option value="expense">Saída</option>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            {MANUAL_OPS.map((o) => (
+              <button
+                key={o.key}
+                onClick={() => setOp(o.key)}
+                className={`flex flex-col items-start gap-1 rounded-[var(--radius)] border p-3 text-left transition ${
+                  op === o.key ? "border-primary bg-primary/5" : "border-border hover:border-foreground/20"
+                }`}
+              >
+                <o.icon className={`h-4 w-4 ${op === o.key ? "text-primary" : "text-muted-foreground"}`} />
+                <span className="text-sm font-medium">{o.label}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {!isCashMove && (
             <Select value={method} onValueChange={setMethod}>
               <option value="dinheiro">Dinheiro</option>
               <option value="pix">Pix</option>
-              <option value="cartao">Cartão</option>
+              <option value="debito">Débito</option>
+              <option value="credito">Crédito</option>
             </Select>
-          </div>
-          <Input placeholder="Valor (R$)" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-          <Input placeholder="Descrição (ex.: pagamento de fornecedor)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          )}
+
+          <Input placeholder="Valor (R$)" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" autoFocus />
+          <Input
+            placeholder={op === "sangria" ? "Motivo (ex.: depósito no banco)" : op === "suprimento" ? "Origem (ex.: fundo de troco)" : "Descrição (ex.: pagamento de fornecedor)"}
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+          />
+          {isCashMove && (
+            <p className="text-[11px] text-muted-foreground">
+              {op === "sangria"
+                ? "A sangria reduz o dinheiro esperado na gaveta, sem afetar o resultado do dia."
+                : "O suprimento aumenta o dinheiro esperado na gaveta, sem afetar o resultado do dia."}
+            </p>
+          )}
           {err && <p className="text-sm text-red-600">{err}</p>}
           <Button onClick={submit} disabled={busy || !amount} className="w-full">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Lançar
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} <current.icon className="h-4 w-4" /> Confirmar {current.label.toLowerCase()}
           </Button>
         </div>
       </Card>
@@ -1371,6 +1431,8 @@ function CloseModal({
   totalIncome,
   totalExpense,
   openingAmount,
+  suprimentoTotal = 0,
+  sangriaTotal = 0,
   salon,
   onClose,
   onConfirm,
@@ -1380,6 +1442,8 @@ function CloseModal({
   totalIncome: number;
   totalExpense: number;
   openingAmount: number;
+  suprimentoTotal?: number;
+  sangriaTotal?: number;
   salon: SalonInfo;
   onClose: () => void;
   onConfirm: (counted: number) => Promise<boolean>;
@@ -1424,6 +1488,8 @@ function CloseModal({
       countedDebito:  countedDebitoNum,
       countedCredito: countedCreditoNum,
       countedPix:     countedPixNum,
+      suprimentoTotal,
+      sangriaTotal,
       fileBase: `fechamento-${today.toISOString().slice(0, 10)}`,
     });
   }

@@ -57,6 +57,8 @@ export type ClosingReportData = {
   countedDebito?: number | null;
   countedCredito?: number | null;
   countedPix?: number | null;
+  suprimentoTotal?: number;
+  sangriaTotal?: number;
   fileBase: string;
 };
 
@@ -303,6 +305,8 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
     y += 4;
     y = para(p, "CONFERÊNCIA DO DINHEIRO", y, { size: 7.5, style: "bold", color: 80 });
     y += 1;
+    if ((d.suprimentoTotal ?? 0) > 0) y = row(p, "Suprimentos", `+${formatBRL(d.suprimentoTotal ?? 0)}`, y, { size: 8.5 });
+    if ((d.sangriaTotal ?? 0) > 0) y = row(p, "Sangrias", `-${formatBRL(d.sangriaTotal ?? 0)}`, y, { size: 8.5 });
     y = row(p, "Esperado em caixa", formatBRL(d.expectedCash), y, { size: 8.5 });
     if (d.countedCash != null) {
       y = row(p, "Contado", formatBRL(d.countedCash), y, { size: 8.5 });
@@ -360,6 +364,8 @@ export function buildClosingReportText(d: ClosingReportData, salon: SalonInfo): 
   }
   lines.push("");
   lines.push("*CONFERÊNCIA DO DINHEIRO*");
+  if ((d.suprimentoTotal ?? 0) > 0) lines.push(`Suprimentos: +${formatBRL(d.suprimentoTotal ?? 0)}`);
+  if ((d.sangriaTotal ?? 0) > 0) lines.push(`Sangrias: -${formatBRL(d.sangriaTotal ?? 0)}`);
   lines.push(`Esperado: ${formatBRL(d.expectedCash)}`);
   if (d.countedCash != null) {
     lines.push(`Contado: ${formatBRL(d.countedCash)}`);
