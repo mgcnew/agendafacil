@@ -1,12 +1,15 @@
 import { ImageResponse } from "next/og";
 
 // Imagem Open Graph gerada dinamicamente (compartilhamento em WhatsApp,
-// Facebook, X, LinkedIn). Mantém a identidade laranja da marca.
+// Facebook, X, LinkedIn). Identidade petróleo + ícone da marca Zulan.
 export const runtime = "edge";
 export const alt =
   "Zulan — sistema de agendamento online para salões e barbearias";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -20,27 +23,21 @@ export default function OpengraphImage() {
           justifyContent: "space-between",
           padding: "72px",
           background:
-            "linear-gradient(135deg, #e8330a 0%, #f23c10 52%, #ff5e1a 100%)",
+            "linear-gradient(135deg, #0a565d 0%, #0e6f78 52%, #138a93 100%)",
           color: "#ffffff",
           fontFamily: "sans-serif",
         }}
       >
         {/* Marca */}
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div
-            style={{
-              width: 76,
-              height: 76,
-              borderRadius: 22,
-              background: "rgba(255,255,255,0.18)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 44,
-            }}
-          >
-            ✂️
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${SITE_URL}/icon-512.png`}
+            width={76}
+            height={76}
+            alt=""
+            style={{ borderRadius: 18 }}
+          />
           <div style={{ fontSize: 40, fontWeight: 800 }}>Zulan</div>
         </div>
 
@@ -70,7 +67,7 @@ export default function OpengraphImage() {
               fontSize: 28,
               fontWeight: 700,
               background: "#ffffff",
-              color: "#e8330a",
+              color: "#0a565d",
               padding: "14px 28px",
               borderRadius: 999,
             }}

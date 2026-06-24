@@ -75,18 +75,12 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Zulan", statusBarStyle: "default" },
-  icons: {
-    icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-  },
+  // Favicon/apple-touch vêm da convenção de arquivos do Next: src/app/icon.png
+  // e src/app/apple-icon.png (gerados de icon-zulan.webp por scripts/gen-icons.mjs).
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f23c10",
+  themeColor: "#0e6f78",
   width: "device-width",
   initialScale: 1,
   // Trava o zoom (pinça/duplo-toque) no Android e no iOS em modo PWA/standalone

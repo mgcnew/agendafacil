@@ -1,13 +1,13 @@
 {
-  "name": "AgendeFácil",
-  "short_name": "AgendeFácil",
+  "name": "Zulan",
+  "short_name": "Zulan",
   "description": "Agendamento, equipe, comissões, caixa e estoque para salões e barbearias.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f6f8f7",
-  "theme_color": "#f23c10",
+  "background_color": "#f4f9f9",
+  "theme_color": "#0e6f78",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -26,12 +26,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
   ]
 }
