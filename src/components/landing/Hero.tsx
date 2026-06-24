@@ -109,10 +109,10 @@ export function Hero() {
               }}
             />
             <Image
-              src="/hero-device.webp"
+              src="/hero-nova.webp"
               alt="Zulan em uso — agenda no tablet e app no celular, num salão de beleza"
-              width={2508}
-              height={2508}
+              width={1254}
+              height={1254}
               quality={92}
               sizes="(max-width: 1024px) 90vw, 560px"
               className="w-full h-auto max-w-[560px] mx-auto"
