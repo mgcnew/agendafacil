@@ -38,6 +38,9 @@ export const viewport: Viewport = {
   themeColor: "#f23c10",
   width: "device-width",
   initialScale: 1,
+  // Trava o zoom (pinça/duplo-toque) no Android e no iOS em modo PWA/standalone
+  maximumScale: 1,
+  userScalable: false,
   // Necessário para env(safe-area-inset-*) funcionar no iOS (barra inferior do painel)
   viewportFit: "cover",
 };
