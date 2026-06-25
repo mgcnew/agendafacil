@@ -113,6 +113,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [bookErr, setBookErr] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [mine, setMine] = useState<Appt[]>([]);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
   const [showGallery, setShowGallery] = useState(false);
 
@@ -245,7 +247,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
       const { data } = await supabase.rpc("my_appointments", { p_salon: salon.id });
       setMine((data as Appt[]) ?? []);
     } else {
-      const ph = savedPhone || phone;
+      // O telefone é gravado em E164 no book_appointment; normalizar aqui também,
+      // senão a busca exata (c.phone = p_phone) não casa e a lista vem vazia.
+      const ph = toE164(savedPhone || phone);
       const { data } = await supabase.rpc("public_appointments_by_phone" as never, {
         p_salon: salon.id,
         p_phone: ph,
@@ -253,6 +257,22 @@ export function BookingApp({ salon }: { salon: Salon }) {
       setMine((data as unknown as Appt[]) ?? []);
     }
     setShowMine(true);
+  }
+
+  async function cancelAppt(a: Appt) {
+    if (!window.confirm("Cancelar este agendamento? O horário será liberado para outros clientes.")) return;
+    setCancelingId(a.id);
+    setCancelErr(null);
+    const { error } = await supabase.rpc("public_cancel_appointment" as never, {
+      p_appointment: a.id,
+      p_phone: userId ? null : toE164(savedPhone || phone),
+    } as never);
+    setCancelingId(null);
+    if (error) {
+      setCancelErr("Não foi possível cancelar. Atualize e tente novamente.");
+      return;
+    }
+    await loadMine();
   }
 
   function toggleService(id: string) {
@@ -739,7 +759,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {/* Drawer: meus agendamentos */}
       <AnimatePresence>
         {showMine && (
-          <MineDrawer key="mine" mine={mine} onClose={() => setShowMine(false)} />
+          <MineDrawer key="mine" mine={mine} onClose={() => { setShowMine(false); setCancelErr(null); }} />
         )}
       </AnimatePresence>
 
@@ -782,28 +802,48 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <h3 className="font-display text-lg font-bold">Meus agendamentos</h3>
             <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
           </div>
+          {cancelErr && (
+            <div className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+              {cancelErr}
+            </div>
+          )}
           {mine.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
               Você ainda não tem agendamentos aqui.
             </p>
           ) : (
             <div className="space-y-3">
-              {mine.map((a) => (
-                <div key={a.id} className="rounded-[var(--radius)] border border-border p-4">
-                  <div className="flex justify-between items-start">
-                    <p className="font-medium capitalize">{formatDateLong(a.starts_at)}</p>
-                    <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
-                      {STATUS_LABEL[a.status] ?? a.status}
-                    </span>
+              {mine.map((a) => {
+                const cancellable =
+                  (a.status === "pending" || a.status === "confirmed") &&
+                  new Date(a.starts_at).getTime() > Date.now();
+                return (
+                  <div key={a.id} className="rounded-[var(--radius)] border border-border p-4">
+                    <div className="flex justify-between items-start">
+                      <p className="font-medium capitalize">{formatDateLong(a.starts_at)}</p>
+                      <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
+                        {STATUS_LABEL[a.status] ?? a.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {new Date(a.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                      {" · "}{a.member_name}
+                    </p>
+                    <p className="text-sm mt-1">{a.services.join(", ")}</p>
+                    <p className="text-sm font-semibold text-primary mt-1">{formatBRL(Number(a.total_price))}</p>
+                    {cancellable && (
+                      <button
+                        onClick={() => cancelAppt(a)}
+                        disabled={cancelingId === a.id}
+                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 transition"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        {cancelingId === a.id ? "Cancelando…" : "Cancelar agendamento"}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {new Date(a.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
-                    {" · "}{a.member_name}
-                  </p>
-                  <p className="text-sm mt-1">{a.services.join(", ")}</p>
-                  <p className="text-sm font-semibold text-primary mt-1">{formatBRL(Number(a.total_price))}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
