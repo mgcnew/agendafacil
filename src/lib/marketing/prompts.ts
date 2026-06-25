@@ -20,19 +20,19 @@ export const ASSET_TYPES: {
   id: AssetType;
   label: string;
   desc: string;
-  icon: string; // nome de ícone lucide
+  icon: string; // nome de ícone Phosphor (chave de TYPE_ICON)
 }[] = [
   {
     id: "promotion",
     label: "Promoção",
     desc: "Divulgar uma campanha com desconto que você já criou.",
-    icon: "BadgePercent",
+    icon: "SealPercent",
   },
   {
     id: "service",
     label: "Serviço",
     desc: "Destacar um serviço que você oferece e o preço.",
-    icon: "Sparkles",
+    icon: "Sparkle",
   },
   {
     id: "client_work",
