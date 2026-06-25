@@ -214,8 +214,8 @@ export function FinanceManager({
           if (!checkoutClient && cartItems.length === 0) { e.preventDefault(); setClosing(true); }
           break;
         case "F9":
-          if (checkoutClient) { e.preventDefault(); setCheckoutPayModal(true); }
-          else if (cartItems.length > 0) { e.preventDefault(); setCartPayModal(true); }
+          if (checkoutClient && checkoutTotal > 0) { e.preventDefault(); setCheckoutPayModal(true); }
+          else if (cartItems.length > 0 && cartTotal > 0) { e.preventDefault(); setCartPayModal(true); }
           break;
       }
     }
@@ -224,6 +224,7 @@ export function FinanceManager({
     return () => window.removeEventListener("keydown", onKey);
   }, [
     tab, canManage, openSession, checkoutClient, cartItems.length,
+    checkoutTotal, cartTotal,
     receberModal, lojaOpen, manualModal, movementsModal,
     checkoutPayModal, cartPayModal, closing, selling, selectedSession,
     reverseTx, receiptTx, commModal,
@@ -1231,10 +1232,22 @@ function CheckoutScreen({
         </div>
       </Card>
 
-      <Button onClick={onConclude} className="w-full mt-auto" size="lg" title="Concluir (F9)">
-        <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
-        <kbd className="hidden lg:inline ml-1 text-[10px] font-mono font-semibold rounded border border-primary-foreground/30 px-1 py-0.5 leading-none opacity-80">F9</kbd>
-      </Button>
+      {total <= 0 ? (
+        <div className="mt-auto space-y-2">
+          <div className="flex items-start gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 text-amber-800 p-3 text-sm">
+            <Warning className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>Serviço sem valor definido — ajuste o preço do serviço antes de cobrar.</span>
+          </div>
+          <Button disabled className="w-full" size="lg">
+            <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={onConclude} className="w-full mt-auto" size="lg" title="Concluir (F9)">
+          <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
+          <kbd className="hidden lg:inline ml-1 text-[10px] font-mono font-semibold rounded border border-primary-foreground/30 px-1 py-0.5 leading-none opacity-80">F9</kbd>
+        </Button>
+      )}
     </div>
   );
 }
