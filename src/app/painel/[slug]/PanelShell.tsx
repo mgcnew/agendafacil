@@ -318,14 +318,14 @@ export function PanelShell({
           </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">
+        <main className="flex-1 overflow-y-auto flex flex-col max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <AnnouncementBanner announcements={announcements} />
           <div
             className={cn(
               "w-full",
               fullBleed
                 ? "h-full p-3 sm:p-4"
-                : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
+                : "flex-1 min-h-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
             )}
           >
             {children}

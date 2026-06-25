@@ -168,6 +168,67 @@ export function FinanceManager({
     if (checkoutClient) addProdToCheckout(p); else addToCart(p);
   }
 
+  // ── Atalhos de teclado estilo PDV (apenas na aba Caixa com caixa aberto) ──
+  useEffect(() => {
+    if (tab !== "caixa" || !canManage || !openSession) return;
+    const anyModal =
+      receberModal || lojaOpen || manualModal || movementsModal ||
+      checkoutPayModal || cartPayModal || closing ||
+      !!selling || !!selectedSession || !!reverseTx || !!receiptTx || !!commModal;
+
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+      // Esc: fecha qualquer modal; senão cancela checkout/carrinho.
+      if (e.key === "Escape") {
+        if (anyModal) {
+          e.preventDefault();
+          setReceberModal(false); setLojaOpen(false); setManualModal(false);
+          setMovementsModal(false); setCheckoutPayModal(false); setCartPayModal(false);
+          setClosing(false); setSelling(null); setSelectedSession(null);
+          setReverseTx(null); setReceiptTx(null); setCommModal(null);
+        } else if (checkoutClient) {
+          e.preventDefault(); setCheckoutClient(null); setCheckoutProds([]);
+        } else if (cartItems.length > 0) {
+          e.preventDefault(); setCartItems([]);
+        }
+        return;
+      }
+
+      // Com modal aberto, não dispara as demais ações.
+      if (anyModal) return;
+
+      // "/" foca a busca (exceto enquanto digita em outro campo).
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        document.getElementById("caixa-search")?.focus();
+        return;
+      }
+
+      switch (e.key) {
+        case "F2": e.preventDefault(); setReceberModal(true); break;
+        case "F3": e.preventDefault(); setManualModal(true); break;
+        case "F4": e.preventDefault(); setMovementsModal(true); break;
+        case "F8":
+          if (!checkoutClient && cartItems.length === 0) { e.preventDefault(); setClosing(true); }
+          break;
+        case "F9":
+          if (checkoutClient) { e.preventDefault(); setCheckoutPayModal(true); }
+          else if (cartItems.length > 0) { e.preventDefault(); setCartPayModal(true); }
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    tab, canManage, openSession, checkoutClient, cartItems.length,
+    receberModal, lojaOpen, manualModal, movementsModal,
+    checkoutPayModal, cartPayModal, closing, selling, selectedSession,
+    reverseTx, receiptTx, commModal,
+  ]);
+
   // Estorna uma movimentação (cobrança de atendimento volta para "Receber"; avulso é removido).
   async function reverseTransaction(t: Tx) {
     const { error } = await supabase.rpc("reverse_cash_transaction" as never, { p_tx: t.id } as never);
@@ -274,7 +335,7 @@ export function FinanceManager({
   }
 
   return (
-    <div className="space-y-6 af-rise min-h-[calc(100dvh-6rem)] lg:min-h-[calc(100dvh-3rem)] flex flex-col">
+    <div className="space-y-6 af-rise min-h-full flex flex-col">
       <div>
         <h1 className="font-display text-2xl font-bold">Caixa & Comissões</h1>
         <p className="text-muted-foreground text-sm">Controle financeiro do salão.</p>
@@ -764,6 +825,15 @@ function ActionTile({
   );
 }
 
+/* Dica de tecla de atalho exibida no rodapé dos botões do PDV (desktop). */
+function KbdHint({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="mt-1 text-[8px] font-mono font-semibold leading-none rounded border border-border bg-muted/60 text-muted-foreground/80 px-1 py-0.5">
+      {children}
+    </kbd>
+  );
+}
+
 /* ── Barra de ações PDV (4 botões compactos horizontais) ── */
 function CaixaBar({
   receivableCount, txCount, inCheckout, onReceber, onLancar, onHistorico, onFechar,
@@ -773,20 +843,22 @@ function CaixaBar({
   onReceber: () => void; onLancar: () => void; onHistorico: () => void; onFechar: () => void;
   orientation?: "vertical" | "horizontal";
 }) {
-  const actions: { icon: React.ElementType; label: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
-    { icon: Users,                 label: "Receber",   badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
-    { icon: Plus,                  label: "Lançar",                                         onClick: onLancar },
-    { icon: ClockCounterClockwise, label: "Histórico", badge: txCount || undefined,         onClick: onHistorico },
+  const actions: { icon: React.ElementType; label: string; key?: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
+    { icon: Users,                 label: "Receber",   key: "F2", badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
+    { icon: Plus,                  label: "Lançar",    key: "F3",                                      onClick: onLancar },
+    { icon: ClockCounterClockwise, label: "Histórico", key: "F4", badge: txCount || undefined,         onClick: onHistorico },
   ];
   // Horizontal (mobile): botões dividem a largura igualmente; vertical (desktop): largura fixa.
   const sizeCls = orientation === "horizontal" ? "flex-1 py-2.5" : "w-16 sm:w-20 py-3.5";
   const dividerCls = orientation === "horizontal" ? "w-px self-stretch" : "h-px";
+  const showKeys = orientation === "vertical";
   return (
     <>
       {actions.map((a) => (
         <button
           key={a.label}
           onClick={a.onClick}
+          title={a.key ? `${a.label} (${a.key})` : a.label}
           className={`relative flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border transition ${sizeCls} ${
             a.highlight ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
           }`}
@@ -798,15 +870,18 @@ function CaixaBar({
           )}
           <a.icon className="h-4 w-4 text-primary" />
           <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground">{a.label}</span>
+          {showKeys && a.key && <KbdHint>{a.key}</KbdHint>}
         </button>
       ))}
       <div className={`bg-border ${dividerCls}`} />
       <button
         onClick={onFechar}
+        title="Fechar caixa (F8)"
         className={`flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card transition hover:border-red-300 hover:bg-red-500/5 group ${sizeCls}`}
       >
         <Lock className="h-4 w-4 text-muted-foreground group-hover:text-red-500" />
         <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground group-hover:text-red-500">Fechar</span>
+        {showKeys && <KbdHint>F8</KbdHint>}
       </button>
     </>
   );
@@ -899,10 +974,11 @@ function SearchBar({
       <div className="relative">
         <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <input
+          id="caixa-search"
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => { if (q) setOpen(true); }}
-          placeholder="Buscar cliente ou produto…"
+          placeholder="Buscar cliente ou produto… (/)"
           className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
         />
       </div>
@@ -1074,9 +1150,10 @@ function CheckoutScreen({
             )}
           </div>
         </div>
-        <button onClick={onCancel}
+        <button onClick={onCancel} title="Cancelar (Esc)"
           className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition mt-0.5">
           <X className="h-3.5 w-3.5" /> Cancelar
+          <kbd className="hidden lg:inline text-[9px] font-mono rounded border border-border px-1 leading-none">Esc</kbd>
         </button>
       </div>
 
@@ -1144,8 +1221,9 @@ function CheckoutScreen({
         </div>
       </Card>
 
-      <Button onClick={onConclude} className="w-full mt-auto" size="lg">
+      <Button onClick={onConclude} className="w-full mt-auto" size="lg" title="Concluir (F9)">
         <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
+        <kbd className="hidden lg:inline ml-1 text-[10px] font-mono font-semibold rounded border border-primary-foreground/30 px-1 py-0.5 leading-none opacity-80">F9</kbd>
       </Button>
     </div>
   );
