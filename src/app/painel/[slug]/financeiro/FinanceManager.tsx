@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
@@ -141,21 +141,31 @@ export function FinanceManager({
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [reverseTx, setReverseTx] = useState<Tx | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  // ── Checkout PDV ──
+  // ── Checkout PDV (cliente selecionado) ──
   const [checkoutClient, setCheckoutClient] = useState<Receivable | null>(null);
   const [checkoutProds, setCheckoutProds] = useState<{ product: ResaleProduct; qty: number }[]>([]);
   const [checkoutPayModal, setCheckoutPayModal] = useState(false);
+  // ── Carrinho de produtos avulso (sem cliente) ──
+  const [cartItems, setCartItems] = useState<{ product: ResaleProduct; qty: number }[]>([]);
+  const [cartPayModal, setCartPayModal] = useState(false);
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3500); }
   const checkoutProdTotal = checkoutProds.reduce((s, i) => s + Number(i.product.sale_price) * i.qty, 0);
   const checkoutTotal = checkoutClient ? Number(checkoutClient.total) + checkoutProdTotal : 0;
+  const cartTotal = cartItems.reduce((s, i) => s + Number(i.product.sale_price) * i.qty, 0);
   function startCheckout(r: Receivable) { setCheckoutClient(r); setCheckoutProds([]); setReceberModal(false); }
   function cancelCheckout() { setCheckoutClient(null); setCheckoutProds([]); }
-  function addProdToCheckout(p: ResaleProduct) {
-    setCheckoutProds((prev) => {
-      const idx = prev.findIndex((i) => i.product.id === p.id);
-      if (idx !== -1) return prev.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { product: p, qty: 1 }];
-    });
+  function upsertInList(
+    list: { product: ResaleProduct; qty: number }[],
+    p: ResaleProduct,
+  ): { product: ResaleProduct; qty: number }[] {
+    const idx = list.findIndex((i) => i.product.id === p.id);
+    if (idx !== -1) return list.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i);
+    return [...list, { product: p, qty: 1 }];
+  }
+  function addProdToCheckout(p: ResaleProduct) { setCheckoutProds((prev) => upsertInList(prev, p)); }
+  function addToCart(p: ResaleProduct) { setCartItems((prev) => upsertInList(prev, p)); }
+  function handleSearchProduct(p: ResaleProduct) {
+    if (checkoutClient) addProdToCheckout(p); else addToCart(p);
   }
 
   // Estorna uma movimentação (cobrança de atendimento volta para "Receber"; avulso é removido).
@@ -318,7 +328,15 @@ export function FinanceManager({
               </p>
               {canManage && (
                 <>
-                  {/* Checkout PDV: exibe quando cliente foi selecionado */}
+                  {/* Barra de busca unificada: cliente ou produto */}
+                  <SearchBar
+                    receivable={receivable}
+                    products={resaleProducts}
+                    onSelectClient={startCheckout}
+                    onSelectProduct={handleSearchProduct}
+                  />
+
+                  {/* Área principal: checkout de cliente, carrinho avulso ou estado vazio */}
                   {checkoutClient ? (
                     <CheckoutScreen
                       client={checkoutClient}
@@ -334,17 +352,28 @@ export function FinanceManager({
                       onConclude={() => setCheckoutPayModal(true)}
                       total={checkoutTotal}
                     />
+                  ) : cartItems.length > 0 ? (
+                    <CartTable
+                      items={cartItems}
+                      total={cartTotal}
+                      onChangeQty={(id, qty) =>
+                        setCartItems((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
+                      }
+                      onRemove={(id) => setCartItems((p) => p.filter((i) => i.product.id !== id))}
+                      onClear={() => setCartItems([])}
+                      onConclude={() => setCartPayModal(true)}
+                    />
                   ) : receivable.length > 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       <strong className="font-medium text-foreground">{receivable.length}</strong>{" "}
                       cliente{receivable.length > 1 ? "s" : ""} aguardando —{" "}
-                      toque em <strong className="font-medium text-foreground">Receber</strong>.
+                      busque pelo nome ou toque em <strong className="font-medium text-foreground">Receber</strong>.
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente aguardando pagamento.</p>
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente aguardando. Use a busca para vender produtos.</p>
                   )}
 
-                  {!checkoutClient && (
+                  {!checkoutClient && cartItems.length === 0 && (
                     <div className="flex justify-end">
                       <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
                         <Lock className="h-4 w-4" /> Fechar caixa
@@ -359,7 +388,6 @@ export function FinanceManager({
                       txCount={transactions.length}
                       inCheckout={!!checkoutClient}
                       onReceber={() => setReceberModal(true)}
-                      onLoja={() => setLojaOpen(true)}
                       onLancar={() => setManualModal(true)}
                       onHistorico={() => setMovementsModal(true)}
                     />
@@ -465,6 +493,28 @@ export function FinanceManager({
             receivable={receivable}
             onPick={startCheckout}
             onClose={() => setReceberModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modal: pagamento do carrinho avulso (produtos sem cliente) */}
+      <AnimatePresence>
+        {cartPayModal && cartItems.length > 0 && (
+          <PaymentPickerModal
+            key="cart-pay"
+            title="Venda de produtos"
+            subtitle={cartItems.map((i) => `${i.product.name}${i.qty > 1 ? ` ×${i.qty}` : ""}`).join(", ")}
+            total={cartTotal}
+            confirmLabel="Cobrar"
+            onClose={() => setCartPayModal(false)}
+            onConfirm={async (pay) => {
+              for (const item of cartItems) {
+                await sellProduct(item.product.id, item.qty, pay);
+              }
+              showToast(`✓ ${formatBRL(cartTotal)} recebido`);
+              setCartItems([]);
+              setCartPayModal(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -703,19 +753,18 @@ function ActionTile({
 
 /* ── Barra de ações PDV (4 botões compactos horizontais) ── */
 function CaixaBar({
-  receivableCount, txCount, inCheckout, onReceber, onLoja, onLancar, onHistorico,
+  receivableCount, txCount, inCheckout, onReceber, onLancar, onHistorico,
 }: {
   receivableCount: number; txCount: number; inCheckout: boolean;
-  onReceber: () => void; onLoja: () => void; onLancar: () => void; onHistorico: () => void;
+  onReceber: () => void; onLancar: () => void; onHistorico: () => void;
 }) {
   const actions: { icon: React.ElementType; label: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
     { icon: Users,                 label: "Receber",   badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
-    { icon: Stack,                 label: "Loja",                                           onClick: onLoja },
     { icon: Plus,                  label: "Lançar",                                         onClick: onLancar },
     { icon: ClockCounterClockwise, label: "Histórico", badge: txCount || undefined,         onClick: onHistorico },
   ];
   return (
-    <div className="grid grid-cols-4 gap-1.5 py-2">
+    <div className="grid grid-cols-3 gap-1.5 py-2">
       {actions.map((a) => (
         <button
           key={a.label}
@@ -789,6 +838,175 @@ function ReceberModal({
         </div>
       </Card>
     </MotionModal>
+  );
+}
+
+/* ── Barra de busca unificada: clientes + produtos ── */
+function SearchBar({
+  receivable, products, onSelectClient, onSelectProduct,
+}: {
+  receivable: Receivable[];
+  products: ResaleProduct[];
+  onSelectClient: (r: Receivable) => void;
+  onSelectProduct: (p: ResaleProduct) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const lq = q.toLowerCase().trim();
+  const matchClients  = lq ? receivable.filter((r) => r.client.toLowerCase().includes(lq))  : [];
+  const matchProducts = lq ? products.filter((p) => p.name.toLowerCase().includes(lq)).slice(0, 6) : [];
+  const hasResults = matchClients.length > 0 || matchProducts.length > 0;
+
+  useEffect(() => {
+    function down(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", down);
+    return () => document.removeEventListener("mousedown", down);
+  }, []);
+
+  function pick(fn: () => void) { fn(); setQ(""); setOpen(false); }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => { if (q) setOpen(true); }}
+          placeholder="Buscar cliente ou produto…"
+          className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+        />
+      </div>
+
+      {open && lq && (
+        <div className="absolute top-full left-0 right-0 z-30 mt-1 rounded-[var(--radius)] border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden max-h-72 overflow-y-auto">
+          {!hasResults ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Nenhum resultado para &ldquo;{q}&rdquo;.</p>
+          ) : (
+            <>
+              {matchClients.length > 0 && (
+                <>
+                  <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Clientes
+                  </p>
+                  {matchClients.map((r) => {
+                    const wait = waitMinutes(r.time);
+                    return (
+                      <button key={r.id} onClick={() => pick(() => onSelectClient(r))}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition text-left">
+                        <Users className="h-4 w-4 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{r.client}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {r.services.join(", ")} · {r.time}
+                            {wait !== null && wait > 0 ? ` · ${wait} min de espera` : ""}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-primary tabular-nums shrink-0">
+                          {formatBRL(Number(r.total))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+              {matchClients.length > 0 && matchProducts.length > 0 && (
+                <div className="border-t border-border my-1 mx-3" />
+              )}
+              {matchProducts.length > 0 && (
+                <>
+                  <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Produtos
+                  </p>
+                  {matchProducts.map((p) => (
+                    <button key={p.id} onClick={() => pick(() => onSelectProduct(p))}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition text-left">
+                      <Stack className="h-4 w-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{Number(p.quantity)} em estoque</p>
+                      </div>
+                      <span className="text-sm font-semibold text-primary tabular-nums shrink-0">
+                        {formatBRL(Number(p.sale_price))}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Carrinho de produtos avulso (sem cliente vinculado) ── */
+function CartTable({
+  items, total, onChangeQty, onRemove, onClear, onConclude,
+}: {
+  items: { product: ResaleProduct; qty: number }[];
+  total: number;
+  onChangeQty: (id: string, qty: number) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+  onConclude: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-muted-foreground">Carrinho</p>
+        <button onClick={onClear}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 transition">
+          <X className="h-3.5 w-3.5" /> Limpar
+        </button>
+      </div>
+
+      <Card className="p-0 overflow-hidden divide-y divide-border">
+        {items.map((item) => (
+          <div key={item.product.id} className="flex items-center gap-2 px-4 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{item.product.name}</p>
+              <p className="text-xs text-muted-foreground">{formatBRL(Number(item.product.sale_price))} × un.</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => item.qty > 1 && onChangeQty(item.product.id, item.qty - 1)}
+                disabled={item.qty <= 1}
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted disabled:opacity-30 transition"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="text-sm font-medium w-5 text-center tabular-nums">{item.qty}</span>
+              <button
+                onClick={() => onChangeQty(item.product.id, item.qty + 1)}
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted transition"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+            <span className="text-sm font-semibold tabular-nums w-16 text-right shrink-0">
+              {formatBRL(Number(item.product.sale_price) * item.qty)}
+            </span>
+            <button onClick={() => onRemove(item.product.id)}
+              className="h-6 w-6 grid place-items-center text-muted-foreground hover:text-red-600 transition shrink-0">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between px-4 py-3.5 bg-secondary/60">
+          <span className="font-medium text-sm">Total</span>
+          <span className="font-display text-xl font-bold text-primary tabular-nums">{formatBRL(total)}</span>
+        </div>
+      </Card>
+
+      <Button onClick={onConclude} className="w-full" size="lg">
+        <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
+      </Button>
+    </div>
   );
 }
 
