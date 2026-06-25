@@ -43,7 +43,7 @@ import {
   generateReceiptPdf, buildReceiptText, payLabel,
   generateCommissionPdf, buildCommissionText,
   generateClosingReportPdf, buildClosingReportText,
-  type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData, type ClosingReportData,
+  type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData, type ClosingReportData, type ReportEntry,
 } from "./receipt";
 import { FixedCostsPanel, type FixedCost, type ChairRental, type ActivePackageSummary } from "./FixedCostsPanel";
 
@@ -532,6 +532,16 @@ export function FinanceManager({
             suprimentoTotal={suprimentoTotal}
             sangriaTotal={sangriaTotal}
             salon={salon}
+            openedBy={openSession?.opened_by ? (operatorNames[openSession.opened_by] ?? null) : null}
+            openedAt={openSession?.opened_at ?? null}
+            entries={transactions.map((t) => ({
+              createdAt: t.created_at,
+              description: t.description ?? "",
+              amount: Number(t.amount),
+              type: t.type as "income" | "expense",
+              method: t.payment_method,
+              category: t.category,
+            }))}
             onClose={() => { setClosing(false); router.refresh(); }}
             onConfirm={async (counted) => {
               const { data: { user } } = await supabase.auth.getUser();
@@ -2174,6 +2184,9 @@ function CloseModal({
   suprimentoTotal = 0,
   sangriaTotal = 0,
   salon,
+  openedBy = null,
+  openedAt = null,
+  entries = [],
   onClose,
   onConfirm,
 }: {
@@ -2185,6 +2198,9 @@ function CloseModal({
   suprimentoTotal?: number;
   sangriaTotal?: number;
   salon: SalonInfo;
+  openedBy?: string | null;
+  openedAt?: string | null;
+  entries?: ReportEntry[];
   onClose: () => void;
   onConfirm: (counted: number) => Promise<boolean>;
 }) {
@@ -2230,6 +2246,11 @@ function CloseModal({
       countedPix:     countedPixNum,
       suprimentoTotal,
       sangriaTotal,
+      openedBy,
+      openedAt,
+      closedBy: null,
+      closedAt: new Date().toISOString(),
+      entries,
       fileBase: `fechamento-${today.toISOString().slice(0, 10)}`,
     });
   }
@@ -2454,6 +2475,18 @@ function SessionDetailModal({
     difference: session.difference != null ? Number(session.difference) : null,
     suprimentoTotal,
     sangriaTotal,
+    openedBy: openedByName,
+    closedBy: closedByName,
+    openedAt: session.opened_at ?? null,
+    closedAt: session.closed_at ?? null,
+    entries: txs.map((t) => ({
+      createdAt: t.created_at,
+      description: t.description ?? "",
+      amount: Number(t.amount),
+      type: t.type as "income" | "expense",
+      method: t.payment_method,
+      category: t.category,
+    })),
     fileBase: `fechamento-${(session.closed_at ?? "").slice(0, 10)}`,
   };
 
