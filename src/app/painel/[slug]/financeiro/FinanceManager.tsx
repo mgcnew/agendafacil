@@ -301,7 +301,7 @@ export function FinanceManager({
       </div>
 
       {tab === "caixa" && (
-        <div className="flex flex-col gap-5 min-h-[calc(100dvh-9rem)]">
+        <div className="space-y-5">
           {!openSession ? (
             <Card className="p-6">
               <Wallet className="h-8 w-8 text-primary" />
@@ -323,8 +323,10 @@ export function FinanceManager({
             <>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <LockOpen className="h-3.5 w-3.5 text-emerald-600" />
-                Caixa aberto às {formatTime(openSession.opened_at)}
-                {openSession.opened_by && operatorNames[openSession.opened_by] && <> · por {operatorNames[openSession.opened_by]}</>}
+                {openSession.opened_by && operatorNames[openSession.opened_by] && (
+                  <><strong className="font-medium text-foreground">{operatorNames[openSession.opened_by]}</strong> · </>
+                )}
+                Caixa aberto em {formatDate(openSession.opened_at)} às {formatTime(openSession.opened_at)}
               </p>
               {canManage && (
                 <>
@@ -336,61 +338,72 @@ export function FinanceManager({
                     onSelectProduct={handleSearchProduct}
                   />
 
-                  {/* Área principal: checkout de cliente, carrinho avulso ou estado vazio */}
-                  {checkoutClient ? (
-                    <CheckoutScreen
-                      client={checkoutClient}
-                      prods={checkoutProds}
-                      onAddProd={() => setLojaOpen(true)}
-                      onChangeQty={(id, qty) =>
-                        setCheckoutProds((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
-                      }
-                      onRemoveProd={(id) =>
-                        setCheckoutProds((p) => p.filter((i) => i.product.id !== id))
-                      }
-                      onCancel={cancelCheckout}
-                      onConclude={() => setCheckoutPayModal(true)}
-                      total={checkoutTotal}
-                    />
-                  ) : cartItems.length > 0 ? (
-                    <CartTable
-                      items={cartItems}
-                      total={cartTotal}
-                      onChangeQty={(id, qty) =>
-                        setCartItems((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
-                      }
-                      onRemove={(id) => setCartItems((p) => p.filter((i) => i.product.id !== id))}
-                      onClear={() => setCartItems([])}
-                      onConclude={() => setCartPayModal(true)}
-                    />
-                  ) : receivable.length > 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      <strong className="font-medium text-foreground">{receivable.length}</strong>{" "}
-                      cliente{receivable.length > 1 ? "s" : ""} aguardando —{" "}
-                      busque pelo nome ou toque em <strong className="font-medium text-foreground">Receber</strong>.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente aguardando. Use a busca para vender produtos.</p>
-                  )}
-
-                  {!checkoutClient && cartItems.length === 0 && (
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
-                        <Lock className="h-4 w-4" /> Fechar caixa
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Barra de ações PDV — empurrada para a base via mt-auto */}
-                  <div className="mt-auto -mx-4 px-4 md:-mx-6 md:px-6 bg-background/95 backdrop-blur-sm border-t border-border">
+                  {/* Mobile: ações em linha horizontal logo abaixo da busca */}
+                  <div className="flex items-stretch gap-1.5 lg:hidden">
                     <CaixaBar
+                      orientation="horizontal"
                       receivableCount={receivable.length}
                       txCount={transactions.length}
                       inCheckout={!!checkoutClient}
                       onReceber={() => setReceberModal(true)}
                       onLancar={() => setManualModal(true)}
                       onHistorico={() => setMovementsModal(true)}
+                      onFechar={() => setClosing(true)}
                     />
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    {/* Zona de trabalho: checkout/carrinho/estado vazio */}
+                    <div className="flex-1 min-w-0">
+                      {checkoutClient ? (
+                        <CheckoutScreen
+                          client={checkoutClient}
+                          prods={checkoutProds}
+                          onAddProd={() => setLojaOpen(true)}
+                          onChangeQty={(id, qty) =>
+                            setCheckoutProds((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
+                          }
+                          onRemoveProd={(id) =>
+                            setCheckoutProds((p) => p.filter((i) => i.product.id !== id))
+                          }
+                          onCancel={cancelCheckout}
+                          onConclude={() => setCheckoutPayModal(true)}
+                          total={checkoutTotal}
+                        />
+                      ) : cartItems.length > 0 ? (
+                        <CartTable
+                          items={cartItems}
+                          total={cartTotal}
+                          onChangeQty={(id, qty) =>
+                            setCartItems((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
+                          }
+                          onRemove={(id) => setCartItems((p) => p.filter((i) => i.product.id !== id))}
+                          onClear={() => setCartItems([])}
+                          onConclude={() => setCartPayModal(true)}
+                        />
+                      ) : receivable.length > 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          <strong className="font-medium text-foreground">{receivable.length}</strong>{" "}
+                          cliente{receivable.length > 1 ? "s" : ""} aguardando —{" "}
+                          busque pelo nome ou toque em <strong className="font-medium text-foreground">Receber</strong>.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente aguardando. Use a busca para vender produtos.</p>
+                      )}
+                    </div>
+
+                    {/* Desktop: trilha de ações vertical à direita (lado oposto à sidebar) */}
+                    <aside className="hidden lg:flex shrink-0 sticky top-0 flex-col gap-1.5 self-start">
+                      <CaixaBar
+                        receivableCount={receivable.length}
+                        txCount={transactions.length}
+                        inCheckout={!!checkoutClient}
+                        onReceber={() => setReceberModal(true)}
+                        onLancar={() => setManualModal(true)}
+                        onHistorico={() => setMovementsModal(true)}
+                        onFechar={() => setClosing(true)}
+                      />
+                    </aside>
                   </div>
                 </>
               )}
@@ -753,23 +766,28 @@ function ActionTile({
 
 /* ── Barra de ações PDV (4 botões compactos horizontais) ── */
 function CaixaBar({
-  receivableCount, txCount, inCheckout, onReceber, onLancar, onHistorico,
+  receivableCount, txCount, inCheckout, onReceber, onLancar, onHistorico, onFechar,
+  orientation = "vertical",
 }: {
   receivableCount: number; txCount: number; inCheckout: boolean;
-  onReceber: () => void; onLancar: () => void; onHistorico: () => void;
+  onReceber: () => void; onLancar: () => void; onHistorico: () => void; onFechar: () => void;
+  orientation?: "vertical" | "horizontal";
 }) {
   const actions: { icon: React.ElementType; label: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
     { icon: Users,                 label: "Receber",   badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
     { icon: Plus,                  label: "Lançar",                                         onClick: onLancar },
     { icon: ClockCounterClockwise, label: "Histórico", badge: txCount || undefined,         onClick: onHistorico },
   ];
+  // Horizontal (mobile): botões dividem a largura igualmente; vertical (desktop): largura fixa.
+  const sizeCls = orientation === "horizontal" ? "flex-1 py-2.5" : "w-16 sm:w-20 py-3.5";
+  const dividerCls = orientation === "horizontal" ? "w-px self-stretch" : "h-px";
   return (
-    <div className="grid grid-cols-3 gap-1.5 py-2">
+    <>
       {actions.map((a) => (
         <button
           key={a.label}
           onClick={a.onClick}
-          className={`relative flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border py-3 px-1 transition ${
+          className={`relative flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border transition ${sizeCls} ${
             a.highlight ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
           }`}
         >
@@ -782,7 +800,15 @@ function CaixaBar({
           <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground">{a.label}</span>
         </button>
       ))}
-    </div>
+      <div className={`bg-border ${dividerCls}`} />
+      <button
+        onClick={onFechar}
+        className={`flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card transition hover:border-red-300 hover:bg-red-500/5 group ${sizeCls}`}
+      >
+        <Lock className="h-4 w-4 text-muted-foreground group-hover:text-red-500" />
+        <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground group-hover:text-red-500">Fechar</span>
+      </button>
+    </>
   );
 }
 
