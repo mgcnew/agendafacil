@@ -301,7 +301,7 @@ export function FinanceManager({
       </div>
 
       {tab === "caixa" && (
-        <div className="space-y-5">
+        <div className="flex flex-col gap-5 min-h-[calc(100dvh-9rem)]">
           {!openSession ? (
             <Card className="p-6">
               <Wallet className="h-8 w-8 text-primary" />
@@ -381,8 +381,8 @@ export function FinanceManager({
                     </div>
                   )}
 
-                  {/* Barra de ações PDV — sticky na base da tela */}
-                  <div className="sticky bottom-0 z-10 -mx-4 px-4 md:-mx-6 md:px-6 bg-background/95 backdrop-blur-sm border-t border-border">
+                  {/* Barra de ações PDV — empurrada para a base via mt-auto */}
+                  <div className="mt-auto -mx-4 px-4 md:-mx-6 md:px-6 bg-background/95 backdrop-blur-sm border-t border-border">
                     <CaixaBar
                       receivableCount={receivable.length}
                       txCount={transactions.length}
