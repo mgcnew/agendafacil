@@ -274,7 +274,7 @@ export function FinanceManager({
   }
 
   return (
-    <div className="space-y-6 af-rise">
+    <div className="space-y-6 af-rise min-h-[calc(100dvh-6rem)] lg:min-h-[calc(100dvh-3rem)] flex flex-col">
       <div>
         <h1 className="font-display text-2xl font-bold">Caixa & Comissões</h1>
         <p className="text-muted-foreground text-sm">Controle financeiro do salão.</p>
@@ -301,7 +301,7 @@ export function FinanceManager({
       </div>
 
       {tab === "caixa" && (
-        <div className="space-y-5">
+        <div className="space-y-5 flex-1 flex flex-col min-h-0">
           {!openSession ? (
             <Card className="p-6">
               <Wallet className="h-8 w-8 text-primary" />
@@ -352,9 +352,9 @@ export function FinanceManager({
                     />
                   </div>
 
-                  <div className="flex items-start gap-4">
+                  <div className="flex gap-4 flex-1 min-h-0">
                     {/* Zona de trabalho: checkout/carrinho/estado vazio */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex flex-col">
                       {checkoutClient ? (
                         <CheckoutScreen
                           client={checkoutClient}
@@ -1053,7 +1053,7 @@ function CheckoutScreen({
   const serviceTotal = Number(client.total);
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col gap-3">
       {/* Cabeçalho do cliente */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -1144,7 +1144,7 @@ function CheckoutScreen({
         </div>
       </Card>
 
-      <Button onClick={onConclude} className="w-full" size="lg">
+      <Button onClick={onConclude} className="w-full mt-auto" size="lg">
         <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
       </Button>
     </div>
