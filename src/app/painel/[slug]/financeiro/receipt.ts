@@ -108,6 +108,12 @@ async function loadLogoPng(url: string): Promise<Logo | null> {
     canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
+    // Máscara circular feita no canvas (confiável). Evita o clip do jsPDF, que
+    // além de não recortar (logo quadrado) corrompia o restante do documento.
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
     const scale = Math.max(size / img.width, size / img.height);
     const dw = img.width * scale;
     const dh = img.height * scale;
@@ -161,16 +167,8 @@ function drawHeader(doc: JsPDF, salon: SalonInfo, logo: Logo | null, y: number):
     const cx = W / 2;
     const cy = y + size / 2;
     const r = size / 2;
-    doc.saveGraphicsState();
-    try {
-      doc.circle(cx, cy, r, "n"); // define path sem pintar
-      doc.clip();                  // clip para o círculo
-      doc.addImage(logo.data, logo.format, cx - r, cy - r, size, size);
-    } catch {
-      /* logo inválido: ignora, mas garante o restore abaixo */
-    } finally {
-      doc.restoreGraphicsState(); // SEMPRE restaura — senão o clip vaza e zera o documento
-    }
+    // logo já vem com máscara circular (PNG transparente) — sem clip do jsPDF
+    doc.addImage(logo.data, logo.format, cx - r, cy - r, size, size);
     y += size + 3;
   } else {
     y += 1;
@@ -357,11 +355,8 @@ export async function generateClosingReportPdf(d: ClosingReportData, salon: Salo
   let lx = AMX;
   if (logo) {
     const s = 18, cx = AMX + s / 2, cy = 17, r = s / 2;
-    fill(RC_WHITE); doc.circle(cx, cy, r + 1.3, "F");
-    doc.saveGraphicsState();
-    try { doc.circle(cx, cy, r, "n"); doc.clip(); doc.addImage(logo.data, "PNG", cx - r, cy - r, s, s); }
-    catch { /* ignora */ }
-    finally { doc.restoreGraphicsState(); }
+    fill(RC_WHITE); doc.circle(cx, cy, r + 1.3, "F"); // anel branco atrás
+    doc.addImage(logo.data, "PNG", cx - r, cy - r, s, s); // logo já é circular (PNG transparente)
     lx = AMX + s + 6;
   }
   ink(RC_WHITE); font(16, "bold");
