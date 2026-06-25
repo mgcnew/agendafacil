@@ -105,7 +105,7 @@ export function FinanceManager({
   canDiscount: boolean;
   maxDiscountPercent: number;
   salon: SalonInfo;
-  initialTab: "caixa" | "comissoes" | "fixos";
+  initialTab: "caixa" | "historico" | "comissoes" | "fixos";
   period: Period;
   fixedCosts: FixedCost[];
   chairRentals: ChairRental[];
@@ -116,15 +116,16 @@ export function FinanceManager({
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
-  // Abas visíveis conforme permissão (Caixa sempre; Comissões/Fixos opcionais).
-  const allowedTabs = (["caixa", "comissoes", "fixos"] as const).filter(
+  // Abas visíveis. Caixa e Histórico sempre; Comissões/Fixos dependem de permissão.
+  const allowedTabs = (["caixa", "historico", "comissoes", "fixos"] as const).filter(
     (t) =>
       t === "caixa" ||
+      t === "historico" ||
       (t === "comissoes" && canViewCommissions) ||
       (t === "fixos" && canViewFixed),
   );
-  const safeInitialTab = allowedTabs.includes(initialTab) ? initialTab : "caixa";
-  const [tab, setTab] = useState<"caixa" | "comissoes" | "fixos">(safeInitialTab);
+  const safeInitialTab = (allowedTabs as readonly string[]).includes(initialTab) ? initialTab as typeof allowedTabs[number] : "caixa";
+  const [tab, setTab] = useState<"caixa" | "historico" | "comissoes" | "fixos">(safeInitialTab);
   const [commModal, setCommModal] = useState<Comm | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -284,7 +285,7 @@ export function FinanceManager({
               tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground"
             }`}
           >
-            {t === "caixa" ? "Caixa" : t === "comissoes" ? "Comissões" : "Fixos"}
+            {t === "caixa" ? "Caixa" : t === "historico" ? "Caixas anteriores" : t === "comissoes" ? "Comissões" : "Fixos"}
           </button>
         ))}
       </div>
@@ -368,45 +369,49 @@ export function FinanceManager({
             </>
           )}
 
-          {/* Histórico de sessões fechadas */}
-          {closedSessions.length > 0 && (
-            <div>
-              <h3 className="font-display font-semibold mb-3 flex items-center gap-2">
-                <ClockCounterClockwise className="h-4 w-4 text-primary" /> Caixas anteriores
-              </h3>
-              <div className="space-y-2">
-                {closedSessions.map((s) => {
-                  const diff = s.difference == null ? null : Number(s.difference);
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedSession(s)}
-                      className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition"
-                    >
-                      <ChartBar className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">
-                          {s.closed_at ? new Date(s.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Abertura {formatBRL(Number(s.opening_amount))}
-                          {s.expected_amount != null && <> · Esperado {formatBRL(Number(s.expected_amount))}</>}
-                          {s.closing_amount != null && <> · Contado {formatBRL(Number(s.closing_amount))}</>}
-                        </p>
-                      </div>
-                      {diff != null && (
-                        <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${
-                          diff === 0 ? "bg-muted text-muted-foreground"
-                          : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
-                          : "bg-red-500/12 text-red-600"
-                        }`}>
-                          {diff === 0 ? "Conferido" : `${diff > 0 ? "Sobra" : "Falta"} ${formatBRL(Math.abs(diff))}`}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+        </div>
+      )}
+
+      {tab === "historico" && (
+        <div className="space-y-3">
+          {closedSessions.length === 0 ? (
+            <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
+              <ClockCounterClockwise className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-3">Nenhum caixa fechado ainda.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {closedSessions.map((s) => {
+                const diff = s.difference == null ? null : Number(s.difference);
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSession(s)}
+                    className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition"
+                  >
+                    <ChartBar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {s.closed_at ? new Date(s.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Abertura {formatBRL(Number(s.opening_amount))}
+                        {s.expected_amount != null && <> · Esperado {formatBRL(Number(s.expected_amount))}</>}
+                        {s.closing_amount != null && <> · Contado {formatBRL(Number(s.closing_amount))}</>}
+                      </p>
+                    </div>
+                    {diff != null && (
+                      <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${
+                        diff === 0 ? "bg-muted text-muted-foreground"
+                        : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
+                        : "bg-red-500/12 text-red-600"
+                      }`}>
+                        {diff === 0 ? "Conferido" : `${diff > 0 ? "Sobra" : "Falta"} ${formatBRL(Math.abs(diff))}`}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

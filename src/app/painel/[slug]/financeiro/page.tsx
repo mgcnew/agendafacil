@@ -25,7 +25,7 @@ export default async function FinanceiroPage({
 }) {
   const { slug } = await params;
   const { tab, cmes } = await searchParams;
-  const validTab = tab === "comissoes" ? "comissoes" : tab === "fixos" ? "fixos" : "caixa";
+  const validTab = tab === "comissoes" ? "comissoes" : tab === "fixos" ? "fixos" : tab === "historico" ? "historico" : "caixa";
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
   await guardFeature(slug, "/financeiro");
