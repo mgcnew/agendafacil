@@ -26,7 +26,6 @@ import {
   DotsThree,
   X,
   SignOut,
-  ArrowSquareOut,
   ShareNetwork,
   ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
@@ -293,14 +292,6 @@ export function PanelShell({
             <ShareNetwork className="h-[18px] w-[18px]" />
             <Tip label="Compartilhar link" />
           </button>
-          <a
-            href={`/${salon.slug}`}
-            target="_blank"
-            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
-          >
-            <ArrowSquareOut className="h-[18px] w-[18px]" />
-            <Tip label="Ver página pública" />
-          </a>
           <button
             onClick={logout}
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
@@ -460,13 +451,6 @@ export function PanelShell({
               >
                 <ShareNetwork className="h-4.5 w-4.5" /> Compartilhar link
               </button>
-              <a
-                href={`/${salon.slug}`}
-                target="_blank"
-                className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
-              >
-                <ArrowSquareOut className="h-4.5 w-4.5" /> Página pública
-              </a>
               <button
                 onClick={logout}
                 className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
