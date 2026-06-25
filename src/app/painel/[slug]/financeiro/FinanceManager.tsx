@@ -64,6 +64,14 @@ const PAY_META: Record<string, { label: string; icon: React.ElementType }> = {
 
 const PICKER_METHODS = ["dinheiro", "pix", "debito", "credito"] as const;
 
+function waitMinutes(timeStr: string): number | null {
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  const now = new Date();
+  const sched = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+  return Math.floor((now.getTime() - sched.getTime()) / 60_000);
+}
+
 export function FinanceManager({
   salonId,
   canManage,
@@ -123,17 +131,31 @@ export function FinanceManager({
   const [opening, setOpening] = useState("0");
   const [closing, setClosing] = useState(false);
 
-  const [receiptTx, setReceiptTx] = useState<Tx | null>(null); // cupom não fiscal aberto
-  const [charging, setCharging] = useState<Receivable | null>(null); // cobrança de cliente
-  const [selling, setSelling] = useState<ResaleProduct | null>(null); // venda de produto
-  const [receberOpen, setReceberOpen] = useState(false); // lista de recebíveis (expande no lugar)
-  const [lojaOpen, setLojaOpen] = useState(false); // modal da loja (venda de produto)
-  const [manualModal, setManualModal] = useState(false); // modal de lançamento manual
-  const [movementsModal, setMovementsModal] = useState(false); // modal "ver todas" as movimentações
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null); // relatório de sessão fechada
-  const [reverseTx, setReverseTx] = useState<Tx | null>(null); // confirmação de estorno
+  const [receiptTx, setReceiptTx] = useState<Tx | null>(null);
+  const [selling, setSelling] = useState<ResaleProduct | null>(null);
+  const [receberModal, setReceberModal] = useState(false);
+  const [lojaOpen, setLojaOpen] = useState(false);
+  const [manualModal, setManualModal] = useState(false);
+  const [movementsModal, setMovementsModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [reverseTx, setReverseTx] = useState<Tx | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // ── Checkout PDV ──
+  const [checkoutClient, setCheckoutClient] = useState<Receivable | null>(null);
+  const [checkoutProds, setCheckoutProds] = useState<{ product: ResaleProduct; qty: number }[]>([]);
+  const [checkoutPayModal, setCheckoutPayModal] = useState(false);
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3500); }
+  const checkoutProdTotal = checkoutProds.reduce((s, i) => s + Number(i.product.sale_price) * i.qty, 0);
+  const checkoutTotal = checkoutClient ? Number(checkoutClient.total) + checkoutProdTotal : 0;
+  function startCheckout(r: Receivable) { setCheckoutClient(r); setCheckoutProds([]); setReceberModal(false); }
+  function cancelCheckout() { setCheckoutClient(null); setCheckoutProds([]); }
+  function addProdToCheckout(p: ResaleProduct) {
+    setCheckoutProds((prev) => {
+      const idx = prev.findIndex((i) => i.product.id === p.id);
+      if (idx !== -1) return prev.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { product: p, qty: 1 }];
+    });
+  }
 
   // Estorna uma movimentação (cobrança de atendimento volta para "Receber"; avulso é removido).
   async function reverseTransaction(t: Tx) {
@@ -295,40 +317,51 @@ export function FinanceManager({
               </p>
               {canManage && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <ActionTile icon={Users} label="Receber" badge={receivable.length} active={receberOpen} onClick={() => setReceberOpen((v) => !v)} />
-                    <ActionTile icon={Stack} label="Loja" onClick={() => setLojaOpen(true)} />
-                    <ActionTile icon={Plus} label="Lançar" onClick={() => setManualModal(true)} />
-                    <ActionTile icon={ClockCounterClockwise} label="Histórico" badge={transactions.length || undefined} onClick={() => setMovementsModal(true)} />
-                  </div>
-
-                  {/* Receber: expande no lugar */}
-                  {receberOpen && (
-                    <Card className="p-4">
-                      {receivable.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-3 text-center">Nenhum cliente a receber agora.</p>
-                      ) : (
-                        <div className="space-y-2 max-h-80 overflow-auto">
-                          {receivable.map((r) => (
-                            <button key={r.id} onClick={() => setCharging(r)}
-                              className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border p-3 hover:bg-muted/40 transition">
-                              <span className="font-display font-bold tabular-nums text-sm w-12 shrink-0">{r.time}</span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium truncate">{r.client}</p>
-                                {r.services.length > 0 && <p className="text-xs text-muted-foreground truncate">{r.services.join(", ")}</p>}
-                              </div>
-                              <span className="text-sm font-semibold text-primary shrink-0">{formatBRL(Number(r.total))}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </Card>
+                  {/* Checkout PDV: exibe quando cliente foi selecionado */}
+                  {checkoutClient ? (
+                    <CheckoutScreen
+                      client={checkoutClient}
+                      prods={checkoutProds}
+                      onAddProd={() => setLojaOpen(true)}
+                      onChangeQty={(id, qty) =>
+                        setCheckoutProds((p) => p.map((i) => i.product.id === id ? { ...i, qty } : i))
+                      }
+                      onRemoveProd={(id) =>
+                        setCheckoutProds((p) => p.filter((i) => i.product.id !== id))
+                      }
+                      onCancel={cancelCheckout}
+                      onConclude={() => setCheckoutPayModal(true)}
+                      total={checkoutTotal}
+                    />
+                  ) : receivable.length > 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      <strong className="font-medium text-foreground">{receivable.length}</strong>{" "}
+                      cliente{receivable.length > 1 ? "s" : ""} aguardando —{" "}
+                      toque em <strong className="font-medium text-foreground">Receber</strong>.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum cliente aguardando pagamento.</p>
                   )}
 
-                  <div className="flex justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
-                      <Lock className="h-4 w-4" /> Fechar caixa
-                    </Button>
+                  {!checkoutClient && (
+                    <div className="flex justify-end">
+                      <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
+                        <Lock className="h-4 w-4" /> Fechar caixa
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Barra de ações PDV — sticky na base da tela */}
+                  <div className="sticky bottom-0 z-10 -mx-4 px-4 md:-mx-6 md:px-6 bg-background/95 backdrop-blur-sm border-t border-border">
+                    <CaixaBar
+                      receivableCount={receivable.length}
+                      txCount={transactions.length}
+                      inCheckout={!!checkoutClient}
+                      onReceber={() => setReceberModal(true)}
+                      onLoja={() => setLojaOpen(true)}
+                      onLancar={() => setManualModal(true)}
+                      onHistorico={() => setMovementsModal(true)}
+                    />
                   </div>
                 </>
               )}
@@ -419,20 +452,40 @@ export function FinanceManager({
         )}
       </AnimatePresence>
 
-      {/* Cobrar cliente (escolha da forma de pagamento) */}
+      {/* Modal: lista de clientes a receber (PDV) */}
       <AnimatePresence>
-        {charging && (
+        {receberModal && (
+          <ReceberModal
+            key="receber"
+            receivable={receivable}
+            onPick={startCheckout}
+            onClose={() => setReceberModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modal: pagamento do checkout PDV (serviços + produtos) */}
+      <AnimatePresence>
+        {checkoutPayModal && checkoutClient && (
           <PaymentPickerModal
-            key="charge"
-            title={charging.client}
-            subtitle={charging.services.join(", ")}
-            total={Number(charging.total)}
+            key="checkout-pay"
+            title={checkoutClient.client}
+            subtitle={[...checkoutClient.services, ...checkoutProds.map((i) => i.product.name)].join(", ")}
+            total={checkoutTotal}
             confirmLabel="Receber"
-            allowDiscount={canDiscount}
+            allowDiscount={canDiscount && checkoutProds.length === 0}
             maxDiscountPercent={maxDiscountPercent}
-            allowSplit
-            onClose={() => setCharging(null)}
-            onConfirm={async (pay, discount, splits) => { await chargeAppointment(charging.id, pay, discount, splits); showToast(`✓ ${formatBRL(Number(charging.total))} recebido de ${charging.client}`); setCharging(null); }}
+            allowSplit={checkoutProds.length === 0}
+            onClose={() => setCheckoutPayModal(false)}
+            onConfirm={async (pay, discount, splits) => {
+              await chargeAppointment(checkoutClient.id, pay, discount, splits);
+              for (const item of checkoutProds) {
+                await sellProduct(item.product.id, item.qty, pay);
+              }
+              showToast(`✓ ${formatBRL(checkoutTotal)} recebido de ${checkoutClient.client}`);
+              cancelCheckout();
+              setCheckoutPayModal(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -455,7 +508,7 @@ export function FinanceManager({
           <LojaModal
             key="loja"
             products={resaleProducts}
-            onPick={(p) => { setLojaOpen(false); setSelling(p); }}
+            onPick={(p) => { setLojaOpen(false); checkoutClient ? addProdToCheckout(p) : setSelling(p); }}
             onClose={() => setLojaOpen(false)}
           />
         )}
@@ -640,6 +693,212 @@ function ActionTile({
       <Icon className="h-5 w-5 text-primary" />
       <span className="text-xs font-medium">{label}</span>
     </button>
+  );
+}
+
+/* ── Barra de ações PDV (4 botões compactos horizontais) ── */
+function CaixaBar({
+  receivableCount, txCount, inCheckout, onReceber, onLoja, onLancar, onHistorico,
+}: {
+  receivableCount: number; txCount: number; inCheckout: boolean;
+  onReceber: () => void; onLoja: () => void; onLancar: () => void; onHistorico: () => void;
+}) {
+  const actions: { icon: React.ElementType; label: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
+    { icon: Users,                 label: "Receber",   badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
+    { icon: Stack,                 label: "Loja",                                           onClick: onLoja },
+    { icon: Plus,                  label: "Lançar",                                         onClick: onLancar },
+    { icon: ClockCounterClockwise, label: "Histórico", badge: txCount || undefined,         onClick: onHistorico },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-1.5 py-2">
+      {actions.map((a) => (
+        <button
+          key={a.label}
+          onClick={a.onClick}
+          className={`relative flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border py-3 px-1 transition ${
+            a.highlight ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
+          }`}
+        >
+          {a.badge !== undefined && a.badge > 0 && (
+            <span className="absolute top-1 right-1 text-[9px] font-bold rounded-full bg-primary text-primary-foreground min-w-[14px] h-3.5 px-1 grid place-items-center leading-none">
+              {a.badge > 9 ? "9+" : a.badge}
+            </span>
+          )}
+          <a.icon className="h-4 w-4 text-primary" />
+          <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground">{a.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Modal: lista de clientes a receber ── */
+function ReceberModal({
+  receivable, onPick, onClose,
+}: { receivable: Receivable[]; onPick: (r: Receivable) => void; onClose: () => void }) {
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-sm mx-auto max-h-[80vh] flex flex-col p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <h3 className="font-display text-lg font-bold flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" /> A receber hoje
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-4 overflow-auto">
+          {receivable.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhum cliente a receber agora.</p>
+          ) : (
+            <div className="space-y-2">
+              {receivable.map((r) => {
+                const wait = waitMinutes(r.time);
+                return (
+                  <button key={r.id} onClick={() => onPick(r)}
+                    className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border p-3.5 hover:border-primary hover:bg-primary/5 transition">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{r.client}</p>
+                      {r.services.length > 0 && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{r.services.join(", ")}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="font-semibold text-sm text-primary tabular-nums">{formatBRL(Number(r.total))}</span>
+                      <span className="text-[11px] text-muted-foreground">{r.time}</span>
+                      {wait !== null && wait > 0 && (
+                        <span className="text-[10px] bg-amber-500/10 text-amber-700 rounded-full px-1.5 py-0.5 font-medium">
+                          {wait} min
+                        </span>
+                      )}
+                      {wait !== null && wait <= 0 && (
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-700 rounded-full px-1.5 py-0.5 font-medium">
+                          No horário
+                        </span>
+                      )}
+                    </div>
+                    <CaretRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Card>
+    </MotionModal>
+  );
+}
+
+/* ── Tela de checkout PDV (inline na página) ── */
+function CheckoutScreen({
+  client, prods, onAddProd, onChangeQty, onRemoveProd, onCancel, onConclude, total,
+}: {
+  client: Receivable;
+  prods: { product: ResaleProduct; qty: number }[];
+  onAddProd: () => void;
+  onChangeQty: (id: string, qty: number) => void;
+  onRemoveProd: (id: string) => void;
+  onCancel: () => void;
+  onConclude: () => void;
+  total: number;
+}) {
+  const wait = waitMinutes(client.time);
+  const serviceTotal = Number(client.total);
+
+  return (
+    <div className="space-y-3">
+      {/* Cabeçalho do cliente */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-display font-semibold text-base truncate">{client.client}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ClockCounterClockwise className="h-3 w-3" /> Agendado {client.time}
+            </span>
+            {wait !== null && wait > 0 && (
+              <span className="text-[11px] bg-amber-500/10 text-amber-700 rounded-full px-2 py-0.5 font-medium">
+                {wait} min de espera
+              </span>
+            )}
+            {wait !== null && wait <= 0 && (
+              <span className="text-[11px] bg-emerald-500/10 text-emerald-700 rounded-full px-2 py-0.5 font-medium">
+                No horário
+              </span>
+            )}
+          </div>
+        </div>
+        <button onClick={onCancel}
+          className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition mt-0.5">
+          <X className="h-3.5 w-3.5" /> Cancelar
+        </button>
+      </div>
+
+      {/* Itens da cobrança */}
+      <Card className="p-0 overflow-hidden divide-y divide-border">
+        {/* Serviços do agendamento */}
+        {client.services.map((s, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3">
+            <span className="text-sm flex-1 min-w-0 truncate">{s}</span>
+            {client.services.length === 1 && (
+              <span className="text-sm font-semibold tabular-nums shrink-0">{formatBRL(serviceTotal)}</span>
+            )}
+          </div>
+        ))}
+        {client.services.length > 1 && (
+          <div className="flex items-center justify-between px-4 py-2.5 bg-muted/40">
+            <span className="text-xs text-muted-foreground">Subtotal serviços</span>
+            <span className="text-sm font-semibold tabular-nums">{formatBRL(serviceTotal)}</span>
+          </div>
+        )}
+
+        {/* Produtos adicionados */}
+        {prods.map((item) => (
+          <div key={item.product.id} className="flex items-center gap-2 px-4 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{item.product.name}</p>
+              <p className="text-xs text-muted-foreground">{formatBRL(Number(item.product.sale_price))} × un.</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => item.qty > 1 && onChangeQty(item.product.id, item.qty - 1)}
+                disabled={item.qty <= 1}
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted disabled:opacity-30 transition"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <span className="text-sm font-medium w-5 text-center tabular-nums">{item.qty}</span>
+              <button
+                onClick={() => onChangeQty(item.product.id, item.qty + 1)}
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted transition"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+            <span className="text-sm font-semibold tabular-nums w-16 text-right shrink-0">
+              {formatBRL(Number(item.product.sale_price) * item.qty)}
+            </span>
+            <button onClick={() => onRemoveProd(item.product.id)}
+              className="h-6 w-6 grid place-items-center text-muted-foreground hover:text-red-600 transition shrink-0">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+
+        {/* Adicionar produto */}
+        <button onClick={onAddProd}
+          className="w-full flex items-center gap-1.5 px-4 py-3 text-xs font-medium text-primary hover:bg-primary/5 transition">
+          <Plus className="h-3.5 w-3.5" /> Adicionar produto
+        </button>
+
+        {/* Total */}
+        <div className="flex items-center justify-between px-4 py-3.5 bg-secondary/60">
+          <span className="font-medium text-sm">Total</span>
+          <span className="font-display text-xl font-bold text-primary tabular-nums">{formatBRL(total)}</span>
+        </div>
+      </Card>
+
+      <Button onClick={onConclude} className="w-full" size="lg">
+        <Check className="h-4 w-4" /> Concluir — {formatBRL(total)}
+      </Button>
+    </div>
   );
 }
 
