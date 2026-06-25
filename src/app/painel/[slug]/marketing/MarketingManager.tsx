@@ -148,7 +148,7 @@ export function MarketingManager({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6 af-rise">
       {/* Cabeçalho + créditos */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
