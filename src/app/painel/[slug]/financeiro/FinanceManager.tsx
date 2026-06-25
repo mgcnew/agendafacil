@@ -82,6 +82,8 @@ export function FinanceManager({
   fixedCosts,
   chairRentals,
   activePackages,
+  canViewCommissions,
+  canViewFixed,
 }: {
   salonId: string;
   canManage: boolean;
@@ -100,11 +102,21 @@ export function FinanceManager({
   fixedCosts: FixedCost[];
   chairRentals: ChairRental[];
   activePackages: ActivePackageSummary;
+  canViewCommissions: boolean;
+  canViewFixed: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
-  const [tab, setTab] = useState<"caixa" | "comissoes" | "fixos">(initialTab);
+  // Abas visíveis conforme permissão (Caixa sempre; Comissões/Fixos opcionais).
+  const allowedTabs = (["caixa", "comissoes", "fixos"] as const).filter(
+    (t) =>
+      t === "caixa" ||
+      (t === "comissoes" && canViewCommissions) ||
+      (t === "fixos" && canViewFixed),
+  );
+  const safeInitialTab = allowedTabs.includes(initialTab) ? initialTab : "caixa";
+  const [tab, setTab] = useState<"caixa" | "comissoes" | "fixos">(safeInitialTab);
   const [commModal, setCommModal] = useState<Comm | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -242,7 +254,7 @@ export function FinanceManager({
       )}
 
       <div className="flex gap-1 border-b border-border">
-        {(["caixa", "comissoes", "fixos"] as const).map((t) => (
+        {allowedTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}

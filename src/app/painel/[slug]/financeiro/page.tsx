@@ -167,6 +167,9 @@ export default async function FinanceiroPage({
   const perms = await getEffectivePermissions(salonId, membership);
   const canDiscount = !!salonCfg?.cash_discount_enabled && perms.has("cash.discount");
   const maxDiscountPercent = Number(salonCfg?.cash_max_discount_percent ?? 0);
+  // Abas opcionais do caixa: comissões e custos fixos (o dono libera por pessoa).
+  const canViewCommissions = perms.has("cash.commissions.view");
+  const canViewFixed = perms.has("cash.fixed.view");
 
   // ── fixos ──
   const [{ data: fixedCostsRaw }, { data: chairRaw }, { data: pkgsRaw }] = await Promise.all([
@@ -212,9 +215,11 @@ export default async function FinanceiroPage({
     <FinanceManager
       salonId={salonId}
       canManage={membership.role !== "professional"}
+      canViewCommissions={canViewCommissions}
+      canViewFixed={canViewFixed}
       openSession={openSession}
       transactions={transactions}
-      commissions={commissions}
+      commissions={canViewCommissions ? commissions : []}
       closedSessions={closedSessions ?? []}
       operatorNames={operatorNames}
       receivable={receivable}
@@ -228,9 +233,9 @@ export default async function FinanceiroPage({
         logo_url: membership.salons.logo_url,
       }}
       initialTab={validTab}
-      fixedCosts={fixedCosts}
-      chairRentals={chairRentals}
-      activePackages={activePackages}
+      fixedCosts={canViewFixed ? fixedCosts : []}
+      chairRentals={canViewFixed ? chairRentals : []}
+      activePackages={canViewFixed ? activePackages : { count: 0, total_value: 0 }}
       period={{
         label: `${MONTHS[pm - 1]} ${py}`,
         prevCmes,
