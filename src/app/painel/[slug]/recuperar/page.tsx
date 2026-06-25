@@ -38,7 +38,8 @@ export default async function RecuperarPage({
 
   return (
     <RecuperarManager
-      data={data}
+      salonId={salonId}
+      initialData={data}
       campaigns={campaigns ?? []}
       salonName={membership.salons.name}
       slug={slug}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
 import {
   ArrowCounterClockwise,
@@ -10,6 +11,8 @@ import {
   XCircle,
   ClockCounterClockwise,
   UserMinus,
+  MagnifyingGlass,
+  CircleNotch,
 } from "@phosphor-icons/react/dist/ssr";
 
 type WinbackClient = {
@@ -31,6 +34,9 @@ const TABS: { id: Bucket; label: string; icon: React.ElementType }[] = [
   { id: "inactive", label: "Inativos", icon: UserMinus },
 ];
 
+const WINDOW_OPTIONS = [30, 60, 90, 180];
+const INACTIVE_OPTIONS = [30, 45, 60, 90];
+
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 
 function waLink(phone: string | null, text: string): string | null {
@@ -41,17 +47,44 @@ function waLink(phone: string | null, text: string): string | null {
 }
 
 export function RecuperarManager({
-  data, campaigns, salonName, slug,
+  salonId, initialData, campaigns, salonName, slug,
 }: {
-  data: WinbackData;
+  salonId: string;
+  initialData: WinbackData;
   campaigns: Campaign[];
   salonName: string;
   slug: string;
 }) {
+  const [supabase] = useState(() => createClient());
   const [tab, setTab] = useState<Bucket>("no_shows");
   const [couponId, setCouponId] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [windowDays, setWindowDays] = useState(60);
+  const [inactiveDays, setInactiveDays] = useState(45);
+  const [data, setData] = useState<WinbackData>(initialData);
+  const [loading, setLoading] = useState(false);
+
+  // Re-busca quando o período muda (pula a 1ª render — initialData já usa 60/45).
+  const didMount = useRef(false);
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return; }
+    let active = true;
+    setLoading(true);
+    supabase
+      .rpc("marketing_winback" as never, {
+        p_salon: salonId, p_window_days: windowDays, p_inactive_days: inactiveDays,
+      } as never)
+      .then(({ data: d }) => {
+        if (!active) return;
+        setData((d as unknown as WinbackData) ?? { no_shows: [], cancelled: [], inactive: [] });
+        setLoading(false);
+      });
+    return () => { active = false; };
+  }, [supabase, salonId, windowDays, inactiveDays]);
+
   const coupon = campaigns.find((c) => c.id === couponId) ?? null;
-  const list = data[tab];
+  const q = query.toLowerCase().trim();
+  const list = data[tab].filter((c) => !q || c.name.toLowerCase().includes(q));
 
   function message(c: WinbackClient): string {
     const couponTxt = coupon
@@ -110,6 +143,35 @@ export function RecuperarManager({
         </div>
       )}
 
+      {/* Busca + período */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nome…"
+            className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+          {tab === "inactive" ? "Inativo há mais de" : "Janela"}
+          <select
+            value={tab === "inactive" ? inactiveDays : windowDays}
+            onChange={(e) =>
+              tab === "inactive"
+                ? setInactiveDays(Number(e.target.value))
+                : setWindowDays(Number(e.target.value))
+            }
+            className="h-10 rounded-[var(--radius)] border border-border bg-card px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            {(tab === "inactive" ? INACTIVE_OPTIONS : WINDOW_OPTIONS).map((d) => (
+              <option key={d} value={d}>{d} dias</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {TABS.map((t) => {
@@ -134,11 +196,17 @@ export function RecuperarManager({
       </div>
 
       {/* Lista */}
-      {list.length === 0 ? (
+      {loading ? (
+        <div className="grid place-items-center py-16">
+          <CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : list.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
           <ArrowCounterClockwise className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">
-            {tab === "no_shows"
+            {q
+              ? "Nenhum cliente encontrado com esse nome."
+              : tab === "no_shows"
               ? "Ninguém faltou no período. 🎉"
               : tab === "cancelled"
               ? "Nenhum cancelamento em aberto para recuperar."
