@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import NextImage from "next/image";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
@@ -298,10 +299,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             {salon.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <NextImage
                 src={salon.logo_url}
                 alt={salon.name}
+                width={56}
+                height={56}
                 className="h-14 w-14 rounded-2xl object-cover border border-border shrink-0"
               />
             ) : (
@@ -760,9 +762,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   function BookingAvatar({ p, size = 72 }: { p: Professional; size?: number }) {
     if (p.photo_url) {
       return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.photo_url} alt={p.display_name} className="rounded-full object-cover shrink-0"
-          style={{ width: size, height: size }} />
+        <NextImage src={p.photo_url} alt={p.display_name} width={size} height={size}
+          className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />
       );
     }
     return (
@@ -894,12 +895,11 @@ function GalleryModal({
             <button
               key={p.id}
               onClick={() => setIdx(i)}
-              className={`shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
+              className={`relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
                 i === idx ? "border-primary opacity-100" : "border-transparent opacity-50 hover:opacity-75"
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" className="w-full h-full object-cover" />
+              <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
             </button>
           ))}
         </div>
