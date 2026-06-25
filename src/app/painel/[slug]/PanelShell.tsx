@@ -325,7 +325,7 @@ export function PanelShell({
               "w-full",
               fullBleed
                 ? "h-full p-3 sm:p-4"
-                : "flex-1 min-h-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
+                : "flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
             )}
           >
             {children}
