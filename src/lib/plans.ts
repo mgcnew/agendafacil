@@ -39,6 +39,7 @@ export const SUBSCRIBABLE_PLANS: Plan[] = Object.values(PLANS).filter(
 /** Rotas do painel exclusivas do Pro/Max (bloqueadas no Básico). */
 export const PRO_ONLY_HREFS = [
   "/campanhas",
+  "/recuperar",
   "/pacotes",
   "/financeiro",
   "/relatorios",

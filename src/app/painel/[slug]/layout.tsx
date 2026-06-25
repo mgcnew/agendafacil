@@ -32,6 +32,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     label: "Crescimento",
     items: [
       { item: { href: "/campanhas", label: "Campanhas", icon: "BadgePercent" }, perms: ["services.manage"] },
+      { item: { href: "/recuperar", label: "Recuperar", icon: "Recover" }, perms: ["clients.view"] },
       { item: { href: "/marketing", label: "Divulgação", icon: "Megaphone" }, perms: ["services.manage"] },
       { item: { href: "/galeria", label: "Galeria", icon: "Images" }, perms: ["salon.manage"] },
     ],

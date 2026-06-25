@@ -22,6 +22,7 @@ import {
   CreditCard,
   Megaphone,
   Images,
+  ArrowCounterClockwise,
   DotsThree,
   X,
   SignOut,
@@ -49,6 +50,7 @@ const ICONS = {
   CreditCard,
   Megaphone,
   Images,
+  Recover: ArrowCounterClockwise,
 } as const;
 
 export type NavItem = {
