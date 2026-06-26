@@ -50,8 +50,8 @@ export function Hero() {
               className="font-display text-4xl sm:text-5xl lg:text-[3.75rem] font-bold leading-[1.04] tracking-tight af-rise"
               style={{ animationDelay: "0.12s" }}
             >
-              Menos WhatsApp,{" "}
-              <span className="text-primary">mais clientes na cadeira.</span>
+              Sua secretária virtual,{" "}
+              <span className="text-primary">24 horas por dia.</span>
             </h1>
 
             {/* Subtítulo */}
