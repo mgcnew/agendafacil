@@ -50,7 +50,7 @@ export function Hero() {
               className="font-display text-4xl sm:text-5xl lg:text-[3.75rem] font-bold leading-[1.04] tracking-tight af-rise"
               style={{ animationDelay: "0.12s" }}
             >
-              Sua secretária virtual,{" "}
+              Sua recepcionista virtual,{" "}
               <span className="text-primary">24 horas por dia.</span>
             </h1>
 
@@ -59,10 +59,11 @@ export function Hero() {
               className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed af-rise"
               style={{ animationDelay: "0.2s" }}
             >
-              O <strong className="font-semibold text-foreground">sistema de agendamento online</strong> para
-              salões de beleza, barbearias e estética: a cliente agenda pelo seu
-              link, recebe confirmação automática e você só aparece para atender.
-              Sem ligação, sem caderninho, sem dor de cabeça.
+              O <strong className="font-semibold text-foreground">sistema de agendamento online com inteligência artificial</strong> para
+              salões de beleza, barbearias e estética. A cliente agenda pelo seu
+              link e recebe confirmação automática; a IA organiza sua agenda,
+              recupera quem deixou de aparecer e ainda cria suas artes de
+              divulgação. Você só aparece para atender.
             </p>
 
             {/* CTAs */}
