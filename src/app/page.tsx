@@ -150,7 +150,7 @@ const FOOTER_COLS = [
   },
   {
     title: "Empresa",
-    links: ["Sobre nós", "Blog", "Contato", "Parcerias"],
+    links: ["Sobre nós", { label: "Blog", href: "/blog" }, "Contato", "Parcerias"],
   },
   {
     title: "Legal",
