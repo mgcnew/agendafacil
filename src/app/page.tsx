@@ -18,9 +18,9 @@ import {
   Lightning,
   Lock,
   Prohibit,
-  Robot,
   SealCheck,
   ShieldCheck,
+  Sparkle,
   Star,
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
@@ -85,7 +85,7 @@ const PLAN_CARDS: {
 
 const OBJECTIONS = [
   {
-    icon: Robot,
+    icon: Sparkle,
     title: "Isso é só agenda com nome bonito de IA?",
     answer:
       "Não. Já identificamos sozinhos quem faltou, cancelou ou sumiu e entregamos pronto pra chamar de volta no WhatsApp. É o primeiro passo da equipe virtual.",

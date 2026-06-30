@@ -25,8 +25,8 @@ import {
   Lock,
   Phone,
   Plus,
-  Robot,
   Scissors,
+  Sparkle,
   Warning,
   X,
 } from "@phosphor-icons/react/dist/ssr";
@@ -1115,7 +1115,7 @@ function AgendaSignalsBanner({ signals, slug }: { signals: TodaySignals | null; 
     <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-          <Robot className="h-3.5 w-3.5" />
+          <Sparkle className="h-3.5 w-3.5" />
         </span>
         <p className="text-sm font-semibold">De olho na agenda de hoje</p>
       </div>

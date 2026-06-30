@@ -16,8 +16,8 @@ import {
   Package,
   PencilSimple,
   Plus,
-  Robot,
   ShoppingCart,
+  Sparkle,
   Trash,
   X,
 } from "@phosphor-icons/react/dist/ssr";
@@ -194,7 +194,7 @@ function SoldList({
         <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-              <Robot className="h-3.5 w-3.5" />
+              <Sparkle className="h-3.5 w-3.5" />
             </span>
             <p className="text-sm font-semibold">De olho nos pacotes</p>
           </div>
@@ -535,7 +535,7 @@ function TemplateEditor({
         {validDraftItems.length > 0 && (
           <div className="rounded-[var(--radius)] border border-border p-4 bg-secondary/40">
             <p className="text-sm font-medium flex items-center gap-1.5">
-              <Robot className="h-4 w-4 text-primary" /> Pra te ajudar a decidir o preço
+              <Sparkle className="h-4 w-4 text-primary" /> Pra te ajudar a decidir o preço
             </p>
             <div className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between">

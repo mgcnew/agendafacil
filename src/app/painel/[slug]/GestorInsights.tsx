@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  Robot,
   UserCheck,
   Cake,
   Package,
@@ -114,7 +113,7 @@ function GestorInsightsCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-            <Robot className="h-4 w-4" />
+            <Sparkle className="h-4 w-4" />
           </span>
           <div>
             <p className="text-sm font-semibold">Gestor Zulan</p>
