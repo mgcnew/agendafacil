@@ -25,6 +25,7 @@ import {
   Lock,
   Phone,
   Plus,
+  Robot,
   Scissors,
   Warning,
   X,
@@ -54,9 +55,11 @@ type Appt    = {
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
 /** Sinais do dia — cálculo direto sobre dados já carregados, sem IA (v1/v2 do roadmap). */
+type LateClient = { id: string; name: string; phone: string | null; time: string };
 type TodaySignals = {
   cancelled: number;
-  late: number;
+  /** Lista (não só contagem) — cada atraso vira uma sugestão acionável de lembrete. */
+  lateClients: LateClient[];
   emptySlots: number;
   /** Estimativa de faturamento dos horários vazios, com base no histórico (v2). null = sem amostra suficiente. */
   estimatedRevenue: number | null;
@@ -1085,50 +1088,109 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
   );
 }
 
+/** Monta o link do WhatsApp pra cobrar gentilmente um cliente atrasado. */
+function lateReminderUrl(client: LateClient) {
+  const first = client.name.split(" ")[0];
+  const msg =
+    `Oi${first && first !== "Cliente" ? ` ${first}` : ""}! Tudo bem? ` +
+    `Você tinha um horário marcado aqui hoje às ${client.time} 💇 ` +
+    `Ainda vem ou prefere remarcar?`;
+  const phone = waPhone(client.phone);
+  return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : null;
+}
+
 /**
  * Banner de sinais do dia — regra direta, sem IA (v1/v2 do roadmap, ver
- * docs/produto/zulan-2.0-roadmap-ia.md). Some por completo se não houver
- * nada relevante, igual ao card do Gestor no Dashboard.
+ * docs/produto/zulan-2.0-roadmap-ia.md). Fala como alguém da equipe avisando
+ * o dono, sempre propondo uma ação de 1 clique (nunca só o número cru) — o
+ * clique do dono É a autorização; nada é enviado sozinho.
+ * Some por completo se não houver nada relevante.
  */
-function AgendaSignalsBanner({ signals }: { signals: TodaySignals | null }) {
+function AgendaSignalsBanner({ signals, slug }: { signals: TodaySignals | null; slug: string }) {
   if (!signals) return null;
-  const emptyLabel = `${signals.emptySlots} horário${signals.emptySlots === 1 ? "" : "s"} livre${signals.emptySlots === 1 ? "" : "s"} hoje`;
-  const chips = [
-    signals.cancelled > 0 && {
-      key: "cancelled",
-      icon: CalendarX,
-      label: `${signals.cancelled} cancelamento${signals.cancelled === 1 ? "" : "s"} hoje`,
-      tone: "bg-red-500/10 text-red-600",
-    },
-    signals.late > 0 && {
-      key: "late",
-      icon: ClockCountdown,
-      label: `${signals.late} cliente${signals.late === 1 ? "" : "s"} atrasado${signals.late === 1 ? "" : "s"}`,
-      tone: "bg-amber-500/10 text-amber-600",
-    },
-    signals.emptySlots > 0 && {
-      key: "empty",
-      icon: CalendarDots,
-      label:
-        signals.estimatedRevenue !== null
-          ? `${emptyLabel} · ~${formatBRL(signals.estimatedRevenue)} em potencial`
-          : emptyLabel,
-      tone: "bg-secondary text-primary",
-    },
-  ].filter((c): c is { key: string; icon: typeof CalendarX; label: string; tone: string } => !!c);
-
-  if (chips.length === 0) return null;
+  const { cancelled, lateClients, emptySlots, estimatedRevenue } = signals;
+  if (cancelled === 0 && lateClients.length === 0 && emptySlots === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {chips.map((c) => (
-        <span
-          key={c.key}
-          className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium", c.tone)}
-        >
-          <c.icon className="h-3.5 w-3.5" /> {c.label}
+    <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+          <Robot className="h-3.5 w-3.5" />
         </span>
-      ))}
+        <p className="text-sm font-semibold">De olho na agenda de hoje</p>
+      </div>
+
+      <div className="space-y-2">
+        {lateClients.length > 0 && (
+          <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+            <p className="flex items-center gap-1.5 text-sm">
+              <ClockCountdown className="h-4 w-4 shrink-0 text-amber-600" />
+              {lateClients.length === 1
+                ? `${lateClients[0].name.split(" ")[0]} ainda não chegou pro horário das ${lateClients[0].time}.`
+                : `${lateClients.length} clientes ainda não chegaram pro horário deles.`}{" "}
+              Quer que eu avise?
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lateClients.map((c) => {
+                const url = lateReminderUrl(c);
+                return url ? (
+                  <a
+                    key={c.id}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/15 transition"
+                  >
+                    <ChatCircle className="h-3.5 w-3.5" /> Lembrar {c.name.split(" ")[0]} ({c.time})
+                  </a>
+                ) : (
+                  <span
+                    key={c.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                  >
+                    {c.name.split(" ")[0]} ({c.time}) — sem WhatsApp cadastrado
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {cancelled > 0 && (
+          <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+            <p className="flex items-center gap-1.5 text-sm">
+              <CalendarX className="h-4 w-4 shrink-0 text-red-600" />
+              {cancelled === 1
+                ? "Um horário cancelou hoje e ficou livre."
+                : `${cancelled} horários cancelaram hoje e ficaram livres.`}{" "}
+              Posso te mostrar quem pode vir no lugar.
+            </p>
+            <Link
+              href={`/painel/${slug}/recuperar`}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              Ver clientes pra chamar <ArrowSquareOut className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
+
+        {emptySlots > 0 && (
+          <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+            <p className="flex items-center gap-1.5 text-sm">
+              <CalendarDots className="h-4 w-4 shrink-0 text-primary" />
+              Ainda {emptySlots === 1 ? "tem 1 horário livre" : `tem ${emptySlots} horários livres`} hoje
+              {estimatedRevenue !== null ? ` — algo em torno de ${formatBRL(estimatedRevenue)} se preencher tudo.` : "."}{" "}
+              Quer que eu sugira algum cliente parado pra esses horários?
+            </p>
+            <Link
+              href={`/painel/${slug}/recuperar`}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              Ver quem chamar <ArrowSquareOut className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1252,7 +1314,7 @@ export function AgendaManager({
     const [{ data: todayAppts }, { data: revenueRows }, ...availability] = await Promise.all([
       supabase
         .from("appointments")
-        .select("starts_at, status")
+        .select("id, starts_at, status, clients(full_name, phone)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end),
@@ -1264,12 +1326,21 @@ export function AgendaManager({
       ),
     ]);
 
-    const list = (todayAppts as { starts_at: string; status: Status }[] | null) ?? [];
+    type TodayAppt = {
+      id: string; starts_at: string; status: Status;
+      clients: { full_name: string; phone: string | null } | null;
+    };
+    const list = (todayAppts as TodayAppt[] | null) ?? [];
     const now = Date.now();
     const cancelled = list.filter((a) => a.status === "cancelled").length;
-    const late = list.filter(
-      (a) => (a.status === "pending" || a.status === "confirmed") && new Date(a.starts_at).getTime() < now,
-    ).length;
+    const lateClients: LateClient[] = list
+      .filter((a) => (a.status === "pending" || a.status === "confirmed") && new Date(a.starts_at).getTime() < now)
+      .map((a) => ({
+        id: a.id,
+        name: a.clients?.full_name ?? "Cliente",
+        phone: a.clients?.phone ?? null,
+        time: fmtHM(a.starts_at),
+      }));
 
     // Conta horários livres distintos (mesmo slot pode aparecer p/ + de 1 profissional).
     const slots = new Set<string>();
@@ -1299,7 +1370,7 @@ export function AgendaManager({
     }
 
     setTodaySignals({
-      cancelled, late, emptySlots: slots.size,
+      cancelled, lateClients, emptySlots: slots.size,
       estimatedRevenue: hasEstimate ? estimatedRevenue : null,
     });
   }, [supabase, salonId, pros]);
@@ -1443,7 +1514,7 @@ export function AgendaManager({
       </div>
 
       {/* ── Sinais de hoje (cancelamento, atraso, vazios) ─── */}
-      <AgendaSignalsBanner signals={todaySignals} />
+      <AgendaSignalsBanner signals={todaySignals} slug={slug} />
 
       {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (

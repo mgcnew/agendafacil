@@ -46,6 +46,12 @@ Implementada junto, mais cedo do que o planejado original, a pedido do usuário 
 - Sem permissão de `reports.view`, a RPC nega e a estimativa degrada graciosamente (chip continua mostrando só a contagem).
 - Arquivo: `supabase/migrations/20260630_agenda_revenue_estimate.sql`, lógica em `AgendaManager.tsx` (`loadTodaySignals`).
 
+### Banner reescrito: tom de equipe + ação de 1 clique (2026-06-30)
+Banner deixou de ser uma fileira de chips com números e virou cartões com voz de funcionário propondo solução (ver Princípio 6/7 abaixo):
+- **Cliente atrasado** → "Fulano ainda não chegou pro horário das 14h. Quer que eu avise?" + botão "Lembrar" que abre WhatsApp com mensagem pronta (mensagem montada em código, não por LLM — continua v1/v2, sem custo de IA).
+- **Cancelamento** → "Um horário cancelou e ficou livre. Posso te mostrar quem pode vir no lugar." + link pra `/recuperar`.
+- **Horário vazio** → soma a estimativa de faturamento na própria frase + link pra `/recuperar`.
+
 ### Adiado, motivo registrado (2026-06-30)
 Avaliado e **conscientemente adiado**, não esquecido:
 
@@ -100,7 +106,9 @@ Avaliado e **conscientemente adiado**, não esquecido:
 ## Princípios que valem pra toda página (lições já aprendidas)
 
 1. **A IA narra, não calcula.** Sinais vêm de SQL/RPC confiável; o LLM só prioriza e dá tom humano. (Ver [zulan-2.0-arquitetura-da-ia.md](zulan-2.0-arquitetura-da-ia.md).)
-2. **Sem ação autônoma sem fluxo de aprovação.** Enquanto não existir um mecanismo de confirmação, a IA só sugere e linka — nunca dispara mensagem, desconto ou remarcação sozinha.
+2. **Sem disparo automático sem o dono confirmar.** A IA nunca manda mensagem, aplica desconto ou remarca sozinha *sem um clique do dono* — mas isso não significa só "linkar pra outra página". Ver princípio 6.
 3. **Cuidado com amostra pequena.** Qualquer insight baseado em histórico/tendência precisa de um piso mínimo de dados antes de aparecer — testado na prática com o Dashboard (salão de teste com 2 clientes não gerava nenhum insight até popularmos dados de seed).
 4. **Streaming, nunca bloquear a página.** Chamada a LLM externo vai atrás de Suspense — a página renderiza primeiro, a IA "entra" depois.
 5. **Sempre ter fallback sem IA.** Se a chave faltar ou a chamada falhar, a página continua funcional com uma versão determinística (regras simples), nunca quebra.
+6. **Todo aviso propõe uma solução pronta pra executar, não só aponta o problema.** Decisão do usuário em 2026-06-30: "preciso que na medida do possível seja mais autônomo, ou seja, além de apontar o problema, propõe a solução e se autorizado executa." Na prática, hoje (sem API de envio de WhatsApp automatizado): a IA já monta a mensagem pronta e o link de ação (`wa.me` pré-preenchido, link pra `/recuperar`, etc.) — **o clique do dono é a autorização**, nada sai sozinho. Quando existir uma API de disparo real, subir um degrau: a IA dispara direto mas ainda pede confirmação prévia para ações de risco médio/alto (ver Hierarquia de decisões em [zulan-2.0-arquitetura-da-ia.md](zulan-2.0-arquitetura-da-ia.md)). Aplicado em: banner da Agenda (cliente atrasado → botão "Lembrar" com WhatsApp pronto; cancelamento/horário vazio → link direto pra `/recuperar`).
+7. **Tom de funcionário falando com o dono, sempre.** Nunca "3 cancelamentos detectados" — sempre algo como "Um horário cancelou hoje e ficou livre. Posso te mostrar quem pode vir no lugar." Vale pra todo aviso novo, não só os gerados por LLM.
