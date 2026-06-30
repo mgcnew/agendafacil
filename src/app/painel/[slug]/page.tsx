@@ -35,7 +35,7 @@ export default async function DashboardPage({
     return d.toISOString();
   })();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }, { data: productsRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -76,6 +76,8 @@ export default async function DashboardPage({
         .lt("starts_at", startDay)
         .order("starts_at", { ascending: false })
         .limit(6),
+      // Pra alimentar o sinal de estoque mínimo no resumo do Gestor.
+      supabase.from("products").select("quantity, min_quantity").eq("salon_id", salonId).eq("is_active", true),
     ]);
 
   const reactArr = reactRaw as unknown[] | null;
@@ -192,6 +194,10 @@ export default async function DashboardPage({
   const birthdaysTodayList = birthdays.filter((b) => b.days_until === 0);
   const birthdaysToday = birthdaysTodayList.length;
   const pkgsExpiringSoon = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3).length;
+  const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
+  const productsLowCount = products.filter(
+    (p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0,
+  ).length;
   const gestorSignals = {
     firstName,
     salonName: membership.salons.name,
@@ -201,6 +207,7 @@ export default async function DashboardPage({
     birthdaysToday,
     birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
     pkgsExpiringSoon,
+    productsLowCount,
   };
 
   return (

@@ -4,6 +4,7 @@ import {
   UserCheck,
   Cake,
   Package,
+  Stack,
   Wallet,
   Sparkle,
   CaretRight,
@@ -35,6 +36,7 @@ const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   birthday: Cake,
   package_expiring: Package,
   revenue: Wallet,
+  low_stock: Stack,
   general: Sparkle,
 };
 
@@ -52,6 +54,8 @@ function hrefFor(slug: string, type: InsightType): string | null {
       return `/painel/${slug}/pacotes`;
     case "revenue":
       return `/painel/${slug}/financeiro`;
+    case "low_stock":
+      return `/painel/${slug}/estoque`;
     default:
       return null;
   }

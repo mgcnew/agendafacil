@@ -20,6 +20,7 @@ export type DashboardSignals = {
   birthdaysToday: number;
   birthdaysSoon: number;
   pkgsExpiringSoon: number;
+  productsLowCount: number;
 };
 
 export type InsightType =
@@ -27,6 +28,7 @@ export type InsightType =
   | "birthday"
   | "package_expiring"
   | "revenue"
+  | "low_stock"
   | "general";
 
 export type Insight = {
@@ -66,6 +68,7 @@ function buildUserPrompt(signals: DashboardSignals): string {
 - Aniversariantes hoje: ${signals.birthdaysToday}
 - Aniversariantes nos próximos dias: ${signals.birthdaysSoon}
 - Pacotes de sessões vencendo em até 3 dias: ${signals.pkgsExpiringSoon}
+- Produtos no estoque mínimo: ${signals.productsLowCount}
 
 Escreva os insights mais relevantes para hoje.`;
 }
@@ -86,7 +89,7 @@ const TOOL_SCHEMA = {
             properties: {
               type: {
                 type: "string",
-                enum: ["reactivation", "birthday", "package_expiring", "revenue", "general"],
+                enum: ["reactivation", "birthday", "package_expiring", "revenue", "low_stock", "general"],
               },
               title: { type: "string", description: "Frase curta, até 60 caracteres." },
               detail: { type: "string", description: "1-2 frases explicando a oportunidade." },
@@ -124,6 +127,14 @@ function stubPayload(signals: DashboardSignals): DashboardInsightsPayload {
       type: "birthday",
       title: `${signals.birthdaysToday} aniversariante${signals.birthdaysToday === 1 ? "" : "s"} hoje`,
       detail: "Um parabéns no WhatsApp fortalece o relacionamento.",
+      priority: "media",
+    });
+  }
+  if (signals.productsLowCount > 0) {
+    insights.push({
+      type: "low_stock",
+      title: `${signals.productsLowCount} produto${signals.productsLowCount === 1 ? "" : "s"} no estoque mínimo`,
+      detail: "Vale repor antes que falte durante um atendimento.",
       priority: "media",
     });
   }
@@ -229,7 +240,7 @@ export async function computeGestorSignals(
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
 
-  const [{ data: todayAppts }, { data: profile }, { data: reactRaw }, { data: bdayRaw }, { data: pkgsRaw }] =
+  const [{ data: todayAppts }, { data: profile }, { data: reactRaw }, { data: bdayRaw }, { data: pkgsRaw }, { data: productsRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -241,6 +252,7 @@ export async function computeGestorSignals(
       supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
       supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 31 } as never),
       supabase.from("client_packages").select("expires_at").eq("salon_id", salonId).eq("status", "active"),
+      supabase.from("products").select("quantity, min_quantity").eq("salon_id", salonId).eq("is_active", true),
     ]);
 
   const appts = (todayAppts ?? []) as { status: string; total_price: number }[];
@@ -260,6 +272,11 @@ export async function computeGestorSignals(
     return dleft >= 0 && dleft <= 3;
   }).length;
 
+  const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
+  const productsLowCount = products.filter(
+    (p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0,
+  ).length;
+
   const fullName = (profile?.full_name ?? opts.displayName ?? "").trim();
 
   return {
@@ -271,5 +288,6 @@ export async function computeGestorSignals(
     birthdaysToday,
     birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
     pkgsExpiringSoon,
+    productsLowCount,
   };
 }

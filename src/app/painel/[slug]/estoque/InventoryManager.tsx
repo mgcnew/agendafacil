@@ -8,17 +8,20 @@ import type { Tables } from "@/lib/database.types";
 import {
   ArrowDown,
   ArrowUp,
+  CalendarX,
   CircleNotch,
   ClockCounterClockwise,
   Minus,
   Plus,
   Stack,
   Trash,
+  TrendDown,
   Warning,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
+import { daysUntilStockout, PRODUCT_INSIGHTS_WINDOW_DAYS, type ProductInsight } from "@/lib/productInsights";
 
 type Product = Tables<"products">;
 export type Movement = {
@@ -35,11 +38,13 @@ export function InventoryManager({
   initial,
   movements,
   canManage,
+  insights = {},
 }: {
   salonId: string;
   initial: Product[];
   movements: Movement[];
   canManage: boolean;
+  insights?: Record<string, ProductInsight>;
 }) {
   const supabase = createClient();
   const [products, setProducts] = useState<Product[]>(initial);
@@ -212,18 +217,44 @@ export function InventoryManager({
         <div className="space-y-2">
           {products.map((p) => {
             const low = Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0;
+            const insight = insights[p.id];
+            const margin = p.is_resale ? Number(p.sale_price) - Number(p.cost_price) : null;
+            const daysLeft = daysUntilStockout(Number(p.quantity), insight);
+            const dormant = p.is_resale && p.is_active && (!insight || insight.consumedQty === 0);
             return (
               <div key={p.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium truncate">{p.name}</p>
                     <span className={`text-[10px] font-medium rounded-full px-1.5 py-0.5 shrink-0 ${p.is_resale ? "bg-emerald-500/12 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
                       {p.is_resale ? "revenda" : "insumo"}
                     </span>
+                    {dormant && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-medium shrink-0">
+                        <CalendarX className="h-3 w-3" /> parado há {PRODUCT_INSIGHTS_WINDOW_DAYS}+ dias
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    custo {formatBRL(Number(p.cost_price))}
-                    {p.is_resale && <> · venda {formatBRL(Number(p.sale_price))}</>}
+                  <p className="text-xs text-muted-foreground flex items-center gap-x-2 flex-wrap mt-0.5">
+                    <span>
+                      custo {formatBRL(Number(p.cost_price))}
+                      {p.is_resale && <> · venda {formatBRL(Number(p.sale_price))}</>}
+                    </span>
+                    {margin != null && (
+                      <span className={margin < 0 ? "text-red-600" : "text-emerald-600"}>
+                        · lucro {formatBRL(margin)}
+                      </span>
+                    )}
+                    {insight && insight.consumedQty > 0 && (
+                      <span className="flex items-center gap-1">
+                        <TrendDown className="h-3 w-3" /> {insight.consumedQty} em {PRODUCT_INSIGHTS_WINDOW_DAYS}d
+                      </span>
+                    )}
+                    {daysLeft != null && (
+                      <span className={daysLeft <= 7 ? "text-amber-600 font-medium" : ""}>
+                        · acaba em ~{daysLeft}d
+                      </span>
+                    )}
                   </p>
                 </div>
                 {canManage && (

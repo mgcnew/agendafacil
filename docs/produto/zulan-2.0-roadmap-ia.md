@@ -149,7 +149,24 @@ A pedido do usuário: "teríamos uma inteligência guiando o dono na tomada de d
 
 ## Estoque
 
-**Status: ⬜ Não avaliado**
+**Status: ✅ Implementado (v1)** (2026-06-30)
+
+Correção importante descoberta durante a análise: o relatório inicial (agente de exploração) dizia que a baixa de insumo por atendimento não era automática — **estava errado**. Conferido direto no banco: `finalize_appointment()` já baixa o estoque via `service_products` e grava em `stock_movements` (`type='out'`, `reason='Atendimento'`, `appointment_id` preenchido) desde antes desta sessão. `cash_sell_product()` também já baixa estoque de revenda. Ou seja, **já existia histórico real de consumo**, só não estava agregado nem exposto em lugar nenhum — diferente de Serviços/Pacotes, aqui não foi preciso "destravar" dado, foi só agregar o que já fluía.
+
+### v1
+- **Nova RPC `product_movement_stats(p_salon, p_window_days=30)`**: agrega `stock_movements` (saídas) por produto — quantidade consumida, nº de movimentações, última movimentação.
+- **Lucro por produto de revenda**: `sale_price - cost_price`, mostrado direto na lista (cálculo simples, dado já existia, só não era exibido).
+- **Consumo (30d)** e **"acaba em ~Nd"**: estimativa de dias até zerar com base no ritmo real de saída (`quantidade ÷ consumo diário médio`) — só aparece quando há consumo recente o suficiente pra calcular uma taxa (sem consumo no período, não estima nada, evita "infinito"/sem sentido).
+- **Badge "parado há 30+ dias"**: produto de revenda ativo sem nenhuma saída na janela — mesmo princípio do "serviço parado"/"pacote parado".
+- **Sinal no Dashboard**: `productsLowCount` (estoque mínimo) chegou até o card do Gestor — gap real que a análise encontrou (Pacotes já tinha `pkgsExpiringSoon` chegando lá, Estoque não tinha equivalente). Tipo de insight novo `low_stock`, mapeado pra `/estoque`.
+- Arquivos: `src/lib/productInsights.ts` (novo), `supabase/migrations/20260630_product_movement_stats.sql`, `estoque/page.tsx`, `estoque/InventoryManager.tsx`, `src/lib/ai/dashboardInsights.ts`, Dashboard `page.tsx`, `GestorInsights.tsx`.
+
+### Adiado, motivo registrado (2026-06-30)
+| Item | Por que não entra ainda |
+|---|---|
+| Identificar desperdícios | `stock_movements.reason` só é preenchido automaticamente ('Atendimento') ou fica vazio — não existe taxonomia de motivo (quebra, validade, etc.) pro dono categorizar perdas. Precisa de UI nova antes de qualquer análise fazer sentido |
+| Sugerir promoções (ação) | O badge "parado" já aponta o produto; faltar a ação de criar campanha pra ele depende do roadmap de **Campanhas**, ainda não avaliado |
+| Sugerir compras automaticamente | Vai além de alertar — decidir quanto comprar e de quem é ação de risco médio (gasto real), precisa de fluxo de aprovação que não existe ainda |
 
 ---
 
