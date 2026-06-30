@@ -190,6 +190,45 @@ Nunca deixar dinheiro parado.
 
 ---
 
+# Serviços
+
+## Objetivo
+
+Garantir que cada serviço do cardápio realmente valha a pena pro salão, não só pro cliente.
+
+## Situação Atual
+
+- Cadastro (nome, preço, duração, comissão, categoria, produtos consumidos)
+- Margem estimada na hora de configurar — nunca confrontada com o que realmente aconteceu
+
+## Evolução
+
+O catálogo deixa de ser só configuração e passa a refletir a realidade: quanto cada serviço realmente trouxe, não só quanto deveria trazer.
+
+## A IA conhece
+
+- quantas vezes cada serviço foi agendado
+- receita real gerada (não só preço de tabela)
+- margem real (preço − comissão − produto consumido, comparada com a estimada)
+- serviços parados (ninguém agenda há X dias)
+- relação tempo ocupado × retorno (vale a pena segurar a agenda 2h nesse serviço?)
+- serviço mais pedido por profissional
+
+## Ações Inteligentes
+
+A IA poderá:
+
+- alertar serviço parado (mesmo princípio do "cliente inativo")
+- avisar quando a margem real ficou negativa ou abaixo do esperado — hoje isso é invisível
+- apontar serviços que ocupam muita agenda e rendem pouco
+- sugerir reajuste de preço com base no padrão de procura
+
+## Benefício
+
+Cardápio que se paga sozinho — menos serviço no escuro, mais decisão com base no que realmente aconteceu.
+
+---
+
 # Estoque
 
 ## Objetivo

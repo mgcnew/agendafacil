@@ -99,6 +99,28 @@ A página com mais reaproveitamento de dado/RPC já existente entre todas que tr
 
 ---
 
+## Serviços
+
+**Status: ✅ Implementado (v1)** (2026-06-30)
+
+Mesmo padrão de reaproveitamento de RPC já estabelecido (`clients_overview`, `agenda_revenue_by_hour`) — `appointment_services` já guardava preço e comissão reais (snapshotados no momento do atendimento), só não estavam agregados nem expostos.
+
+### v1
+- **Nova RPC `service_insights(p_salon, p_window_days=90)`**: agrupa `appointment_services` (atendimentos concluídos) por serviço — quantidade de agendamentos, receita real, comissão média real, última vez que foi pedido. Permissão: `is_salon_member` (mesmo padrão da `clients_overview`, não exige `reports.view` — é visível a quem gerencia o catálogo).
+- **Lucro real vs. estimado**: quando há histórico (`bookings > 0`), a margem mostrada na lista passa a usar preço/comissão médios reais em vez dos valores de cadastro — só o custo de insumo continua estimado (não dá pra saber a quantidade exata consumida por atendimento específico, só a "receita" configurada). Rótulo muda de "lucro est." pra "lucro real" automaticamente.
+- **Badge "parado há 90+ dias"**: serviço ativo sem nenhum agendamento concluído na janela.
+- **Contador de agendamentos** (`Nx`) ao lado da duração/comissão na lista.
+- Arquivos: `src/lib/serviceInsights.ts` (novo), `supabase/migrations/20260630_service_insights.sql`, `servicos/page.tsx`, `servicos/ServicesManager.tsx`.
+
+### Adiado, motivo registrado (2026-06-30)
+| Item | Por que não entra ainda |
+|---|---|
+| Alerta proativo de margem negativa / serviço parado | Hoje é só visual na lista (precisa abrir a página); virar alerta proativo (tipo o banner da Agenda/card do Dashboard) é next, mas precisa decidir onde aparece — Dashboard? Notificação? |
+| Sugestão automática de reajuste de preço | Ação de risco médio (mexe em preço) — entra na hierarquia de decisões que exige confirmação; ainda não tem fluxo de aprovação pra esse tipo de ação |
+| Serviço mais pedido por profissional | Precisa juntar `appointment_services` com `member_id` do agendamento — RPC dá pra estender, mas não entrou nesta rodada |
+
+---
+
 ## Estoque
 
 **Status: ⬜ Não avaliado**

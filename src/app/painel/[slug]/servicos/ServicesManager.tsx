@@ -10,7 +10,9 @@ import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import { SERVICE_COLORS, defaultServiceColor } from "@/lib/serviceColors";
+import type { ServiceInsight } from "@/lib/serviceInsights";
 import {
+  CalendarX,
   CaretDown,
   Check,
   CircleNotch,
@@ -24,6 +26,7 @@ import {
   Tag,
   Timer,
   Trash,
+  TrendUp,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 
@@ -47,6 +50,7 @@ export function ServicesManager({
   products,
   serviceProducts,
   initialCategories,
+  insights = {},
 }: {
   salonId: string;
   niche: Niche;
@@ -54,6 +58,7 @@ export function ServicesManager({
   products: Prod[];
   serviceProducts: SP[];
   initialCategories: Category[];
+  insights?: Record<string, ServiceInsight>;
 }) {
   const [services, setServices] = useState<Service[]>(initial);
   const [svcProducts, setSvcProducts] = useState<SP[]>(serviceProducts);
@@ -98,6 +103,22 @@ export function ServicesManager({
     const price = Number(s.price);
     const commission = price * ((s.commission_percent ?? 0) / 100);
     return price - commission - insumoCostOf(s.id);
+  }
+
+  // Margem real (90 dias): preço e comissão médios de verdade, não os do
+  // cadastro — só o custo de insumo continua estimado (não tem como saber
+  // ao certo quanto foi consumido por atendimento específico).
+  function realMarginOf(s: Service): number | null {
+    const ins = insights[s.id];
+    if (!ins || ins.bookings === 0) return null;
+    const avgPrice = ins.revenue / ins.bookings;
+    return avgPrice - ins.avgCommission - insumoCostOf(s.id);
+  }
+
+  const DORMANT_WINDOW_DAYS = 90;
+  function isDormant(s: Service): boolean {
+    if (!s.is_active) return false;
+    return !insights[s.id] || insights[s.id].bookings === 0;
   }
 
   function resetForm() {
@@ -572,7 +593,11 @@ export function ServicesManager({
           <p className="text-sm text-muted-foreground mt-3">Nenhum serviço cadastrado ainda.</p>
         </div>
       ) : categories.length === 0 ? (
-        <ServiceList services={services} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} margin={marginOf} />
+        <ServiceList
+          services={services} onEdit={openEdit} onRemove={remove} onToggle={toggleActive}
+          margin={marginOf} realMargin={realMarginOf} insights={insights} isDormant={isDormant}
+          dormantWindowDays={DORMANT_WINDOW_DAYS}
+        />
       ) : (
         <div className="space-y-4">
           {[...categories, { id: "__none__", name: "Sem categoria", sort_order: 9999 }].map((cat) => {
@@ -585,7 +610,11 @@ export function ServicesManager({
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
                   <Tag className="h-3 w-3" /> {cat.name}
                 </p>
-                <ServiceList services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} margin={marginOf} />
+                <ServiceList
+                  services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive}
+                  margin={marginOf} realMargin={realMarginOf} insights={insights} isDormant={isDormant}
+                  dormantWindowDays={DORMANT_WINDOW_DAYS}
+                />
               </div>
             );
           })}
@@ -602,23 +631,44 @@ function ServiceList({
   onRemove,
   onToggle,
   margin,
+  realMargin,
+  insights,
+  isDormant,
+  dormantWindowDays,
 }: {
   services: Tables<"services">[];
   onEdit: (s: Tables<"services">) => void;
   onRemove: (id: string) => void;
   onToggle: (s: Tables<"services">) => void;
   margin?: (s: Tables<"services">) => number | null;
+  realMargin?: (s: Tables<"services">) => number | null;
+  insights?: Record<string, ServiceInsight>;
+  isDormant?: (s: Tables<"services">) => boolean;
+  dormantWindowDays?: number;
 }) {
   return (
     <div className="space-y-2">
-      {services.map((s) => (
+      {services.map((s) => {
+        const real = realMargin?.(s) ?? null;
+        const estimated = margin?.(s) ?? null;
+        const m = real ?? estimated;
+        const bookings = insights?.[s.id]?.bookings ?? 0;
+        const dormant = isDormant?.(s) ?? false;
+        return (
         <div
           key={s.id}
           className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${!s.is_active ? "opacity-60" : ""}`}
         >
           <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
           <div className="flex-1 min-w-0">
-            <p className="font-medium">{s.name}</p>
+            <p className="font-medium flex items-center gap-2">
+              {s.name}
+              {dormant && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-medium">
+                  <CalendarX className="h-3 w-3" /> parado há {dormantWindowDays ?? 90}+ dias
+                </span>
+              )}
+            </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
               <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
               {s.commission_percent != null && (
@@ -627,15 +677,16 @@ function ServiceList({
               {s.processing_time_min > 0 && (
                 <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
               )}
-              {(() => {
-                const m = margin?.(s);
-                if (m == null) return null;
-                return (
-                  <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                    <Percent className="h-3 w-3" /> lucro {formatBRL(m)}
-                  </span>
-                );
-              })()}
+              {bookings > 0 && (
+                <span className="flex items-center gap-1 text-foreground/70" title={`${bookings} atendimento(s) concluído(s) nos últimos ${dormantWindowDays ?? 90} dias`}>
+                  <TrendUp className="h-3 w-3" /> {bookings}x
+                </span>
+              )}
+              {m != null && (
+                <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  <Percent className="h-3 w-3" /> lucro{real != null ? " real" : " est."} {formatBRL(m)}
+                </span>
+              )}
             </div>
           </div>
           <span className="font-semibold text-primary text-sm text-right">
@@ -654,7 +705,8 @@ function ServiceList({
             <Trash className="h-4 w-4" />
           </button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
