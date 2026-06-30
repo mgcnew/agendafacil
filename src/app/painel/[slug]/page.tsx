@@ -189,7 +189,8 @@ export default async function DashboardPage({
 
   // Sinais para o "Gestor Zulan" — a geração roda atrás de um Suspense (ver
   // abaixo) pra nunca atrasar o resto do Dashboard na 1ª visita do dia.
-  const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
+  const birthdaysTodayList = birthdays.filter((b) => b.days_until === 0);
+  const birthdaysToday = birthdaysTodayList.length;
   const pkgsExpiringSoon = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3).length;
   const gestorSignals = {
     firstName,
@@ -227,7 +228,13 @@ export default async function DashboardPage({
         <div className="space-y-6 min-w-0">
           {/* Resumo do Gestor Zulan — streaming: não bloqueia o resto da página */}
           <Suspense fallback={<GestorInsightsSkeleton />}>
-            <GestorInsightsAsync slug={slug} supabase={supabase} salonId={salonId} signals={gestorSignals} />
+            <GestorInsightsAsync
+              slug={slug}
+              supabase={supabase}
+              salonId={salonId}
+              signals={gestorSignals}
+              birthdayClients={birthdaysTodayList.map((b) => ({ id: b.id, name: b.name, phone: b.phone }))}
+            />
           </Suspense>
 
           {/* Stats */}
