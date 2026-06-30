@@ -10,6 +10,7 @@ Conjunto de documentos que define a direção estratégica do produto. Toda deci
 | [zulan-2.0-estrategia-comercial.md](zulan-2.0-estrategia-comercial.md) | Planos (Solo / Equipe / Gestor) e como comunicar valor |
 | [zulan-2.0-manifesto-equipe-virtual.md](zulan-2.0-manifesto-equipe-virtual.md) | Texto de posicionamento — o problema, a visão, a promessa |
 | [zulan-2.0-documento-funcional-das-paginas.md](zulan-2.0-documento-funcional-das-paginas.md) | Página por página: situação atual vs. evolução com IA |
+| [zulan-2.0-roadmap-ia.md](zulan-2.0-roadmap-ia.md) | **Documento vivo** — status real de implementação por página (v1/v2, o que foi adiado e por quê) |
 
 ---
 
@@ -37,7 +38,4 @@ Conjunto de documentos que define a direção estratégica do produto. Toda deci
 
 ## O que isso implica para o roadmap técnico
 
-Esses documentos são visão de produto, não uma spec de implementação. Antes de tocar em código, vale decidir com você:
-1. Qual painel/feature começa primeiro (Dashboard com resumo do Gestor IA parece o ponto de entrada mais natural, já que toca todas as outras áreas).
-2. Que modelo de IA/orquestração vai gerar essas análises (regras determinísticas hoje vs. LLM).
-3. Escopo realista para uma primeira versão visível ao usuário, dado que "Recuperar clientes" já é um protótipo funcionando desse padrão.
+Esses documentos são visão de produto, não uma spec de implementação. O acompanhamento real de status — o que já foi construído, o que está planejado pra próxima fase, e o que foi conscientemente adiado (e por quê) — fica em [zulan-2.0-roadmap-ia.md](zulan-2.0-roadmap-ia.md). Atualizar esse documento sempre que uma decisão de escopo for tomada.

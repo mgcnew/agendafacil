@@ -21,6 +21,7 @@ import {
   CaretRight,
   ChatCircle,
   CircleNotch,
+  ClockCountdown,
   Lock,
   Phone,
   Plus,
@@ -52,6 +53,8 @@ type Appt    = {
   color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
+/** Sinais do dia — cálculo direto sobre dados já carregados, sem IA (v1 do roadmap). */
+type TodaySignals = { cancelled: number; late: number; emptySlots: number };
 type Block = { id: string; member_id: string | null; starts_at: string; ends_at: string; reason: string | null };
 type HistoryAppt = {
   id: string;
@@ -1074,6 +1077,50 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
   );
 }
 
+/**
+ * Banner de sinais do dia — regra direta, sem IA (v1 do roadmap, ver
+ * docs/produto/zulan-2.0-roadmap-ia.md). Some por completo se não houver
+ * nada relevante, igual ao card do Gestor no Dashboard.
+ */
+function AgendaSignalsBanner({ signals }: { signals: TodaySignals | null }) {
+  if (!signals) return null;
+  const chips = [
+    signals.cancelled > 0 && {
+      key: "cancelled",
+      icon: CalendarX,
+      label: `${signals.cancelled} cancelamento${signals.cancelled === 1 ? "" : "s"} hoje`,
+      tone: "bg-red-500/10 text-red-600",
+    },
+    signals.late > 0 && {
+      key: "late",
+      icon: ClockCountdown,
+      label: `${signals.late} cliente${signals.late === 1 ? "" : "s"} atrasado${signals.late === 1 ? "" : "s"}`,
+      tone: "bg-amber-500/10 text-amber-600",
+    },
+    signals.emptySlots > 0 && {
+      key: "empty",
+      icon: CalendarDots,
+      label: `${signals.emptySlots} horário${signals.emptySlots === 1 ? "" : "s"} livre${signals.emptySlots === 1 ? "" : "s"} hoje`,
+      tone: "bg-secondary text-primary",
+    },
+  ].filter((c): c is { key: string; icon: typeof CalendarX; label: string; tone: string } => !!c);
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium", c.tone)}
+        >
+          <c.icon className="h-3.5 w-3.5" /> {c.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
@@ -1181,20 +1228,58 @@ export function AgendaManager({
 
   useEffect(() => { load(); }, [load]);
 
+  // Sinais de "hoje" — independentes da view/data navegada (banner sempre
+  // reflete o dia atual, mesmo se o usuário estiver olhando outro mês).
+  const [todaySignals, setTodaySignals] = useState<TodaySignals | null>(null);
+  const loadTodaySignals = useCallback(async () => {
+    const todayStr = toStr(new Date());
+    const start = new Date(todayStr + "T00:00:00").toISOString();
+    const end   = new Date(todayStr + "T23:59:59").toISOString();
+
+    const [{ data: todayAppts }, ...availability] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("starts_at, status")
+        .eq("salon_id", salonId)
+        .gte("starts_at", start)
+        .lte("starts_at", end),
+      ...pros.map((p) =>
+        supabase.rpc("get_availability", { p_salon: salonId, p_member: p.id, p_date: todayStr, p_duration: 30 }),
+      ),
+    ]);
+
+    const list = (todayAppts as { starts_at: string; status: Status }[] | null) ?? [];
+    const now = Date.now();
+    const cancelled = list.filter((a) => a.status === "cancelled").length;
+    const late = list.filter(
+      (a) => (a.status === "pending" || a.status === "confirmed") && new Date(a.starts_at).getTime() < now,
+    ).length;
+
+    // Conta horários livres distintos (mesmo slot pode aparecer p/ + de 1 profissional).
+    const slots = new Set<string>();
+    for (const r of availability) for (const slot of (r.data as string[] | null) ?? []) slots.add(slot);
+
+    setTodaySignals({ cancelled, late, emptySlots: slots.size });
+  }, [supabase, salonId, pros]);
+
+  useEffect(() => { loadTodaySignals(); }, [loadTodaySignals]);
+
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; }, [load]);
+  const loadTodaySignalsRef = useRef(loadTodaySignals);
+  useEffect(() => { loadTodaySignalsRef.current = loadTodaySignals; }, [loadTodaySignals]);
   useEffect(() => {
     const channel = supabase
       .channel(`agenda:${salonId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments", filter: `salon_id=eq.${salonId}` },
-        () => loadRef.current(),
+        () => { loadRef.current(); loadTodaySignalsRef.current(); },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "schedule_blocks", filter: `salon_id=eq.${salonId}` },
-        () => loadRef.current(),
+        () => { loadRef.current(); loadTodaySignalsRef.current(); },
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -1314,6 +1399,9 @@ export function AgendaManager({
           </Button>
         </div>
       </div>
+
+      {/* ── Sinais de hoje (cancelamento, atraso, vazios) ─── */}
+      <AgendaSignalsBanner signals={todaySignals} />
 
       {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (
