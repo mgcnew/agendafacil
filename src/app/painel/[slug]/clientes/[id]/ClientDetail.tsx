@@ -29,6 +29,8 @@ import {
   Heartbeat,
   Phone,
   ShieldCheck,
+  Sparkle,
+  Star,
   User,
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
@@ -46,7 +48,12 @@ type ClientStats = {
   totalSpent: number;
   avgTicket: number;
   lastVisit: string | null;
+  noShows: number;
+  cancellations: number;
+  favoritePro: string | null;
 };
+type Birthday = { daysUntil: number; turningAge: number } | null;
+type Reactivation = { daysSince: number; overdueBy: number } | null;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando", confirmed: "Confirmado", in_progress: "Em andamento",
@@ -56,7 +63,7 @@ const STATUS_LABEL: Record<string, string> = {
 type Tab = "dados" | "anamnese" | "historico";
 
 export function ClientDetail({
-  slug, client, anamnesis, history, stats, canManage, niche,
+  slug, client, anamnesis, history, stats, canManage, niche, isVip, birthday, reactivation,
 }: {
   slug: string;
   client: Client;
@@ -65,13 +72,20 @@ export function ClientDetail({
   stats: ClientStats;
   canManage: boolean;
   niche: Niche;
+  isVip: boolean;
+  birthday: Birthday;
+  reactivation: Reactivation;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("dados");
   const [alert, setAlert] = useState<string | null>(client.alert_summary);
 
-  const wa = client.phone ? waLink(client.phone, `Oi ${client.full_name.split(" ")[0]}! Tudo bem? 😊`) : null;
+  const firstName = client.full_name.split(" ")[0];
+  const wa = client.phone ? waLink(client.phone, `Oi ${firstName}! Tudo bem? 😊`) : null;
+  const waReturn = client.phone
+    ? waLink(client.phone, `Oi ${firstName}! Faz um tempinho que você não vem aqui — bora marcar um horário? 💇`)
+    : null;
   const agendarHref = `/painel/${slug}/agenda?novo=1&cliente=${client.id}`;
 
   return (
@@ -85,7 +99,20 @@ export function ClientDetail({
           {client.full_name.charAt(0)}
         </span>
         <div className="flex-1 min-w-0">
-          <h1 className="font-display text-2xl">{client.full_name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-2xl">{client.full_name}</h1>
+            {isVip && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+                <Star className="h-3 w-3" /> VIP
+              </span>
+            )}
+            {birthday && birthday.daysUntil <= 7 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-pink-400/15 px-2 py-0.5 text-[11px] font-medium text-pink-700">
+                <Cake className="h-3 w-3" />
+                {birthday.daysUntil === 0 ? "Aniversário hoje 🎉" : birthday.daysUntil === 1 ? "Aniversário amanhã" : `Aniversário em ${birthday.daysUntil} dias`}
+              </span>
+            )}
+          </div>
           {client.phone && <p className="text-sm text-muted-foreground">{client.phone}</p>}
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -108,7 +135,34 @@ export function ClientDetail({
         <StatBox label="Total gasto" value={formatBRL(stats.totalSpent)} />
         <StatBox label="Ticket médio" value={formatBRL(stats.avgTicket)} />
         <StatBox label="Última visita" value={stats.lastVisit ? formatDate(stats.lastVisit) : "—"} />
+        <StatBox label="Faltas" value={String(stats.noShows)} warn={stats.noShows > 0} />
+        <StatBox label="Cancelamentos" value={String(stats.cancellations)} warn={stats.cancellations > 0} />
+        <StatBox label="Profissional favorito" value={stats.favoritePro ?? "—"} />
       </div>
+
+      {/* Sugestão do Gestor: cliente acima do ritmo normal de retorno */}
+      {reactivation && (
+        <div className="flex items-start gap-3 rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+            <Sparkle className="h-4 w-4" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm">
+              {firstName} está {reactivation.daysSince} dias sem vir — isso é {reactivation.overdueBy} dias a mais que o ritmo normal dela(e). Quer lembrar de voltar?
+            </p>
+            {waReturn && (
+              <a
+                href={waReturn}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/15 transition"
+              >
+                <ChatCircle className="h-3.5 w-3.5" /> Lembrar retorno
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Alerta de segurança */}
       {alert && (
@@ -415,11 +469,11 @@ function HistoricoTab({ history }: { history: HistoryItem[] }) {
 }
 
 /* ---------------- Resumo (cards) ---------------- */
-function StatBox({ label, value }: { label: string; value: string }) {
+function StatBox({ label, value, warn = false }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className="rounded-[var(--radius)] border border-border bg-card p-3 text-center">
+    <div className={`rounded-[var(--radius)] border p-3 text-center ${warn ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}>
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 font-display font-bold text-foreground truncate">{value}</p>
+      <p className={`mt-1 font-display font-bold truncate ${warn ? "text-amber-700" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }

@@ -68,7 +68,25 @@ Avaliado e **conscientemente adiado**, não esquecido:
 
 ## Clientes
 
-**Status: ⬜ Não avaliado**
+**Status: ✅ Implementado (v1)** (2026-06-30)
+
+A página com mais reaproveitamento de dado/RPC já existente entre todas que tratamos até aqui — quase tudo do v1 já estava calculado em outro lugar do sistema, só não exposto no perfil do cliente.
+
+### v1 — sinais fáceis, reaproveitando RPCs já existentes
+- **Aniversário no perfil**: badge no cabeçalho quando faltam ≤7 dias (`nextBirthday()` em `src/lib/clients.ts`, a partir do `birth_date` já cadastrado).
+- **Profissional favorito**: agregação simples sobre o histórico completo de atendimentos concluídos do cliente (mais frequente).
+- **Faltas e cancelamentos no perfil**: contagem direta sobre os agendamentos do cliente (antes só existia agregado, dentro do `/recuperar`).
+- **Selo de Cliente VIP** (lista e perfil): top 20% de gasto entre clientes com 2+ visitas — **com guard de amostra mínima** (precisa de pelo menos 5 clientes elegíveis no salão, senão ninguém é marcado VIP). Lógica em `computeVipIds()`, `src/lib/clients.ts`.
+- **"Previsão de abandono" no perfil**: reaproveita a fórmula já validada do `report_reactivation` (mesma RPC do `/recuperar`) — mostra "está X dias acima do ritmo normal dela(e)" quando aplicável.
+- **"Lembrar retorno"** — ação de 1 clique (WhatsApp pré-preenchido), aparece junto da previsão de abandono. Mesmo princípio de sempre: a IA narra o sinal, o código monta o link com dado real, o clique do dono autoriza.
+- Arquivos: `src/lib/clients.ts` (novo, compartilhado entre lista e perfil), `clientes/page.tsx`, `clientes/ClientsManager.tsx`, `clientes/[id]/page.tsx`, `clientes/[id]/ClientDetail.tsx`.
+
+### Adiado, motivo registrado (2026-06-30)
+| Sinal | Por que não entra ainda |
+|---|---|
+| Produtos/serviços preferidos | Precisa de RPC nova juntando `appointment_services` por cliente — não é leitura direta de dado já calculado |
+| Potencial de compra | Precisa de um score de verdade (ex.: RFM), não é leitura direta — modelo ainda não definido |
+| Sugestão automática de campanha por cliente | Faz mais sentido morar no roadmap de **Campanhas** (ainda não avaliado) do que no perfil individual |
 
 ---
 

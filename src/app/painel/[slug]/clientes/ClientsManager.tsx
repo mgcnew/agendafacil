@@ -15,6 +15,7 @@ import {
   MagnifyingGlass,
   Phone,
   Plus,
+  Star,
   Trash,
   Warning,
   X,
@@ -32,15 +33,17 @@ function daysSince(iso: string | undefined): number | null {
 }
 
 export function ClientsManager({
-  slug, salonId, initial, lastVisit, canManage,
+  slug, salonId, initial, lastVisit, vipIds = [], canManage,
 }: {
   slug: string;
   salonId: string;
   initial: Client[];
   lastVisit: Record<string, string>;
+  vipIds?: string[];
   canManage: boolean;
 }) {
   const supabase = createClient();
+  const vipSet = new Set(vipIds);
   const [clients, setClients] = useState<Client[]>(initial);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -231,6 +234,11 @@ export function ClientsManager({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate flex items-center gap-2">
                     {c.full_name}
+                    {vipSet.has(c.id) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase">
+                        <Star className="h-3 w-3" /> VIP
+                      </span>
+                    )}
                     {c.alert_summary && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium">
                         <Warning className="h-3 w-3" /> alerta
