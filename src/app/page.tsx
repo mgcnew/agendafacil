@@ -18,6 +18,7 @@ import {
   Lightning,
   Lock,
   Prohibit,
+  Robot,
   SealCheck,
   ShieldCheck,
   Star,
@@ -31,9 +32,9 @@ const SITE_URL =
 // buscas que a dona de salão/barbearia faz no Google.
 export const metadata: Metadata = {
   title:
-    "Sistema de agendamento online para salões de beleza e barbearias",
+    "Sistema de agendamento online com IA para salões de beleza e barbearias",
   description:
-    "Zulan é o sistema de agendamento online para salões de beleza, barbearias e estética. A cliente agenda pelo seu link, recebe confirmação automática e você gerencia agenda, comissões, caixa e estoque. Teste grátis por 14 dias, sem cartão.",
+    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda, do caixa e do marketing. Teste grátis por 14 dias, sem cartão.",
   alternates: { canonical: "/" },
 };
 
@@ -42,38 +43,40 @@ export const metadata: Metadata = {
 const PLAN_CARDS: {
   id: "basic" | "pro" | "max";
   highlight?: boolean;
+  role: string;
   pitch: string;
   features: string[];
 }[] = [
   {
     id: "basic",
-    pitch: "Para organizar a agenda e parar de perder horário.",
+    role: "Recepcionista virtual",
+    pitch: "Ela atende, agenda e confirma horário — 24 horas por dia.",
     features: [
       "Agenda online ilimitada",
       "Link de agendamento para clientes",
-      "Cadastro de clientes",
-      "Serviços e equipe",
-      "Lembretes via WhatsApp",
+      "Confirmação e lembretes no WhatsApp",
+      "Cadastro de clientes, serviços e equipe",
     ],
   },
   {
     id: "pro",
     highlight: true,
-    pitch: "O salão completo: financeiro, estoque e relatórios.",
+    role: "+ Marketing e Financeiro",
+    pitch: "Sua equipe cresce: alguém cuidando do caixa e procurando clientes para você.",
     features: [
-      "Tudo do Básico",
-      "Caixa e comissões",
+      "Tudo da Recepcionista",
+      "Caixa e comissões automatizados",
       "Controle de estoque",
-      "Pacotes de sessões",
-      "Campanhas e promoções",
+      "Campanhas e recuperação de clientes",
       "Relatórios e reativação",
     ],
   },
   {
     id: "max",
-    pitch: "Tudo do Pro com automação no WhatsApp.",
+    role: "+ Automação no WhatsApp",
+    pitch: "Toda a equipe, agora respondendo e agindo sozinha no WhatsApp.",
     features: [
-      "Tudo do Pro",
+      "Tudo da Equipe",
       "Integração com WhatsApp",
       "Mensagens automáticas",
     ],
@@ -81,6 +84,12 @@ const PLAN_CARDS: {
 ];
 
 const OBJECTIONS = [
+  {
+    icon: Robot,
+    title: "Isso é só agenda com nome bonito de IA?",
+    answer:
+      "Não. Já identificamos sozinhos quem faltou, cancelou ou sumiu e entregamos pronto pra chamar de volta no WhatsApp. É o primeiro passo da equipe virtual.",
+  },
   {
     icon: DeviceMobile,
     title: "Minha cliente vai conseguir usar?",
@@ -303,7 +312,7 @@ function StructuredData() {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         description:
-          "Software de agendamento online para salões de beleza, barbearias e clínicas de estética.",
+          "Equipe virtual com inteligência artificial para salões de beleza, barbearias e clínicas de estética: agenda, recupera clientes, fecha caixa e cuida do marketing 24 horas por dia.",
         sameAs: [],
       },
       {
@@ -322,7 +331,7 @@ function StructuredData() {
         url: SITE_URL,
         inLanguage: "pt-BR",
         description:
-          "Sistema de agendamento online para salões de beleza, barbearias e estética: agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios.",
+          "Sistema de agendamento online com IA para salões de beleza, barbearias e estética: link de agendamento para clientes, recuperação automática de clientes, comissões, caixa, estoque e relatórios.",
         offers: {
           "@type": "AggregateOffer",
           priceCurrency: "BRL",
@@ -450,16 +459,16 @@ export default function Home() {
             <div className="reveal">
               <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
                 <span className="h-px w-8 bg-primary" />
-                Um sistema, dois lados do balcão
+                Sua equipe, trabalhando enquanto você atende
               </p>
               <h2 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.08] tracking-tight">
-                No computador da recepção,<br className="hidden sm:block" />{" "}
-                <span className="text-primary">no celular da profissional.</span>
+                Não é mais uma agenda.<br className="hidden sm:block" />{" "}
+                <span className="text-primary">É uma equipe que nunca para.</span>
               </h2>
               <p className="mt-4 text-muted-foreground leading-relaxed max-w-md">
-                Mesma agenda, telas diferentes. A recepção organiza no desktop, a
-                profissional confere pelo celular e a cliente agenda pelo link —
-                tudo em tempo real, sem instalar nada.
+                Enquanto você atende quem está na cadeira, o resto do salão
+                continua andando — confirmação, cobrança, recuperação de
+                cliente e fechamento de caixa, sem você precisar parar.
               </p>
 
               {/* Capacidades — tabela editorial com etiqueta de contexto */}
@@ -467,18 +476,18 @@ export default function Home() {
                 {[
                   {
                     tag: "Recepção",
-                    label: "Agenda em tempo real",
-                    desc: "Toda a equipe vê a mesma agenda, atualizada na hora.",
+                    label: "Agenda que atende sozinha",
+                    desc: "A cliente agenda pelo link, recebe confirmação automática e pode remarcar sem te chamar.",
                   },
                   {
-                    tag: "Celular",
-                    label: "Link sem cadastro",
-                    desc: "A cliente agenda de qualquer celular — nada para instalar.",
+                    tag: "Marketing",
+                    label: "Clientes que voltam sozinhos",
+                    desc: "Quem faltou, cancelou ou sumiu aparece pronto pra chamar no WhatsApp, com mensagem e cupom prontos.",
                   },
                   {
-                    tag: "Qualquer tela",
-                    label: "Painel que se adapta",
-                    desc: "Do caixa ao tablet, a interface se ajusta sozinha.",
+                    tag: "Financeiro",
+                    label: "Caixa que se fecha em minutos",
+                    desc: "Comissão, vendas e relatório do dia prontos pra baixar — sem planilha.",
                   },
                   {
                     tag: "Equipe",
@@ -555,8 +564,8 @@ export default function Home() {
               <span className="text-primary">agora roda sozinho.</span>
             </h2>
             <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl">
-              Seis dores do dia a dia de um salão — e exatamente como o
-              Zulan resolve cada uma.
+              Seis dores do dia a dia de um salão — e exatamente como sua
+              equipe virtual resolve cada uma.
             </p>
           </div>
 
@@ -682,7 +691,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center reveal">
             <h2 className="font-display text-3xl sm:text-4xl font-bold">
-              Planos que cabem no seu salão
+              Monte a equipe virtual do seu salão
             </h2>
             <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
               Comece com 14 dias grátis. Sem cartão, sem fidelidade — cancele
@@ -716,7 +725,10 @@ export default function Home() {
                     </span>
                   )}
 
-                  <h3 className="font-display text-xl font-bold">{plan.name}</h3>
+                  <span className="inline-flex w-fit items-center rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
+                    {card.role}
+                  </span>
+                  <h3 className="mt-3 font-display text-xl font-bold">{plan.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground min-h-[2.5rem]">
                     {card.pitch}
                   </p>
@@ -835,17 +847,24 @@ export default function Home() {
         className="relative border-t border-border py-20 sm:py-28 overflow-hidden"
         style={{ background: "var(--card)" }}
       >
-        {/* Formas geométricas */}
-        <OrangeRing size={420} opacity={0.08} style={{ top: -140, left: -100 }} />
-        <OrangeDots cols={5} rows={4} opacity={0.12} style={{ bottom: 40, right: 24 }} />
-        <OrangeTriangle size={60} opacity={0.11} rotate={-10} style={{ top: 50, right: "30%" }} />
+        {/* Atmosfera única (sem ruído de formas) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
+          style={{
+            background:
+              "radial-gradient(50% 60% at 50% 0%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%)",
+          }}
+        />
 
         <div className="mx-auto max-w-6xl px-5 relative">
           <div className="text-center max-w-xl mx-auto mb-14 reveal">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary mb-3">
+            <p className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+              <span className="h-px w-8 bg-primary" />
               Depoimentos
+              <span className="h-px w-8 bg-primary" />
             </p>
-            <h2 className="font-display text-3xl sm:text-4xl">
+            <h2 className="font-display text-3xl sm:text-5xl tracking-tight">
               Quem usa, não quer mais largar.
             </h2>
           </div>
@@ -897,10 +916,6 @@ export default function Home() {
 
       {/* ── FOOTER ───────────────────────────────────────────────────── */}
       <footer className="relative bg-background border-t border-border overflow-hidden">
-        {/* Formas geométricas */}
-        <OrangeRing size={300} opacity={0.07} style={{ bottom: -100, left: -60 }} />
-        <OrangeDots cols={3} rows={3} opacity={0.10} style={{ top: 24, right: 40 }} />
-
         <div className="relative mx-auto max-w-6xl px-5 py-14">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
 
@@ -916,8 +931,8 @@ export default function Home() {
                 />
               </Link>
               <p className="mt-3 text-sm text-muted-foreground max-w-xs leading-relaxed">
-                Software de agendamento para salões de beleza, barbearias e
-                clínicas de estética.
+                Equipe virtual com inteligência artificial para salões de
+                beleza, barbearias e clínicas de estética.
               </p>
               <div className="flex gap-3 mt-5">
                 <a href="#" aria-label="Instagram" className="text-muted-foreground hover:text-foreground transition-colors">

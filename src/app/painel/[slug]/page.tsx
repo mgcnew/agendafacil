@@ -9,6 +9,8 @@ import { CalendarDots, Wallet, Clock, Users, Plus, Package, UserCheck, CaretRigh
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
+import { GestorInsights } from "./GestorInsights";
+import { getOrGenerateDashboardInsights } from "@/lib/ai/dashboardInsights";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +187,20 @@ export default async function DashboardPage({
     { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
   ];
 
+  // Resumo do "Gestor Zulan" — narra os sinais acima, não os recalcula.
+  const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
+  const pkgsExpiringSoon = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3).length;
+  const gestor = await getOrGenerateDashboardInsights(supabase, salonId, {
+    firstName,
+    salonName: membership.salons.name,
+    apptsToday: appts.length,
+    revenueToday: revenue,
+    reactivateCount: reactCount,
+    birthdaysToday,
+    birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
+    pkgsExpiringSoon,
+  });
+
   return (
     <div className="space-y-6 af-rise">
       {/* Header — sempre largura total */}
@@ -208,6 +224,9 @@ export default async function DashboardPage({
 
         {/* ── Coluna principal ──────────────────────────────────�� */}
         <div className="space-y-6 min-w-0">
+          {/* Resumo do Gestor Zulan */}
+          <GestorInsights slug={slug} greeting={gestor.greeting} insights={gestor.insights} />
+
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {stats.map((s) => (
