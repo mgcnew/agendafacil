@@ -16,6 +16,7 @@ import {
   type InsightType,
 } from "@/lib/ai/dashboardInsights";
 import { RefreshGestorButton } from "./RefreshGestorButton";
+import { TypewriterText } from "./TypewriterText";
 
 const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   reactivation: UserCheck,
@@ -95,7 +96,7 @@ function GestorInsightsCard({ slug, insights }: { slug: string; insights: Insigh
           <div>
             <p className="text-sm font-semibold">Sua equipe virtual</p>
             <p className="text-xs text-muted-foreground">
-              {insights.length > 0 ? "Encontrei isso hoje pra você" : "Já passei pelo salão hoje"}
+              <TypewriterText text={insights.length > 0 ? "Encontrei isso hoje pra você" : "Já passei pelo salão hoje"} />
             </p>
           </div>
         </div>
@@ -104,7 +105,7 @@ function GestorInsightsCard({ slug, insights }: { slug: string; insights: Insigh
 
       {insights.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Tudo tranquilo por aqui — sem pendência ou oportunidade pra te mostrar agora.
+          <TypewriterText text="Tudo tranquilo por aqui — sem pendência ou oportunidade pra te mostrar agora." />
         </p>
       ) : (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -131,18 +132,24 @@ function GestorInsightsCard({ slug, insights }: { slug: string; insights: Insigh
               </>
             );
 
+            // af-rise com atraso escalonado: cards "se montam" em sequência,
+            // reforçando a sensação de algo sendo organizado na hora.
+            const style = { animationDelay: `${220 + i * 90}ms` };
+
             return href ? (
               <Link
                 key={i}
                 href={href}
-                className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3 transition hover:border-primary/40"
+                style={style}
+                className="af-rise flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3 transition hover:border-primary/40"
               >
                 {content}
               </Link>
             ) : (
               <div
                 key={i}
-                className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3"
+                style={style}
+                className="af-rise flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3"
               >
                 {content}
               </div>
