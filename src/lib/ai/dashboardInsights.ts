@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
 import { getDeepSeekClient, DEEPSEEK_MODEL } from "./deepseek";
 
 /**
@@ -36,7 +37,6 @@ export type Insight = {
 };
 
 export type DashboardInsightsPayload = {
-  greeting: string;
   insights: Insight[];
 };
 
@@ -48,7 +48,7 @@ const TOOL_NAME = "report_insights";
 
 function buildSystemPrompt(): string {
   return [
-    "Você é o Gestor Zulan, a funcionária virtual que abre o dia do dono do salão.",
+    "Você é o Gestor Zulan, a funcionária virtual que cuida do dia a dia do salão.",
     "Fale como uma excelente recepcionista: natural, calorosa, direta — nunca como um robô ou relatório técnico.",
     "Nunca use jargão de dados (ex.: 'detectei', 'métrica', 'taxa'). Prefira frases como 'percebi que...', 'consegui...'.",
     "Use SOMENTE os números fornecidos no contexto. Nunca invente clientes, valores ou eventos que não estejam nos dados.",
@@ -67,7 +67,7 @@ function buildUserPrompt(signals: DashboardSignals): string {
 - Aniversariantes nos próximos dias: ${signals.birthdaysSoon}
 - Pacotes de sessões vencendo em até 3 dias: ${signals.pkgsExpiringSoon}
 
-Escreva uma saudação curta (1 frase) e os insights mais relevantes para hoje.`;
+Escreva os insights mais relevantes para hoje.`;
 }
 
 const TOOL_SCHEMA = {
@@ -78,10 +78,6 @@ const TOOL_SCHEMA = {
     parameters: {
       type: "object",
       properties: {
-        greeting: {
-          type: "string",
-          description: "Saudação curta e pessoal, 1 frase, tom de recepcionista.",
-        },
         insights: {
           type: "array",
           maxItems: 4,
@@ -100,7 +96,7 @@ const TOOL_SCHEMA = {
           },
         },
       },
-      required: ["greeting", "insights"],
+      required: ["insights"],
     },
   },
 };
@@ -131,10 +127,7 @@ function stubPayload(signals: DashboardSignals): DashboardInsightsPayload {
       priority: "media",
     });
   }
-  return {
-    greeting: signals.firstName ? `Bom dia, ${signals.firstName}.` : "Bom dia.",
-    insights,
-  };
+  return { insights };
 }
 
 async function generateLive(signals: DashboardSignals): Promise<DashboardInsightsPayload | null> {
@@ -158,11 +151,33 @@ async function generateLive(signals: DashboardSignals): Promise<DashboardInsight
     if (!call || call.type !== "function" || call.function.name !== TOOL_NAME) return null;
 
     const parsed = JSON.parse(call.function.arguments) as DashboardInsightsPayload;
-    if (!parsed.greeting || !Array.isArray(parsed.insights)) return null;
-    return { greeting: parsed.greeting, insights: parsed.insights.slice(0, 4) };
+    if (!Array.isArray(parsed.insights)) return null;
+    return { insights: parsed.insights.slice(0, 4) };
   } catch {
     return null; // qualquer falha (rede, parse, etc.) cai no stub — nunca quebra o Dashboard
   }
+}
+
+async function generateAndCache(
+  supabase: SupabaseClient,
+  salonId: string,
+  date: string,
+  signals: DashboardSignals,
+): Promise<DashboardInsightsResult> {
+  const live = await generateLive(signals);
+  const payload = live ?? stubPayload(signals);
+  const mode: "live" | "stub" = live ? "live" : "stub";
+
+  await supabase
+    .from("ai_dashboard_insights")
+    .upsert(
+      { salon_id: salonId, date, payload, model: live ? DEEPSEEK_MODEL : null },
+      { onConflict: "salon_id,date" },
+    );
+  // Erro de upsert (ex.: migração não aplicada ainda) é ignorado de propósito —
+  // o resumo já foi calculado e é devolvido mesmo sem cache persistido.
+
+  return { ...payload, mode };
 }
 
 /**
@@ -189,18 +204,72 @@ export async function getOrGenerateDashboardInsights(
     return { ...payload, mode: cached.model ? "live" : "stub" };
   }
 
-  const live = await generateLive(signals);
-  const payload = live ?? stubPayload(signals);
-  const mode: "live" | "stub" = live ? "live" : "stub";
+  return generateAndCache(supabase, salonId, today, signals);
+}
 
-  await supabase
-    .from("ai_dashboard_insights")
-    .upsert(
-      { salon_id: salonId, date: today, payload, model: live ? DEEPSEEK_MODEL : null },
-      { onConflict: "salon_id,date" },
-    );
-  // Erro de upsert (ex.: migração não aplicada ainda) é ignorado de propósito —
-  // o resumo já foi calculado e é devolvido mesmo sem cache persistido.
+/** Ignora o cache do dia e força uma nova geração (botão "Atualizar"). */
+export async function refreshDashboardInsights(
+  supabase: SupabaseClient,
+  salonId: string,
+  signals: DashboardSignals,
+): Promise<DashboardInsightsResult> {
+  const today = new Date().toISOString().slice(0, 10);
+  return generateAndCache(supabase, salonId, today, signals);
+}
 
-  return { ...payload, mode };
+/**
+ * Recalcula os sinais do zero (usado pelo botão "Atualizar", que não tem
+ * acesso aos dados já carregados pela página do Dashboard).
+ */
+export async function computeGestorSignals(
+  supabase: SupabaseClient,
+  salonId: string,
+  opts: { profileId: string; displayName: string; salonName: string },
+): Promise<DashboardSignals> {
+  const startDay = startOfTodayBR();
+  const endDay = startOfTomorrowBR();
+
+  const [{ data: todayAppts }, { data: profile }, { data: reactRaw }, { data: bdayRaw }, { data: pkgsRaw }] =
+    await Promise.all([
+      supabase
+        .from("appointments")
+        .select("status, total_price")
+        .eq("salon_id", salonId)
+        .gte("starts_at", startDay)
+        .lt("starts_at", endDay),
+      supabase.from("profiles").select("full_name").eq("id", opts.profileId).maybeSingle(),
+      supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
+      supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 31 } as never),
+      supabase.from("client_packages").select("expires_at").eq("salon_id", salonId).eq("status", "active"),
+    ]);
+
+  const appts = (todayAppts ?? []) as { status: string; total_price: number }[];
+  const revenueToday = appts
+    .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
+    .reduce((sum, a) => sum + Number(a.total_price), 0);
+
+  const reactArr = reactRaw as unknown[] | null;
+  const reactivateCount = Array.isArray(reactArr) ? reactArr.length : 0;
+
+  const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as { days_until: number }[];
+  const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
+
+  const pkgs = (pkgsRaw ?? []) as { expires_at: string }[];
+  const pkgsExpiringSoon = pkgs.filter((p) => {
+    const dleft = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000);
+    return dleft >= 0 && dleft <= 3;
+  }).length;
+
+  const fullName = (profile?.full_name ?? opts.displayName ?? "").trim();
+
+  return {
+    firstName: fullName ? fullName.split(" ")[0] : "",
+    salonName: opts.salonName,
+    apptsToday: appts.length,
+    revenueToday,
+    reactivateCount,
+    birthdaysToday,
+    birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
+    pkgsExpiringSoon,
+  };
 }

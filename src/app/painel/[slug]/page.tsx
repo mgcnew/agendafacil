@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getMembershipBySlug } from "@/lib/salon";
@@ -9,8 +10,7 @@ import { CalendarDots, Wallet, Clock, Users, Plus, Package, UserCheck, CaretRigh
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
-import { GestorInsights } from "./GestorInsights";
-import { getOrGenerateDashboardInsights } from "@/lib/ai/dashboardInsights";
+import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
 
 export const dynamic = "force-dynamic";
 
@@ -187,10 +187,11 @@ export default async function DashboardPage({
     { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
   ];
 
-  // Resumo do "Gestor Zulan" — narra os sinais acima, não os recalcula.
+  // Sinais para o "Gestor Zulan" — a geração roda atrás de um Suspense (ver
+  // abaixo) pra nunca atrasar o resto do Dashboard na 1ª visita do dia.
   const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
   const pkgsExpiringSoon = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3).length;
-  const gestor = await getOrGenerateDashboardInsights(supabase, salonId, {
+  const gestorSignals = {
     firstName,
     salonName: membership.salons.name,
     apptsToday: appts.length,
@@ -199,7 +200,7 @@ export default async function DashboardPage({
     birthdaysToday,
     birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
     pkgsExpiringSoon,
-  });
+  };
 
   return (
     <div className="space-y-6 af-rise">
@@ -224,8 +225,10 @@ export default async function DashboardPage({
 
         {/* ── Coluna principal ──────────────────────────────────�� */}
         <div className="space-y-6 min-w-0">
-          {/* Resumo do Gestor Zulan */}
-          <GestorInsights slug={slug} greeting={gestor.greeting} insights={gestor.insights} />
+          {/* Resumo do Gestor Zulan — streaming: não bloqueia o resto da página */}
+          <Suspense fallback={<GestorInsightsSkeleton />}>
+            <GestorInsightsAsync slug={slug} supabase={supabase} salonId={salonId} signals={gestorSignals} />
+          </Suspense>
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
