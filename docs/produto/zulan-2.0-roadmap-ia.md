@@ -29,26 +29,30 @@
 
 ## Agenda
 
-**Status: 🔜 Planejado (v1)**
+**Status: ✅ Implementado (v1 + parte da v2)** (2026-06-30)
 
-### v1 — sinais fáceis, sem RPC nova (próxima fase)
-Dados já calculáveis a partir do que a página já carrega (sem agregação histórica):
-- Cancelamentos no período visível
+### v1 — sinais fáceis, sem RPC nova
+Banner acima do calendário (`AgendaSignalsBanner`), regra direta (sem LLM), sempre reflete "hoje" independente da view/data navegada:
+- Cancelamentos do dia
 - Clientes atrasados (`starts_at` passado, status ainda `pending`/`confirmed`)
-- Horários vazios de hoje (cruzando agendamentos do dia com a RPC `get_availability`, que já existe)
+- Horários vazios de hoje (reaproveita a RPC `get_availability` já existente, deduplicado em blocos de 30min não sobrepostos por profissional)
 
-Formato: banner acima do calendário, no mesmo espírito do card do Dashboard — mas aqui pode ser regra direta (sem LLM), já que são contagens simples, não precisa de narrativa gerada.
+### v2 — estimativa de faturamento dos horários vazios
+Implementada junto, mais cedo do que o planejado original, a pedido do usuário ("na medida que os salões forem usando e criando histórico essa funcionalidade vai se fazer importante").
 
-### v2 — adiado, motivo registrado (2026-06-30)
+- Nova RPC `agenda_revenue_by_hour(p_salon, p_weekday, p_window_days=90)`: ticket médio histórico por hora, no mesmo dia da semana, últimos 90 dias. Gate por `reports.view` (mesmo padrão de `report_reactivation`).
+- **Guard de amostra mínima:** só usa o ticket médio de uma hora se houver `sample_count >= 3` atendimentos concluídos naquele bucket — sem isso, a hora fica de fora do cálculo (em vez de mostrar estimativa enganosa).
+- Estimativa some sozinha se a amostra for insuficiente (`estimatedRevenue: null`) — o chip mostra só a contagem de horários livres, sem valor chutado.
+- Sem permissão de `reports.view`, a RPC nega e a estimativa degrada graciosamente (chip continua mostrando só a contagem).
+- Arquivo: `supabase/migrations/20260630_agenda_revenue_estimate.sql`, lógica em `AgendaManager.tsx` (`loadTodaySignals`).
+
+### Adiado, motivo registrado (2026-06-30)
 Avaliado e **conscientemente adiado**, não esquecido:
 
-| Sinal | Por que não entra na v1 |
+| Sinal | Por que não entra ainda |
 |---|---|
-| Horários mais lucrativos | Precisa de RPC nova agregando receita histórica por faixa de horário (não é cálculo do que já está na tela) |
-| Dias fracos | Precisa de RPC nova comparando ocupação média por dia da semana ao longo do tempo |
+| Dias fracos | Precisa de RPC nova comparando ocupação média por dia da semana ao longo do tempo (diferente do ticket médio por hora já implementado) |
 | Oportunidades de encaixe | Precisa cruzar gap livre + duração de serviço + lista de clientes parados (`/recuperar`) — acopla dois módulos hoje independentes |
-
-**Bloqueador real da v2:** problema de amostra mínima. Salão novo/com pouco histórico não tem padrão suficiente pra esses cálculos serem confiáveis — sem um guard (ex.: "só mostra dia fraco com 8+ semanas de dados"), o risco é apontar tendência falsa a partir de 2-3 pontos, o que é pior que não mostrar nada. Reavaliar quando tivermos salões com uso real e histórico suficiente pra validar.
 
 **Ações inteligentes (remarcar cliente, preencher horário sozinho, abrir horário extra) — fora de escopo até existir um fluxo de aprovação.** Isso é ação autônoma de risco médio/alto pela hierarquia de decisões definida em [zulan-2.0-arquitetura-da-ia.md](zulan-2.0-arquitetura-da-ia.md); não deve ser construído sem esse fluxo existir primeiro.
 

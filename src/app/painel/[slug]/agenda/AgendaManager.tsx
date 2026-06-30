@@ -53,8 +53,16 @@ type Appt    = {
   color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
-/** Sinais do dia — cálculo direto sobre dados já carregados, sem IA (v1 do roadmap). */
-type TodaySignals = { cancelled: number; late: number; emptySlots: number };
+/** Sinais do dia — cálculo direto sobre dados já carregados, sem IA (v1/v2 do roadmap). */
+type TodaySignals = {
+  cancelled: number;
+  late: number;
+  emptySlots: number;
+  /** Estimativa de faturamento dos horários vazios, com base no histórico (v2). null = sem amostra suficiente. */
+  estimatedRevenue: number | null;
+};
+/** Amostra mínima de atendimentos concluídos naquele horário p/ confiar na média (evita estimativa enganosa). */
+const MIN_REVENUE_SAMPLES = 3;
 type Block = { id: string; member_id: string | null; starts_at: string; ends_at: string; reason: string | null };
 type HistoryAppt = {
   id: string;
@@ -1078,12 +1086,13 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 }
 
 /**
- * Banner de sinais do dia — regra direta, sem IA (v1 do roadmap, ver
+ * Banner de sinais do dia — regra direta, sem IA (v1/v2 do roadmap, ver
  * docs/produto/zulan-2.0-roadmap-ia.md). Some por completo se não houver
  * nada relevante, igual ao card do Gestor no Dashboard.
  */
 function AgendaSignalsBanner({ signals }: { signals: TodaySignals | null }) {
   if (!signals) return null;
+  const emptyLabel = `${signals.emptySlots} horário${signals.emptySlots === 1 ? "" : "s"} livre${signals.emptySlots === 1 ? "" : "s"} hoje`;
   const chips = [
     signals.cancelled > 0 && {
       key: "cancelled",
@@ -1100,7 +1109,10 @@ function AgendaSignalsBanner({ signals }: { signals: TodaySignals | null }) {
     signals.emptySlots > 0 && {
       key: "empty",
       icon: CalendarDots,
-      label: `${signals.emptySlots} horário${signals.emptySlots === 1 ? "" : "s"} livre${signals.emptySlots === 1 ? "" : "s"} hoje`,
+      label:
+        signals.estimatedRevenue !== null
+          ? `${emptyLabel} · ~${formatBRL(signals.estimatedRevenue)} em potencial`
+          : emptyLabel,
       tone: "bg-secondary text-primary",
     },
   ].filter((c): c is { key: string; icon: typeof CalendarX; label: string; tone: string } => !!c);
@@ -1235,14 +1247,18 @@ export function AgendaManager({
     const todayStr = toStr(new Date());
     const start = new Date(todayStr + "T00:00:00").toISOString();
     const end   = new Date(todayStr + "T23:59:59").toISOString();
+    const weekday = parse(todayStr).getDay(); // 0=domingo..6=sábado, mesma convenção do extract(dow) no Postgres
 
-    const [{ data: todayAppts }, ...availability] = await Promise.all([
+    const [{ data: todayAppts }, { data: revenueRows }, ...availability] = await Promise.all([
       supabase
         .from("appointments")
         .select("starts_at, status")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end),
+      // Ticket médio histórico por hora, no mesmo dia da semana (v2 — estimativa de faturamento).
+      // Sem permissão de relatórios, a RPC nega e a estimativa some sozinha (degrada bem).
+      supabase.rpc("agenda_revenue_by_hour" as never, { p_salon: salonId, p_weekday: weekday } as never),
       ...pros.map((p) =>
         supabase.rpc("get_availability", { p_salon: salonId, p_member: p.id, p_date: todayStr, p_duration: 30 }),
       ),
@@ -1259,7 +1275,33 @@ export function AgendaManager({
     const slots = new Set<string>();
     for (const r of availability) for (const slot of (r.data as string[] | null) ?? []) slots.add(slot);
 
-    setTodaySignals({ cancelled, late, emptySlots: slots.size });
+    // Ticket médio por hora, só usado quando há amostra mínima (evita estimativa enganosa).
+    const hourAvg = new Map<number, number>();
+    for (const row of (revenueRows as { hour_bucket: number; avg_ticket: number; sample_count: number }[] | null) ?? []) {
+      if (row.sample_count >= MIN_REVENUE_SAMPLES) hourAvg.set(row.hour_bucket, Number(row.avg_ticket));
+    }
+
+    // Estimativa: para cada profissional, soma o ticket médio dos horários livres
+    // SEM sobreposição (o RPC de disponibilidade avança de 15 em 15 min, então slots
+    // consecutivos se sobrepõem — sem essa deduplicação a estimativa ficaria inflada).
+    let estimatedRevenue = 0;
+    let hasEstimate = false;
+    for (const r of availability) {
+      const proSlots = ((r.data as string[] | null) ?? []).slice().sort();
+      let blockedUntil = -Infinity;
+      for (const iso of proSlots) {
+        const t = new Date(iso).getTime();
+        if (t < blockedUntil) continue;
+        blockedUntil = t + 30 * 60000;
+        const avg = hourAvg.get(new Date(iso).getHours());
+        if (avg !== undefined) { estimatedRevenue += avg; hasEstimate = true; }
+      }
+    }
+
+    setTodaySignals({
+      cancelled, late, emptySlots: slots.size,
+      estimatedRevenue: hasEstimate ? estimatedRevenue : null,
+    });
   }, [supabase, salonId, pros]);
 
   useEffect(() => { loadTodaySignals(); }, [loadTodaySignals]);
