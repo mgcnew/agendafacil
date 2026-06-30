@@ -229,6 +229,42 @@ Cardápio que se paga sozinho — menos serviço no escuro, mais decisão com ba
 
 ---
 
+# Pacotes
+
+## Objetivo
+
+Ajudar o dono a precificar pacotes com informação, não no escuro — tanto na criação quanto no acompanhamento dos já vendidos.
+
+## Situação Atual
+
+Modelos reutilizáveis (nome, serviços incluídos, validade, preço digitado manualmente). Pacotes vendidos mostram sessões restantes e vencimento. Zero estatística agregada.
+
+## Evolução
+
+Na hora de criar o modelo, o dono vê o impacto real da decisão, não só um campo de preço vazio. Nos pacotes já vendidos, a IA aponta o que precisa de atenção.
+
+## A IA conhece
+
+- preço avulso somado dos serviços incluídos vs. preço do pacote → desconto efetivo real
+- margem real desses serviços (reaproveitando o que já existe em Serviços) → margem por sessão dentro do pacote
+- pacotes vencendo
+- pacotes comprados e nunca usados (sinal de risco/insatisfação)
+- modelo mais vendido / que mais gera receita
+
+## Ações Inteligentes
+
+A IA poderá:
+
+- ao criar o modelo: mostrar desconto efetivo e margem estimada *antes* de salvar (cálculo direto, sem IA generativa — é conta, não opinião)
+- alertar pacote parado (comprado, zero sessão usada) com sugestão de lembrete de 1 clique
+- trazer "vencendo" também pra essa página, não só no Dashboard
+
+## Benefício
+
+Pacote vendido com discernimento, não no escuro — e nenhum cliente que pagou antecipado é esquecido.
+
+---
+
 # Estoque
 
 ## Objetivo

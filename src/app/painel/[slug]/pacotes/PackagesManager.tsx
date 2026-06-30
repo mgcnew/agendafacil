@@ -6,14 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
-import { formatBRL } from "@/lib/utils";
+import { formatBRL, waLink } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
+import type { ServiceInsight } from "@/lib/serviceInsights";
 import {
   CalendarDots,
+  ChatCircle,
   CircleNotch,
   Package,
   PencilSimple,
   Plus,
+  Robot,
   ShoppingCart,
   Trash,
   X,
@@ -24,7 +27,7 @@ type TemplateItem = { id: string; service_id: string; quantity: number; services
 export type Template = Tables<"package_templates"> & { package_template_items: TemplateItem[] };
 type PkgItem = Tables<"client_package_items">;
 export type Sold = Tables<"client_packages"> & {
-  clients: { full_name: string } | null;
+  clients: { full_name: string; phone: string | null } | null;
   client_package_items: PkgItem[];
 };
 export type Pro = { id: string; name: string };
@@ -49,6 +52,7 @@ export function PackagesManager({
   services,
   clients,
   pros,
+  serviceInsights = {},
 }: {
   salonId: string;
   canManage: boolean;
@@ -57,6 +61,7 @@ export function PackagesManager({
   services: Svc[];
   clients: Client[];
   pros: Pro[];
+  serviceInsights?: Record<string, ServiceInsight>;
 }) {
   const [tab, setTab] = useState<"vendidos" | "modelos">("vendidos");
   const [editingTpl, setEditingTpl] = useState<Template | "new" | null>(null);
@@ -116,6 +121,7 @@ export function PackagesManager({
             key="template"
             salonId={salonId}
             services={services}
+            serviceInsights={serviceInsights}
             template={editingTpl === "new" ? null : editingTpl}
             onClose={() => setEditingTpl(null)}
           />
@@ -141,6 +147,23 @@ export function PackagesManager({
   );
 }
 
+// Pacote comprado, nenhuma sessão usada, há tempo demais — sinal de risco/insatisfação.
+const DORMANT_DAYS = 14;
+function isDormant(p: Sold): boolean {
+  if (effStatus(p) !== "active") return false;
+  const noUsage = p.client_package_items.every((it) => it.used === 0);
+  if (!noUsage) return false;
+  const daysSincePurchase = Math.floor((Date.now() - new Date(p.purchased_at).getTime()) / 86400000);
+  return daysSincePurchase >= DORMANT_DAYS;
+}
+
+function dormantReminderUrl(p: Sold): string | null {
+  if (!p.clients?.phone) return null;
+  const first = (p.clients.full_name ?? "").split(" ")[0];
+  const msg = `Oi${first ? ` ${first}` : ""}! Vi que você tem o pacote "${p.name}" aqui com a gente esperando pra ser usado 😊 Quer marcar um horário?`;
+  return waLink(p.clients.phone, msg);
+}
+
 /* ───────────────────────── Vendidos ───────────────────────── */
 function SoldList({
   sold,
@@ -159,8 +182,72 @@ function SoldList({
       </div>
     );
   }
+
+  const dormant = sold.filter(isDormant);
+  const expiringSoon = sold.filter(
+    (p) => effStatus(p) === "active" && daysLeft(p.expires_at) >= 0 && daysLeft(p.expires_at) <= 7,
+  );
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-4">
+      {(dormant.length > 0 || expiringSoon.length > 0) && (
+        <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+              <Robot className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-sm font-semibold">De olho nos pacotes</p>
+          </div>
+
+          {dormant.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+              <p className="text-sm">
+                {dormant.length === 1
+                  ? `${dormant[0].clients?.full_name?.split(" ")[0] ?? "Uma cliente"} comprou um pacote e ainda não usou nenhuma sessão.`
+                  : `${dormant.length} clientes compraram pacote e ainda não usaram nenhuma sessão.`}{" "}
+                Quer lembrar?
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {dormant.map((p) => {
+                  const url = dormantReminderUrl(p);
+                  const first = p.clients?.full_name?.split(" ")[0] ?? "Cliente";
+                  return url ? (
+                    <a
+                      key={p.id}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/15 transition"
+                    >
+                      <ChatCircle className="h-3.5 w-3.5" /> Lembrar {first}
+                    </a>
+                  ) : (
+                    <span
+                      key={p.id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                    >
+                      {first} — sem WhatsApp cadastrado
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {expiringSoon.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+              <p className="text-sm">
+                {expiringSoon.length === 1
+                  ? "1 pacote vence nos próximos 7 dias."
+                  : `${expiringSoon.length} pacotes vencem nos próximos 7 dias.`}{" "}
+                Dá uma olhada nos cards abaixo.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
       {sold.map((p) => {
         const st = effStatus(p);
         const meta = STATUS_META[st];
@@ -215,6 +302,7 @@ function SoldList({
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -283,11 +371,13 @@ type DraftItem = { service_id: string; quantity: string };
 function TemplateEditor({
   salonId,
   services,
+  serviceInsights,
   template,
   onClose,
 }: {
   salonId: string;
   services: Svc[];
+  serviceInsights: Record<string, ServiceInsight>;
   template: Template | null;
   onClose: () => void;
 }) {
@@ -307,6 +397,28 @@ function TemplateEditor({
   function setItem(idx: number, patch: Partial<DraftItem>) {
     setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
+
+  // Orientação de preço ao vivo — preço avulso somado, desconto efetivo e
+  // comissão estimada (real quando há histórico do serviço, senão a do
+  // cadastro). Cálculo direto, sem IA — é conta, não opinião (v1 do roadmap).
+  const validDraftItems = items.filter((i) => i.service_id && (parseInt(i.quantity) || 0) > 0);
+  let standalonePrice = 0;
+  let estimatedCommission = 0;
+  for (const it of validDraftItems) {
+    const svc = services.find((s) => s.id === it.service_id);
+    if (!svc) continue;
+    const qty = parseInt(it.quantity) || 0;
+    standalonePrice += svc.price * qty;
+    const insight = serviceInsights[svc.id];
+    const commissionPerUnit =
+      insight && insight.bookings > 0
+        ? insight.avgCommission
+        : svc.price * ((svc.commission_percent ?? 0) / 100);
+    estimatedCommission += commissionPerUnit * qty;
+  }
+  const packagePrice = parseFloat(price.replace(",", ".")) || 0;
+  const effectiveDiscount = standalonePrice > 0 ? (1 - packagePrice / standalonePrice) * 100 : 0;
+  const estimatedProfit = packagePrice - estimatedCommission;
 
   async function save() {
     const validItems = items.filter((i) => i.service_id && (parseInt(i.quantity) || 0) > 0);
@@ -419,6 +531,41 @@ function TemplateEditor({
             <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
           </div>
         </div>
+
+        {validDraftItems.length > 0 && (
+          <div className="rounded-[var(--radius)] border border-border p-4 bg-secondary/40">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Robot className="h-4 w-4 text-primary" /> Pra te ajudar a decidir o preço
+            </p>
+            <div className="mt-2 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Avulso (somando os serviços)</span>
+                <span>{formatBRL(standalonePrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Desconto efetivo do pacote</span>
+                <span className={effectiveDiscount < 0 ? "text-red-600" : "text-foreground"}>
+                  {effectiveDiscount.toFixed(0)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">− Comissão estimada</span>
+                <span>{formatBRL(estimatedCommission)}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                <span>Lucro estimado (sem insumo)</span>
+                <span className={estimatedProfit < 0 ? "text-red-600" : "text-emerald-600"}>
+                  {formatBRL(estimatedProfit)}
+                </span>
+              </div>
+            </div>
+            {effectiveDiscount < 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                Esse preço está mais caro que comprar os serviços avulsos — pode afastar quem compara.
+              </p>
+            )}
+          </div>
+        )}
 
         {err && <p className="text-sm text-red-600">{err}</p>}
 

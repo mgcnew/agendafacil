@@ -121,6 +121,32 @@ Mesmo padrão de reaproveitamento de RPC já estabelecido (`clients_overview`, `
 
 ---
 
+## Pacotes
+
+**Status: ✅ Implementado (v1)** (2026-06-30)
+
+A pedido do usuário: "teríamos uma inteligência guiando o dono na tomada de decisões, no momento de criar pacotes, como nos pacotes existentes" — ambos os momentos (criação e acompanhamento) entraram na v1.
+
+### v1 — criação guiada
+- No editor de modelo, card ao vivo (atualiza a cada serviço/quantidade adicionada) com: preço avulso somado, desconto efetivo do pacote, comissão estimada e **lucro estimado sem insumo**. Reaproveita `service_insights` (de Serviços) — usa comissão real média quando o serviço já tem histórico, senão cai pro `commission_percent` do cadastro.
+- Aviso quando o desconto efetivo é negativo (pacote mais caro que comprar avulso).
+- **Não inclui custo de insumo** — deixaria a página de Pacotes dependente de buscar `service_products`/`products`, que ela hoje não carrega. Rotulado claramente como "sem insumo" pra não passar precisão que não tem.
+
+### v1 — pacotes já vendidos
+- Banner "De olho nos pacotes" (mesmo padrão visual do Dashboard/Agenda) na aba Vendidos:
+  - **Pacote parado**: comprado, zero sessão usada, 14+ dias — com botão "Lembrar {nome}" (WhatsApp pré-preenchido) por cliente.
+  - **Vencendo em 7 dias**: contagem consolidada (o detalhe por pacote já existia nos cards, só não havia visão agregada).
+- Arquivos: `src/lib/serviceInsights.ts` (reaproveitado), `pacotes/page.tsx`, `pacotes/PackagesManager.tsx`.
+
+### Adiado, motivo registrado (2026-06-30)
+| Item | Por que não entra ainda |
+|---|---|
+| Modelo mais vendido / receita por modelo | Precisa de nova agregação por `template_id` sobre `client_packages` — não é leitura direta |
+| Margem incluindo custo de insumo | Precisa carregar `service_products`/`products` na página de Pacotes (hoje não carrega) — mais plumbing, ficou pra quando o ganho justificar |
+| Sugestão automática do preço "ideal" | Mesmo motivo de sempre: amostra pequena vira chute. v1 mostra a informação pro dono decidir (Princípio 6), não decide por ele |
+
+---
+
 ## Estoque
 
 **Status: ⬜ Não avaliado**

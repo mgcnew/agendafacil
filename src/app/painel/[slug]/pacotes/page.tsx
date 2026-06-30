@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
+import { buildServiceInsightMap, type ServiceInsightRow } from "@/lib/serviceInsights";
 import { PackagesManager, type Template, type Sold } from "./PackagesManager";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function PacotesPage({
   const canManage = perms.has("packages.manage");
 
   const supabase = await createClient();
-  const [{ data: templates }, { data: sold }, { data: services }, { data: clients }, { data: pros }] =
+  const [{ data: templates }, { data: sold }, { data: services }, { data: clients }, { data: pros }, { data: insightRows }] =
     await Promise.all([
       supabase
         .from("package_templates")
@@ -31,7 +32,7 @@ export default async function PacotesPage({
         .order("created_at", { ascending: false }),
       supabase
         .from("client_packages")
-        .select("*, clients(full_name), client_package_items(*)")
+        .select("*, clients(full_name, phone), client_package_items(*)")
         .eq("salon_id", salonId)
         .order("purchased_at", { ascending: false })
         .limit(100),
@@ -48,12 +49,17 @@ export default async function PacotesPage({
         .eq("salon_id", salonId)
         .eq("is_active", true)
         .order("created_at"),
+      // Reaproveita a RPC já criada em Serviços — comissão real média por serviço,
+      // pra estimar a margem do pacote com mais precisão que só o cadastro.
+      supabase.rpc("service_insights" as never, { p_salon: salonId } as never),
     ]);
 
   const proList = (pros ?? []).map((p) => ({
     id: p.id,
     name: p.display_name ?? (p.profiles as { full_name?: string } | null)?.full_name ?? "—",
   }));
+
+  const serviceInsights = buildServiceInsightMap((insightRows as ServiceInsightRow[] | null) ?? []);
 
   return (
     <PackagesManager
@@ -64,6 +70,7 @@ export default async function PacotesPage({
       services={services ?? []}
       clients={clients ?? []}
       pros={proList}
+      serviceInsights={serviceInsights}
     />
   );
 }
