@@ -6,12 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
+import { Calendar as DatePicker } from "@/components/Calendar";
 import { formatBRL, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import {
   Calendar,
+  CaretDown,
   Check,
+  ChartLineUp,
   CircleNotch,
+  Info,
   PencilSimple,
   Plus,
   Power,
@@ -24,6 +28,7 @@ import {
 type Campaign = Tables<"campaigns">;
 type Svc = { id: string; name: string; price: number; price_type: string | null };
 type CampSvc = { campaign_id: string; service_id: string };
+type Performance = { campaign_id: string; bookings: number; revenue: number; discount_given: number };
 
 // Data de hoje (YYYY-MM-DD) em componentes locais — o navegador do salão está no Brasil.
 function todayStr() {
@@ -45,6 +50,9 @@ function statusOf(c: Campaign): { key: StatusKey; label: string; cls: string } {
   return { key: "active", label: "Ativa", cls: "bg-emerald-500/12 text-emerald-600" };
 }
 
+// Data em que a atribuição de campanha por agendamento passou a ser gravada (migration campaign_performance_attribution).
+const PERFORMANCE_SINCE = "2026-07-01";
+
 function periodLabel(c: Campaign) {
   if (!c.starts_on && !c.ends_on) return "Sem prazo";
   if (c.starts_on && c.ends_on) return `${fmtDate(c.starts_on)} – ${fmtDate(c.ends_on)}`;
@@ -53,12 +61,13 @@ function periodLabel(c: Campaign) {
 }
 
 export function CampaignsManager({
-  salonId, initial, services, campaignServices,
+  salonId, initial, services, campaignServices, performance,
 }: {
   salonId: string;
   initial: Campaign[];
   services: Svc[];
   campaignServices: CampSvc[];
+  performance: Record<string, Performance>;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -119,6 +128,13 @@ export function CampaignsManager({
         </div>
       )}
 
+      {initial.length > 0 && (
+        <div className="flex items-start gap-2 rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+          Agendamentos, receita e desconto concedido são medidos a partir de {fmtDate(PERFORMANCE_SINCE)}. Campanhas encerradas antes disso não têm dado retroativo.
+        </div>
+      )}
+
       {initial.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
           <Tag className="h-8 w-8 mx-auto text-muted-foreground" />
@@ -132,38 +148,57 @@ export function CampaignsManager({
           {initial.map((c) => {
             const st = statusOf(c);
             const muted = st.key === "ended" || st.key === "paused";
+            const perf = performance[c.id];
+            const hasData = !!perf && perf.bookings > 0;
             return (
-              <Card key={c.id} className={cn("p-4 flex items-center gap-4", muted && "opacity-70")}>
-                <span className="grid place-items-center h-11 w-11 rounded-full bg-primary/10 text-primary font-display font-bold shrink-0">
-                  -{Number(c.discount_percent)}%
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium truncate">{c.name}</p>
-                    <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", st.cls)}>{st.label}</span>
+              <Card key={c.id} className={cn("p-4", muted && "opacity-70")}>
+                <div className="flex items-center gap-4">
+                  <span className="grid place-items-center h-11 w-11 rounded-full bg-primary/10 text-primary font-display font-bold shrink-0">
+                    -{Number(c.discount_percent)}%
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium truncate">{c.name}</p>
+                      <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", st.cls)}>{st.label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Calendar className="h-3 w-3" /> {periodLabel(c)}
+                      {" · "}
+                      {c.scope === "all" ? "Todos os serviços" : `${svcCount(c.id)} serviço(s)`}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Calendar className="h-3 w-3" /> {periodLabel(c)}
-                    {" · "}
-                    {c.scope === "all" ? "Todos os serviços" : `${svcCount(c.id)} serviço(s)`}
-                  </p>
+                  <button
+                    onClick={() => toggleActive(c)}
+                    title={c.is_active ? "Pausar" : "Ativar"}
+                    className={cn(
+                      "p-2 rounded-[var(--radius)] hover:bg-muted transition",
+                      c.is_active ? "text-emerald-600" : "text-muted-foreground",
+                    )}
+                  >
+                    <Power className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => { setEditing(c); setErr(null); }} className="p-2 text-muted-foreground hover:text-foreground">
+                    <PencilSimple className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => remove(c)} className="p-2 text-muted-foreground hover:text-red-600">
+                    <Trash className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleActive(c)}
-                  title={c.is_active ? "Pausar" : "Ativar"}
-                  className={cn(
-                    "p-2 rounded-[var(--radius)] hover:bg-muted transition",
-                    c.is_active ? "text-emerald-600" : "text-muted-foreground",
-                  )}
-                >
-                  <Power className="h-4 w-4" />
-                </button>
-                <button onClick={() => { setEditing(c); setErr(null); }} className="p-2 text-muted-foreground hover:text-foreground">
-                  <PencilSimple className="h-4 w-4" />
-                </button>
-                <button onClick={() => remove(c)} className="p-2 text-muted-foreground hover:text-red-600">
-                  <Trash className="h-4 w-4" />
-                </button>
+
+                {hasData ? (
+                  <p className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                    <ChartLineUp className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span><strong className="text-foreground">{perf.bookings}</strong> agendamento{perf.bookings === 1 ? "" : "s"}</span>
+                    <span>·</span>
+                    <span><strong className="text-foreground">{formatBRL(perf.revenue)}</strong> em receita</span>
+                    <span>·</span>
+                    <span><strong className="text-foreground">{formatBRL(perf.discount_given)}</strong> de desconto concedido</span>
+                  </p>
+                ) : (st.key === "active" || st.key === "scheduled") ? (
+                  <p className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
+                    Ainda sem agendamentos com esta campanha.
+                  </p>
+                ) : null}
               </Card>
             );
           })}
@@ -214,6 +249,7 @@ function CampaignEditor({
   const [active, setActive] = useState(campaign?.is_active ?? true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [openCal, setOpenCal] = useState<"start" | "end" | null>(null);
 
   function toggleSvc(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -340,15 +376,59 @@ function CampaignEditor({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Início (opcional)</Label>
-              <Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+          <div className="space-y-1.5">
+            <Label>Período (opcional)</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setOpenCal((v) => (v === "start" ? null : "start"))}
+                aria-expanded={openCal === "start"}
+                className={cn(
+                  "h-11 flex items-center justify-between rounded-[var(--radius)] border bg-card px-3.5 text-sm transition",
+                  openCal === "start" ? "border-primary" : "border-border hover:border-foreground/25",
+                )}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className={cn("truncate", !startsOn && "text-muted-foreground")}>
+                    {startsOn ? fmtDate(startsOn) : "Início"}
+                  </span>
+                </span>
+                <CaretDown className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform", openCal === "start" && "rotate-180")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenCal((v) => (v === "end" ? null : "end"))}
+                aria-expanded={openCal === "end"}
+                className={cn(
+                  "h-11 flex items-center justify-between rounded-[var(--radius)] border bg-card px-3.5 text-sm transition",
+                  openCal === "end" ? "border-primary" : "border-border hover:border-foreground/25",
+                )}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className={cn("truncate", !endsOn && "text-muted-foreground")}>
+                    {endsOn ? fmtDate(endsOn) : "Fim"}
+                  </span>
+                </span>
+                <CaretDown className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform", openCal === "end" && "rotate-180")} />
+              </button>
             </div>
-            <div className="space-y-1.5">
-              <Label>Fim (opcional)</Label>
-              <Input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
-            </div>
+            {openCal === "start" && (
+              <DatePicker value={startsOn} onChange={(d) => { setStartsOn(d); setOpenCal(null); }} className="mt-1.5" />
+            )}
+            {openCal === "end" && (
+              <DatePicker value={endsOn} onChange={(d) => { setEndsOn(d); setOpenCal(null); }} min={startsOn || undefined} className="mt-1.5" />
+            )}
+            {(startsOn || endsOn) && (
+              <button
+                type="button"
+                onClick={() => { setStartsOn(""); setEndsOn(""); setOpenCal(null); }}
+                className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Limpar datas
+              </button>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground -mt-2">
             Sem datas, a campanha vale enquanto estiver ativa.

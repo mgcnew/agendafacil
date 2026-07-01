@@ -20,7 +20,7 @@ export default async function CampanhasPage({
   if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
 
   const supabase = await createClient();
-  const [{ data: campaigns }, { data: services }, { data: campaignServices }] = await Promise.all([
+  const [{ data: campaigns }, { data: services }, { data: campaignServices }, { data: performanceRows }] = await Promise.all([
     supabase
       .from("campaigns")
       .select("*")
@@ -36,7 +36,19 @@ export default async function CampanhasPage({
       .from("campaign_services")
       .select("campaign_id, service_id")
       .eq("salon_id", membership.salon_id),
+    // Medição de performance (v2 do roadmap de IA) — agendamentos/receita/desconto
+    // concedido por campanha, só a partir de quando a atribuição passou a ser gravada.
+    supabase.rpc("campaign_performance" as never, { p_salon: membership.salon_id } as never),
   ]);
+
+  const performance = Object.fromEntries(
+    ((performanceRows as unknown as {
+      campaign_id: string;
+      bookings: number;
+      revenue: number;
+      discount_given: number;
+    }[]) ?? []).map((r) => [r.campaign_id, r]),
+  );
 
   return (
     <CampaignsManager
@@ -44,6 +56,7 @@ export default async function CampanhasPage({
       initial={campaigns ?? []}
       services={services ?? []}
       campaignServices={campaignServices ?? []}
+      performance={performance}
     />
   );
 }
