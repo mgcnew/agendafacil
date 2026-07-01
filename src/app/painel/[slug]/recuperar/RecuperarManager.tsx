@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
@@ -14,7 +15,12 @@ import {
   MagnifyingGlass,
   CircleNotch,
   Sparkle,
+  SealPercent,
 } from "@phosphor-icons/react/dist/ssr";
+
+// Piso mínimo pra sugerir campanha de reativação — abaixo disso, o grupo é
+// pequeno demais pra justificar uma campanha (chamar 1 a 1 já resolve).
+const REACTIVATION_CAMPAIGN_MIN_INACTIVE = 5;
 
 type WinbackClient = {
   client_id: string;
@@ -149,6 +155,7 @@ export function RecuperarManager({
   }
 
   const priorityPick = pickPriority(data);
+  const suggestCampaign = data.inactive.length >= REACTIVATION_CAMPAIGN_MIN_INACTIVE;
 
   return (
     <div className="space-y-6 af-rise">
@@ -161,32 +168,50 @@ export function RecuperarManager({
         </p>
       </header>
 
-      {/* De olho em quem chamar primeiro — regra direta, sem IA, sempre reflete o dado carregado */}
-      {priorityPick && (
-        <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 mb-2">
+      {/* De olho na recuperação — regras diretas, sem IA, sempre refletem o dado carregado */}
+      {(priorityPick || suggestCampaign) && (
+        <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
               <Sparkle className="h-3.5 w-3.5" />
             </span>
-            <p className="text-sm font-semibold">Quem chamar primeiro</p>
+            <p className="text-sm font-semibold">De olho na recuperação</p>
           </div>
-          <div className="rounded-[var(--radius)] border border-border bg-background p-3">
-            <p className="text-sm">{priorityPick.headline}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={waLink(priorityPick.client.phone, "") === null}
-                onClick={() => openWhatsApp(priorityPick.client, priorityPick.bucket)}
-                className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-              >
-                <WhatsappLogo className="h-4 w-4" /> Chamar {firstName(priorityPick.client.name)}
-              </Button>
-              {waLink(priorityPick.client.phone, "") === null && (
-                <span className="text-xs text-muted-foreground">sem telefone cadastrado</span>
-              )}
+
+          {priorityPick && (
+            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+              <p className="text-sm">{priorityPick.headline}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={waLink(priorityPick.client.phone, "") === null}
+                  onClick={() => openWhatsApp(priorityPick.client, priorityPick.bucket)}
+                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                >
+                  <WhatsappLogo className="h-4 w-4" /> Chamar {firstName(priorityPick.client.name)}
+                </Button>
+                {waLink(priorityPick.client.phone, "") === null && (
+                  <span className="text-xs text-muted-foreground">sem telefone cadastrado</span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {suggestCampaign && (
+            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+              <p className="flex items-center gap-1.5 text-sm">
+                <UserMinus className="h-4 w-4 shrink-0 text-primary" />
+                {data.inactive.length} clientes estão inativos há mais de {inactiveDays} dias. Uma campanha de reativação pode trazer parte deles de volta.
+              </p>
+              <Link
+                href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent("Volta pra cá")}&desconto=15`}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <SealPercent className="h-3.5 w-3.5" /> Criar campanha de reativação
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
