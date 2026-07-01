@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
@@ -9,8 +9,11 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarX,
+  CaretLeft,
+  CaretRight,
   CircleNotch,
   ClockCounterClockwise,
+  MagnifyingGlass,
   Minus,
   Plus,
   Stack,
@@ -22,27 +25,25 @@ import {
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { daysUntilStockout, PRODUCT_INSIGHTS_WINDOW_DAYS, type ProductInsight } from "@/lib/productInsights";
+import { loadMoreMovements } from "./inventoryActions";
+import { type Movement } from "./types";
 
 type Product = Tables<"products">;
-export type Movement = {
-  id: string;
-  type: "in" | "out" | "adjustment";
-  quantity: number;
-  reason: string | null;
-  created_at: string;
-  products: { name: string } | null;
-};
 
 export function InventoryManager({
+  slug,
   salonId,
   initial,
   movements,
+  movementsHasMore,
   canManage,
   insights = {},
 }: {
+  slug: string;
   salonId: string;
   initial: Product[];
   movements: Movement[];
+  movementsHasMore: boolean;
   canManage: boolean;
   insights?: Record<string, ProductInsight>;
 }) {
@@ -57,6 +58,24 @@ export function InventoryManager({
   const [isResale, setIsResale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "resale" | "supply">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "low" | "dormant">("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
+
+  const [movementsList, setMovementsList] = useState<Movement[]>(movements);
+  const [hasMoreMovements, setHasMoreMovements] = useState(movementsHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const { movements: next, hasMore } = await loadMoreMovements(slug, movementsList.length);
+    setMovementsList((list) => [...list, ...next]);
+    setHasMoreMovements(hasMore);
+    setLoadingMore(false);
+  }
 
   async function add() {
     if (!name) return;
@@ -118,12 +137,43 @@ export function InventoryManager({
 
   const lowStock = products.filter((p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0);
 
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return products.filter((p) => {
+      if (term && !p.name.toLowerCase().includes(term)) return false;
+      if (typeFilter === "resale" && !p.is_resale) return false;
+      if (typeFilter === "supply" && p.is_resale) return false;
+      if (statusFilter === "low") {
+        const low = Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0;
+        if (!low) return false;
+      }
+      if (statusFilter === "dormant") {
+        const insight = insights[p.id];
+        const dormant = p.is_resale && p.is_active && (!insight || insight.consumedQty === 0);
+        if (!dormant) return false;
+      }
+      return true;
+    });
+  }, [products, search, typeFilter, statusFilter, insights]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paginated = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
   return (
     <div className="space-y-6 af-rise">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Estoque</h1>
-          <p className="text-muted-foreground text-sm">{products.length} produtos.</p>
+          <p className="text-muted-foreground text-sm">
+            {filtered.length === products.length
+              ? `${products.length} produtos.`
+              : `${filtered.length} de ${products.length} produtos.`}
+          </p>
         </div>
         {canManage && (
           <Button onClick={() => setAdding((v) => !v)}>
@@ -208,14 +258,67 @@ export function InventoryManager({
         )}
       </AnimatePresence>
 
+      {products.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar produto..."
+              className="pl-9"
+            />
+          </div>
+          <div className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+            {([
+              ["all", "Todos"],
+              ["supply", "Insumos"],
+              ["resale", "Revenda"],
+            ] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setTypeFilter(val)}
+                className={`px-2.5 py-1.5 rounded-[calc(var(--radius)-2px)] transition ${
+                  typeFilter === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+            {([
+              ["all", "Todo status"],
+              ["low", "Estoque baixo"],
+              ["dormant", "Parados"],
+            ] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setStatusFilter(val)}
+                className={`px-2.5 py-1.5 rounded-[calc(var(--radius)-2px)] transition whitespace-nowrap ${
+                  statusFilter === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {products.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
           <Stack className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhum produto cadastrado.</p>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
+          <MagnifyingGlass className="h-8 w-8 mx-auto text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mt-3">Nenhum produto encontrado com esses filtros.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {products.map((p) => {
+          {paginated.map((p) => {
             const low = Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0;
             const insight = insights[p.id];
             const margin = p.is_resale ? Number(p.sale_price) - Number(p.cost_price) : null;
@@ -278,17 +381,40 @@ export function InventoryManager({
               </div>
             );
           })}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-muted-foreground">
+                Página {pageSafe} de {totalPages} · {filtered.length} produto{filtered.length === 1 ? "" : "s"}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((v) => Math.max(1, v - 1))}
+                  disabled={pageSafe <= 1}
+                  className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <CaretLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+                  disabled={pageSafe >= totalPages}
+                  className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <CaretRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Movimentações recentes (inclui baixas automáticas por atendimento) */}
-      {movements.length > 0 && (
+      {movementsList.length > 0 && (
         <div>
           <h2 className="font-display font-semibold mb-3 flex items-center gap-2">
             <ClockCounterClockwise className="h-5 w-5 text-primary" /> Movimentações recentes
           </h2>
           <div className="space-y-1.5">
-            {movements.map((m) => {
+            {movementsList.map((m) => {
               const out = m.type === "out";
               return (
                 <div key={m.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3">
@@ -311,6 +437,16 @@ export function InventoryManager({
               );
             })}
           </div>
+          {hasMoreMovements && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mt-3 w-full rounded-[var(--radius)] border border-dashed border-border py-2 text-sm text-muted-foreground hover:bg-muted disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loadingMore && <CircleNotch className="h-4 w-4 animate-spin" />}
+              {loadingMore ? "Carregando..." : "Carregar mais"}
+            </button>
+          )}
         </div>
       )}
     </div>
