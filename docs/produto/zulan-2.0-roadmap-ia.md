@@ -248,6 +248,8 @@ Solução: um card "narrador" (ícone `Sparkle`, mesmo tom das outras páginas) 
 - Todas as comparações têm guarda de amostra mínima (ex.: só alerta serviço em queda se o mês anterior teve ≥3 atendimentos daquele serviço) — sem isso, ruído de 1 atendimento vira "queda de 100%" e o funcionário-IA soa histérico.
 - Arquivos: `relatorios/page.tsx` (fetch do mês anterior via `report_overview`), `relatorios/ReportsView.tsx` (componente `Narrator` reaproveitado nas 4 abas + funções `financeiroNarration`/`operacionalNarration`).
 
+**Bug corrigido no processo (2026-07-01)**: ao testar o destaque de profissional, o dono (Marcelo) aparecia genérico como "Profissional" na tabela "Desempenho por profissional" — `report_overview` fazia `coalesce(m.display_name, 'Profissional')` sem cair pra `profiles.full_name` quando o membro não tem apelido configurado, diferente do padrão já usado em Equipe/Agenda/Pacotes/Configurações (`display_name ?? profiles.full_name ?? fallback`). Corrigido via `supabase/migrations/20260701_report_overview_professional_name_fallback.sql` (CREATE OR REPLACE FUNCTION, só ajusta o coalesce, sem mudança de schema).
+
 ### Adiado, motivo registrado (2026-07-01)
 | Item | Por que não entra ainda |
 |---|---|
