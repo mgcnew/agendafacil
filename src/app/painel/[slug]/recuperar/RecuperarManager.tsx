@@ -13,6 +13,7 @@ import {
   UserMinus,
   MagnifyingGlass,
   CircleNotch,
+  Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 
 type WinbackClient = {
@@ -44,6 +45,47 @@ function waLink(phone: string | null, text: string): string | null {
   // 55 (país) + DDD (2) + 8/9 dígitos → mínimo 12
   if (digits.length < 12) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+type PriorityPick = { client: WinbackClient; bucket: Bucket; headline: string };
+
+/**
+ * Escolhe 1 cliente pra destacar no banner — regra direta, sem IA/LLM.
+ * Prioridade: cliente fiel que sumiu > risco de falta recorrente > qualquer
+ * um dos baldes (fallback, pra sempre ter algo útil quando existir dado).
+ */
+function pickPriority(data: WinbackData): PriorityPick | null {
+  const inactiveByVisits = [...data.inactive].sort((a, b) => (b.visits ?? 0) - (a.visits ?? 0));
+  const loyalGone = inactiveByVisits[0];
+  if (loyalGone && (loyalGone.visits ?? 0) >= 3) {
+    return {
+      client: loyalGone,
+      bucket: "inactive",
+      headline: `${firstName(loyalGone.name)} já veio ${loyalGone.visits}x aqui e sumiu${loyalGone.last_at ? ` desde ${formatDate(loyalGone.last_at)}` : ""}. Vale chamar primeiro.`,
+    };
+  }
+
+  const riskyByFaults = [...data.no_shows].sort((a, b) => (b.total_no_shows ?? 0) - (a.total_no_shows ?? 0));
+  const risky = riskyByFaults[0];
+  if (risky && (risky.total_no_shows ?? 0) >= 2) {
+    return {
+      client: risky,
+      bucket: "no_shows",
+      headline: `${firstName(risky.name)} já faltou ${risky.total_no_shows} vezes. Uma confirmação por WhatsApp pode evitar a próxima.`,
+    };
+  }
+
+  if (loyalGone) {
+    return { client: loyalGone, bucket: "inactive", headline: `${firstName(loyalGone.name)} está sumido${loyalGone.last_at ? ` desde ${formatDate(loyalGone.last_at)}` : ""}. Bora chamar de volta?` };
+  }
+  if (risky) {
+    return { client: risky, bucket: "no_shows", headline: `${firstName(risky.name)} faltou recentemente. Quer remarcar?` };
+  }
+  const cancelledFirst = data.cancelled[0];
+  if (cancelledFirst) {
+    return { client: cancelledFirst, bucket: "cancelled", headline: `${firstName(cancelledFirst.name)} cancelou e ainda não remarcou.` };
+  }
+  return null;
 }
 
 export function RecuperarManager({
@@ -86,14 +128,14 @@ export function RecuperarManager({
   const q = query.toLowerCase().trim();
   const list = data[tab].filter((c) => !q || c.name.toLowerCase().includes(q));
 
-  function message(c: WinbackClient): string {
+  function message(c: WinbackClient, bucket: Bucket = tab): string {
     const couponTxt = coupon
       ? ` Use o cupom *${coupon.name}* e ganhe ${coupon.discount_percent}% de desconto na sua próxima visita!`
       : "";
     const base =
-      tab === "no_shows"
+      bucket === "no_shows"
         ? `Oi ${firstName(c.name)}! Sentimos sua falta no seu horário aqui no ${salonName}. Sem problema — quer remarcar?`
-        : tab === "cancelled"
+        : bucket === "cancelled"
         ? `Oi ${firstName(c.name)}! Vimos que seu horário no ${salonName} foi cancelado. Bora reagendar um novo?`
         : `Oi ${firstName(c.name)}! Faz um tempinho que você não aparece aqui no ${salonName} 😊 Que tal marcar um horário?`;
     const bookingUrl =
@@ -101,10 +143,12 @@ export function RecuperarManager({
     return base + couponTxt + (bookingUrl ? `\n\nAgende aqui: ${bookingUrl}` : "");
   }
 
-  function openWhatsApp(c: WinbackClient) {
-    const link = waLink(c.phone, message(c));
+  function openWhatsApp(c: WinbackClient, bucket: Bucket = tab) {
+    const link = waLink(c.phone, message(c, bucket));
     if (link) window.open(link, "_blank", "noopener,noreferrer");
   }
+
+  const priorityPick = pickPriority(data);
 
   return (
     <div className="space-y-6 af-rise">
@@ -116,6 +160,35 @@ export function RecuperarManager({
           Traga de volta quem faltou, cancelou ou está sumido — com uma mensagem pronta no WhatsApp.
         </p>
       </header>
+
+      {/* De olho em quem chamar primeiro — regra direta, sem IA, sempre reflete o dado carregado */}
+      {priorityPick && (
+        <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+              <Sparkle className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-sm font-semibold">Quem chamar primeiro</p>
+          </div>
+          <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+            <p className="text-sm">{priorityPick.headline}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={waLink(priorityPick.client.phone, "") === null}
+                onClick={() => openWhatsApp(priorityPick.client, priorityPick.bucket)}
+                className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+              >
+                <WhatsappLogo className="h-4 w-4" /> Chamar {firstName(priorityPick.client.name)}
+              </Button>
+              {waLink(priorityPick.client.phone, "") === null && (
+                <span className="text-xs text-muted-foreground">sem telefone cadastrado</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cupom de retorno (opcional) */}
       {campaigns.length > 0 && (
