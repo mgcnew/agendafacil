@@ -46,6 +46,7 @@ import {
   type ReceiptData, type SalonInfo, type CommissionLine, type CommissionReceiptData, type ClosingReportData, type ReportEntry,
 } from "./receipt";
 import { FixedCostsPanel, type FixedCost, type ChairRental, type ActivePackageSummary } from "./FixedCostsPanel";
+import { Narrator } from "@/components/Narrator";
 
 type Session = Tables<"cash_sessions">;
 type Tx = Tables<"cash_transactions">;
@@ -92,6 +93,8 @@ export function FinanceManager({
   activePackages,
   canViewCommissions,
   canViewFixed,
+  lastMonthRevenue,
+  lastMonthLabel,
 }: {
   salonId: string;
   canManage: boolean;
@@ -112,6 +115,8 @@ export function FinanceManager({
   activePackages: ActivePackageSummary;
   canViewCommissions: boolean;
   canViewFixed: boolean;
+  lastMonthRevenue: number;
+  lastMonthLabel: string;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -270,6 +275,13 @@ export function FinanceManager({
     if (error) throw error;
     router.refresh();
   }
+
+  // ── histórico de diferenças de caixa (base para os narradores de Caixa/Histórico) ──
+  const sessionsWithDiff = closedSessions.filter((s) => s.difference != null);
+  const historicalAvgAbsDiff = sessionsWithDiff.length > 0
+    ? sessionsWithDiff.reduce((s, x) => s + Math.abs(Number(x.difference)), 0) / sessionsWithDiff.length
+    : 0;
+  const shortfalls = sessionsWithDiff.filter((s) => Number(s.difference) < -0.01);
 
   const opening0 = openSession ? Number(openSession.opening_amount) : 0;
 
@@ -477,6 +489,29 @@ export function FinanceManager({
 
       {tab === "historico" && (
         <div className="space-y-3">
+          {sessionsWithDiff.length >= 3 && (() => {
+            let dominantOperator: string | null = null;
+            if (shortfalls.length >= 2) {
+              const counts = new Map<string, number>();
+              for (const s of shortfalls) {
+                if (!s.closed_by) continue;
+                counts.set(s.closed_by, (counts.get(s.closed_by) ?? 0) + 1);
+              }
+              const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+              if (top && top[1] / shortfalls.length >= 0.6) dominantOperator = operatorNames[top[0]] ?? null;
+            }
+            const avgShortfall = shortfalls.length > 0
+              ? shortfalls.reduce((s, x) => s + Math.abs(Number(x.difference)), 0) / shortfalls.length
+              : 0;
+            const lines = shortfalls.length === 0
+              ? [`Seus últimos ${sessionsWithDiff.length} fechamentos bateram certo (ou só tiveram sobra) — nenhuma falta de caixa no período.`]
+              : [];
+            const alert = shortfalls.length >= 2
+              ? `Nos últimos ${sessionsWithDiff.length} fechamentos, houve falta de caixa em ${shortfalls.length} deles, média de ${formatBRL(avgShortfall)}.` +
+                (dominantOperator ? ` A maioria aconteceu com ${dominantOperator} no fechamento.` : "")
+              : undefined;
+            return <Narrator lines={lines} alert={alert} />;
+          })()}
           {closedSessions.length === 0 ? (
             <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
               <ClockCounterClockwise className="h-8 w-8 mx-auto text-muted-foreground" />
@@ -535,6 +570,8 @@ export function FinanceManager({
             salon={salon}
             openedBy={openSession?.opened_by ? (operatorNames[openSession.opened_by] ?? null) : null}
             openedAt={openSession?.opened_at ?? null}
+            historicalAvgAbsDiff={historicalAvgAbsDiff}
+            historicalCount={sessionsWithDiff.length}
             entries={transactions.map((t) => ({
               createdAt: t.created_at,
               description: t.description ?? "",
@@ -731,6 +768,15 @@ export function FinanceManager({
 
       {tab === "comissoes" && (
         <div className="space-y-4">
+          {commissions.length > 0 && (() => {
+            const top = commissions[0];
+            const totalOutstanding = commissions.reduce((s, c) => s + Math.max(0, c.earned - c.paid), 0);
+            const lines = [`Destaque do período: ${top.name}, com ${formatBRL(top.earned)} em comissão apurada.`];
+            const alert = totalOutstanding > 0.01
+              ? `Você tem ${formatBRL(totalOutstanding)} em comissões apuradas e ainda não pagas neste período.`
+              : undefined;
+            return <Narrator lines={lines} alert={alert} />;
+          })()}
           {/* Navegação de período */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
@@ -801,6 +847,8 @@ export function FinanceManager({
           fixedCosts={fixedCosts}
           chairRentals={chairRentals}
           activePackages={activePackages}
+          lastMonthRevenue={lastMonthRevenue}
+          lastMonthLabel={lastMonthLabel}
         />
       )}
 
@@ -2200,6 +2248,8 @@ function CloseModal({
   openedBy = null,
   openedAt = null,
   entries = [],
+  historicalAvgAbsDiff = 0,
+  historicalCount = 0,
   onClose,
   onConfirm,
 }: {
@@ -2214,6 +2264,8 @@ function CloseModal({
   openedBy?: string | null;
   openedAt?: string | null;
   entries?: ReportEntry[];
+  historicalAvgAbsDiff?: number;
+  historicalCount?: number;
   onClose: () => void;
   onConfirm: (counted: number) => Promise<boolean>;
 }) {
@@ -2290,6 +2342,13 @@ function CloseModal({
               </h3>
               <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
+
+            {historicalCount >= 3 && Math.abs(diff) >= 5 && Math.abs(diff) > historicalAvgAbsDiff * 1.5 && (
+              <Narrator
+                alert={`Essa ${diff < 0 ? "falta" : "sobra"} de ${formatBRL(Math.abs(diff))} está acima do normal (média das últimas ${historicalCount} contagens: ${formatBRL(historicalAvgAbsDiff)}).`}
+                lines={[]}
+              />
+            )}
 
             <div className="rounded-[var(--radius)] bg-secondary border border-border p-4 space-y-1.5 text-sm">
               <div className="flex justify-between">

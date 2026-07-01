@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
+import { Narrator, narratorPct } from "@/components/Narrator";
 import {
   Buildings,
   Check,
@@ -43,11 +44,15 @@ export function FixedCostsPanel({
   fixedCosts,
   chairRentals,
   activePackages,
+  lastMonthRevenue,
+  lastMonthLabel,
 }: {
   salonId: string;
   fixedCosts: FixedCost[];
   chairRentals: ChairRental[];
   activePackages: ActivePackageSummary;
+  lastMonthRevenue: number;
+  lastMonthLabel: string;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -128,6 +133,15 @@ export function FixedCostsPanel({
     setAddingType(null);
   }
 
+  const narratorLines: string[] = [];
+  if (totalExpenses > 0 && lastMonthRevenue > 0) {
+    const share = (totalExpenses / lastMonthRevenue) * 100;
+    narratorLines.push(`Seus custos fixos somam ${formatBRL(totalExpenses)}/mês — isso é ${narratorPct(share)} do faturamento de ${lastMonthLabel}.`);
+  }
+  if (activePackages.total_value > 0) {
+    narratorLines.push(`Você tem ${formatBRL(activePackages.total_value)} em pacotes já vendidos e ainda não entregues — parte do seu passivo de serviço.`);
+  }
+
   return (
     <div className="space-y-6">
       {err && (
@@ -135,6 +149,8 @@ export function FixedCostsPanel({
           <X className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
+
+      <Narrator lines={narratorLines} />
 
       {/* Resultado mensal */}
       <div className="grid grid-cols-3 gap-3">

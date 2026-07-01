@@ -42,6 +42,12 @@ export default async function FinanceiroPage({
   const prevCmes = cmesOf(new Date(py, pm - 2, 1));
   const nextCmes = cmesOf(new Date(py, pm, 1));
 
+  // Faturamento do mês passado (fixo, independe da navegação da aba Comissões) —
+  // só pra dar contexto ao narrador de custos fixos.
+  const now = new Date();
+  const lastClosedCmes = cmesOf(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const { start: lastMonthStart, end: lastMonthEnd } = monthRangeBR(lastClosedCmes);
+
   // ── caixa ──
   const { data: openSession } = await supabase
     .from("cash_sessions")
@@ -81,18 +87,20 @@ export default async function FinanceiroPage({
   if (operatorIds.size > 0) {
     const { data: ops } = await supabase
       .from("salon_members")
-      .select("profile_id, display_name")
+      .select("profile_id, display_name, profiles(full_name)")
       .eq("salon_id", salonId)
       .in("profile_id", Array.from(operatorIds));
     for (const o of ops ?? []) {
-      if (o.profile_id) operatorNames[o.profile_id] = o.display_name ?? "—";
+      if (o.profile_id) {
+        operatorNames[o.profile_id] = o.display_name ?? (o.profiles as { full_name?: string } | null)?.full_name ?? "—";
+      }
     }
   }
 
   // ── comissões apuradas no período (atendimentos concluídos) ──
   const { data: commRows } = await supabase
     .from("appointment_services")
-    .select("commission_amount, appointments!inner(member_id, status, starts_at, salon_members(display_name))")
+    .select("commission_amount, appointments!inner(member_id, status, starts_at, salon_members(display_name, profiles(full_name)))")
     .eq("salon_id", salonId)
     .eq("appointments.status", "completed")
     .gte("appointments.starts_at", periodStartIso)
@@ -102,10 +110,10 @@ export default async function FinanceiroPage({
   for (const r of commRows ?? []) {
     const appt = r.appointments as unknown as {
       member_id: string;
-      salon_members: { display_name: string | null } | null;
+      salon_members: { display_name: string | null; profiles: { full_name: string | null } | null } | null;
     };
     const key = appt.member_id;
-    const name = appt.salon_members?.display_name ?? "Profissional";
+    const name = appt.salon_members?.display_name ?? appt.salon_members?.profiles?.full_name ?? "Profissional";
     const cur = earnedMap.get(key) ?? { name, earned: 0 };
     cur.earned += Number(r.commission_amount);
     earnedMap.set(key, cur);
@@ -114,14 +122,15 @@ export default async function FinanceiroPage({
   // ── comissões de uso de pacote no período ──
   const { data: redRows } = await supabase
     .from("package_redemptions")
-    .select("commission_amount, member_id, salon_members(display_name)")
+    .select("commission_amount, member_id, salon_members(display_name, profiles(full_name))")
     .eq("salon_id", salonId)
     .gte("used_at", periodStartIso)
     .lte("used_at", periodEndIso)
     .not("member_id", "is", null);
   for (const r of redRows ?? []) {
     if (!r.member_id) continue;
-    const name = (r.salon_members as unknown as { display_name: string | null } | null)?.display_name ?? "Profissional";
+    const sm = r.salon_members as unknown as { display_name: string | null; profiles: { full_name: string | null } | null } | null;
+    const name = sm?.display_name ?? sm?.profiles?.full_name ?? "Profissional";
     const cur = earnedMap.get(r.member_id) ?? { name, earned: 0 };
     cur.earned += Number(r.commission_amount);
     earnedMap.set(r.member_id, cur);
@@ -211,6 +220,17 @@ export default async function FinanceiroPage({
     total_value: (pkgsRaw ?? []).reduce((s: number, p: { price: number }) => s + Number(p.price), 0),
   };
 
+  // Faturamento do mês passado — só pra narrar custos fixos em % da receita (reaproveita report_overview de Relatórios).
+  let lastMonthRevenue = 0;
+  if (canViewFixed) {
+    const { data: lastMonthOverview } = await supabase.rpc("report_overview" as never, {
+      p_salon: salonId,
+      p_from: lastMonthStart,
+      p_to: lastMonthEnd,
+    } as never);
+    lastMonthRevenue = Number((lastMonthOverview as { faturamento?: number } | null)?.faturamento ?? 0);
+  }
+
   return (
     <FinanceManager
       salonId={salonId}
@@ -236,6 +256,8 @@ export default async function FinanceiroPage({
       fixedCosts={canViewFixed ? fixedCosts : []}
       chairRentals={canViewFixed ? chairRentals : []}
       activePackages={canViewFixed ? activePackages : { count: 0, total_value: 0 }}
+      lastMonthRevenue={lastMonthRevenue}
+      lastMonthLabel={`${MONTHS[(new Date(lastClosedCmes + "-01").getMonth())]} ${lastClosedCmes.slice(0, 4)}`}
       period={{
         label: `${MONTHS[pm - 1]} ${py}`,
         prevCmes,

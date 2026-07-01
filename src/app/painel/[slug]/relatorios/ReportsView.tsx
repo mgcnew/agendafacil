@@ -28,6 +28,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
+import { Narrator, narratorPct as pct } from "@/components/Narrator";
 
 export type ReportData = {
   faturamento: number;
@@ -335,32 +336,6 @@ export function ReportsView({
     </div>
   );
 }
-
-/* ───────────────────────── Narrador de IA ───────────────────────── */
-
-function Narrator({ lines, alert }: { lines: string[]; alert?: string }) {
-  if (lines.length === 0 && !alert) return null;
-  return (
-    <Card className="p-4 min-w-0 border-primary/25 bg-primary/[0.03]">
-      <div className="flex items-start gap-2.5">
-        <Sparkle className="h-4.5 w-4.5 shrink-0 text-primary mt-0.5" />
-        <div className="space-y-1.5 text-sm">
-          {lines.map((l, i) => (
-            <p key={i}>{l}</p>
-          ))}
-          {alert && (
-            <p className="flex items-start gap-1.5 text-amber-700">
-              <Flame className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{alert}</span>
-            </p>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-const pct = (n: number) => `${n >= 0 ? "" : "-"}${Math.abs(Math.round(n))}%`;
 
 /* ───────────────────────── Financeiro ───────────────────────── */
 

@@ -195,7 +195,23 @@ A pedido do usuário: estoque não é só insumo, é também produto de revenda 
 
 ## Inteligência do Negócio (Financeiro)
 
-**Status: ⬜ Não avaliado**
+**Status: ✅ Implementado (v1 — narrador em linguagem natural)** (2026-07-01)
+
+O documento funcional descreve uma página "Inteligência do Negócio" bem mais ampla (abas Financeiro/Inteligência/Temperatura/Crescimento/Assistente IA, IA respondendo "por que faturou menos", "onde há desperdício") — não bate com a página real, que é **Caixa & Comissões** (`/financeiro`), com 4 abas operacionais: Caixa (PDV ao vivo), Caixas anteriores (histórico), Comissões, Fixos. Avaliado com o mesmo formato já usado em Relatórios: card "narrador" (`Sparkle`, extraído para `src/components/Narrator.tsx` e reaproveitado por Relatórios e Caixa) em cada aba, só fala e linka pra ação existente — nunca dispara nada sozinho.
+
+- **Caixa**: o fechamento (`CloseModal`) já era "cego" (dono conta o dinheiro sem ver o valor esperado) — o narrador entra só na tela de sucesso, comparando a sobra/falta desse fechamento com a média das últimas contagens. Só aparece se houver ≥3 fechamentos históricos e a diferença for claramente maior que o normal (>1.5× a média e ≥R$5) — evita alarmar por variação normal de troco.
+- **Caixas anteriores**: mesmo piso de amostra (≥3 fechamentos com diferença registrada). Narra quantas faltas de caixa houve no período e a média, e se ≥60% das faltas caíram com o mesmo operador, menciona (tom neutro, não acusatório). Sem faltas, comemora a organização.
+- **Comissões**: destaca quem mais gerou comissão no período e alerta o total ainda não pago (risco de esquecer de quitar antes de fechar o mês).
+- **Fixos**: cruza custos fixos mensais com o faturamento do mês passado (reaproveita `report_overview`, mesma RPC de Relatórios) pra mostrar que fatia da receita os custos fixos comem, e lembra do valor em pacotes vendidos e ainda não entregues (passivo de serviço).
+
+**Bug corrigido no processo (2026-07-01)**: a mesma falha do fallback de nome (dono sem `display_name` aparecendo como "Profissional" genérico) existia também em `financeiro/page.tsx` — nas queries de comissões e nos nomes de quem abriu/fechou o caixa. Corrigido adicionando `profiles(full_name)` como fallback nas 3 queries (sem migration, é só ajuste de `select`).
+
+### Adiado, motivo registrado (2026-07-01)
+| Item | Por que não entra ainda |
+|---|---|
+| Abas "Inteligência"/"Crescimento"/"Assistente IA" do documento funcional | Visão bem mais ampla que a página real; precisa de uma sessão dedicada pra decidir o que faz sentido migrar pra cá vs. já coberto por Relatórios |
+| Sugestão automática de ajuste de preço/desconto a partir do resultado mensal | Precisa de mais contexto (margem por serviço) antes de virar sugestão confiável |
+| Envio automático do resumo de fechamento (hoje é manual via WhatsApp/PDF) | Ação de risco médio — mesma barreira de outros "envios autônomos" adiados em outras páginas |
 
 ---
 
