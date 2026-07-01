@@ -161,6 +161,13 @@ Correção importante descoberta durante a análise: o relatório inicial (agent
 - **Sinal no Dashboard**: `productsLowCount` (estoque mínimo) chegou até o card do Gestor — gap real que a análise encontrou (Pacotes já tinha `pkgsExpiringSoon` chegando lá, Estoque não tinha equivalente). Tipo de insight novo `low_stock`, mapeado pra `/estoque`.
 - Arquivos: `src/lib/productInsights.ts` (novo), `supabase/migrations/20260630_product_movement_stats.sql`, `estoque/page.tsx`, `estoque/InventoryManager.tsx`, `src/lib/ai/dashboardInsights.ts`, Dashboard `page.tsx`, `GestorInsights.tsx`.
 
+### UX: paginação e filtros (2026-07-01)
+A pedido do usuário: estoque não é só insumo, é também produto de revenda vendido no caixa — precisava de filtro por tipo e por status, além de paginação.
+- **Lista de produtos**: busca por nome, filtro por tipo (insumo/revenda) e por status (estoque baixo/parado), paginação de 15 itens (in-memory — catálogo é naturalmente pequeno e limitado).
+- **Movimentações recentes**: correção de rumo importante — a paginação real (server-side) era pra esta lista, não pra de produtos, já que o histórico de movimentação cresce sem limite. Passou a carregar em lotes de 10 (`MOVEMENTS_PAGE_SIZE`) via nova Server Action `loadMoreMovements` (`estoque/inventoryActions.ts`), com botão "Carregar mais" — evita trazer todo o histórico de uma vez no primeiro load. Usa a técnica de buscar `N+1` linhas pra saber se há mais sem precisar de `count: "exact"` numa tabela que só cresce.
+- Tipo `Movement` e a constante `MOVEMENTS_PAGE_SIZE` moraram num arquivo neutro (`estoque/types.ts`) sem diretiva `"use client"`/`"use server"` — necessário porque `InventoryManager.tsx` (client) e `inventoryActions.ts` (server action) importam o mesmo tipo/constante um do outro, e isso causa erro de resolução de módulo no Turbopack (`tsc` não pega, só aparece em runtime).
+- Arquivos: `estoque/InventoryManager.tsx`, `estoque/page.tsx`, `estoque/types.ts` (novo), `estoque/inventoryActions.ts` (novo).
+
 ### Adiado, motivo registrado (2026-06-30)
 | Item | Por que não entra ainda |
 |---|---|
@@ -184,7 +191,29 @@ Correção importante descoberta durante a análise: o relatório inicial (agent
 
 ## Campanhas
 
-**Status: ⬜ Não avaliado**
+**Status: ✅ Implementado (v2, pulando o v1)** (2026-07-01)
+
+A visão do documento funcional ([zulan-2.0-documento-funcional-das-paginas.md](zulan-2.0-documento-funcional-das-paginas.md)) descreve campanha totalmente autônoma (IA escolhe público, horário, texto, envia e aprende sozinha) — conflita direto com o Princípio 2 (sem disparo automático sem confirmação do dono) e não tem fluxo de aprovação pra isso hoje. Não foi construída como está descrita lá.
+
+Prova de que o padrão "IA propõe, dono clica pra criar" já existia antes mesmo de avaliarmos esta página: o "Termômetro por dia da semana" em Relatórios já linka pra `/campanhas?nova=1&nome=...&desconto=15` quando identifica um dia frio, e `CampaignsManager.tsx` já sabia abrir o editor pré-preenchido a partir desses parâmetros.
+
+Ao analisar, ficou claro que faltava a base de tudo: **nenhum agendamento gravava qual campanha gerou seu desconto** — sem isso, não dá pra medir se uma campanha funciona. O usuário decidiu pular direto pro que resolve essa lacuna (v2) em vez de começar por sugestões mais simples de campanha (v1).
+
+### v2 — medição de performance
+- Migration `20260701_campaign_performance_attribution.sql`: `appointment_services` ganha `campaign_id` e `original_price`; `_appt_fill` (usada por `book_appointment` e `create_staff_appointment`) passa a resolver a campanha vencedora (`campaign_for_service`, mesma regra de elegibilidade que já existia em `campaign_discount`, só que agora também retorna o id) e grava os dois campos no momento do agendamento. `campaign_discount` foi reescrita por cima de `campaign_for_service`, mantendo assinatura/comportamento — não quebra `effective_price` nem `public_campaign_discounts`.
+- Nova RPC `campaign_performance(p_salon)`: agendamentos, receita e desconto concedido por campanha, só sobre atendimentos `completed`. Gate por `is_salon_member` (mesmo padrão de `product_movement_stats`).
+- UI em `CampaignsManager.tsx`: cada card de campanha mostra as três métricas (quando há dado), com aviso fixo no topo da página de que a medição só existe a partir de 01/07/2026 — **não há como reconstruir atribuição de agendamentos passados**, já que a campanha nunca foi gravada antes desta migration. Campanhas encerradas antes disso aparecem sempre zeradas, e isso é esperado, não bug.
+- **Escopo desta v2: apenas serviços** (`appointment_services`). Venda de produto no caixa não é atribuída a campanha — decisão explícita do usuário ("nesse primeiro momento não precisamos estender para os produtos").
+- Bônus fora do escopo original: os campos de data (Início/Fim) da modal de campanha usavam `<input type="date">` nativo do navegador (fora do tema); trocados pelo componente `Calendar` próprio do sistema (já usado na Agenda), com bloqueio de datas antes do início selecionado.
+- Arquivos: `supabase/migrations/20260701_campaign_performance_attribution.sql`, `campanhas/page.tsx`, `campanhas/CampaignsManager.tsx`.
+
+### Adiado, motivo registrado (2026-07-01)
+| Item | Por que não entra ainda |
+|---|---|
+| v1 — banner de sugestões de campanha (clientes inativos, dormência de produto, dia frio) reaproveitando `report_reactivation`/`service_insights`/termômetro já existente | Avaliado antes da v2, mas o usuário optou por ir direto pra medição de performance; não foi rejeitado, só ficou pra depois |
+| Escolha de público/horário/texto pela IA | Descrito no documento funcional como autônomo — precisa do fluxo de aprovação da hierarquia de decisões antes de existir, mesmo em versão "propõe e o dono clica" |
+| Atribuição de campanha em venda de produto (caixa) | Fora do escopo desta v2 por decisão do usuário; `cash_sell_product` não grava `campaign_id` hoje |
+| Envio automático de campanha (WhatsApp/notificação) | Ação de risco médio/alto — mesma barreira dos demais "envios autônomos" já adiados em outras páginas |
 
 ---
 
