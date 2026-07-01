@@ -83,12 +83,15 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 const payLabel = (m: string) => PAYMENT_LABELS[m] ?? m;
 
+const shiftMonthPrev = (cmes: string) => shiftMonth(cmes, -1);
+
 export function ReportsView({
   salonId,
   salonName,
   slug,
   initialCmes,
   initialData,
+  initialPrevData,
   initialTab,
 }: {
   salonId: string;
@@ -96,11 +99,13 @@ export function ReportsView({
   slug: string;
   initialCmes: string;
   initialData: ReportData | null;
+  initialPrevData?: ReportData | null;
   initialTab?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [cmes, setCmes] = useState(initialCmes);
   const [data, setData] = useState<ReportData | null>(initialData);
+  const [prevData, setPrevData] = useState<ReportData | null>(initialPrevData ?? null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>(
     initialTab === "operacional" || initialTab === "reativacao" || initialTab === "temperatura"
@@ -175,12 +180,21 @@ export function ReportsView({
       setCmes(target);
       setLoading(true);
       const { start, end } = monthRangeBR(target);
-      const res = await supabase.rpc("report_overview" as never, {
-        p_salon: salonId,
-        p_from: start,
-        p_to: end,
-      } as never);
+      const { start: prevStart, end: prevEnd } = monthRangeBR(shiftMonthPrev(target));
+      const [res, prevRes] = await Promise.all([
+        supabase.rpc("report_overview" as never, {
+          p_salon: salonId,
+          p_from: start,
+          p_to: end,
+        } as never),
+        supabase.rpc("report_overview" as never, {
+          p_salon: salonId,
+          p_from: prevStart,
+          p_to: prevEnd,
+        } as never),
+      ]);
       setData(((res as { data: ReportData | null }).data) ?? null);
+      setPrevData(((prevRes as { data: ReportData | null }).data) ?? null);
       setLoading(false);
     },
     [supabase, salonId],
@@ -314,26 +328,91 @@ export function ReportsView({
           </p>
         </div>
       ) : tab === "financeiro" ? (
-        <FinanceiroTab d={d!} />
+        <FinanceiroTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} slug={slug} />
       ) : (
-        <OperacionalTab d={d!} />
+        <OperacionalTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} />
       )}
     </div>
   );
 }
 
+/* ───────────────────────── Narrador de IA ───────────────────────── */
+
+function Narrator({ lines, alert }: { lines: string[]; alert?: string }) {
+  if (lines.length === 0 && !alert) return null;
+  return (
+    <Card className="p-4 min-w-0 border-primary/25 bg-primary/[0.03]">
+      <div className="flex items-start gap-2.5">
+        <Sparkle className="h-4.5 w-4.5 shrink-0 text-primary mt-0.5" />
+        <div className="space-y-1.5 text-sm">
+          {lines.map((l, i) => (
+            <p key={i}>{l}</p>
+          ))}
+          {alert && (
+            <p className="flex items-start gap-1.5 text-amber-700">
+              <Flame className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{alert}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+const pct = (n: number) => `${n >= 0 ? "" : "-"}${Math.abs(Math.round(n))}%`;
+
 /* ───────────────────────── Financeiro ───────────────────────── */
 
-function FinanceiroTab({ d }: { d: ReportData }) {
+function financeiroNarration(d: ReportData, prev: ReportData | null, prevLabel: string) {
+  const lines: string[] = [];
+  let alert: string | undefined;
+  if (!prev || prev.atendimentos === 0) {
+    lines.push(`Faturamento de ${formatBRL(d.faturamento)} este mês, com ${d.atendimentos} atendimento${d.atendimentos === 1 ? "" : "s"}.`);
+    return { lines, alert };
+  }
+  if (prev.faturamento > 0) {
+    const delta = ((d.faturamento - prev.faturamento) / prev.faturamento) * 100;
+    const dir = delta >= 0 ? "a mais" : "a menos";
+    lines.push(`Faturamento de ${formatBRL(d.faturamento)} este mês, ${pct(delta)} ${dir} que em ${prevLabel}.`);
+  } else {
+    lines.push(`Faturamento de ${formatBRL(d.faturamento)} este mês.`);
+  }
+  if (prev.ticket_medio > 0 && d.ticket_medio > 0) {
+    const deltaTicket = ((d.ticket_medio - prev.ticket_medio) / prev.ticket_medio) * 100;
+    if (Math.abs(deltaTicket) >= 5) {
+      lines.push(`Ticket médio ${deltaTicket >= 0 ? "subiu" : "caiu"} pra ${formatBRL(d.ticket_medio)} (${pct(deltaTicket)}).`);
+    }
+  }
+  if (d.faturamento > 0 && prev.faturamento > 0) {
+    const marginNow = d.despesas / d.faturamento;
+    const marginPrev = prev.despesas / prev.faturamento;
+    if (marginNow - marginPrev >= 0.05) {
+      alert = `Suas despesas cresceram mais rápido que o faturamento: hoje elas representam ${pct(marginNow * 100)} da receita, contra ${pct(marginPrev * 100)} em ${prevLabel}. Vale revisar o que mudou.`;
+    }
+  }
+  return { lines, alert };
+}
+
+function FinanceiroTab({ d, prev, prevLabel, slug }: { d: ReportData; prev: ReportData | null; prevLabel: string; slug: string }) {
   const kpis = [
     { icon: Wallet, label: "Faturamento", value: formatBRL(d.faturamento), tone: "text-primary" },
     { icon: TrendDown, label: "Despesas", value: formatBRL(d.despesas), tone: "text-red-600" },
     { icon: Coins, label: "Líquido", value: formatBRL(d.liquido), tone: d.liquido >= 0 ? "text-emerald-600" : "text-red-600" },
     { icon: Receipt, label: "Ticket médio", value: formatBRL(d.ticket_medio), sub: `${d.atendimentos} atendimento${d.atendimentos === 1 ? "" : "s"}` },
   ];
+  const { lines, alert } = financeiroNarration(d, prev, prevLabel);
 
   return (
     <div className="space-y-6">
+      <Narrator lines={lines} alert={alert} />
+      {alert && (
+        <div className="-mt-3 flex flex-wrap gap-3 text-xs">
+          <Link href={`/painel/${slug}/relatorios?tab=temperatura`} className="font-semibold text-primary hover:underline">
+            Ver dias e horários mais fracos →
+          </Link>
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k) => (
           <Card key={k.label} className="p-5 min-w-0">
@@ -452,11 +531,20 @@ function ReativacaoTab({
     return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
   };
 
+  const urgent = [...clients].sort((a, b) => b.overdue_by - a.overdue_by)[0];
+
   return (
     <div className="space-y-4">
+      <Narrator
+        lines={[
+          `Você tem ${clients.length} cliente${clients.length === 1 ? "" : "s"} que já passou do próprio ritmo de retorno.` +
+            (urgent
+              ? ` A mais urgente é ${firstName(urgent.name)}, ${urgent.overdue_by} dia${urgent.overdue_by === 1 ? "" : "s"} além do previsto.`
+              : ""),
+        ]}
+      />
       <p className="text-sm text-muted-foreground">
-        Clientes que passaram do próprio ritmo de retorno — ordenados por urgência e valor.
-        Mande um oi pelo WhatsApp e traga ela de volta. 💬
+        Ordenadas por urgência e valor. Mande um oi pelo WhatsApp e traga ela de volta. 💬
       </p>
       <div className="space-y-2">
         {clients.map((c) => {
@@ -565,8 +653,21 @@ function TemperaturaTab({
   const hourRange: number[] = [];
   for (let h = minH; h <= maxH; h++) hourRange.push(h);
 
+  const openDays = data.weekdays.filter((w) => w.occupation !== null);
+  const hottest = [...openDays].sort((a, b) => b.revenue - a.revenue)[0];
+  const coldest = [...openDays].sort((a, b) => a.revenue - b.revenue)[0];
+  const narratorLines: string[] = [];
+  if (hottest) {
+    narratorLines.push(`${WEEKDAYS[hottest.weekday]} é seu dia mais quente: ${formatBRL(hottest.revenue)} e ${hottest.occupation}% de ocupação.`);
+  }
+  let coldAlert: string | undefined;
+  if (coldest && coldest.weekday !== hottest?.weekday && temp(coldest) === "frio") {
+    coldAlert = `${WEEKDAYS[coldest.weekday]} está frio, só ${coldest.occupation}% de ocupação. Dá pra usar a promoção abaixo pra aquecer.`;
+  }
+
   return (
     <div className="space-y-6">
+      <Narrator lines={narratorLines} alert={coldAlert} />
       {/* Termômetro por dia da semana */}
       <Card className="p-5 min-w-0">
         <h2 className="font-display font-semibold">Termômetro por dia da semana</h2>
@@ -649,9 +750,50 @@ function TemperaturaTab({
 
 /* ─────────────────── Serviços & Profissionais ─────────────────── */
 
-function OperacionalTab({ d }: { d: ReportData }) {
+function operacionalNarration(d: ReportData, prev: ReportData | null, prevLabel: string) {
+  const lines: string[] = [];
+  let alert: string | undefined;
+
+  const topPro = [...d.professionals].sort((a, b) => b.revenue - a.revenue)[0];
+  if (topPro) {
+    lines.push(`Destaque do mês: ${topPro.name}, com ${topPro.qty} atendimento${topPro.qty === 1 ? "" : "s"} e ${formatBRL(topPro.revenue)} em receita.`);
+  }
+
+  if (prev) {
+    const prevByService = new Map(prev.services.map((s) => [s.name, s]));
+    let worst: { name: string; delta: number } | null = null;
+    for (const s of d.services) {
+      const p = prevByService.get(s.name);
+      if (!p || p.qty < 3) continue;
+      const delta = ((s.qty - p.qty) / p.qty) * 100;
+      if (delta <= -30 && (!worst || delta < worst.delta)) worst = { name: s.name, delta };
+    }
+    if (worst) {
+      alert = `${worst.name} caiu ${pct(Math.abs(worst.delta))} em atendimentos em relação a ${prevLabel} — vale conferir se ainda está sendo bem divulgado.`;
+    } else {
+      const prevByPro = new Map(prev.professionals.map((p) => [p.name, p]));
+      let bestGrowth: { name: string; delta: number } | null = null;
+      for (const p of d.professionals) {
+        const pv = prevByPro.get(p.name);
+        if (!pv || pv.qty < 3) continue;
+        const delta = ((p.qty - pv.qty) / pv.qty) * 100;
+        if (delta >= 30 && (!bestGrowth || delta > bestGrowth.delta)) bestGrowth = { name: p.name, delta };
+      }
+      if (bestGrowth) {
+        lines.push(`${bestGrowth.name} cresceu ${pct(bestGrowth.delta)} em atendimentos em relação a ${prevLabel}.`);
+      }
+    }
+  }
+
+  return { lines, alert };
+}
+
+function OperacionalTab({ d, prev, prevLabel }: { d: ReportData; prev: ReportData | null; prevLabel: string }) {
   const maxSvc = Math.max(...d.services.map((s) => s.total), 1);
+  const { lines, alert } = operacionalNarration(d, prev, prevLabel);
   return (
+    <div className="space-y-6">
+    <Narrator lines={lines} alert={alert} />
     <div className="grid gap-6 lg:grid-cols-2">
       <Card className="p-5 min-w-0">
         <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
@@ -707,6 +849,7 @@ function OperacionalTab({ d }: { d: ReportData }) {
           </div>
         )}
       </Card>
+    </div>
     </div>
   );
 }

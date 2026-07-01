@@ -233,6 +233,30 @@ Ao analisar, ficou claro que faltava a base de tudo: **nenhum agendamento gravav
 
 ---
 
+## Relatórios
+
+**Status: ✅ Implementado (v1 — narrador em linguagem natural)** (2026-07-01)
+
+Não havia seção própria pra esta página em nenhum dos documentos — nem no funcional, nem aqui. A única menção prévia era o "Termômetro por dia da semana" (aba Temperatura), citado ao avaliar Campanhas como prova de que "IA propõe, dono clica" já existia. Ao olhar a página inteira, ficou claro que 2 das 4 abas (Financeiro e Serviços & Profissionais) eram só números/gráficos — zero camada de IA narrando o que eles significam, contrariando o pilar central da bíblia (funcionário fala com o dono, não só mostra dashboard).
+
+Solução: um card "narrador" (ícone `Sparkle`, mesmo tom das outras páginas) no topo de cada uma das 4 abas, com frases em linguagem natural — nunca autônomo, nunca dispara nada sozinho, só fala e (quando cabe) linka pra uma ação que já existia.
+
+- **Financeiro**: compara o mês atual com o anterior reaproveitando 100% a RPC `report_overview` (chamada 2x — mês corrente + anterior — sem migration nova). Narra faturamento (Δ%), ticket médio quando a variação é relevante (≥5%), e alerta em tom de atenção (não de bronca) quando despesas crescem mais rápido que faturamento (margem piorou ≥5 p.p.), com link pra aba Temperatura.
+- **Serviços & Profissionais**: destaca o profissional do mês (maior receita) e, comparando com o mês anterior, ou alerta um serviço que caiu ≥30% em atendimentos (piso de 3 atendimentos no mês anterior pra não alarmar por ruído de amostra pequena), ou comemora um profissional que cresceu ≥30%.
+- **Temperatura**: nova frase de abertura identificando o dia mais quente (maior receita) e, se houver um dia realmente frio entre os abertos, um alerta natural puxando pra promoção que já existia (`Criar promoção para aquecer este dia`).
+- **Reativação**: a lista de clientes atrasados já existia; trocada a frase estática genérica por uma narrada — quantidade total + nome da cliente mais urgente (maior atraso sobre o próprio ritmo).
+- Todas as comparações têm guarda de amostra mínima (ex.: só alerta serviço em queda se o mês anterior teve ≥3 atendimentos daquele serviço) — sem isso, ruído de 1 atendimento vira "queda de 100%" e o funcionário-IA soa histérico.
+- Arquivos: `relatorios/page.tsx` (fetch do mês anterior via `report_overview`), `relatorios/ReportsView.tsx` (componente `Narrator` reaproveitado nas 4 abas + funções `financeiroNarration`/`operacionalNarration`).
+
+### Adiado, motivo registrado (2026-07-01)
+| Item | Por que não entra ainda |
+|---|---|
+| Unificar aba Reativação (`report_reactivation`) com a página Recuperação de clientes (`marketing_winback`) | Mesma pendência já registrada na seção de Recuperação de clientes — precisa de uma sessão dedicada a decidir se é 1 conceito só ou 2 propositalmente diferentes |
+| IA sugerir tamanho/tipo de desconto na promoção de dia frio | Hoje o link já vem com 15% fixo (mesmo padrão do resto do sistema); variar por dados pede mais contexto (ex. margem do serviço) antes de decidir algo automático |
+| Envio automático de resumo semanal/mensal (WhatsApp/e-mail pro dono) | Ação de risco médio — mesma barreira dos demais "envios autônomos" adiados em outras páginas |
+
+---
+
 ## Princípios que valem pra toda página (lições já aprendidas)
 
 1. **A IA narra, não calcula.** Sinais vêm de SQL/RPC confiável; o LLM só prioriza e dá tom humano. (Ver [zulan-2.0-arquitetura-da-ia.md](zulan-2.0-arquitetura-da-ia.md).)

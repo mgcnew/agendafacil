@@ -5,6 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { ReportsView, type ReportData } from "./ReportsView";
 
+function prevCmes(cmes: string): string {
+  const [y, m] = cmes.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage({
@@ -28,15 +34,24 @@ export default async function RelatoriosPage({
 
   const cmes = currentMonthBR();
   const { start, end } = monthRangeBR(cmes);
+  const { start: prevStart, end: prevEnd } = monthRangeBR(prevCmes(cmes));
 
   const supabase = await createClient();
   // report_overview ainda não está no database.types.ts (função nova) — cast local.
-  const res = await supabase.rpc("report_overview" as never, {
-    p_salon: membership.salon_id,
-    p_from: start,
-    p_to: end,
-  } as never);
+  const [res, prevRes] = await Promise.all([
+    supabase.rpc("report_overview" as never, {
+      p_salon: membership.salon_id,
+      p_from: start,
+      p_to: end,
+    } as never),
+    supabase.rpc("report_overview" as never, {
+      p_salon: membership.salon_id,
+      p_from: prevStart,
+      p_to: prevEnd,
+    } as never),
+  ]);
   const initial = (res.data ?? null) as ReportData | null;
+  const initialPrev = (prevRes.data ?? null) as ReportData | null;
 
   return (
     <ReportsView
@@ -45,6 +60,7 @@ export default async function RelatoriosPage({
       slug={slug}
       initialCmes={cmes}
       initialData={initial}
+      initialPrevData={initialPrev}
       initialTab={tab}
     />
   );
