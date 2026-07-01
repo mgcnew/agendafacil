@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/utils";
+import { formatBRL, formatDate } from "@/lib/utils";
 import {
   ArrowCounterClockwise,
   WhatsappLogo,
@@ -34,6 +34,7 @@ type WinbackClient = {
 type Bucket = "no_shows" | "cancelled" | "inactive";
 type WinbackData = Record<Bucket, WinbackClient[]>;
 type Campaign = { id: string; name: string; discount_percent: number };
+type CampaignPerformance = { campaign_id: string; bookings: number; revenue: number; discount_given: number };
 
 const TABS: { id: Bucket; label: string; icon: React.ElementType }[] = [
   { id: "no_shows", label: "Faltaram", icon: XCircle },
@@ -95,11 +96,12 @@ function pickPriority(data: WinbackData): PriorityPick | null {
 }
 
 export function RecuperarManager({
-  salonId, initialData, campaigns, salonName, slug,
+  salonId, initialData, campaigns, performance, salonName, slug,
 }: {
   salonId: string;
   initialData: WinbackData;
   campaigns: Campaign[];
+  performance: Record<string, CampaignPerformance>;
   salonName: string;
   slug: string;
 }) {
@@ -239,6 +241,20 @@ export function RecuperarManager({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Resultado do cupom escolhido — fecha o loop "chamei com esse cupom, quanto voltou" */}
+      {coupon && (
+        <p className="text-xs text-muted-foreground -mt-3">
+          {performance[coupon.id] && performance[coupon.id].bookings > 0 ? (
+            <>
+              Esse cupom já gerou <strong className="text-foreground">{performance[coupon.id].bookings}</strong> agendamento{performance[coupon.id].bookings === 1 ? "" : "s"} e{" "}
+              <strong className="text-foreground">{formatBRL(performance[coupon.id].revenue)}</strong> em receita.
+            </>
+          ) : (
+            "Esse cupom ainda não tem agendamento registrado."
+          )}
+        </p>
       )}
 
       {/* Busca + período */}
