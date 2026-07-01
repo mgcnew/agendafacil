@@ -155,7 +155,11 @@ const TESTIMONIALS = [
 const FOOTER_COLS = [
   {
     title: "Produto",
-    links: ["Funcionalidades", "Planos e preços", "Novidades", "Roadmap"],
+    links: [
+      { label: "Funcionalidades", href: "#funcionalidades" },
+      { label: "Planos e preços", href: "#planos" },
+      { label: "Novidades", href: "/blog" },
+    ],
   },
   {
     title: "Empresa",
