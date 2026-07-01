@@ -92,10 +92,26 @@ A página com mais reaproveitamento de dado/RPC já existente entre todas que tr
 
 ## Recuperação de clientes
 
-**Status: ✅ Implementado** (anterior ao reposicionamento Zulan 2.0)
+**Status: ✅ Implementado (base + v1)** (anterior ao reposicionamento Zulan 2.0; v1 de IA em 2026-07-01)
 
 - `/recuperar`: tabs no_shows / cancelled / inactive, busca por nome, ajuste de período, RPC `marketing_winback`, WhatsApp 1-clique com cupom opcional.
 - Foi o protótipo que inspirou o padrão "narrar dados confiáveis" usado depois no Dashboard.
+
+O documento funcional descreve a página com autonomia total (IA escolhe público/horário/texto, envia e aprende sozinha) — conflita com o Princípio 2 e não tem fluxo de aprovação; não foi construído assim. Era, até 2026-07-01, a única página madura sem a camada de "banner que fala com o dono" já dada às demais.
+
+### v1 — três etapas, cada uma commitada/verificada em separado (2026-07-01)
+1. **Banner "De olho na recuperação"** — regra direta, sem LLM, reaproveita os 3 baldes que `marketing_winback` já calcula (`total_no_shows`, `visits`, `last_at`). `pickPriority()` escolhe 1 cliente pra destacar: cliente fiel que sumiu (3+ visitas) > risco de falta recorrente (2+ no-shows) > fallback pro primeiro registro de qualquer balde, pra sempre mostrar algo útil quando há dado. Botão "Chamar" reaproveita a mesma função de mensagem/WhatsApp já usada na lista (`message`/`openWhatsApp` passaram a aceitar o bucket explícito em vez de depender só da tab ativa).
+2. **Sugestão de campanha de reativação** — quando o balde de inativos atinge o piso mínimo (`REACTIVATION_CAMPAIGN_MIN_INACTIVE = 5`, mesmo padrão do selo VIP em Clientes), aparece um link pra `/campanhas?nova=1&nome=Volta%20pra%20c%C3%A1&desconto=15` — mesmo mecanismo que o Termômetro de Relatórios já usa pra "dia frio". Abaixo do piso, o grupo é pequeno demais pra justificar campanha (chamar 1 a 1 já resolve) e o card simplesmente não aparece.
+3. **Performance do cupom selecionado** — fecha o loop "anexei esse cupom nas mensagens → quanto ele já trouxe": ao escolher um cupom, mostra agendamentos/receita gerados por ele, reaproveitando `campaign_performance()` (criada na v2 de Campanhas, ver seção Campanhas). Sem agendamento registrado, mostra "ainda não tem agendamento registrado" em vez de esconder o texto.
+- Arquivos: `recuperar/RecuperarManager.tsx`, `recuperar/page.tsx`.
+
+### Adiado, motivo registrado (2026-07-01)
+| Item | Por que não entra ainda |
+|---|---|
+| Mensagem de WhatsApp personalizada por IA (serviço favorito, `notes`/`alert_summary`) | Precisa cruzar `service_insights` por cliente — mais plumbing; template estático hoje já cobre o essencial |
+| Uso de `birth_date`/tempo de casa (`created_at`) pra priorizar quem chamar | Não entrou nesta rodada — `pickPriority()` já cobre os casos mais fortes (fidelidade + risco de falta) sem precisar desses campos |
+| Escolha de público/horário/texto e envio automático pela IA | Descrito no documento funcional como autônomo — precisa do fluxo de aprovação da hierarquia de decisões antes de existir, mesmo em versão "propõe e o dono clica" |
+| Unificar `marketing_winback.inactive` com `report_reactivation` (já usada em Dashboard/Clientes/Pacotes/Serviços) | Pode haver sobreposição conceitual entre as duas métricas de "cliente parado" — vale decidir/alinhar numa sessão futura, não travava o v1 |
 
 ---
 
