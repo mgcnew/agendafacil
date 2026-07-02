@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { Calendar as DatePicker } from "@/components/Calendar";
 import { MotionModal } from "@/components/MotionModal";
 import { AnimatePresence } from "framer-motion";
-import { formatBRL, formatDate, formatTime } from "@/lib/utils";
+import { cn, formatBRL, formatDate, formatTime } from "@/lib/utils";
 import { PLANS, type PlanId } from "@/lib/plans";
 import {
   ArrowSquareOut,
   Buildings,
+  CalendarBlank,
+  CaretDown,
   ChartBar,
   ChatCircle,
   CircleNotch,
@@ -876,6 +879,12 @@ function BlogPostModal({
   const [body, setBody] = useState(post?.body ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
+
+  function fmtDate(s: string) {
+    const [y, m, d] = s.split("-");
+    return `${d}/${m}/${y}`;
+  }
 
   function onTitleChange(v: string) {
     setTitle(v);
@@ -942,9 +951,30 @@ function BlogPostModal({
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <Label>Data de publicação</Label>
-              <Input type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} />
+              <button
+                type="button"
+                onClick={() => setCalOpen((v) => !v)}
+                aria-expanded={calOpen}
+                className={cn(
+                  "h-11 w-full flex items-center justify-between gap-2 rounded-[var(--radius)] border bg-card px-3.5 text-sm transition",
+                  calOpen ? "border-primary" : "border-border hover:border-foreground/25",
+                )}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <CalendarBlank className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{fmtDate(publishedAt)}</span>
+                </span>
+                <CaretDown className={cn("h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform", calOpen && "rotate-180")} />
+              </button>
+              {calOpen && (
+                <DatePicker
+                  value={publishedAt}
+                  onChange={(d) => { setPublishedAt(d); setCalOpen(false); }}
+                  className="absolute z-[60] mt-1 w-full shadow-xl"
+                />
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Min. de leitura</Label>
