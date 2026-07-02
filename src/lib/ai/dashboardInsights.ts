@@ -165,12 +165,16 @@ async function generateAndCache(
   date: string,
   context: GestorContext,
   signals: Signal[],
+  refreshCount = 0,
 ): Promise<DashboardInsightsResult> {
   // Sem sinais = nada a avisar: devolve vazio sem gastar chamada de IA.
   if (signals.length === 0) {
     await supabase
       .from("ai_dashboard_insights")
-      .upsert({ salon_id: salonId, date, payload: { insights: [] }, model: null }, { onConflict: "salon_id,date" });
+      .upsert(
+        { salon_id: salonId, date, payload: { insights: [] }, model: null, refresh_count: refreshCount },
+        { onConflict: "salon_id,date" },
+      );
     return { insights: [], mode: "stub" };
   }
 
@@ -181,7 +185,7 @@ async function generateAndCache(
   await supabase
     .from("ai_dashboard_insights")
     .upsert(
-      { salon_id: salonId, date, payload, model: live ? DEEPSEEK_MODEL : null },
+      { salon_id: salonId, date, payload, model: live ? DEEPSEEK_MODEL : null, refresh_count: refreshCount },
       { onConflict: "salon_id,date" },
     );
   // Erro de upsert (ex.: migração não aplicada ainda) é ignorado de propósito —
@@ -218,13 +222,38 @@ export async function getOrGenerateDashboardInsights(
   return generateAndCache(supabase, salonId, today, context, signals);
 }
 
-/** Ignora o cache do dia e força uma nova geração (botão "Atualizar"). */
+/** Quantas vezes por dia o dono pode pedir uma nova análise manual. */
+export const MAX_MANUAL_REFRESHES_PER_DAY = 3;
+
+export type RefreshOutcome = DashboardInsightsResult & { blocked: boolean };
+
+/**
+ * Ignora o cache do dia e força uma nova análise (botão "Analisar de novo").
+ * Limitado a MAX_MANUAL_REFRESHES_PER_DAY por dia — cada chamada de IA tem
+ * custo, e sem limite o dono poderia clicar repetido sem perceber. O contador
+ * mora na própria linha do dia (salon_id, date), então reseta sozinho à meia-noite.
+ */
 export async function refreshDashboardInsights(
   supabase: SupabaseClient,
   salonId: string,
   context: GestorContext,
   signals: Signal[],
-): Promise<DashboardInsightsResult> {
+): Promise<RefreshOutcome> {
   const today = new Date().toISOString().slice(0, 10);
-  return generateAndCache(supabase, salonId, today, context, signals);
+
+  const { data: cached } = await supabase
+    .from("ai_dashboard_insights")
+    .select("payload, model, refresh_count")
+    .eq("salon_id", salonId)
+    .eq("date", today)
+    .maybeSingle();
+
+  const usedToday = cached?.refresh_count ?? 0;
+  if (usedToday >= MAX_MANUAL_REFRESHES_PER_DAY) {
+    const payload = (cached?.payload as unknown as DashboardInsightsPayload) ?? { insights: [] };
+    return { ...payload, mode: cached?.model ? "live" : "stub", blocked: true };
+  }
+
+  const result = await generateAndCache(supabase, salonId, today, context, signals, usedToday + 1);
+  return { ...result, blocked: false };
 }
