@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, Tag } from "@phosphor-icons/react/dist/ssr";
-import { getPost, formatPostDate } from "@/lib/blog/posts";
+import { ArrowLeft, ArrowRight, Clock, Tag } from "@phosphor-icons/react/dist/ssr";
+import { getPost, getPostSummaries, formatPostDate, type PostSummary } from "@/lib/blog/posts";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -31,6 +31,11 @@ export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
   const post = await getPost(slug);
   if (!post) notFound();
+
+  const others = await getPostSummaries(slug);
+  const related = [...others]
+    .sort((a, b) => (a.category === post.category ? -1 : 0) - (b.category === post.category ? -1 : 0))
+    .slice(0, 3);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -101,6 +106,19 @@ export default async function BlogPostPage({ params }: Props) {
             ))}
           </article>
 
+          {related.length > 0 && (
+            <div className="mt-12">
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                Leia também
+              </h2>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {related.map((p) => (
+                  <RelatedCard key={p.slug} post={p} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-12 rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-5">
             <p className="text-sm font-medium text-foreground">
               Pronto para lotar a agenda?
@@ -128,5 +146,32 @@ export default async function BlogPostPage({ params }: Props) {
         </div>
       </main>
     </>
+  );
+}
+
+function RelatedCard({ post }: { post: PostSummary }) {
+  return (
+    <Link
+      href={`/blog/${post.slug}`}
+      className="group flex flex-col rounded-[var(--radius)] border border-border bg-card p-5 transition hover:border-primary/40 hover:shadow-card"
+    >
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 font-medium">
+          {post.category}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock className="h-3 w-3" /> {post.readMinutes} min
+        </span>
+      </div>
+      <h3 className="mt-3 font-display text-base font-semibold leading-snug group-hover:text-primary transition-colors">
+        {post.title}
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+        {post.excerpt}
+      </p>
+      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+        Ler <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </Link>
   );
 }

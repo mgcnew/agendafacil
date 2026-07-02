@@ -47,6 +47,28 @@ export async function getAllPosts(): Promise<Post[]> {
   return ((data ?? []) as unknown as BlogPostRow[]).map(rowToPost);
 }
 
+export type PostSummary = Pick<Post, "slug" | "title" | "excerpt" | "category" | "date" | "readMinutes">;
+
+/** Lista leve (sem body) para blocos de "leia também" etc. */
+export async function getPostSummaries(excludeSlug?: string): Promise<PostSummary[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("blog_posts" as never)
+    .select("slug, title, excerpt, category, read_minutes, published_at")
+    .eq("is_published", true)
+    .order("published_at", { ascending: false });
+  if (excludeSlug) query = query.neq("slug", excludeSlug);
+  const { data } = await query;
+  return ((data ?? []) as unknown as BlogPostRow[]).map((row) => ({
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    category: row.category,
+    date: row.published_at,
+    readMinutes: row.read_minutes,
+  }));
+}
+
 export async function getPost(slug: string): Promise<Post | undefined> {
   const supabase = await createClient();
   const { data } = await supabase
