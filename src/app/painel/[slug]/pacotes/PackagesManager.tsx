@@ -7,6 +7,13 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, waLink } from "@/lib/utils";
+import {
+  daysUntil,
+  daysSince,
+  isExpiringSoon,
+  PACKAGE_DORMANT_DAYS,
+  PACKAGE_EXPIRY_WINDOW_DAYS,
+} from "@/lib/signals/rules";
 import type { Tables } from "@/lib/database.types";
 import type { ServiceInsight } from "@/lib/serviceInsights";
 import {
@@ -40,7 +47,7 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Cancelado", cls: "bg-muted text-muted-foreground" },
 };
 
-const daysLeft = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+const daysLeft = (iso: string) => daysUntil(iso);
 const effStatus = (p: Sold) =>
   p.status === "active" && daysLeft(p.expires_at) < 0 ? "expired" : p.status;
 
@@ -148,13 +155,11 @@ export function PackagesManager({
 }
 
 // Pacote comprado, nenhuma sessão usada, há tempo demais — sinal de risco/insatisfação.
-const DORMANT_DAYS = 14;
 function isDormant(p: Sold): boolean {
   if (effStatus(p) !== "active") return false;
   const noUsage = p.client_package_items.every((it) => it.used === 0);
   if (!noUsage) return false;
-  const daysSincePurchase = Math.floor((Date.now() - new Date(p.purchased_at).getTime()) / 86400000);
-  return daysSincePurchase >= DORMANT_DAYS;
+  return daysSince(p.purchased_at) >= PACKAGE_DORMANT_DAYS;
 }
 
 function dormantReminderUrl(p: Sold): string | null {
@@ -185,7 +190,7 @@ function SoldList({
 
   const dormant = sold.filter(isDormant);
   const expiringSoon = sold.filter(
-    (p) => effStatus(p) === "active" && daysLeft(p.expires_at) >= 0 && daysLeft(p.expires_at) <= 7,
+    (p) => effStatus(p) === "active" && isExpiringSoon(p.expires_at),
   );
 
   return (
@@ -238,8 +243,8 @@ function SoldList({
             <div className="rounded-[var(--radius)] border border-border bg-background p-3">
               <p className="text-sm">
                 {expiringSoon.length === 1
-                  ? "1 pacote vence nos próximos 7 dias."
-                  : `${expiringSoon.length} pacotes vencem nos próximos 7 dias.`}{" "}
+                  ? `1 pacote vence nos próximos ${PACKAGE_EXPIRY_WINDOW_DAYS} dias.`
+                  : `${expiringSoon.length} pacotes vencem nos próximos ${PACKAGE_EXPIRY_WINDOW_DAYS} dias.`}{" "}
                 Dá uma olhada nos cards abaixo.
               </p>
             </div>

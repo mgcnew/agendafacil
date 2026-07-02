@@ -1,34 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { startOfTodayBR, startOfTomorrowBR } from "@/lib/utils";
 import { getDeepSeekClient, DEEPSEEK_MODEL } from "./deepseek";
+import type { Signal, GestorContext } from "@/lib/signals/types";
 
 /**
  * Resumo diário do "Gestor Zulan" no Dashboard.
  *
  * Princípio: o DeepSeek nunca calcula números — só narra, prioriza e dá tom
- * humano a sinais que o painel já computa de forma confiável (SQL). Isso evita
- * alucinação e mantém o custo previsível (1 chamada por salão por dia, cacheada
- * em `ai_dashboard_insights`).
+ * humano aos sinais que o painel já computa de forma confiável (ver
+ * `@/lib/signals`). Isso evita alucinação e mantém o custo previsível (1
+ * chamada por salão por dia, cacheada em `ai_dashboard_insights`; salão sem
+ * nenhum sinal nem chega a chamar a IA).
  */
-
-export type DashboardSignals = {
-  firstName: string;
-  salonName: string;
-  apptsToday: number;
-  revenueToday: number;
-  reactivateCount: number;
-  birthdaysToday: number;
-  birthdaysSoon: number;
-  pkgsExpiringSoon: number;
-  /** Menor nº de dias até vencer entre os pacotes de pkgsExpiringSoon (null se nenhum). */
-  pkgsMinDaysLeft: number | null;
-  productsLowCount: number;
-};
 
 export type InsightType =
   | "reactivation"
   | "birthday"
   | "package_expiring"
+  | "package_dormant"
   | "revenue"
   | "low_stock"
   | "general";
@@ -52,30 +40,25 @@ const TOOL_NAME = "report_insights";
 
 function buildSystemPrompt(): string {
   return [
-    "Você é o Gestor Zulan, a funcionária virtual que cuida do dia a dia do salão.",
-    "Fale como uma excelente recepcionista: natural, calorosa, direta — nunca como um robô ou relatório técnico.",
-    "Nunca use jargão de dados (ex.: 'detectei', 'métrica', 'taxa'). Prefira frases como 'percebi que...', 'consegui...'.",
+    "Você é o Gestor Zulan, o gerente de confiança que cuida do dia a dia do salão e conversa com o dono.",
+    "Fale como um ótimo gerente: natural, caloroso, direto — nunca como um robô ou relatório técnico.",
+    "Nunca use jargão de dados (ex.: 'detectei', 'métrica', 'taxa'). Prefira frases como 'percebi que...', 'reparei aqui...'.",
     "Use SOMENTE os números fornecidos no contexto. Nunca invente clientes, valores ou eventos que não estejam nos dados.",
-    "Se for citar em quantos dias um pacote vence, use exatamente o número de dias informado no contexto — nunca estime ou arredonde por conta própria.",
+    "Ao citar qualquer número (dias para vencer, quantidade de clientes, etc.), use exatamente o número informado no contexto — nunca estime ou arredonde por conta própria.",
     "Toda sugestão precisa responder: aumenta faturamento, economiza tempo ou melhora a experiência do cliente?",
-    "Gere no máximo 4 insights, ordenados por prioridade. Se os números forem todos baixos/zerados, é normal devolver poucos ou nenhum insight — não force conteúdo.",
+    "Gere no máximo 4 insights, ordenados por prioridade.",
     `Responda chamando a função ${TOOL_NAME}.`,
   ].join(" ");
 }
 
-function buildUserPrompt(signals: DashboardSignals): string {
-  return `Dados de hoje no salão "${signals.salonName}" (dono: ${signals.firstName || "—"}):
-- Agendamentos hoje: ${signals.apptsToday}
-- Previsão de faturamento hoje: R$ ${signals.revenueToday.toFixed(2)}
-- Clientes parados/com ritmo de retorno atrasado: ${signals.reactivateCount}
-- Aniversariantes hoje: ${signals.birthdaysToday}
-- Aniversariantes nos próximos dias: ${signals.birthdaysSoon}
-- Pacotes de sessões vencendo em até 3 dias: ${signals.pkgsExpiringSoon}${
-    signals.pkgsExpiringSoon > 0 && signals.pkgsMinDaysLeft !== null
-      ? ` (o mais próximo vence em ${signals.pkgsMinDaysLeft} dia${signals.pkgsMinDaysLeft === 1 ? "" : "s"})`
-      : ""
-  }
-- Produtos no estoque mínimo: ${signals.productsLowCount}
+function buildUserPrompt(context: GestorContext, signals: Signal[]): string {
+  const factLines = signals.map((s) => `- ${s.fact}`).join("\n");
+  return `Dados de hoje no salão "${context.salonName}" (dono: ${context.firstName || "—"}):
+- Agendamentos hoje: ${context.apptsToday}
+- Previsão de faturamento hoje: R$ ${context.revenueToday.toFixed(2)}
+
+Sinais que merecem atenção (já calculados — cite os números exatamente como estão):
+${factLines}
 
 Escreva os insights mais relevantes para hoje.`;
 }
@@ -96,7 +79,7 @@ const TOOL_SCHEMA = {
             properties: {
               type: {
                 type: "string",
-                enum: ["reactivation", "birthday", "package_expiring", "revenue", "low_stock", "general"],
+                enum: ["reactivation", "birthday", "package_expiring", "package_dormant", "revenue", "low_stock", "general"],
               },
               title: { type: "string", description: "Frase curta, até 60 caracteres." },
               detail: { type: "string", description: "1-2 frases explicando a oportunidade." },
@@ -111,44 +94,44 @@ const TOOL_SCHEMA = {
   },
 };
 
-function stubPayload(signals: DashboardSignals): DashboardInsightsPayload {
-  const insights: Insight[] = [];
-  if (signals.reactivateCount > 0) {
-    insights.push({
-      type: "reactivation",
-      title: `${signals.reactivateCount} cliente${signals.reactivateCount === 1 ? "" : "s"} pode${signals.reactivateCount === 1 ? "" : "m"} voltar`,
-      detail: "Passaram do ritmo habitual de retorno — vale chamar no WhatsApp.",
-      priority: "alta",
-    });
-  }
-  if (signals.pkgsExpiringSoon > 0) {
-    insights.push({
-      type: "package_expiring",
-      title: `${signals.pkgsExpiringSoon} pacote${signals.pkgsExpiringSoon === 1 ? "" : "s"} vencendo`,
-      detail: "Sessões compradas perto do prazo final de uso.",
-      priority: "media",
-    });
-  }
-  if (signals.birthdaysToday > 0) {
-    insights.push({
-      type: "birthday",
-      title: `${signals.birthdaysToday} aniversariante${signals.birthdaysToday === 1 ? "" : "s"} hoje`,
-      detail: "Um parabéns no WhatsApp fortalece o relacionamento.",
-      priority: "media",
-    });
-  }
-  if (signals.productsLowCount > 0) {
-    insights.push({
-      type: "low_stock",
-      title: `${signals.productsLowCount} produto${signals.productsLowCount === 1 ? "" : "s"} no estoque mínimo`,
-      detail: "Vale repor antes que falte durante um atendimento.",
-      priority: "media",
-    });
-  }
+// Mapa determinístico sinal → insight (fallback quando não há IA disponível).
+const STUB: Record<Signal["key"], { type: InsightType; title: (c: number) => string; priority: Insight["priority"] }> = {
+  reactivation: {
+    type: "reactivation",
+    title: (c) => `${c} cliente${c === 1 ? "" : "s"} pode${c === 1 ? "" : "m"} voltar`,
+    priority: "alta",
+  },
+  birthday_today: {
+    type: "birthday",
+    title: (c) => `${c} aniversariante${c === 1 ? "" : "s"} hoje`,
+    priority: "media",
+  },
+  package_expiring: {
+    type: "package_expiring",
+    title: (c) => `${c} pacote${c === 1 ? "" : "s"} vencendo`,
+    priority: "media",
+  },
+  package_dormant: {
+    type: "package_dormant",
+    title: (c) => `${c} pacote${c === 1 ? "" : "s"} comprado${c === 1 ? "" : "s"} e sem uso`,
+    priority: "media",
+  },
+  low_stock: {
+    type: "low_stock",
+    title: (c) => `${c} produto${c === 1 ? "" : "s"} no estoque mínimo`,
+    priority: "media",
+  },
+};
+
+function stubPayload(signals: Signal[]): DashboardInsightsPayload {
+  const insights: Insight[] = signals.slice(0, 4).map((s) => {
+    const meta = STUB[s.key];
+    return { type: meta.type, title: meta.title(s.count), detail: s.fact, priority: meta.priority };
+  });
   return { insights };
 }
 
-async function generateLive(signals: DashboardSignals): Promise<DashboardInsightsPayload | null> {
+async function generateLive(context: GestorContext, signals: Signal[]): Promise<DashboardInsightsPayload | null> {
   const client = getDeepSeekClient();
   if (!client) return null;
 
@@ -157,7 +140,7 @@ async function generateLive(signals: DashboardSignals): Promise<DashboardInsight
       model: DEEPSEEK_MODEL,
       messages: [
         { role: "system", content: buildSystemPrompt() },
-        { role: "user", content: buildUserPrompt(signals) },
+        { role: "user", content: buildUserPrompt(context, signals) },
       ],
       tools: [TOOL_SCHEMA],
       tool_choice: { type: "function", function: { name: TOOL_NAME } },
@@ -180,9 +163,18 @@ async function generateAndCache(
   supabase: SupabaseClient,
   salonId: string,
   date: string,
-  signals: DashboardSignals,
+  context: GestorContext,
+  signals: Signal[],
 ): Promise<DashboardInsightsResult> {
-  const live = await generateLive(signals);
+  // Sem sinais = nada a avisar: devolve vazio sem gastar chamada de IA.
+  if (signals.length === 0) {
+    await supabase
+      .from("ai_dashboard_insights")
+      .upsert({ salon_id: salonId, date, payload: { insights: [] }, model: null }, { onConflict: "salon_id,date" });
+    return { insights: [], mode: "stub" };
+  }
+
+  const live = await generateLive(context, signals);
   const payload = live ?? stubPayload(signals);
   const mode: "live" | "stub" = live ? "live" : "stub";
 
@@ -200,13 +192,14 @@ async function generateAndCache(
 
 /**
  * Busca o resumo do dia em cache; se não existir, gera (live se houver
- * DEEPSEEK_API_KEY, senão stub determinístico) e tenta cachear para o resto
- * do dia. Nunca lança — na pior hipótese devolve o stub.
+ * DEEPSEEK_API_KEY e houver sinais, senão stub/vazio) e tenta cachear para o
+ * resto do dia. Nunca lança — na pior hipótese devolve o stub.
  */
 export async function getOrGenerateDashboardInsights(
   supabase: SupabaseClient,
   salonId: string,
-  signals: DashboardSignals,
+  context: GestorContext,
+  signals: Signal[],
 ): Promise<DashboardInsightsResult> {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -222,81 +215,16 @@ export async function getOrGenerateDashboardInsights(
     return { ...payload, mode: cached.model ? "live" : "stub" };
   }
 
-  return generateAndCache(supabase, salonId, today, signals);
+  return generateAndCache(supabase, salonId, today, context, signals);
 }
 
 /** Ignora o cache do dia e força uma nova geração (botão "Atualizar"). */
 export async function refreshDashboardInsights(
   supabase: SupabaseClient,
   salonId: string,
-  signals: DashboardSignals,
+  context: GestorContext,
+  signals: Signal[],
 ): Promise<DashboardInsightsResult> {
   const today = new Date().toISOString().slice(0, 10);
-  return generateAndCache(supabase, salonId, today, signals);
-}
-
-/**
- * Recalcula os sinais do zero (usado pelo botão "Atualizar", que não tem
- * acesso aos dados já carregados pela página do Dashboard).
- */
-export async function computeGestorSignals(
-  supabase: SupabaseClient,
-  salonId: string,
-  opts: { profileId: string; displayName: string; salonName: string },
-): Promise<DashboardSignals> {
-  const startDay = startOfTodayBR();
-  const endDay = startOfTomorrowBR();
-
-  const [{ data: todayAppts }, { data: profile }, { data: reactRaw }, { data: bdayRaw }, { data: pkgsRaw }, { data: productsRaw }] =
-    await Promise.all([
-      supabase
-        .from("appointments")
-        .select("status, total_price")
-        .eq("salon_id", salonId)
-        .gte("starts_at", startDay)
-        .lt("starts_at", endDay),
-      supabase.from("profiles").select("full_name").eq("id", opts.profileId).maybeSingle(),
-      supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
-      supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 31 } as never),
-      supabase.from("client_packages").select("expires_at").eq("salon_id", salonId).eq("status", "active"),
-      supabase.from("products").select("quantity, min_quantity").eq("salon_id", salonId).eq("is_active", true),
-    ]);
-
-  const appts = (todayAppts ?? []) as { status: string; total_price: number }[];
-  const revenueToday = appts
-    .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
-    .reduce((sum, a) => sum + Number(a.total_price), 0);
-
-  const reactArr = reactRaw as unknown[] | null;
-  const reactivateCount = Array.isArray(reactArr) ? reactArr.length : 0;
-
-  const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as { days_until: number }[];
-  const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
-
-  const pkgs = (pkgsRaw ?? []) as { expires_at: string }[];
-  const pkgsDaysLeftSoon = pkgs
-    .map((p) => Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000))
-    .filter((dleft) => dleft >= 0 && dleft <= 3);
-  const pkgsExpiringSoon = pkgsDaysLeftSoon.length;
-  const pkgsMinDaysLeft = pkgsDaysLeftSoon.length > 0 ? Math.min(...pkgsDaysLeftSoon) : null;
-
-  const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
-  const productsLowCount = products.filter(
-    (p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0,
-  ).length;
-
-  const fullName = (profile?.full_name ?? opts.displayName ?? "").trim();
-
-  return {
-    firstName: fullName ? fullName.split(" ")[0] : "",
-    salonName: opts.salonName,
-    apptsToday: appts.length,
-    revenueToday,
-    reactivateCount,
-    birthdaysToday,
-    birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
-    pkgsExpiringSoon,
-    pkgsMinDaysLeft,
-    productsLowCount,
-  };
+  return generateAndCache(supabase, salonId, today, context, signals);
 }

@@ -6,6 +6,7 @@ import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
+import { daysUntil } from "@/lib/signals/rules";
 import { CalendarDots, Wallet, Clock, Users, Plus, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
@@ -35,7 +36,7 @@ export default async function DashboardPage({
     return d.toISOString();
   })();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }, { data: productsRaw }] =
+  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -47,6 +48,7 @@ export default async function DashboardPage({
       supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true),
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
       supabase.from("profiles").select("full_name").eq("id", membership.profile_id).maybeSingle(),
+      // Pacotes ativos — para o card lateral "Pacotes ativos"
       supabase
         .from("client_packages")
         .select("id, name, expires_at, clients(full_name), client_package_items(total, used)")
@@ -54,9 +56,9 @@ export default async function DashboardPage({
         .eq("status", "active")
         .order("expires_at", { ascending: true })
         .limit(6),
-      // Clientes para reativar — retorna erro (null) p/ quem não tem reports.view
+      // Clientes para reativar — para o alerta lateral (null p/ quem não tem reports.view)
       supabase.rpc("report_reactivation" as never, { p_salon: salonId, p_min_days: 14 } as never),
-      // Aniversários do mês — janela ampliada para 31 dias
+      // Aniversários do mês — para o card lateral (o Gestor coleta os dele à parte)
       supabase.rpc("upcoming_birthdays" as never, { p_salon: salonId, p_days: 31 } as never),
       // Agendamentos de amanhã (para lembrar) — só os que ainda vão acontecer
       supabase
@@ -76,12 +78,9 @@ export default async function DashboardPage({
         .lt("starts_at", startDay)
         .order("starts_at", { ascending: false })
         .limit(6),
-      // Pra alimentar o sinal de estoque mínimo no resumo do Gestor.
-      supabase.from("products").select("quantity, min_quantity").eq("salon_id", salonId).eq("is_active", true),
     ]);
 
-  const reactArr = reactRaw as unknown[] | null;
-  const reactCount = Array.isArray(reactArr) ? reactArr.length : 0;
+  const reactCount = Array.isArray(reactRaw) ? (reactRaw as unknown[]).length : 0;
   const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as BirthdayClient[];
 
   type RecentAppt = { id: string; date: string; client: string; prof: string; services: string[] };
@@ -106,13 +105,12 @@ export default async function DashboardPage({
     const items = (p.client_package_items as unknown as { total: number; used: number }[]) ?? [];
     const total = items.reduce((a, i) => a + i.total, 0);
     const used = items.reduce((a, i) => a + i.used, 0);
-    const dleft = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000);
     return {
       id: p.id,
       client: (p.clients as { full_name?: string } | null)?.full_name ?? "Cliente",
       name: p.name,
       remaining: total - used,
-      dleft,
+      dleft: daysUntil(p.expires_at),
     };
   });
 
@@ -189,30 +187,6 @@ export default async function DashboardPage({
     { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
   ];
 
-  // Sinais para o "Gestor Zulan" — a geração roda atrás de um Suspense (ver
-  // abaixo) pra nunca atrasar o resto do Dashboard na 1ª visita do dia.
-  const birthdaysTodayList = birthdays.filter((b) => b.days_until === 0);
-  const birthdaysToday = birthdaysTodayList.length;
-  const pkgsExpiringSoonList = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3);
-  const pkgsExpiringSoon = pkgsExpiringSoonList.length;
-  const pkgsMinDaysLeft = pkgsExpiringSoon > 0 ? Math.min(...pkgsExpiringSoonList.map((p) => p.dleft)) : null;
-  const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
-  const productsLowCount = products.filter(
-    (p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0,
-  ).length;
-  const gestorSignals = {
-    firstName,
-    salonName: membership.salons.name,
-    apptsToday: appts.length,
-    revenueToday: revenue,
-    reactivateCount: reactCount,
-    birthdaysToday,
-    birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
-    pkgsExpiringSoon,
-    pkgsMinDaysLeft,
-    productsLowCount,
-  };
-
   return (
     <div className="space-y-6 af-rise">
       {/* Header — sempre largura total */}
@@ -242,8 +216,8 @@ export default async function DashboardPage({
               slug={slug}
               supabase={supabase}
               salonId={salonId}
-              signals={gestorSignals}
-              birthdayClients={birthdaysTodayList.map((b) => ({ id: b.id, name: b.name, phone: b.phone }))}
+              firstName={firstName}
+              salonName={membership.salons.name}
             />
           </Suspense>
 

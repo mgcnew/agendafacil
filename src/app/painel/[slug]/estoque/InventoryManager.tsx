@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
+import { isLowStock } from "@/lib/signals/rules";
 import type { Tables } from "@/lib/database.types";
 import {
   ArrowDown,
@@ -135,7 +136,7 @@ export function InventoryManager({
     }
   }
 
-  const lowStock = products.filter((p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0);
+  const lowStock = products.filter((p) => isLowStock(p.quantity, p.min_quantity));
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -144,8 +145,7 @@ export function InventoryManager({
       if (typeFilter === "resale" && !p.is_resale) return false;
       if (typeFilter === "supply" && p.is_resale) return false;
       if (statusFilter === "low") {
-        const low = Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0;
-        if (!low) return false;
+        if (!isLowStock(p.quantity, p.min_quantity)) return false;
       }
       if (statusFilter === "dormant") {
         const insight = insights[p.id];
@@ -319,7 +319,7 @@ export function InventoryManager({
       ) : (
         <div className="space-y-2">
           {paginated.map((p) => {
-            const low = Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0;
+            const low = isLowStock(p.quantity, p.min_quantity);
             const insight = insights[p.id];
             const margin = p.is_resale ? Number(p.sale_price) - Number(p.cost_price) : null;
             const daysLeft = daysUntilStockout(Number(p.quantity), insight);

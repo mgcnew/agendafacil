@@ -12,10 +12,10 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import {
   getOrGenerateDashboardInsights,
-  type DashboardSignals,
   type Insight,
   type InsightType,
 } from "@/lib/ai/dashboardInsights";
+import { collectSignals } from "@/lib/signals/collect";
 import { RefreshGestorButton } from "./RefreshGestorButton";
 import { TypewriterText } from "./TypewriterText";
 
@@ -35,6 +35,7 @@ const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   reactivation: UserCheck,
   birthday: Cake,
   package_expiring: Package,
+  package_dormant: Package,
   revenue: Wallet,
   low_stock: Stack,
   general: Sparkle,
@@ -51,6 +52,7 @@ function hrefFor(slug: string, type: InsightType): string | null {
     case "reactivation":
       return `/painel/${slug}/recuperar`;
     case "package_expiring":
+    case "package_dormant":
       return `/painel/${slug}/pacotes`;
     case "revenue":
       return `/painel/${slug}/financeiro`;
@@ -90,16 +92,22 @@ export async function GestorInsightsAsync({
   slug,
   supabase,
   salonId,
-  signals,
-  birthdayClients,
+  firstName,
+  salonName,
 }: {
   slug: string;
   supabase: SupabaseClient;
   salonId: string;
-  signals: DashboardSignals;
-  birthdayClients: BirthdayContact[];
+  firstName: string;
+  salonName: string;
 }) {
-  const result = await getOrGenerateDashboardInsights(supabase, salonId, signals);
+  // Todo o trabalho de sinais (queries + IA) mora atrás do Suspense: coletamos
+  // os avisos da mesma fonte única usada pelas páginas e só então narramos.
+  const { context, signals, birthdays } = await collectSignals(supabase, salonId, { firstName, salonName });
+  const result = await getOrGenerateDashboardInsights(supabase, salonId, context, signals);
+  const birthdayClients: BirthdayContact[] = birthdays
+    .filter((b) => b.days_until === 0)
+    .map((b) => ({ id: b.id, name: b.name, phone: b.phone }));
   return <GestorInsightsCard slug={slug} insights={result.insights} birthdayClients={birthdayClients} />;
 }
 
