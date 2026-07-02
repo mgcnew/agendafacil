@@ -18,6 +18,7 @@ import {
 import { collectSignals } from "@/lib/signals/collect";
 import { RefreshGestorButton } from "./RefreshGestorButton";
 import { TypewriterText } from "./TypewriterText";
+import { InsightsCarousel } from "./InsightsCarousel";
 
 export type BirthdayContact = { id: string; name: string; phone: string | null };
 
@@ -45,6 +46,22 @@ const PRIORITY_STYLE: Record<Insight["priority"], string> = {
   alta: "bg-amber-500/12 text-amber-600",
   media: "bg-secondary text-primary",
   baixa: "bg-muted text-muted-foreground",
+};
+
+// Fundo/borda sutil por prioridade — só um leve toque de cor pra hierarquia,
+// sem poluir. Alta puxa âmbar (urgência); média um sussurro do primário;
+// baixa fica neutra.
+const CARD_STYLE: Record<Insight["priority"], string> = {
+  alta: "border-amber-500/25 bg-amber-500/[0.055] hover:border-amber-500/40",
+  media: "border-primary/15 bg-primary/[0.035] hover:border-primary/40",
+  baixa: "border-border bg-background hover:border-primary/40",
+};
+
+// Cor do ícone acompanha a prioridade, mantendo tudo coeso.
+const ICON_ACCENT: Record<Insight["priority"], string> = {
+  alta: "text-amber-600",
+  media: "text-primary",
+  baixa: "text-muted-foreground",
 };
 
 function hrefFor(slug: string, type: InsightType): string | null {
@@ -146,8 +163,8 @@ function GestorInsightsCard({
           <TypewriterText text="Tudo tranquilo por aqui — sem pendência ou oportunidade pra te mostrar agora." />
         </p>
       ) : (
-        <div className="relative mt-4 grid gap-2 sm:grid-cols-2">
-          {insights.map((insight, i) => {
+        <InsightsCarousel
+          items={insights.map((insight, i) => {
             const Icon = ICON[insight.type];
             const href = hrefFor(slug, insight.type);
             // af-rise com atraso escalonado: cards "se montam" em sequência,
@@ -161,10 +178,10 @@ function GestorInsightsCard({
                 <div
                   key={i}
                   style={style}
-                  className="af-rise flex flex-col gap-2 rounded-[var(--radius)] border border-border bg-background p-3 sm:col-span-2"
+                  className={`af-rise flex h-full flex-col gap-2 rounded-[var(--radius)] border p-3 transition ${CARD_STYLE[insight.priority]}`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card text-primary">
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card ${ICON_ACCENT[insight.priority]}`}>
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -208,7 +225,7 @@ function GestorInsightsCard({
 
             const content = (
               <>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card text-primary">
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card ${ICON_ACCENT[insight.priority]}`}>
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -231,7 +248,7 @@ function GestorInsightsCard({
                 key={i}
                 href={href}
                 style={style}
-                className="af-rise group flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3 transition hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm"
+                className={`af-rise group flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${CARD_STYLE[insight.priority]}`}
               >
                 {content}
               </Link>
@@ -239,13 +256,13 @@ function GestorInsightsCard({
               <div
                 key={i}
                 style={style}
-                className="af-rise flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3"
+                className={`af-rise flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 transition ${CARD_STYLE[insight.priority]}`}
               >
                 {content}
               </div>
             );
           })}
-        </div>
+        />
       )}
     </div>
   );
