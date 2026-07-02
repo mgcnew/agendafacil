@@ -193,7 +193,9 @@ export default async function DashboardPage({
   // abaixo) pra nunca atrasar o resto do Dashboard na 1ª visita do dia.
   const birthdaysTodayList = birthdays.filter((b) => b.days_until === 0);
   const birthdaysToday = birthdaysTodayList.length;
-  const pkgsExpiringSoon = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3).length;
+  const pkgsExpiringSoonList = pkgs.filter((p) => p.dleft >= 0 && p.dleft <= 3);
+  const pkgsExpiringSoon = pkgsExpiringSoonList.length;
+  const pkgsMinDaysLeft = pkgsExpiringSoon > 0 ? Math.min(...pkgsExpiringSoonList.map((p) => p.dleft)) : null;
   const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
   const productsLowCount = products.filter(
     (p) => Number(p.quantity) <= Number(p.min_quantity) && Number(p.min_quantity) > 0,
@@ -207,6 +209,7 @@ export default async function DashboardPage({
     birthdaysToday,
     birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
     pkgsExpiringSoon,
+    pkgsMinDaysLeft,
     productsLowCount,
   };
 

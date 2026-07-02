@@ -20,6 +20,8 @@ export type DashboardSignals = {
   birthdaysToday: number;
   birthdaysSoon: number;
   pkgsExpiringSoon: number;
+  /** Menor nº de dias até vencer entre os pacotes de pkgsExpiringSoon (null se nenhum). */
+  pkgsMinDaysLeft: number | null;
   productsLowCount: number;
 };
 
@@ -54,6 +56,7 @@ function buildSystemPrompt(): string {
     "Fale como uma excelente recepcionista: natural, calorosa, direta — nunca como um robô ou relatório técnico.",
     "Nunca use jargão de dados (ex.: 'detectei', 'métrica', 'taxa'). Prefira frases como 'percebi que...', 'consegui...'.",
     "Use SOMENTE os números fornecidos no contexto. Nunca invente clientes, valores ou eventos que não estejam nos dados.",
+    "Se for citar em quantos dias um pacote vence, use exatamente o número de dias informado no contexto — nunca estime ou arredonde por conta própria.",
     "Toda sugestão precisa responder: aumenta faturamento, economiza tempo ou melhora a experiência do cliente?",
     "Gere no máximo 4 insights, ordenados por prioridade. Se os números forem todos baixos/zerados, é normal devolver poucos ou nenhum insight — não force conteúdo.",
     `Responda chamando a função ${TOOL_NAME}.`,
@@ -67,7 +70,11 @@ function buildUserPrompt(signals: DashboardSignals): string {
 - Clientes parados/com ritmo de retorno atrasado: ${signals.reactivateCount}
 - Aniversariantes hoje: ${signals.birthdaysToday}
 - Aniversariantes nos próximos dias: ${signals.birthdaysSoon}
-- Pacotes de sessões vencendo em até 3 dias: ${signals.pkgsExpiringSoon}
+- Pacotes de sessões vencendo em até 3 dias: ${signals.pkgsExpiringSoon}${
+    signals.pkgsExpiringSoon > 0 && signals.pkgsMinDaysLeft !== null
+      ? ` (o mais próximo vence em ${signals.pkgsMinDaysLeft} dia${signals.pkgsMinDaysLeft === 1 ? "" : "s"})`
+      : ""
+  }
 - Produtos no estoque mínimo: ${signals.productsLowCount}
 
 Escreva os insights mais relevantes para hoje.`;
@@ -267,10 +274,11 @@ export async function computeGestorSignals(
   const birthdaysToday = birthdays.filter((b) => b.days_until === 0).length;
 
   const pkgs = (pkgsRaw ?? []) as { expires_at: string }[];
-  const pkgsExpiringSoon = pkgs.filter((p) => {
-    const dleft = Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000);
-    return dleft >= 0 && dleft <= 3;
-  }).length;
+  const pkgsDaysLeftSoon = pkgs
+    .map((p) => Math.ceil((new Date(p.expires_at).getTime() - Date.now()) / 86400000))
+    .filter((dleft) => dleft >= 0 && dleft <= 3);
+  const pkgsExpiringSoon = pkgsDaysLeftSoon.length;
+  const pkgsMinDaysLeft = pkgsDaysLeftSoon.length > 0 ? Math.min(...pkgsDaysLeftSoon) : null;
 
   const products = (productsRaw ?? []) as { quantity: number; min_quantity: number }[];
   const productsLowCount = products.filter(
@@ -288,6 +296,7 @@ export async function computeGestorSignals(
     birthdaysToday,
     birthdaysSoon: Math.max(0, birthdays.length - birthdaysToday),
     pkgsExpiringSoon,
+    pkgsMinDaysLeft,
     productsLowCount,
   };
 }
