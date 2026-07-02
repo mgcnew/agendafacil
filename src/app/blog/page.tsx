@@ -11,8 +11,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/blog" },
 };
 
-export default function BlogIndexPage() {
-  const posts = getAllPosts();
+export const revalidate = 300;
+
+export default async function BlogIndexPage() {
+  const posts = await getAllPosts();
 
   return (
     <main className="min-h-full bg-background text-foreground">

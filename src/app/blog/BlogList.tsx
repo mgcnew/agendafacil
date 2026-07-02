@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock } from "@phosphor-icons/react/dist/ssr";
-import type { Post } from "@/lib/blog/posts";
-import { formatPostDate } from "@/lib/blog/posts";
+import type { Post } from "@/lib/blog/types";
+import { formatPostDate } from "@/lib/blog/types";
 
 export function BlogList({ posts }: { posts: Post[] }) {
   const categories = useMemo(

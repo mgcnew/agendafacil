@@ -20,6 +20,8 @@ import {
   DownloadSimple,
   Envelope,
   Megaphone,
+  Newspaper,
+  PencilSimple,
   Percent,
   Receipt,
   Repeat,
@@ -108,6 +110,20 @@ export type Announcement = {
   created_at: string;
 };
 
+export type BlogPostRow = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  body: string;
+  read_minutes: number;
+  published_at: string;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Dias desde a última atividade (criação de agendamento). null = nunca. */
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -179,6 +195,7 @@ export function AdminDashboard({
   audit,
   announcements,
   mrrHistory,
+  blogPosts,
 }: {
   metrics: AdminMetrics | null;
   salons: AdminSalon[];
@@ -186,6 +203,7 @@ export function AdminDashboard({
   audit: AuditEntry[];
   announcements: Announcement[];
   mrrHistory: { month: string; mrr: number }[];
+  blogPosts: BlogPostRow[];
 }) {
   // Usa o histórico real (snapshots) quando há ao menos 2 pontos; senão, a estimativa.
   const useRealMrr = mrrHistory.length >= 2;
@@ -193,7 +211,7 @@ export function AdminDashboard({
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [tab, setTab] = useState<"atencao" | "geral" | "saloes" | "admin" | "avisos">("atencao");
+  const [tab, setTab] = useState<"atencao" | "geral" | "saloes" | "admin" | "avisos" | "blog">("atencao");
 
   // "Precisa de atenção": trials vencendo, inadimplentes e salões parados.
   const TRIAL_SOON_DAYS = 3;
@@ -238,7 +256,7 @@ export function AdminDashboard({
 
         {/* Abas */}
         <div className="flex gap-1 border-b border-border">
-          {([["atencao", attentionCount > 0 ? `Atenção (${attentionCount})` : "Atenção"], ["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"]] as const).map(([id, label]) => (
+          {([["atencao", attentionCount > 0 ? `Atenção (${attentionCount})` : "Atenção"], ["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"], ["blog", "Blog"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -365,6 +383,8 @@ export function AdminDashboard({
         )}
 
         {tab === "avisos" && <AnnouncementsPanel announcements={announcements} />}
+
+        {tab === "blog" && <BlogPanel posts={blogPosts} />}
       </div>
 
       <AnimatePresence>
@@ -697,6 +717,226 @@ function AnnouncementsPanel({ announcements }: { announcements: Announcement[] }
         )}
       </div>
     </div>
+  );
+}
+
+function slugify(s: string): string {
+  return s
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function BlogPanel({ posts }: { posts: BlogPostRow[] }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState<BlogPostRow | "new" | null>(null);
+
+  async function remove(p: BlogPostRow) {
+    if (!window.confirm(`Excluir o artigo "${p.title}"? Essa ação não pode ser desfeita.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.rpc("admin_delete_blog_post" as never, { p_id: p.id } as never);
+    if (!error) router.refresh();
+  }
+
+  async function togglePublished(p: BlogPostRow) {
+    const supabase = createClient();
+    const { error } = await supabase.rpc("admin_update_blog_post" as never, {
+      p_id: p.id, p_slug: p.slug, p_title: p.title, p_excerpt: p.excerpt, p_category: p.category,
+      p_body: p.body, p_read_minutes: p.read_minutes, p_published_at: p.published_at,
+      p_is_published: !p.is_published,
+    } as never);
+    if (!error) router.refresh();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-primary" /> Posts do blog
+        </h2>
+        <Button size="sm" onClick={() => setEditing("new")}>
+          <PencilSimple className="h-4 w-4" /> Novo artigo
+        </Button>
+      </div>
+
+      {posts.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-10 text-center border border-dashed border-border rounded-[var(--radius)]">
+          Nenhum artigo ainda.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {posts.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium truncate">{p.title}</p>
+                  <span className="text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 bg-secondary text-secondary-foreground">{p.category}</span>
+                  {!p.is_published && <span className="text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 bg-amber-500/15 text-amber-600">Rascunho</span>}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  /blog/{p.slug} · {formatDate(p.published_at)} · {p.read_minutes} min
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => togglePublished(p)}
+                  className="text-xs font-medium text-primary hover:underline px-2 py-1"
+                >
+                  {p.is_published ? "Despublicar" : "Publicar"}
+                </button>
+                <Button variant="outline" size="sm" onClick={() => setEditing(p)}>Editar</Button>
+                <button
+                  onClick={() => remove(p)}
+                  title="Excluir"
+                  className="grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {editing && (
+          <BlogPostModal
+            key="blog-post"
+            post={editing === "new" ? null : editing}
+            categories={Array.from(new Set(posts.map((p) => p.category)))}
+            onClose={() => setEditing(null)}
+            onDone={() => { setEditing(null); router.refresh(); }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function BlogPostModal({
+  post, categories, onClose, onDone,
+}: { post: BlogPostRow | null; categories: string[]; onClose: () => void; onDone: () => void }) {
+  const supabase = createClient();
+  const isNew = post === null;
+  const [title, setTitle] = useState(post?.title ?? "");
+  const [slug, setSlug] = useState(post?.slug ?? "");
+  const [slugTouched, setSlugTouched] = useState(!isNew);
+  const [excerpt, setExcerpt] = useState(post?.excerpt ?? "");
+  const [category, setCategory] = useState(post?.category ?? "");
+  const [publishedAt, setPublishedAt] = useState(post?.published_at ?? new Date().toISOString().slice(0, 10));
+  const [readMinutes, setReadMinutes] = useState(String(post?.read_minutes ?? 5));
+  const [isPublished, setIsPublished] = useState(post?.is_published ?? true);
+  const [body, setBody] = useState(post?.body ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function onTitleChange(v: string) {
+    setTitle(v);
+    if (!slugTouched) setSlug(slugify(v));
+  }
+
+  async function save() {
+    if (!title.trim() || !slug.trim() || !body.trim()) {
+      setErr("Preencha título, slug e corpo do artigo.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    const args = {
+      p_slug: slug.trim(), p_title: title.trim(), p_excerpt: excerpt.trim(), p_category: category.trim() || "Geral",
+      p_body: body, p_read_minutes: parseInt(readMinutes) || 1, p_published_at: publishedAt, p_is_published: isPublished,
+    };
+    const { error } = isNew
+      ? await supabase.rpc("admin_create_blog_post" as never, args as never)
+      : await supabase.rpc("admin_update_blog_post" as never, { p_id: post!.id, ...args } as never);
+    setBusy(false);
+    if (error) { setErr(error.message || "Não foi possível salvar."); return; }
+    onDone();
+  }
+
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-2xl mx-auto max-h-[90vh] overflow-auto p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between p-5 pb-3 border-b border-border">
+          <h3 className="font-display text-lg font-bold">{isNew ? "Novo artigo" : "Editar artigo"}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {err && (
+            <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+              <X className="h-4 w-4 shrink-0" /> {err}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Título</Label>
+            <Input value={title} onChange={(e) => onTitleChange(e.target.value)} placeholder="Ex.: Como reduzir faltas no salão" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Slug (URL)</Label>
+              <Input
+                value={slug}
+                onChange={(e) => { setSlug(slugify(e.target.value)); setSlugTouched(true); }}
+                placeholder="como-reduzir-faltas"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Gestão" list="blog-categories" />
+              <datalist id="blog-categories">
+                {categories.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Resumo (aparece na listagem)</Label>
+            <Textarea rows={2} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} placeholder="Uma ou duas frases sobre o artigo." />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Data de publicação</Label>
+              <Input type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Min. de leitura</Label>
+              <Input type="number" min={1} value={readMinutes} onChange={(e) => setReadMinutes(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={isPublished ? "1" : "0"} onValueChange={(v) => setIsPublished(v === "1")}>
+                <option value="1">Publicado</option>
+                <option value="0">Rascunho</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Corpo do artigo</Label>
+            <Textarea
+              rows={14}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              className="font-mono text-[13px]"
+              placeholder={"Primeiro parágrafo do artigo.\n\n## Um subtítulo\nOutro parágrafo, depois do subtítulo.\n\n- Um item de lista\n- Outro item"}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Use <code>## Texto</code> para criar um subtítulo, uma linha em branco para separar parágrafos e <code>- </code> no início da linha para criar uma lista.
+            </p>
+          </div>
+
+          <Button onClick={save} disabled={busy} className="w-full">
+            {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <PencilSimple className="h-4 w-4" />}
+            {isNew ? "Publicar artigo" : "Salvar alterações"}
+          </Button>
+        </div>
+      </Card>
+    </MotionModal>
   );
 }
 

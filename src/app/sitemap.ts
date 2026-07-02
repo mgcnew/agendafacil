@@ -4,10 +4,11 @@ import { getAllPosts } from "@/lib/blog/posts";
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const blogPosts: MetadataRoute.Sitemap = getAllPosts().map((p) => ({
+  const posts = await getAllPosts();
+  const blogPosts: MetadataRoute.Sitemap = posts.map((p) => ({
     url: `${SITE_URL}/blog/${p.slug}`,
     lastModified: new Date(p.date),
     changeFrequency: "monthly",

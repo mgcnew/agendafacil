@@ -2,17 +2,16 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, Tag } from "@phosphor-icons/react/dist/ssr";
-import { getAllPosts, getPost, formatPostDate } from "@/lib/blog/posts";
+import { getPost, formatPostDate } from "@/lib/blog/posts";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export async function generateStaticParams() {
-  return getAllPosts().map((p) => ({ slug: p.slug }));
-}
+export const revalidate = 300;
+export const dynamicParams = true;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
   if (!post) return {};
   return {
     title: `${post.title} | Blog Zulan`,
@@ -30,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
   if (!post) notFound();
 
   const jsonLd = {
@@ -51,7 +50,7 @@ export default async function BlogPostPage({ params }: Props) {
       />
 
       <main className="min-h-full bg-background text-foreground">
-        <div className="mx-auto w-full max-w-2xl px-5 py-10 md:py-16">
+        <div className="mx-auto w-full max-w-6xl px-5 py-10 md:py-16">
           <Link
             href="/blog"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
