@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -814,6 +814,52 @@ function BlogPanel({ posts }: { posts: BlogPostRow[] }) {
   );
 }
 
+function CategoryCombobox({
+  value, onChange, categories,
+}: { value: string; onChange: (v: string) => void; categories: string[] }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const matches = categories.filter(
+    (c) => c.toLowerCase().includes(value.trim().toLowerCase()) && c !== value,
+  );
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <Input
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="Gestão"
+        autoComplete="off"
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-[60] mt-1 w-full overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground max-h-48">
+          {matches.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => { onChange(c); setOpen(false); }}
+              className="flex w-full items-center rounded-[calc(var(--radius)-0.35rem)] px-2.5 py-2 text-left text-sm text-foreground hover:bg-muted transition"
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BlogPostModal({
   post, categories, onClose, onDone,
 }: { post: BlogPostRow | null; categories: string[]; onClose: () => void; onDone: () => void }) {
@@ -886,10 +932,7 @@ function BlogPostModal({
             </div>
             <div className="space-y-1.5">
               <Label>Categoria</Label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Gestão" list="blog-categories" />
-              <datalist id="blog-categories">
-                {categories.map((c) => <option key={c} value={c} />)}
-              </datalist>
+              <CategoryCombobox value={category} onChange={setCategory} categories={categories} />
             </div>
           </div>
 
