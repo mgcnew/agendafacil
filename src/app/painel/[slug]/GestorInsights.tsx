@@ -121,14 +121,18 @@ function GestorInsightsCard({
   birthdayClients: BirthdayContact[];
 }) {
   return (
-    <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-            <Sparkle className="h-4 w-4" />
+    <div className="relative overflow-hidden rounded-[var(--radius)] border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card to-card p-5 shadow-sm">
+      {/* brilho decorativo no canto — dá o toque "assistente" sem pesar */}
+      <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm ring-1 ring-primary/20">
+            <Sparkle className="h-[18px] w-[18px]" weight="fill" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
           </span>
           <div>
-            <p className="text-sm font-semibold">Gestor Zulan</p>
+            <p className="text-sm font-semibold leading-tight">Gestor Zulan</p>
             <p className="text-xs text-muted-foreground">
               <TypewriterText text={insights.length > 0 ? "Encontrei isso hoje pra você" : "Já passei pelo salão hoje"} />
             </p>
@@ -138,11 +142,11 @@ function GestorInsightsCard({
       </div>
 
       {insights.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="relative mt-3 text-sm text-muted-foreground">
           <TypewriterText text="Tudo tranquilo por aqui — sem pendência ou oportunidade pra te mostrar agora." />
         </p>
       ) : (
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="relative mt-4 grid gap-2 sm:grid-cols-2">
           {insights.map((insight, i) => {
             const Icon = ICON[insight.type];
             const href = hrefFor(slug, insight.type);
@@ -218,7 +222,7 @@ function GestorInsightsCard({
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{insight.detail}</p>
                 </div>
-                {href && <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground self-center" />}
+                {href && <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground self-center transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />}
               </>
             );
 
@@ -227,7 +231,7 @@ function GestorInsightsCard({
                 key={i}
                 href={href}
                 style={style}
-                className="af-rise flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3 transition hover:border-primary/40"
+                className="af-rise group flex items-start gap-3 rounded-[var(--radius)] border border-border bg-background p-3 transition hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm"
               >
                 {content}
               </Link>
