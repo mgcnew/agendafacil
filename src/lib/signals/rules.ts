@@ -12,6 +12,14 @@ export const PACKAGE_EXPIRY_WINDOW_DAYS = 7;
 export const PACKAGE_DORMANT_DAYS = 14;
 /** Cliente "para reativar": sem retornar há pelo menos tantos dias (RPC). */
 export const REACTIVATION_MIN_DAYS = 14;
+/**
+ * Depois que o dono chama o cliente (clique em "Chamar" em /recuperar), o
+ * aviso de reativação fica "adormecido" por esses dias — dá tempo do cliente
+ * responder antes do Gestor sugerir de novo. Aplicado dentro da RPC
+ * report_reactivation (filtro em clients.last_contacted_at), documentado
+ * aqui como fonte de verdade do número.
+ */
+export const REACTIVATION_SNOOZE_DAYS = 7;
 /** Janela de aniversários considerada nos avisos (RPC). */
 export const BIRTHDAY_WINDOW_DAYS = 31;
 

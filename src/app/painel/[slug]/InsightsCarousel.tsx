@@ -3,53 +3,73 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 
+// Abaixo dessa largura por card, 2-por-página fica espremido — melhor 1 por vez.
+const MIN_CARD_WIDTH = 260;
+const GAP = 8; // px, equivale ao gap-2
+
 /**
- * Carrossel dos avisos do Gestor: mostra 2 por vez no desktop e 1 no mobile,
- * com swipe nativo (scroll-snap) + setas e "bolinhas" de página. Some os
- * controles quando tudo cabe numa página só. Os cards vêm já renderizados
- * (server) e são só posicionados aqui — a interatividade fica isolada neste
- * client component.
+ * Carrossel dos avisos do Gestor: mostra 1 ou 2 cards por página, com swipe
+ * nativo (scroll-snap) + setas e "bolinhas" de página. A decisão de 1 vs 2
+ * usa a largura REAL do contêiner (ResizeObserver), não o tamanho da tela —
+ * esse card pode ficar num espaço mais estreito que o viewport (ex.: coluna
+ * do dashboard), e um breakpoint de viewport cortaria o 2º card sem dar
+ * jeito de rolar até ele. Os cards vêm já renderizados (server) e são só
+ * posicionados aqui — a interatividade fica isolada neste client component.
  */
 export function InsightsCarousel({ items }: { items: ReactNode[] }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState(1);
+  const [perPage, setPerPage] = useState(1);
   const [page, setPage] = useState(0);
 
-  const sync = () => {
-    const el = trackRef.current;
+  useEffect(() => {
+    const el = wrapperRef.current;
     if (!el) return;
-    setPages(Math.max(1, Math.round(el.scrollWidth / el.clientWidth)));
-    setPage(Math.round(el.scrollLeft / el.clientWidth));
-  };
+    const measure = () => setPerPage(el.clientWidth >= MIN_CARD_WIDTH * 2 + GAP ? 2 : 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
 
   useEffect(() => {
-    sync();
+    // se perPage mudar (ex.: girar o celular) a página atual pode não existir mais
+    setPage((p) => Math.min(p, pages - 1));
+  }, [pages]);
+
+  useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
-    el.addEventListener("scroll", sync, { passive: true });
-    window.addEventListener("resize", sync);
-    return () => {
-      el.removeEventListener("scroll", sync);
-      window.removeEventListener("resize", sync);
+    const onScroll = () => {
+      if (el.clientWidth === 0) return;
+      setPage(Math.round(el.scrollLeft / el.clientWidth));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length]);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   const go = (p: number) => {
     const el = trackRef.current;
     if (!el) return;
     const clamped = Math.max(0, Math.min(pages - 1, p));
     el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+    setPage(clamped);
   };
 
   return (
-    <div className="mt-4">
+    <div ref={wrapperRef} className="mt-4">
       <div
         ref={trackRef}
         className="no-scrollbar flex items-stretch gap-2 overflow-x-auto snap-x snap-mandatory scroll-smooth"
       >
         {items.map((item, i) => (
-          <div key={i} className="snap-start shrink-0 basis-full sm:basis-[calc(50%-0.25rem)]">
+          <div
+            key={i}
+            className="snap-start shrink-0"
+            style={{ width: perPage === 2 ? `calc(50% - ${GAP / 2}px)` : "100%" }}
+          >
             {item}
           </div>
         ))}

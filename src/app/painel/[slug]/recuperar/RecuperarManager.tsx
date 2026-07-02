@@ -153,7 +153,11 @@ export function RecuperarManager({
 
   function openWhatsApp(c: WinbackClient, bucket: Bucket = tab) {
     const link = waLink(c.phone, message(c, bucket));
-    if (link) window.open(link, "_blank", "noopener,noreferrer");
+    if (!link) return;
+    window.open(link, "_blank", "noopener,noreferrer");
+    // Registra o contato pra o Gestor Zulan não sugerir reativar de novo
+    // logo em seguida — dá um tempo (7 dias) antes de voltar a avisar.
+    supabase.from("clients").update({ last_contacted_at: new Date().toISOString() }).eq("id", c.client_id).then();
   }
 
   const priorityPick = pickPriority(data);
