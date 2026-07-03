@@ -8,7 +8,7 @@ import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, waLink } from "@/lib/utils";
 import {
-  daysUntil,
+  daysUntilCalendarBR,
   daysSince,
   isExpiringSoon,
   PACKAGE_DORMANT_DAYS,
@@ -47,7 +47,8 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Cancelado", cls: "bg-muted text-muted-foreground" },
 };
 
-const daysLeft = (iso: string) => daysUntil(iso);
+// Vencimento por data de calendário (BR) — vale até o fim do dia, igual ao banco.
+const daysLeft = (iso: string) => daysUntilCalendarBR(iso);
 const effStatus = (p: Sold) =>
   p.status === "active" && daysLeft(p.expires_at) < 0 ? "expired" : p.status;
 
@@ -676,6 +677,19 @@ function SellModal({
 }
 
 /* ─────────────────── Usar (resgatar) ─────────────────── */
+/**
+ * Traduz o erro cru da RPC redeem_package numa mensagem útil pro dono —
+ * o motivo importa (o pacote venceu? já usou tudo?), senão ele fica no escuro.
+ */
+function redeemErrorMessage(raw: string): string {
+  if (raw.includes("package_expired")) return "Este pacote venceu e não pode mais ser usado.";
+  if (raw.includes("package_inactive")) return "Este pacote não está mais ativo.";
+  if (raw.includes("item_exhausted")) return "Todas as sessões deste serviço já foram usadas.";
+  if (raw.includes("item_not_found")) return "Serviço do pacote não encontrado. Recarregue a página.";
+  if (raw.includes("forbidden")) return "Você não tem permissão para registrar uso de pacotes.";
+  return "Não foi possível registrar o uso. Tente novamente.";
+}
+
 function RedeemModal({
   pkg,
   item,
@@ -699,7 +713,7 @@ function RedeemModal({
       p_item: item.id,
       p_member: member || undefined,
     });
-    if (error) { setErr("Não foi possível registrar o uso."); setBusy(false); return; }
+    if (error) { setErr(redeemErrorMessage(error.message)); setBusy(false); return; }
     onClose();
     router.refresh();
   }

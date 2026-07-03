@@ -37,6 +37,20 @@ export function daysSince(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 }
 
+/**
+ * Dias de CALENDÁRIO (fuso America/Sao_Paulo) de hoje até a data informada.
+ * Diferente de daysUntil (que conta blocos de 24h a partir do horário exato):
+ * aqui só a data importa, então um vencimento "hoje" continua 0 o dia inteiro
+ * e só vira negativo amanhã — batendo com a regra "vale até o fim do dia" que
+ * a RPC redeem_package aplica no banco. Use este para vencimento de pacote.
+ */
+export function daysUntilCalendarBR(iso: string): number {
+  const toBRDate = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+  const target = Date.parse(`${toBRDate(new Date(iso))}T00:00:00Z`);
+  const today = Date.parse(`${toBRDate(new Date())}T00:00:00Z`);
+  return Math.round((target - today) / 86400000);
+}
+
 /** Está vencendo dentro da janela (inclui o dia de hoje, exclui o que já venceu). */
 export function isExpiringSoon(iso: string): boolean {
   const d = daysUntil(iso);
