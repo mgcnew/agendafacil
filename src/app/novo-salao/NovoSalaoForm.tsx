@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Input, Label, Textarea } from "@/components/ui";
+import { Button, Input, Label, Select, Textarea } from "@/components/ui";
 import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import type { TablesUpdate } from "@/lib/database.types";
@@ -21,8 +21,18 @@ import {
   Star,
   Storefront,
   UploadSimple,
+  UsersThree,
+  WhatsappLogo,
   X,
 } from "@phosphor-icons/react/dist/ssr";
+
+// Cargos de convite — mesmos da aba Equipe (member_role, sem "owner").
+const ROLE_LABEL: Record<string, string> = {
+  manager: "Gerente",
+  professional: "Profissional",
+  receptionist: "Recepção",
+};
+const ROLE_OPTIONS = ["manager", "professional", "receptionist"] as const;
 
 async function compressImage(file: File, maxDim = 512, quality = 0.9): Promise<File> {
   try {
@@ -78,7 +88,7 @@ const DEFAULT_HOURS: DayHours[] = WEEKDAYS.map((_, w) => ({
   end: "18:00",
 }));
 
-const STEPS = ["Seu salão", "Contato", "Sua marca", "Serviços", "Horários"];
+const STEPS = ["Seu salão", "Contato", "Sua marca", "Serviços", "Horários", "Equipe"];
 
 export default function NovoSalaoPage() {
   const router = useRouter();
@@ -98,6 +108,15 @@ export default function NovoSalaoPage() {
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Passo Equipe: dono escolhe se trabalha sozinho ou já convida o 1º funcionário.
+  const [hasTeam, setHasTeam] = useState<boolean | null>(null);
+  const [empEmail, setEmpEmail] = useState("");
+  const [empRole, setEmpRole] = useState<string>("professional");
+  const [empCommission, setEmpCommission] = useState("");
+  // Ao terminar com convite gerado, mostramos a tela de "mandar pelo WhatsApp"
+  // em vez de já jogar pro painel — o dono decide quando enviar.
+  const [done, setDone] = useState<{ slug: string; token: string; email: string } | null>(null);
 
   const meta = useMemo(() => CHOOSABLE_NICHES.find((n) => n.id === niche)!, [niche]);
 
@@ -191,6 +210,23 @@ export default function NovoSalaoPage() {
         .map((p) => ({ salon_id: salon.id, name: p.name, duration_min: p.duration, price: 0 }));
       if (svcRows.length) await supabase.from("services").insert(svcRows);
 
+      // 1º funcionário (opcional): gera o convite já aqui pra o dono mandar no
+      // WhatsApp. Falha no convite não derruba o cadastro — o salão já existe.
+      if (hasTeam && empEmail.trim()) {
+        const { data: invData, error: invErr } = await supabase.rpc("create_invite", {
+          p_salon: salon.id,
+          p_email: empEmail.trim(),
+          p_role: empRole as "manager" | "professional" | "receptionist",
+          p_commission: Number(empCommission.replace(",", ".")) || 0,
+        });
+        const inv = (Array.isArray(invData) ? invData[0] : invData) as { token?: string } | null;
+        if (!invErr && inv?.token) {
+          setDone({ slug: salon.slug, token: inv.token, email: empEmail.trim() });
+          setLoading(false);
+          return; // mostra a tela de "enviar convite", sem redirecionar
+        }
+      }
+
       router.push(`/painel/${salon.slug}`);
       router.refresh();
     } catch (e) {
@@ -202,6 +238,45 @@ export default function NovoSalaoPage() {
       );
       setLoading(false);
     }
+  }
+
+  function shareInviteWhatsApp() {
+    if (!done) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const link = `${origin}/convite/${done.token}`;
+    const msg = `Olá! Você foi convidado(a) para a equipe do ${name} 💈\nCrie seu acesso por aqui: ${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+  }
+
+  // Tela final quando o dono já convidou o 1º funcionário — ele decide quando
+  // mandar pelo WhatsApp e então entra no painel.
+  if (done) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-5 py-10">
+        <div className="w-full max-w-md af-rise rounded-[var(--radius)] border border-border bg-card shadow-card p-7 text-center">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <UsersThree className="h-7 w-7" weight="fill" />
+          </span>
+          <h1 className="font-display text-2xl mt-4">Salão criado! 🎉</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">
+            Convite de <b className="text-foreground">{done.email}</b> pronto. Mande o link pelo
+            WhatsApp para a pessoa criar o acesso — ou faça isso depois na aba <b>Equipe</b>.
+          </p>
+          <div className="mt-6 space-y-2.5">
+            <Button size="lg" className="w-full" onClick={shareInviteWhatsApp}>
+              <WhatsappLogo className="h-5 w-5" weight="fill" /> Enviar convite pelo WhatsApp
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => { router.push(`/painel/${done.slug}`); router.refresh(); }}
+            >
+              Ir para o painel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -231,8 +306,10 @@ export default function NovoSalaoPage() {
             {step === 0 && (
               <div className="space-y-5 af-rise">
                 <div>
-                  <h1 className="font-display text-2xl">Vamos criar seu salão</h1>
-                  <p className="text-sm text-muted-foreground mt-1">Comece pelo essencial.</p>
+                  <h1 className="font-display text-2xl">Vamos montar seu salão juntos</h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Faço umas perguntas rápidas e já deixo tudo pronto pra você. Começando pelo básico:
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Nome do salão</Label>
@@ -454,6 +531,68 @@ export default function NovoSalaoPage() {
               </div>
             )}
 
+            {/* STEP 5 — equipe (opcional) */}
+            {step === 5 && (
+              <div className="space-y-5 af-rise">
+                <div>
+                  <h1 className="font-display text-2xl flex items-center gap-2">
+                    <UsersThree className="h-5 w-5 text-primary" /> Você tem equipe?
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Se trabalha com mais gente, já deixo o primeiro convite pronto pra você mandar no WhatsApp.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setHasTeam(false)}
+                    aria-pressed={hasTeam === false}
+                    className={`rounded-[var(--radius)] border p-4 text-left transition ${hasTeam === false ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"}`}
+                  >
+                    <p className="font-semibold text-sm">Trabalho sozinho(a)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Posso convidar gente depois.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHasTeam(true)}
+                    aria-pressed={hasTeam === true}
+                    className={`rounded-[var(--radius)] border p-4 text-left transition ${hasTeam === true ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-foreground/20"}`}
+                  >
+                    <p className="font-semibold text-sm">Tenho equipe</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Convidar o primeiro agora.</p>
+                  </button>
+                </div>
+
+                {hasTeam && (
+                  <div className="space-y-4 af-rise rounded-[var(--radius)] border border-border p-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="empEmail">E-mail da pessoa</Label>
+                      <Input id="empEmail" type="email" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} placeholder="funcionaria@email.com" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="empRole">Cargo</Label>
+                        <Select id="empRole" value={empRole} onValueChange={setEmpRole}>
+                          {ROLE_OPTIONS.map((r) => (
+                            <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="empCommission">Comissão geral (%)</Label>
+                        <Input id="empCommission" inputMode="decimal" value={empCommission} onChange={(e) => setEmpCommission(e.target.value)} placeholder="0" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      A pessoa recebe um link, cria a conta e preenche os próprios dados. Você ajusta
+                      horários e comissões quando quiser, na aba <b>Equipe</b>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
 
             {/* Navegação */}
@@ -469,7 +608,8 @@ export default function NovoSalaoPage() {
                 </Button>
               ) : (
                 <Button className="ml-auto" size="lg" onClick={finish} disabled={loading}>
-                  {loading && <CircleNotch className="h-4 w-4 animate-spin" />} Criar salão
+                  {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
+                  {hasTeam && empEmail.trim() ? "Criar salão e convidar" : "Criar salão"}
                 </Button>
               )}
             </div>
