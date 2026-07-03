@@ -10,6 +10,7 @@ import { COLOR_GROUPS, CHOOSABLE_NICHES, NICHE_DEFAULT_COLOR, BARBEARIA_DEFAULT_
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
 import { uploadLogo, removeLogo } from "./actions";
+import { PushNotificationsCard } from "./PushNotificationsCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
@@ -136,7 +137,10 @@ export function SettingsTabs({
 
       {/* Painel ativo */}
       {active === "estabelecimento" && (
-        <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
+        <div className="space-y-5">
+          <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
+          <PushNotificationsCard salonId={salon.id} />
+        </div>
       )}
       {active === "horarios" && (
         <HoursManager salonId={salon.id} pros={pros} initialHours={initialHours} embedded />

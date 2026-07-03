@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          detail: Json | null
+          id: string
+          salon_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          salon_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          salon_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_log_actor_fkey"
+            columns: ["actor"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_dashboard_insights: {
+        Row: {
+          created_at: string
+          date: string
+          model: string | null
+          payload: Json
+          refresh_count: number
+          salon_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          model?: string | null
+          payload: Json
+          refresh_count?: number
+          salon_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          model?: string | null
+          payload?: Json
+          refresh_count?: number
+          salon_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_dashboard_insights_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_segments: {
         Row: {
           appointment_id: string
@@ -66,33 +136,39 @@ export type Database = {
       appointment_services: {
         Row: {
           appointment_id: string
+          campaign_id: string | null
           commission_amount: number
           commission_percent: number
           duration_min: number
           id: string
           name: string
+          original_price: number | null
           price: number
           salon_id: string
           service_id: string | null
         }
         Insert: {
           appointment_id: string
+          campaign_id?: string | null
           commission_amount?: number
           commission_percent?: number
           duration_min: number
           id?: string
           name: string
+          original_price?: number | null
           price: number
           salon_id: string
           service_id?: string | null
         }
         Update: {
           appointment_id?: string
+          campaign_id?: string | null
           commission_amount?: number
           commission_percent?: number
           duration_min?: number
           id?: string
           name?: string
+          original_price?: number | null
           price?: number
           salon_id?: string
           service_id?: string | null
@@ -103,6 +179,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_services_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
             referencedColumns: ["id"]
           },
           {
@@ -197,6 +280,59 @@ export type Database = {
             columns: ["salon_id"]
             isOneToOne: false
             referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_posts: {
+        Row: {
+          body: string
+          category: string
+          created_at: string
+          created_by: string | null
+          excerpt: string
+          id: string
+          is_published: boolean
+          published_at: string
+          read_minutes: number
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category: string
+          created_at?: string
+          created_by?: string | null
+          excerpt: string
+          id?: string
+          is_published?: boolean
+          published_at?: string
+          read_minutes?: number
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string
+          id?: string
+          is_published?: boolean
+          published_at?: string
+          read_minutes?: number
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -890,6 +1026,35 @@ export type Database = {
           },
         ]
       }
+      gestor_dismissals: {
+        Row: {
+          dismissed_on: string
+          salon_id: string
+          signal_key: string
+          updated_at: string
+        }
+        Insert: {
+          dismissed_on: string
+          salon_id: string
+          signal_key: string
+          updated_at?: string
+        }
+        Update: {
+          dismissed_on?: string
+          salon_id?: string
+          signal_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gestor_dismissals_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_permissions: {
         Row: {
           allowed: boolean
@@ -922,6 +1087,36 @@ export type Database = {
             referencedColumns: ["key"]
           },
         ]
+      }
+      mrr_snapshots: {
+        Row: {
+          active: number
+          canceled: number
+          mrr: number
+          past_due: number
+          snapshot_date: string
+          total: number
+          trialing: number
+        }
+        Insert: {
+          active?: number
+          canceled?: number
+          mrr?: number
+          past_due?: number
+          snapshot_date: string
+          total?: number
+          trialing?: number
+        }
+        Update: {
+          active?: number
+          canceled?: number
+          mrr?: number
+          past_due?: number
+          snapshot_date?: string
+          total?: number
+          trialing?: number
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -1155,6 +1350,70 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_admins_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_announcements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          link_label: string | null
+          link_url: string | null
+          message: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          link_label?: string | null
+          link_url?: string | null
+          message: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          link_label?: string | null
+          link_url?: string | null
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           cost_price: number
@@ -1292,28 +1551,28 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
-          auth: string
           created_at: string
-          endpoint: string
           id: string
-          p256dh: string
           profile_id: string
+          salon_id: string
+          token: string
+          updated_at: string
         }
         Insert: {
-          auth: string
           created_at?: string
-          endpoint: string
           id?: string
-          p256dh: string
           profile_id: string
+          salon_id: string
+          token: string
+          updated_at?: string
         }
         Update: {
-          auth?: string
           created_at?: string
-          endpoint?: string
           id?: string
-          p256dh?: string
           profile_id?: string
+          salon_id?: string
+          token?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1321,6 +1580,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
             referencedColumns: ["id"]
           },
         ]
@@ -1348,6 +1614,41 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "permissions"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      salon_gallery: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          salon_id: string
+          sort_order: number
+          url: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          salon_id: string
+          sort_order?: number
+          url: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          salon_id?: string
+          sort_order?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salon_gallery_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1501,41 +1802,6 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      salon_gallery: {
-        Row: {
-          id: string
-          salon_id: string
-          url: string
-          caption: string | null
-          sort_order: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          salon_id: string
-          url: string
-          caption?: string | null
-          sort_order?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          salon_id?: string
-          url?: string
-          caption?: string | null
-          sort_order?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salon_gallery_salon_id_fkey"
-            columns: ["salon_id"]
-            isOneToOne: false
-            referencedRelation: "salons"
             referencedColumns: ["id"]
           },
         ]
@@ -1698,6 +1964,7 @@ export type Database = {
           logo_url: string | null
           name: string
           niche: Database["public"]["Enums"]["salon_niche"]
+          onboarding_done_at: string | null
           owner_id: string
           phone: string | null
           slug: string
@@ -1719,6 +1986,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           niche?: Database["public"]["Enums"]["salon_niche"]
+          onboarding_done_at?: string | null
           owner_id: string
           phone?: string | null
           slug: string
@@ -1740,6 +2008,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           niche?: Database["public"]["Enums"]["salon_niche"]
+          onboarding_done_at?: string | null
           owner_id?: string
           phone?: string | null
           slug?: string
@@ -2090,6 +2359,10 @@ export type Database = {
         }
         Returns: string
       }
+      add_appointment_service: {
+        Args: { p_appointment: string; p_service_id: string }
+        Returns: Json
+      }
       add_member_by_email: {
         Args: {
           p_display_name?: string
@@ -2105,6 +2378,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_active: boolean
+          photo_url: string | null
           profile_id: string
           role: Database["public"]["Enums"]["member_role"]
           salon_id: string
@@ -2115,6 +2389,173 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_add_admin: { Args: { p_email: string }; Returns: undefined }
+      admin_audit: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          actor_email: string
+          created_at: string
+          detail: Json
+          id: string
+          salon_name: string
+        }[]
+      }
+      admin_create_announcement: {
+        Args: {
+          p_kind: string
+          p_link_label: string
+          p_link_url: string
+          p_message: string
+        }
+        Returns: undefined
+      }
+      admin_create_blog_post: {
+        Args: {
+          p_body: string
+          p_category: string
+          p_excerpt: string
+          p_is_published: boolean
+          p_published_at: string
+          p_read_minutes: number
+          p_slug: string
+          p_title: string
+        }
+        Returns: string
+      }
+      admin_delete_announcement: { Args: { p_id: string }; Returns: undefined }
+      admin_delete_blog_post: { Args: { p_id: string }; Returns: undefined }
+      admin_extend_trial: {
+        Args: { p_days: number; p_salon: string }
+        Returns: undefined
+      }
+      admin_list_admins: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          profile_id: string
+        }[]
+      }
+      admin_list_announcements: {
+        Args: never
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          link_label: string | null
+          link_url: string | null
+          message: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "platform_announcements"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_list_blog_posts: {
+        Args: never
+        Returns: {
+          body: string
+          category: string
+          created_at: string
+          created_by: string | null
+          excerpt: string
+          id: string
+          is_published: boolean
+          published_at: string
+          read_minutes: number
+          slug: string
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "blog_posts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_list_salons: {
+        Args: never
+        Returns: {
+          appts_30d: number
+          clients_count: number
+          created_at: string
+          current_period_end: string
+          is_active: boolean
+          last_activity: string
+          members_count: number
+          name: string
+          owner_email: string
+          owner_name: string
+          plan: string
+          salon_id: string
+          slug: string
+          status: string
+          trial_ends_at: string
+          value: number
+        }[]
+      }
+      admin_metrics: { Args: never; Returns: Json }
+      admin_mrr_history: {
+        Args: never
+        Returns: {
+          month: string
+          mrr: number
+        }[]
+      }
+      admin_overview: {
+        Args: never
+        Returns: {
+          active: number
+          canceled: number
+          mrr: number
+          new_30d: number
+          past_due: number
+          total_salons: number
+          trialing: number
+        }[]
+      }
+      admin_remove_admin: { Args: { p_profile: string }; Returns: undefined }
+      admin_set_announcement_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: undefined
+      }
+      admin_set_plan: {
+        Args: { p_plan: string; p_salon: string }
+        Returns: undefined
+      }
+      admin_set_status: {
+        Args: { p_salon: string; p_status: string }
+        Returns: undefined
+      }
+      admin_update_blog_post: {
+        Args: {
+          p_body: string
+          p_category: string
+          p_excerpt: string
+          p_id: string
+          p_is_published: boolean
+          p_published_at: string
+          p_read_minutes: number
+          p_slug: string
+          p_title: string
+        }
+        Returns: undefined
+      }
+      agenda_revenue_by_hour: {
+        Args: { p_salon: string; p_weekday: number; p_window_days?: number }
+        Returns: {
+          avg_ticket: number
+          hour_bucket: number
+          sample_count: number
+        }[]
       }
       book_appointment: {
         Args: {
@@ -2153,9 +2594,45 @@ export type Database = {
         Args: { p_on: string; p_salon: string; p_service: string }
         Returns: number
       }
+      campaign_for_service: {
+        Args: { p_on: string; p_salon: string; p_service: string }
+        Returns: {
+          campaign_id: string
+          discount_percent: number
+        }[]
+      }
+      campaign_performance: {
+        Args: { p_salon: string }
+        Returns: {
+          bookings: number
+          campaign_id: string
+          campaign_name: string
+          discount_given: number
+          revenue: number
+        }[]
+      }
+      capture_mrr_snapshot: { Args: never; Returns: undefined }
+      cash_sell_product: {
+        Args: {
+          p_payment_method: string
+          p_product: string
+          p_qty: number
+          p_session: string
+        }
+        Returns: undefined
+      }
       client_has_overlap: {
         Args: { p_client: string; p_end: string; p_start: string }
         Returns: boolean
+      }
+      clients_overview: {
+        Args: { p_salon: string }
+        Returns: {
+          client_id: string
+          last_visit: string
+          total_spent: number
+          visits: number
+        }[]
       }
       create_invite: {
         Args: {
@@ -2195,7 +2672,10 @@ export type Database = {
         }
         Returns: {
           address: string | null
+          agenda_color_mode: string
           allow_simultaneous: boolean
+          cash_discount_enabled: boolean
+          cash_max_discount_percent: number
           color_theme: string
           created_at: string
           email: string | null
@@ -2204,6 +2684,7 @@ export type Database = {
           logo_url: string | null
           name: string
           niche: Database["public"]["Enums"]["salon_niche"]
+          onboarding_done_at: string | null
           owner_id: string
           phone: string | null
           slug: string
@@ -2251,15 +2732,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      clients_overview: {
-        Args: { p_salon: string }
-        Returns: {
-          client_id: string
-          visits: number
-          total_spent: number
-          last_visit: string
-        }[]
-      }
       effective_price: {
         Args: {
           p_base: number
@@ -2271,7 +2743,12 @@ export type Database = {
         Returns: number
       }
       finalize_appointment: {
-        Args: { p_appointment: string; p_payment_method?: string }
+        Args: {
+          p_appointment: string
+          p_discount?: number
+          p_payment_method?: string
+          p_splits?: Json
+        }
         Returns: Json
       }
       get_availability: {
@@ -2299,7 +2776,16 @@ export type Database = {
         Args: { p_perm: string; p_salon: string }
         Returns: boolean
       }
+      is_platform_admin: { Args: never; Returns: boolean }
       is_salon_member: { Args: { p_salon: string }; Returns: boolean }
+      marketing_winback: {
+        Args: {
+          p_inactive_days?: number
+          p_salon: string
+          p_window_days?: number
+        }
+        Returns: Json
+      }
       my_appointments: {
         Args: { p_salon?: string }
         Returns: {
@@ -2325,6 +2811,15 @@ export type Database = {
         }
         Returns: Json
       }
+      product_movement_stats: {
+        Args: { p_salon: string; p_window_days?: number }
+        Returns: {
+          consumed_qty: number
+          last_movement_at: string
+          movements_count: number
+          product_id: string
+        }[]
+      }
       public_appointments_by_phone: {
         Args: { p_phone: string; p_salon: string }
         Returns: {
@@ -2345,6 +2840,31 @@ export type Database = {
           discount_percent: number
           service_id: string
         }[]
+      }
+      public_cancel_appointment: {
+        Args: { p_appointment: string; p_phone?: string }
+        Returns: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          payment_method: string | null
+          salon_id: string
+          source: string
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          total_price: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       public_professional_services: {
         Args: { p_salon: string }
@@ -2403,6 +2923,7 @@ export type Database = {
         Args: { p_item: string; p_member?: string }
         Returns: Json
       }
+      reopen_cash_session: { Args: { p_session: string }; Returns: Json }
       report_heatmap: {
         Args: { p_from: string; p_salon: string; p_to: string }
         Returns: Json
@@ -2415,6 +2936,7 @@ export type Database = {
         Args: { p_min_days?: number; p_salon: string }
         Returns: Json
       }
+      reverse_cash_transaction: { Args: { p_tx: string }; Returns: Json }
       revoke_invite: { Args: { p_id: string }; Returns: undefined }
       salon_access_status: {
         Args: { p_slug: string }
@@ -2458,6 +2980,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      service_insights: {
+        Args: { p_salon: string; p_window_days?: number }
+        Returns: {
+          avg_commission: number
+          bookings: number
+          last_booked: string
+          revenue: number
+          service_id: string
+        }[]
       }
       upcoming_birthdays: {
         Args: { p_days?: number; p_salon: string }

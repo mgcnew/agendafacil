@@ -65,3 +65,43 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+// ── Notificações push (FCM) ─────────────────────────────────────
+// Só Web Push API nativa — o FCM entrega push padrão de qualquer forma, não
+// precisa importar o SDK do Firebase aqui dentro (mais leve).
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+  const notification = payload.notification || {};
+  const title = notification.title || "Zulan";
+  const body = notification.body || "";
+  const link = payload.fcmOptions?.link || payload.data?.link || "/painel";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: link },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/painel";
+  event.waitUntil(
+    (async () => {
+      const clientsList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const c of clientsList) {
+        if (c.url.includes(url) && "focus" in c) return c.focus();
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});
