@@ -4,7 +4,7 @@ import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
-import { FinanceManager, type Receivable } from "./FinanceManager";
+import { FinanceManager, type Receivable, type ServiceCatalogItem } from "./FinanceManager";
 import type { FixedCost, ChairRental } from "./FixedCostsPanel";
 
 export const dynamic = "force-dynamic";
@@ -167,6 +167,15 @@ export default async function FinanceiroPage({
     .order("name");
   const resaleProducts = (resaleRaw ?? []) as { id: string; name: string; sale_price: number; quantity: number }[];
 
+  // Catálogo de serviços (pra adicionar serviço extra ao fechar o checkout)
+  const { data: servicesRaw } = await supabase
+    .from("services")
+    .select("id, name, price")
+    .eq("salon_id", salonId)
+    .eq("is_active", true)
+    .order("name");
+  const services = (servicesRaw ?? []) as ServiceCatalogItem[];
+
   // ── desconto no caixa (config do salão + permissão do usuário) ──
   const { data: salonCfg } = await supabase
     .from("salons")
@@ -244,6 +253,7 @@ export default async function FinanceiroPage({
       operatorNames={operatorNames}
       receivable={receivable}
       resaleProducts={resaleProducts}
+      services={services}
       canDiscount={canDiscount}
       maxDiscountPercent={maxDiscountPercent}
       salon={{

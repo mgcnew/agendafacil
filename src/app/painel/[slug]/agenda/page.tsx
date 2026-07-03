@@ -18,7 +18,7 @@ export default async function AgendaPage({
   const canManageSchedule = perms.has("schedule.manage");
 
   const supabase = await createClient();
-  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }] = await Promise.all([
+  const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }, { data: salonCfg }] = await Promise.all([
     supabase
       .from("salon_members")
       .select("id, display_name, profiles(full_name), commission_percent, color, photo_url")
@@ -39,7 +39,16 @@ export default async function AgendaPage({
       .from("professional_services")
       .select("member_id")
       .eq("salon_id", membership.salon_id),
+    supabase
+      .from("salons")
+      .select("cash_discount_enabled, cash_max_discount_percent")
+      .eq("id", membership.salon_id)
+      .maybeSingle(),
   ]);
+
+  // Mesma config de desconto do Caixa — o fechamento pela Agenda usa o mesmo modal.
+  const canDiscount = !!salonCfg?.cash_discount_enabled && perms.has("cash.discount");
+  const maxDiscountPercent = Number(salonCfg?.cash_max_discount_percent ?? 0);
 
   const discounts: Record<string, number> = {};
   for (const r of (discountRows as { service_id: string; discount_percent: number }[] | null) ?? []) {
@@ -68,6 +77,8 @@ export default async function AgendaPage({
       discounts={discounts}
       canManageSchedule={canManageSchedule}
       myMemberId={membership.id}
+      canDiscount={canDiscount}
+      maxDiscountPercent={maxDiscountPercent}
     />
   );
 }

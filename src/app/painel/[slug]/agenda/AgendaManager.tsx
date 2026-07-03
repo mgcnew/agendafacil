@@ -12,6 +12,8 @@ import { formatBRL } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
 import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
+import { PaymentPickerModal } from "@/components/PaymentPickerModal";
+import { chargeAppointment as chargeAppointmentRpc, addAppointmentService as addAppointmentServiceRpc } from "@/lib/checkout";
 import {
   ArrowSquareOut,
   CalendarDots,
@@ -23,6 +25,7 @@ import {
   CircleNotch,
   ClockCountdown,
   Lock,
+  Minus,
   Phone,
   Plus,
   Scissors,
@@ -350,12 +353,15 @@ function ApptDetailModal({
   // Fetch history when expanded
   useEffect(() => {
     if (!showHistory || !appt.client_id || history !== null) return;
-    supabase
+    let q = supabase
       .from("appointments")
       .select("id, starts_at, status, total_price, salon_members(display_name), appointment_services(name)")
       .eq("salon_id", salonId)
-      .eq("client_id", appt.client_id)
-      .neq("id", appt.id)
+      .eq("client_id", appt.client_id);
+    // Enquanto o atendimento ainda não aconteceu, não listar ele mesmo como
+    // "visita passada". Já finalizado, ele é uma visita de verdade — inclui.
+    if (appt.status !== "completed") q = q.neq("id", appt.id);
+    q
       .order("starts_at", { ascending: false })
       .limit(10)
       .then(({ data }) => setHistory((data as unknown as HistoryAppt[]) ?? []));
@@ -1198,12 +1204,14 @@ function AgendaSignalsBanner({ signals, slug }: { signals: TodaySignals | null; 
 // ── Main component ─────────────────────────────────────────────
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
-  canManageSchedule = false, myMemberId,
+  canManageSchedule = false, myMemberId, canDiscount = false, maxDiscountPercent = 0,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
   canManageSchedule?: boolean;
   myMemberId?: string;
+  canDiscount?: boolean;
+  maxDiscountPercent?: number;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1653,6 +1661,9 @@ export function AgendaManager({
           <FinalizeModal
             key="finalize"
             appt={finalizing}
+            services={services}
+            canDiscount={canDiscount}
+            maxDiscountPercent={maxDiscountPercent}
             onClose={() => setFinalizing(null)}
             onDone={() => { setFinalizing(null); load(); }}
           />
@@ -1663,46 +1674,78 @@ export function AgendaManager({
 }
 
 // ── Finalizar atendimento ──────────────────────────────────────
-const PAYMENT_METHODS = [
-  { id: "dinheiro", label: "Dinheiro" },
-  { id: "pix", label: "Pix" },
-  { id: "cartao", label: "Cartão" },
-];
-
 function FinalizeModal({
-  appt, onClose, onDone,
+  appt, services, canDiscount, maxDiscountPercent, onClose, onDone,
 }: {
-  appt: Appt; onClose: () => void; onDone: () => void;
+  appt: Appt; services: Service[]; canDiscount: boolean; maxDiscountPercent: number;
+  onClose: () => void; onDone: () => void;
 }) {
   const supabase = createClient();
-  const [method, setMethod] = useState("dinheiro");
-  const [busy, setBusy]     = useState(false);
-  const [err, setErr]       = useState<string | null>(null);
   const [warn, setWarn]     = useState<string[] | null>(null);
+  const [items, setItems]   = useState<ApptService[] | null>(null);
+  // Serviço extra pedido em cima da hora (ex.: "veio pro corte, pediu barba
+  // também") — fica só no estado local; vira linha em appointment_services só
+  // ao confirmar, junto com o resto do fechamento.
+  const [extra, setExtra]           = useState<{ service: Service; qty: number }[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [svcQuery, setSvcQuery]     = useState("");
+  const [payModalOpen, setPayModalOpen] = useState(false);
 
-  async function finalize() {
-    setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("finalize_appointment", {
-      p_appointment: appt.id,
-      p_payment_method: method,
+  useEffect(() => {
+    supabase
+      .from("appointment_services")
+      .select("id, name, price, duration_min")
+      .eq("appointment_id", appt.id)
+      .then(({ data }) => setItems((data as ApptService[]) ?? []));
+  }, [appt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const extraTotal = extra.reduce((s, i) => s + Number(i.service.price) * i.qty, 0);
+  const total = Number(appt.total_price) + extraTotal;
+
+  function addExtra(s: Service) {
+    setExtra(prev => {
+      const idx = prev.findIndex(i => i.service.id === s.id);
+      if (idx !== -1) return prev.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { service: s, qty: 1 }];
     });
-    if (error) {
-      setErr("Não foi possível finalizar. Tente novamente.");
-      setBusy(false);
-      return;
+    setPickerOpen(false); setSvcQuery("");
+  }
+
+  // Mesma função usada pelo Caixa — mesmo comportamento (desconto, split,
+  // registro no caixa), pra fechar pela Agenda não divergir do Caixa.
+  async function confirmPayment(pay: string, discount: number, splits?: { method: string; amount: number }[]) {
+    for (const item of extra) {
+      for (let i = 0; i < item.qty; i++) {
+        await addAppointmentServiceRpc(supabase, appt.id, item.service.id);
+      }
     }
-    const warnings = (data as { stock_warnings?: string[] } | null)?.stock_warnings ?? [];
+    let data: { stock_warnings?: string[] } | null;
+    try {
+      data = await chargeAppointmentRpc(supabase, appt.id, pay, discount, splits);
+    } catch (e) {
+      const msg = (e as { message?: string })?.message ?? "";
+      if (msg.includes("already_finalized")) {
+        throw new Error("Esse atendimento já foi cobrado. Se precisar refazer, estorne no Caixa primeiro.");
+      }
+      throw e;
+    }
+    const warnings = data?.stock_warnings ?? [];
     if (warnings.length > 0) {
+      setPayModalOpen(false);
       setWarn(warnings);
-      setBusy(false);
       return;
     }
     onDone();
   }
 
+  const filteredServices = svcQuery.trim()
+    ? services.filter(s => s.name.toLowerCase().includes(svcQuery.toLowerCase()))
+    : services;
+  const itemNames = [...(items ?? []).map(i => i.name), ...extra.map(i => `${i.service.name}${i.qty > 1 ? ` ×${i.qty}` : ""}`)];
+
   return (
     <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-sm mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+      <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-display text-lg font-bold">Finalizar atendimento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
@@ -1724,46 +1767,106 @@ function FinalizeModal({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-4">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <span className="font-display text-xl font-bold text-primary">{formatBRL(Number(appt.total_price))}</span>
-            </div>
-
-            <div className="mt-4">
-              <Label className="text-xs text-muted-foreground">Forma de pagamento</Label>
-              <div className="grid grid-cols-3 gap-2 mt-1.5">
-                {PAYMENT_METHODS.map(m => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMethod(m.id)}
-                    className={cn(
-                      "rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition",
-                      method === m.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:border-foreground/25",
-                    )}
-                  >
-                    {m.label}
+            {/* Itens do atendimento + serviço extra */}
+            <div className="mt-4 rounded-[var(--radius)] border border-border divide-y divide-border overflow-hidden">
+              {(items ?? []).map(it => (
+                <div key={it.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span className="truncate">{it.name}</span>
+                  <span className="font-medium tabular-nums shrink-0 ml-2">{formatBRL(Number(it.price))}</span>
+                </div>
+              ))}
+              {extra.map(item => (
+                <div key={item.service.id} className="flex items-center gap-2 px-3 py-2">
+                  <span className="text-sm flex-1 min-w-0 truncate">{item.service.name}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => item.qty > 1 && setExtra(p => p.map(i => i.service.id === item.service.id ? { ...i, qty: i.qty - 1 } : i))}
+                      disabled={item.qty <= 1}
+                      className="h-5 w-5 grid place-items-center rounded border border-border hover:bg-muted disabled:opacity-30 transition"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="text-xs font-medium w-4 text-center tabular-nums">{item.qty}</span>
+                    <button
+                      onClick={() => setExtra(p => p.map(i => i.service.id === item.service.id ? { ...i, qty: i.qty + 1 } : i))}
+                      className="h-5 w-5 grid place-items-center rounded border border-border hover:bg-muted transition"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <span className="text-sm font-medium tabular-nums w-14 text-right shrink-0">
+                    {formatBRL(Number(item.service.price) * item.qty)}
+                  </span>
+                  <button onClick={() => setExtra(p => p.filter(i => i.service.id !== item.service.id))}
+                    className="h-5 w-5 grid place-items-center text-muted-foreground hover:text-red-600 transition shrink-0">
+                    <X className="h-3.5 w-3.5" />
                   </button>
-                ))}
-              </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPickerOpen(v => !v)}
+                className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition"
+              >
+                <Plus className="h-3.5 w-3.5" /> Adicionar serviço
+              </button>
+              {pickerOpen && (
+                <div className="p-3 space-y-2 bg-muted/30">
+                  <Input autoFocus value={svcQuery} onChange={e => setSvcQuery(e.target.value)} placeholder="Buscar serviço…" />
+                  <div className="max-h-40 overflow-auto space-y-1">
+                    {filteredServices.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-2">Nada encontrado.</p>
+                    ) : filteredServices.map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => addExtra(s)}
+                        className="w-full flex items-center justify-between rounded border border-border px-2.5 py-1.5 text-sm hover:border-primary hover:bg-primary/5 transition"
+                      >
+                        <span className="truncate">{s.name}</span>
+                        <span className="text-muted-foreground shrink-0 ml-2">{formatBRL(Number(s.price))}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+            <div className="flex items-center justify-between rounded-[var(--radius)] bg-secondary border border-border px-4 py-3 mt-3">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="font-display text-xl font-bold text-primary">{formatBRL(total)}</span>
+            </div>
 
             <div className="flex gap-2 mt-5">
-              <Button onClick={finalize} disabled={busy} className="flex-1">
-                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar e receber
+              <Button onClick={() => setPayModalOpen(true)} disabled={total <= 0} className="flex-1">
+                Continuar
               </Button>
               <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             </div>
             <p className="text-[11px] text-muted-foreground mt-3 text-center">
-              A receita entra no caixa (se aberto), comissão e baixa de estoque automáticas.
+              A receita entra no caixa (se aberto), comissão e baixa de estoque automáticas — mesmo fluxo do Caixa.
             </p>
           </>
         )}
       </Card>
+
+      {/* Mesmo modal de pagamento do Caixa: desconto, split, troco. */}
+      <AnimatePresence>
+        {payModalOpen && (
+          <PaymentPickerModal
+            key="pay"
+            title={appt.clients?.full_name ?? "Cliente"}
+            subtitle={itemNames.join(", ")}
+            total={total}
+            confirmLabel="Receber"
+            allowDiscount={canDiscount}
+            maxDiscountPercent={maxDiscountPercent}
+            allowSplit
+            onClose={() => setPayModalOpen(false)}
+            onConfirm={confirmPayment}
+          />
+        )}
+      </AnimatePresence>
     </MotionModal>
   );
 }
