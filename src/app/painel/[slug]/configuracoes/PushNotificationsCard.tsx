@@ -27,15 +27,23 @@ export function PushNotificationsCard({ salonId }: { salonId: string }) {
   async function activate() {
     setStatus("loading");
     setErr(null);
-    const result = await requestPushPermission(salonId);
-    if (result === "unsupported") {
-      setStatus("unsupported");
-      setErr("Este navegador não tem suporte a notificações push.");
-      return;
-    }
-    setStatus(result);
-    if (result === "denied") {
-      setErr("Permissão negada. Ative pelas configurações de notificação do navegador.");
+    try {
+      const result = await requestPushPermission(salonId);
+      if (result === "unsupported") {
+        setStatus("unsupported");
+        setErr("Este navegador não tem suporte a notificações push.");
+        return;
+      }
+      setStatus(result);
+      if (result === "denied") {
+        setErr("Permissão negada. Ative pelas configurações de notificação do navegador.");
+      }
+    } catch (e) {
+      // Volta pro estado anterior (permission já pode ter sido concedida
+      // pelo navegador mesmo se o registro do token falhou) pra poder tentar
+      // de novo, e mostra o erro real em vez de ficar preso carregando.
+      setStatus(typeof window !== "undefined" && "Notification" in window ? (Notification.permission as Status) : "default");
+      setErr((e as { message?: string })?.message ?? "Não foi possível ativar. Tente novamente.");
     }
   }
 

@@ -49,12 +49,13 @@ export async function requestPushPermission(salonId: string): Promise<PushPermis
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return "unsupported";
 
-  await supabase
+  const { error } = await supabase
     .from("push_subscriptions")
     .upsert(
       { salon_id: salonId, profile_id: user.id, token, updated_at: new Date().toISOString() },
       { onConflict: "salon_id,token" },
     );
+  if (error) throw error;
 
   return "granted";
 }
