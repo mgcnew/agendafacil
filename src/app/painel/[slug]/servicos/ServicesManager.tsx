@@ -657,53 +657,62 @@ function ServiceList({
         return (
         <div
           key={s.id}
-          className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${!s.is_active ? "opacity-60" : ""}`}
+          className={`flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4 ${!s.is_active ? "opacity-60" : ""}`}
         >
-          <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium flex items-center gap-2">
-              {s.name}
-              {dormant && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-medium">
-                  <CalendarX className="h-3 w-3" /> parado há {dormantWindowDays ?? 90}+ dias
-                </span>
-              )}
-            </p>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
-              {s.commission_percent != null && (
-                <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
-              )}
-              {s.processing_time_min > 0 && (
-                <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
-              )}
-              {bookings > 0 && (
-                <span className="flex items-center gap-1 text-foreground/70" title={`${bookings} atendimento(s) concluído(s) nos últimos ${dormantWindowDays ?? 90} dias`}>
-                  <TrendUp className="h-3 w-3" /> {bookings}x
-                </span>
-              )}
-              {m != null && (
-                <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                  <Percent className="h-3 w-3" /> lucro{real != null ? " real" : " est."} {formatBRL(m)}
-                </span>
-              )}
+          {/* Bloco de informações — ocupa a linha toda no mobile */}
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+                {s.name}
+                {dormant && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-medium">
+                    <CalendarX className="h-3 w-3" /> parado há {dormantWindowDays ?? 90}+ dias
+                  </span>
+                )}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
+                {s.commission_percent != null && (
+                  <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
+                )}
+                {s.processing_time_min > 0 && (
+                  <span className="flex items-center gap-1 text-primary"><Timer className="h-3 w-3" /> pausa {s.processing_time_min}min</span>
+                )}
+                {bookings > 0 && (
+                  <span className="flex items-center gap-1 text-foreground/70" title={`${bookings} atendimento(s) concluído(s) nos últimos ${dormantWindowDays ?? 90} dias`}>
+                    <TrendUp className="h-3 w-3" /> {bookings}x
+                  </span>
+                )}
+                {m != null && (
+                  <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                    <Percent className="h-3 w-3" /> lucro{real != null ? " real" : " est."} {formatBRL(m)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <span className="font-semibold text-primary text-sm text-right">
-            {formatServicePrice(Number(s.price), s.price_type)}
-          </span>
-          <button
-            onClick={() => onToggle(s)}
-            className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
-          >
-            {s.is_active ? "Ativo" : "Inativo"}
-          </button>
-          <button onClick={() => onEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-            <PencilSimple className="h-4 w-4" />
-          </button>
-          <button onClick={() => onRemove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
-            <Trash className="h-4 w-4" />
-          </button>
+
+          {/* Preço + ações — descem para baixo do bloco no mobile, alinhados à direita no desktop */}
+          <div className="flex items-center justify-between gap-1 border-t border-border pt-3 pl-6 sm:justify-end sm:border-t-0 sm:pt-0 sm:pl-0">
+            <span className="font-semibold text-primary text-sm">
+              {formatServicePrice(Number(s.price), s.price_type)}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onToggle(s)}
+                className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
+              >
+                {s.is_active ? "Ativo" : "Inativo"}
+              </button>
+              <button onClick={() => onEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
+                <PencilSimple className="h-4 w-4" />
+              </button>
+              <button onClick={() => onRemove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
+                <Trash className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
         );
       })}

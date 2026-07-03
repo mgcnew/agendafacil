@@ -153,7 +153,7 @@ export function FixedCostsPanel({
       <Narrator lines={narratorLines} />
 
       {/* Resultado mensal */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-[var(--radius)] border border-border bg-card p-4">
           <TrendUp className="h-4 w-4 text-emerald-600" />
           <p className="font-display text-lg font-bold mt-2 text-emerald-600">{formatBRL(totalRevenues)}</p>
