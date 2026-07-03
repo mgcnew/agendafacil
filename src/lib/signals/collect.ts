@@ -4,9 +4,9 @@ import {
   REACTIVATION_MIN_DAYS,
   BIRTHDAY_WINDOW_DAYS,
   PACKAGE_DORMANT_DAYS,
-  daysUntil,
+  PACKAGE_EXPIRY_WINDOW_DAYS,
+  daysUntilCalendarBR,
   daysSince,
-  isExpiringSoon,
   isLowStock,
 } from "./rules";
 import type { Signal, SignalsResult, BirthdayContact } from "./types";
@@ -87,15 +87,19 @@ export async function collectSignals(
     client_package_items: { used: number }[] | null;
   }[];
 
+  // Só pacotes que vencem HOJE ou nos próximos dias (data de calendário BR,
+  // igual ao painel de pacotes). Já vencido (dias < 0) não é "vencendo em
+  // breve" — não faz sentido o Gestor avisar algo que já passou.
   const expiringDays = pkgs
-    .filter((p) => isExpiringSoon(p.expires_at))
-    .map((p) => daysUntil(p.expires_at));
+    .map((p) => daysUntilCalendarBR(p.expires_at))
+    .filter((d) => d >= 0 && d <= PACKAGE_EXPIRY_WINDOW_DAYS);
   if (expiringDays.length > 0) {
     const min = Math.min(...expiringDays);
+    const quando = min === 0 ? "o mais próximo vence hoje" : `o mais próximo vence em ${min} dia${min === 1 ? "" : "s"}`;
     signals.push({
       key: "package_expiring",
       count: expiringDays.length,
-      fact: `${expiringDays.length} pacote${expiringDays.length === 1 ? "" : "s"} vencendo em breve — o mais próximo vence em ${min} dia${min === 1 ? "" : "s"}`,
+      fact: `${expiringDays.length} pacote${expiringDays.length === 1 ? "" : "s"} vencendo em breve — ${quando}`,
     });
   }
 

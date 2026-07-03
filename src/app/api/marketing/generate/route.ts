@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   // Paleta do tema do salão → cores do prompt.
-  const variant = ALL_COLOR_VARIANTS.find((v) => v.id === (salon.color_theme ?? "a"));
+  const variant = ALL_COLOR_VARIANTS.find((v) => v.id === (salon.color_theme || "a"));
   const promptInput: PromptInput = {
     type,
     style,

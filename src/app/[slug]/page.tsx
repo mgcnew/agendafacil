@@ -56,12 +56,20 @@ export default async function SalonBookingPage({
   const salon = data?.[0];
   if (!salon) notFound();
 
-  const colorTheme = (salon.color_theme ?? "a") as string;
+  // "" ou ausente → barbearia usa a identidade CSS nativa (:not([data-color]));
+  // demais nichos caem em "a". Mesma regra do painel (layout.tsx).
+  const rawColor = salon.color_theme as string | null | undefined;
+  const colorAttr =
+    rawColor && rawColor !== ""
+      ? rawColor
+      : salon.niche === "barbearia"
+        ? undefined
+        : "a";
 
   return (
     <div
       data-niche={salon.niche}
-      data-color={colorTheme}
+      data-color={colorAttr}
       className="min-h-dvh bg-background text-foreground"
     >
       <BookingApp salon={salon} />

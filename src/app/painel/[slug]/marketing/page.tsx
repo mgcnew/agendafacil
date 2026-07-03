@@ -43,7 +43,7 @@ export default async function MarketingPage({
         name: salon.name,
         logoUrl: salon.logo_url ?? null,
         phone: salon.phone ?? null,
-        colorTheme: (salon.color_theme ?? "a") as string,
+        colorTheme: (salon.color_theme || "a") as string,
       }}
       services={services ?? []}
       campaigns={campaigns ?? []}
