@@ -26,6 +26,7 @@ import {
   ClockCountdown,
   Lock,
   Minus,
+  Monitor,
   Phone,
   Plus,
   Scissors,
@@ -1510,6 +1511,15 @@ export function AgendaManager({
             </button>
           </div>
 
+          <a
+            href={`/tv/${slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abre uma tela de próximos atendimentos, pra espelhar num monitor"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
+          >
+            <Monitor className="h-4 w-4" /> Modo TV
+          </a>
           {canBlock && (
             <Button variant="outline" onClick={() => setBlocking(true)}>
               <Lock className="h-4 w-4" /> Bloquear
