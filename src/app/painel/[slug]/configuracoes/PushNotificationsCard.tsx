@@ -21,7 +21,16 @@ export function PushNotificationsCard({ salonId }: { salonId: string }) {
       setStatus("unsupported");
       return;
     }
-    setStatus(Notification.permission as Status);
+    if (Notification.permission === "granted") {
+      // Permissão do navegador concedida não garante que o token chegou a
+      // ser salvo no banco (ex.: uma tentativa anterior falhou no meio do
+      // caminho) — resincroniza sempre que abrir a tela. requestPermission
+      // com permissão já concedida resolve na hora, sem popup.
+      activate();
+    } else {
+      setStatus(Notification.permission as Status);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function activate() {
