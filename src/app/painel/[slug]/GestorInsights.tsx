@@ -16,9 +16,11 @@ import {
   type InsightType,
 } from "@/lib/ai/dashboardInsights";
 import { collectSignals } from "@/lib/signals/collect";
+import { getDismissedKeys, signalKeyForInsight } from "@/lib/signals/dismissals";
 import { RefreshGestorButton } from "./RefreshGestorButton";
 import { TypewriterText } from "./TypewriterText";
 import { InsightsCarousel } from "./InsightsCarousel";
+import { DismissibleCard } from "./DismissibleCard";
 
 export type BirthdayContact = { id: string; name: string; phone: string | null };
 
@@ -122,10 +124,21 @@ export async function GestorInsightsAsync({
   // os avisos da mesma fonte única usada pelas páginas e só então narramos.
   const { context, signals, birthdays } = await collectSignals(supabase, salonId, { firstName, salonName });
   const result = await getOrGenerateDashboardInsights(supabase, salonId, context, signals);
+
+  // Remove o que o dono dispensou hoje — mesmo que já esteja no cache do dia,
+  // o card sai da tela (o cache regenera sem ele na próxima análise/amanhã).
+  const dismissed = await getDismissedKeys(supabase, salonId);
+  const insights = dismissed.size > 0
+    ? result.insights.filter((it) => {
+        const k = signalKeyForInsight(it.type);
+        return !k || !dismissed.has(k);
+      })
+    : result.insights;
+
   const birthdayClients: BirthdayContact[] = birthdays
     .filter((b) => b.days_until === 0)
     .map((b) => ({ id: b.id, name: b.name, phone: b.phone }));
-  return <GestorInsightsCard slug={slug} insights={result.insights} birthdayClients={birthdayClients} />;
+  return <GestorInsightsCard slug={slug} insights={insights} birthdayClients={birthdayClients} />;
 }
 
 function GestorInsightsCard({
@@ -167,6 +180,7 @@ function GestorInsightsCard({
           items={insights.map((insight, i) => {
             const Icon = ICON[insight.type];
             const href = hrefFor(slug, insight.type);
+            const sk = signalKeyForInsight(insight.type); // categoria dispensável (ou null)
             // af-rise com atraso escalonado: cards "se montam" em sequência,
             // reforçando a sensação de algo sendo organizado na hora.
             const style = { animationDelay: `${220 + i * 90}ms` };
@@ -175,10 +189,10 @@ function GestorInsightsCard({
             // a IA só narra; quem manda o link pronto é o código, com dado real do cliente.
             if (insight.type === "birthday" && birthdayClients.length > 0) {
               return (
+                <DismissibleCard key={i} slug={slug} signalKey={sk}>
                 <div
-                  key={i}
                   style={style}
-                  className={`af-rise flex h-full flex-col gap-2 rounded-[var(--radius)] border p-3 transition ${CARD_STYLE[insight.priority]}`}
+                  className={`af-rise flex h-full flex-col gap-2 rounded-[var(--radius)] border p-3 pr-8 transition ${CARD_STYLE[insight.priority]}`}
                 >
                   <div className="flex items-start gap-3">
                     <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card ${ICON_ACCENT[insight.priority]}`}>
@@ -220,6 +234,7 @@ function GestorInsightsCard({
                     })}
                   </div>
                 </div>
+                </DismissibleCard>
               );
             }
 
@@ -243,23 +258,25 @@ function GestorInsightsCard({
               </>
             );
 
-            return href ? (
-              <Link
-                key={i}
-                href={href}
-                style={style}
-                className={`af-rise group flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${CARD_STYLE[insight.priority]}`}
-              >
-                {content}
-              </Link>
-            ) : (
-              <div
-                key={i}
-                style={style}
-                className={`af-rise flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 transition ${CARD_STYLE[insight.priority]}`}
-              >
-                {content}
-              </div>
+            return (
+              <DismissibleCard key={i} slug={slug} signalKey={sk}>
+                {href ? (
+                  <Link
+                    href={href}
+                    style={style}
+                    className={`af-rise group flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 pr-8 transition hover:-translate-y-0.5 hover:shadow-sm ${CARD_STYLE[insight.priority]}`}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <div
+                    style={style}
+                    className={`af-rise flex h-full items-start gap-3 rounded-[var(--radius)] border p-3 pr-8 transition ${CARD_STYLE[insight.priority]}`}
+                  >
+                    {content}
+                  </div>
+                )}
+              </DismissibleCard>
             );
           })}
         />

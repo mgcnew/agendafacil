@@ -10,6 +10,7 @@ import {
   isLowStock,
 } from "./rules";
 import type { Signal, SignalsResult, BirthdayContact } from "./types";
+import { getDismissedKeys } from "./dismissals";
 
 /**
  * Coletor único de sinais do painel — o lugar de onde o Gestor Zulan (e só ele)
@@ -127,6 +128,11 @@ export async function collectSignals(
     });
   }
 
+  // Categorias que o dono dispensou hoje somem antes de chegar na IA — assim
+  // nem gastamos narração com um aviso que ele já pediu pra esconder por hoje.
+  const dismissed = await getDismissedKeys(supabase, salonId);
+  const visibleSignals = dismissed.size > 0 ? signals.filter((s) => !dismissed.has(s.key)) : signals;
+
   return {
     context: {
       firstName: opts.firstName,
@@ -134,7 +140,7 @@ export async function collectSignals(
       apptsToday: appts.length,
       revenueToday,
     },
-    signals,
+    signals: visibleSignals,
     birthdays,
   };
 }
