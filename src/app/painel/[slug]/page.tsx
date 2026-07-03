@@ -12,6 +12,7 @@ import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
+import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,28 @@ export default async function DashboardPage({
   const fullName = (profile?.full_name ?? membership.display_name ?? "").trim();
   const firstName = fullName ? fullName.split(" ")[0] : "";
 
+  // ── Primeiros passos (só o dono, até concluir ou dispensar) ──────────────
+  const isOwner = membership.role === "owner";
+  const onboardingDoneAt = (membership.salons as { onboarding_done_at?: string | null }).onboarding_done_at ?? null;
+  let onboardingSteps: OnboardingStep[] | null = null;
+  if (isOwner && !onboardingDoneAt) {
+    const [{ count: pricedCount }, { count: memberCount }, { count: inviteCount }, { count: apptCount }] =
+      await Promise.all([
+        supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true).gt("price", 0),
+        supabase.from("salon_members").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+        supabase.from("salon_invites").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+        supabase.from("appointments").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+      ]);
+    const steps: OnboardingStep[] = [
+      { done: (pricedCount ?? 0) > 0, title: "Defina os preços dos serviços", hint: "Já deixamos os serviços comuns — agora ajuste os valores.", href: `/painel/${slug}/servicos`, cta: "Ajustar" },
+      { done: (clientsCount ?? 0) > 0, title: "Cadastre seu primeiro cliente", hint: "Guarde contato e histórico de quem você atende.", href: `/painel/${slug}/clientes`, cta: "Adicionar" },
+      { done: (memberCount ?? 0) > 1 || (inviteCount ?? 0) > 0, title: "Convide sua equipe", hint: "Cada pessoa acessa com o próprio login.", href: `/painel/${slug}/equipe`, cta: "Convidar" },
+      { done: (apptCount ?? 0) > 0, title: "Registre o primeiro agendamento", hint: "Marque um horário ou compartilhe seu link.", href: `/painel/${slug}/agenda?novo=1`, cta: "Agendar" },
+    ];
+    // Some sozinho quando tudo estiver feito.
+    if (!steps.every((s) => s.done)) onboardingSteps = steps;
+  }
+
   // ── Minhas comissões (profissional/gerente, só Pro/Max) ──────────
   const access = await getAccessStatus(slug);
   const earnsCommission = membership.role === "professional" || membership.role === "manager";
@@ -210,6 +233,9 @@ export default async function DashboardPage({
 
         {/* ── Coluna principal ──────────────────────────────────�� */}
         <div className="space-y-6 min-w-0">
+          {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
+          {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
+
           {/* Resumo do Gestor Zulan — streaming: não bloqueia o resto da página */}
           <Suspense fallback={<GestorInsightsSkeleton />}>
             <GestorInsightsAsync
