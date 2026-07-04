@@ -394,15 +394,20 @@ export function PanelShell({
       {/* ── Bottom sheet "Mais" (mobile) ─────────────────────────── */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[80vh] overflow-auto shadow-2xl">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[80vh] overflow-auto shadow-2xl border-t border-border/50">
             <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="font-display font-bold">{salon.name}</p>
-                <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="grid place-items-center h-9 w-9 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <Scissors className="h-[18px] w-[18px]" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
+                  <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+                </div>
               </div>
-              <button onClick={() => setOpen(false)} className="p-2 rounded-md hover:bg-muted">
+              <button onClick={() => setOpen(false)} className="shrink-0 grid place-items-center h-9 w-9 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground transition">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -411,10 +416,10 @@ export function PanelShell({
               <div className="space-y-3">
                 {moreGroups.map((group) => (
                   <div key={group.label}>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-0.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-0.5">
                       {group.label}
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-2.5">
                       {group.items.map((it) => {
                         const active = isActive(it.href);
                         const Icon = ICONS[it.icon];
@@ -424,14 +429,21 @@ export function PanelShell({
                             href={base + it.href}
                             onClick={() => setOpen(false)}
                             className={cn(
-                              "flex flex-col items-center gap-1.5 rounded-[var(--radius)] border p-3 text-center transition",
-                              active
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border hover:bg-muted text-foreground",
+                              "flex flex-col items-center gap-2 rounded-[var(--radius)] p-3 text-center transition active:scale-[0.97]",
+                              active ? "bg-primary/10 ring-1 ring-primary/25" : "bg-muted/50 hover:bg-muted",
                             )}
                           >
-                            <Icon className="h-5 w-5" />
-                            <span className="text-[11px] font-medium leading-tight">{it.label}</span>
+                            <span
+                              className={cn(
+                                "grid place-items-center h-10 w-10 rounded-[var(--radius)] transition",
+                                active ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
+                              )}
+                            >
+                              <Icon className="h-5 w-5" weight={active ? "fill" : "regular"} />
+                            </span>
+                            <span className={cn("text-[11px] font-medium leading-tight", active ? "text-primary" : "text-foreground/75")}>
+                              {it.label}
+                            </span>
                           </Link>
                         );
                       })}
@@ -441,27 +453,36 @@ export function PanelShell({
               </div>
             )}
 
-            <div className="border-t border-border mt-4 pt-3 space-y-1">
+            <div className="border-t border-border/60 mt-5 pt-3 space-y-1">
               {isPlatformAdmin && (
                 <Link
                   href="/admin"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted"
+                  className="flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-foreground/80 hover:bg-muted transition"
                 >
-                  <ShieldCheck className="h-4.5 w-4.5" /> Painel da plataforma
+                  <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-muted text-foreground/70">
+                    <ShieldCheck className="h-[18px] w-[18px]" />
+                  </span>
+                  Painel da plataforma
                 </Link>
               )}
               <button
                 onClick={() => { setOpen(false); sharePublic(); }}
-                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/10"
+                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition"
               >
-                <ShareNetwork className="h-4.5 w-4.5" /> Compartilhar link
+                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-primary/10 text-primary">
+                  <ShareNetwork className="h-[18px] w-[18px]" />
+                </span>
+                Compartilhar link
               </button>
               <button
                 onClick={logout}
-                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm text-foreground/80 hover:bg-muted"
+                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm text-foreground/80 hover:bg-muted transition"
               >
-                <SignOut className="h-4.5 w-4.5" /> Sair
+                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-muted text-foreground/70">
+                  <SignOut className="h-[18px] w-[18px]" />
+                </span>
+                Sair
               </button>
             </div>
           </div>
