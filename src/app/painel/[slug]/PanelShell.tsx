@@ -191,9 +191,13 @@ export function PanelShell({
     if (!usedHrefs.has(it.href)) { primaryItems.push(it); usedHrefs.add(it.href); }
   }
 
-  // Grupos do sheet "Mais" (exclui os itens já na barra primária)
+  // Configurações vai pro rodapé fixo do sheet "Mais" (junto de Compartilhar/Sair).
+  const settingsItem = allItems.find((it) => it.href === "/configuracoes");
+
+  // Grupos do sheet "Mais" (exclui os já na barra primária e o Configurações,
+  // que fica fixo no rodapé).
   const moreGroups = groups
-    .map((g) => ({ ...g, items: g.items.filter((it) => !usedHrefs.has(it.href)) }))
+    .map((g) => ({ ...g, items: g.items.filter((it) => !usedHrefs.has(it.href) && it.href !== "/configuracoes") }))
     .filter((g) => g.items.length > 0);
 
   // Desktop: último grupo (Sistema/Configurações) fica no rodapé da sidebar
@@ -395,65 +399,72 @@ export function PanelShell({
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[80vh] overflow-auto shadow-2xl border-t border-border/50">
-            <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="grid place-items-center h-9 w-9 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
-                  <Scissors className="h-[18px] w-[18px]" />
-                </span>
-                <div className="min-w-0">
-                  <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
-                  <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl max-h-[85vh] flex flex-col shadow-2xl border-t border-border/50">
+            {/* Topo fixo: puxador + cabeçalho */}
+            <div className="shrink-0 px-4 pt-3">
+              <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="grid place-items-center h-9 w-9 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
+                    <Scissors className="h-[18px] w-[18px]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
+                    <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+                  </div>
                 </div>
+                <button onClick={() => setOpen(false)} className="shrink-0 grid place-items-center h-9 w-9 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button onClick={() => setOpen(false)} className="shrink-0 grid place-items-center h-9 w-9 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground transition">
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
-            {moreGroups.length > 0 && (
-              <div className="space-y-3">
-                {moreGroups.map((group) => (
-                  <div key={group.label}>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-0.5">
-                      {group.label}
-                    </p>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {group.items.map((it) => {
-                        const active = isActive(it.href);
-                        const Icon = ICONS[it.icon];
-                        return (
-                          <Link
-                            key={it.href}
-                            href={base + it.href}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              "flex flex-col items-center gap-2 rounded-[var(--radius)] p-3 text-center transition active:scale-[0.97]",
-                              active ? "bg-primary/10 ring-1 ring-primary/25" : "bg-muted/50 hover:bg-muted",
-                            )}
-                          >
-                            <span
+            {/* Meio rolável: grade de páginas */}
+            <div className="flex-1 overflow-auto px-4 pb-2">
+              {moreGroups.length > 0 && (
+                <div className="space-y-3">
+                  {moreGroups.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-0.5">
+                        {group.label}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {group.items.map((it) => {
+                          const active = isActive(it.href);
+                          const Icon = ICONS[it.icon];
+                          return (
+                            <Link
+                              key={it.href}
+                              href={base + it.href}
+                              onClick={() => setOpen(false)}
                               className={cn(
-                                "grid place-items-center h-10 w-10 rounded-[var(--radius)] transition",
-                                active ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
+                                "flex flex-col items-center gap-2 rounded-[var(--radius)] p-3 text-center transition active:scale-[0.97]",
+                                active ? "bg-primary/10 ring-1 ring-primary/25" : "bg-muted/50 hover:bg-muted",
                               )}
                             >
-                              <Icon className="h-5 w-5" weight={active ? "fill" : "regular"} />
-                            </span>
-                            <span className={cn("text-[11px] font-medium leading-tight", active ? "text-primary" : "text-foreground/75")}>
-                              {it.label}
-                            </span>
-                          </Link>
-                        );
-                      })}
+                              <span
+                                className={cn(
+                                  "grid place-items-center h-10 w-10 rounded-[var(--radius)] transition",
+                                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
+                                )}
+                              >
+                                <Icon className="h-5 w-5" weight={active ? "fill" : "regular"} />
+                              </span>
+                              <span className={cn("text-[11px] font-medium leading-tight", active ? "text-primary" : "text-foreground/75")}>
+                                {it.label}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <div className="border-t border-border/60 mt-5 pt-3 space-y-1">
+            {/* Rodapé fixo: sempre à mostra (Configurações, Compartilhar, Sair) */}
+            <div className="shrink-0 border-t border-border/60 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
               {isPlatformAdmin && (
                 <Link
                   href="/admin"
@@ -464,6 +475,24 @@ export function PanelShell({
                     <ShieldCheck className="h-[18px] w-[18px]" />
                   </span>
                   Painel da plataforma
+                </Link>
+              )}
+              {settingsItem && (
+                <Link
+                  href={base + settingsItem.href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium transition",
+                    isActive(settingsItem.href) ? "bg-primary/10 text-primary" : "text-foreground/80 hover:bg-muted",
+                  )}
+                >
+                  <span className={cn(
+                    "grid place-items-center h-9 w-9 rounded-[var(--radius)]",
+                    isActive(settingsItem.href) ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+                  )}>
+                    <Gear className="h-[18px] w-[18px]" />
+                  </span>
+                  {settingsItem.label}
                 </Link>
               )}
               <button
