@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { planAllowsHref } from "@/lib/plans";
 import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
+import { InlineScript } from "@/components/InlineScript";
 
 export const dynamic = "force-dynamic";
 
@@ -138,10 +139,8 @@ export default async function PanelLayout({
       {/* Aplica o modo noturno antes de pintar (evita flash claro). Só roda
           nas rotas do painel — landing/página pública do cliente nunca ficam
           escuras. A preferência é por dispositivo (localStorage). */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `try{if(localStorage.getItem('af-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}`,
-        }}
+      <InlineScript
+        html={`try{if(localStorage.getItem('af-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}`}
       />
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
