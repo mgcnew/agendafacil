@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Oswald } from "next/font/google";
+import { Plus_Jakarta_Sans, Oswald, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
 import { MotionProvider } from "@/components/MotionProvider";
@@ -19,6 +19,17 @@ const oswald = Oswald({
   display: "swap",
   // Só é usada em títulos de barbearia — não pré-carregar (peso morto na
   // landing/SEO). Carrega sob demanda (swap) quando uma página de barbearia usa.
+  preload: false,
+});
+
+// Display serifado elegante para os títulos dos nichos de beleza
+// (feminino/estética) — dá o ar de spa/salão sofisticado. Só em títulos;
+// não pré-carrega (a landing usa Jakarta).
+const playfair = Playfair_Display({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
   preload: false,
 });
 
@@ -98,7 +109,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={`${jakarta.variable} ${oswald.variable} h-full`}>
+    <html lang="pt-BR" className={`${jakarta.variable} ${oswald.variable} ${playfair.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-body">
         <MotionProvider>{children}</MotionProvider>
         <PWARegister />

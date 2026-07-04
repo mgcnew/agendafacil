@@ -133,8 +133,16 @@ export default async function PanelLayout({
     <div
       data-niche={niche}
       data-color={colorAttr}
-      className="min-h-full bg-background text-foreground"
+      className="panel-root min-h-full bg-background text-foreground"
     >
+      {/* Aplica o modo noturno antes de pintar (evita flash claro). Só roda
+          nas rotas do painel — landing/página pública do cliente nunca ficam
+          escuras. A preferência é por dispositivo (localStorage). */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `try{if(localStorage.getItem('af-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}`,
+        }}
+      />
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   House,
   CalendarDots,
@@ -285,6 +286,7 @@ export function PanelShell({
               <Tip label="Plataforma" />
             </Link>
           )}
+          <ThemeToggle />
           <button
             onClick={sharePublic}
             className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-primary hover:bg-primary/10 transition"
@@ -304,11 +306,12 @@ export function PanelShell({
 
       {/* ── Área principal ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar mobile — apenas marca (sem hambúrguer) */}
-        <header className="lg:hidden shrink-0 flex items-center border-b border-border bg-card px-4 h-14">
+        {/* Topbar mobile — marca à esquerda, alternar tema à direita */}
+        <header className="lg:hidden shrink-0 flex items-center justify-between border-b border-border bg-card px-4 h-14">
           <Link href={base} className="flex items-center gap-2 font-display font-bold">
             <Scissors className="h-5 w-5 text-primary" /> {salon.name}
           </Link>
+          <ThemeToggle className="-mr-2" />
         </header>
 
         <main className="flex-1 overflow-y-auto flex flex-col max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">

@@ -72,9 +72,11 @@
 
 [data-niche="feminino"] {
   --radius: 1.25rem;
-  --display-tracking: -0.01em;
+  --display-tracking: 0;
   --display-transform: none;
   --display-weight: 600;
+  /* Títulos serifados elegantes — ar de salão/spa sofisticado */
+  --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
 }
 
 [data-niche="barbearia"] {
@@ -91,6 +93,8 @@
   --display-tracking: 0;
   --display-transform: none;
   --display-weight: 600;
+  /* Títulos serifados elegantes — ar de clínica de estética premium */
+  --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
 }
 
 [data-niche="neutro"] {
@@ -363,6 +367,45 @@
   --border: #34291f;
   --ring: #c8852f;
   --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 14px 30px -18px rgba(0,0,0,.75);
+}
+
+
+/* ============================================================
+   MODO NOTURNO — escurece as superfícies neutras mas MANTÉM a cor
+   da marca da paleta (por isso os ícones continuam coloridos). Só o
+   painel liga [data-theme="dark"] no <html> (landing/página pública
+   nunca setam esse atributo), então na prática vale só no painel. As
+   superfícies levam um leve tom da marca (color-mix com --primary).
+   ============================================================ */
+[data-theme="dark"] [data-color]:not([data-color="i"]) {
+  --background: color-mix(in srgb, var(--primary) 6%, #0d0d0f);
+  --card: color-mix(in srgb, var(--primary) 8%, #17171a);
+  --card-foreground: #f2f0ee;
+  --foreground: #f2f0ee;
+  --secondary: color-mix(in srgb, var(--primary) 22%, #1c1c20);
+  --secondary-foreground: #ece9e6;
+  --muted: color-mix(in srgb, var(--primary) 6%, #1a1a1d);
+  --muted-foreground: #a6a3a0;
+  --border: color-mix(in srgb, var(--primary) 12%, #2b2b2f);
+  --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 16px 34px -20px rgba(0,0,0,.8);
+}
+
+/* Marcas escuras que sumiriam no fundo escuro — versão clareada
+   (o -foreground vira escuro porque a marca ficou clara). */
+[data-theme="dark"] [data-color="a"] { /* Rosa Gold */
+  --primary: #cf7ba1; --ring: #cf7ba1; --primary-foreground: #2a1b22;
+}
+[data-theme="dark"] [data-color="c"] { /* Sálvia */
+  --primary: #82b79a; --ring: #82b79a; --primary-foreground: #14231b;
+}
+[data-theme="dark"] [data-color="j"] { /* Marinho */
+  --primary: #8aa4f2; --ring: #8aa4f2; --primary-foreground: #0a1228;
+}
+[data-theme="dark"] [data-color="k"] { /* Esmeralda */
+  --primary: #35c793; --ring: #35c793; --primary-foreground: #04231a;
+}
+[data-theme="dark"] [data-color="l"] { /* Bordô */
+  --primary: #e2698a; --ring: #e2698a; --primary-foreground: #2a0810;
 }
 
 
