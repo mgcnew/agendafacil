@@ -13,6 +13,7 @@ import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
+import { NotificationBell, type NotifItem } from "./NotificationBell";
 
 export const dynamic = "force-dynamic";
 
@@ -203,6 +204,14 @@ export default async function DashboardPage({
     };
   });
 
+  // Notificações do sino (RLS filtra pelo recipient = usuário logado).
+  const { data: notifRaw } = await supabase
+    .from("notifications")
+    .select("id, type, title, body, created_at, read_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const notifItems = (notifRaw ?? []) as NotifItem[];
+
   const stats = [
     { icon: CalendarDots, label: "Agendamentos hoje", value: String(appts.length) },
     { icon: Wallet, label: "Previsão de hoje", value: formatBRL(revenue) },
@@ -220,12 +229,15 @@ export default async function DashboardPage({
           </h1>
           <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
         </div>
-        <Link
-          href={`/painel/${slug}/agenda?novo=1`}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium"
-        >
-          <Plus className="h-4 w-4" /> Novo agendamento
-        </Link>
+        <div className="flex items-center gap-2">
+          <NotificationBell salonId={salonId} initialItems={notifItems} />
+          <Link
+            href={`/painel/${slug}/agenda?novo=1`}
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" /> Novo agendamento
+          </Link>
+        </div>
       </div>
 
       {/* Desktop: 2 colunas. Mobile: coluna única */}
