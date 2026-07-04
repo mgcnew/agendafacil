@@ -308,8 +308,11 @@ export function PanelShell({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar mobile — marca à esquerda, alternar tema à direita */}
         <header className="lg:hidden shrink-0 relative z-20 flex items-center justify-between border-b border-border/70 bg-card px-4 h-14 shadow-[0_2px_10px_-6px_rgba(0,0,0,0.16)]">
-          <Link href={base} className="flex items-center gap-2 font-display font-bold">
-            <Scissors className="h-5 w-5 text-primary" /> {salon.name}
+          <Link href={base} className="flex items-center gap-2.5 font-display font-bold min-w-0">
+            <span className="grid place-items-center h-8 w-8 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
+              <Scissors className="h-[18px] w-[18px]" />
+            </span>
+            <span className="truncate">{salon.name}</span>
           </Link>
           <ThemeToggle className="-mr-2" />
         </header>
