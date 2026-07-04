@@ -7,7 +7,7 @@ import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { daysUntil } from "@/lib/signals/rules";
-import { CalendarDots, Wallet, Clock, Users, Plus, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { CalendarDots, Wallet, Clock, Users, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
@@ -229,15 +229,7 @@ export default async function DashboardPage({
           </h1>
           <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <NotificationBell salonId={salonId} initialItems={notifItems} />
-          <Link
-            href={`/painel/${slug}/agenda?novo=1`}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium"
-          >
-            <Plus className="h-4 w-4" /> Novo agendamento
-          </Link>
-        </div>
+        <NotificationBell salonId={salonId} initialItems={notifItems} />
       </div>
 
       {/* Desktop: 2 colunas. Mobile: coluna única */}
