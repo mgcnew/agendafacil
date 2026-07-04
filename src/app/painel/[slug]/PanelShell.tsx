@@ -307,7 +307,7 @@ export function PanelShell({
       {/* ── Área principal ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar mobile — marca à esquerda, alternar tema à direita */}
-        <header className="lg:hidden shrink-0 flex items-center justify-between border-b border-border bg-card px-4 h-14">
+        <header className="lg:hidden shrink-0 relative z-20 flex items-center justify-between border-b border-border/70 bg-card px-4 h-14 shadow-[0_2px_10px_-6px_rgba(0,0,0,0.16)]">
           <Link href={base} className="flex items-center gap-2 font-display font-bold">
             <Scissors className="h-5 w-5 text-primary" /> {salon.name}
           </Link>
@@ -328,8 +328,8 @@ export function PanelShell({
           </div>
         </main>
 
-        {/* ── Bottom navigation (mobile) — fixa na viewport ───────── */}
-        <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
+        {/* ── Bottom navigation (mobile) — fixa na viewport, leve efeito vidro ───────── */}
+        <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/85 backdrop-blur-md rounded-t-2xl shadow-[0_-6px_24px_-10px_rgba(0,0,0,0.28)] pb-[env(safe-area-inset-bottom)]">
           <div className="grid grid-cols-4 h-16">
             {primaryItems.map((it) => {
               const active = isActive(it.href);
