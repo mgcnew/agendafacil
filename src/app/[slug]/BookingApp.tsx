@@ -8,7 +8,6 @@ import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
-import { NICHES, type Niche } from "@/lib/themes";
 import {
   CalendarDots,
   CaretLeft,
@@ -18,8 +17,10 @@ import {
   CircleNotch,
   Clock,
   ClockCounterClockwise,
+  Heart,
   Images,
   MapPin,
+  Package,
   Phone,
   Sparkle,
   User,
@@ -49,6 +50,7 @@ type Professional = { id: string; display_name: string; color: string | null; bi
 type Appt = {
   id: string;
   salon_name: string;
+  member_id: string;
   member_name: string;
   status: string;
   starts_at: string;
@@ -56,9 +58,13 @@ type Appt = {
   total_price: number;
   services: string[];
 };
+type ResaleProduct = { id: string; name: string; sale_price: number; unit: string; linked: boolean };
 
 type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done";
 type GalleryPhoto = { id: string; url: string };
+type MineTab = "next" | "history";
+
+const UPCOMING_STATUSES = new Set(["pending", "confirmed", "in_progress"]);
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando",
@@ -84,7 +90,6 @@ function todayLocal() {
 
 export function BookingApp({ salon }: { salon: Salon }) {
   const supabase = useMemo(() => createClient(), []);
-  const nicheMeta = NICHES[(salon.niche as Niche)] ?? NICHES.neutro;
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [pros, setPros] = useState<Professional[]>([]);
@@ -112,11 +117,16 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [booking, setBooking] = useState(false);
   const [bookErr, setBookErr] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
+  const [mineTab, setMineTab] = useState<MineTab>("next");
   const [mine, setMine] = useState<Appt[]>([]);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
   const [showGallery, setShowGallery] = useState(false);
+  const [favoriteProId, setFavoriteProId] = useState<string | null>(null);
+  const [resaleProducts, setResaleProducts] = useState<ResaleProduct[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // preço com desconto da campanha (ignora "sob consulta")
   const discPct = (s: Service) => (s.price_type === "on_request" ? 0 : discounts[s.id] ?? 0);
@@ -128,6 +138,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const selectedServices = services.filter((s) => selected.includes(s.id));
   const totalPrice = selectedServices.reduce((a, s) => a + effPrice(s), 0);
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
+  const selectedProducts = resaleProducts.filter((p) => selectedProductIds.includes(p.id));
+  const productsTotal = selectedProducts.reduce((a, p) => a + Number(p.sale_price), 0);
+
+  // profissional mais frequentado no histórico (mesma lógica do painel do dono)
+  const suggestedProId = useMemo(() => {
+    const count: Record<string, number> = {};
+    for (const a of mine) {
+      if (a.status !== "completed") continue;
+      count[a.member_id] = (count[a.member_id] ?? 0) + 1;
+    }
+    const top = Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return top ?? null;
+  }, [mine]);
   // preço total varia se algum serviço é "sob consulta" (a combinar) ou "a partir de"
   const hasOnRequest = selectedServices.some((s) => s.price_type === "on_request");
   const hasFrom = selectedServices.some((s) => s.price_type === "from");
@@ -148,6 +171,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
       }),
     );
   }, [pros, proSvc, selected]);
+
+  // favorito manual (ou sugestão automática pelo histórico) aparece primeiro
+  const sortedEligiblePros = useMemo(() => {
+    const favId = favoriteProId ?? suggestedProId;
+    if (!favId) return eligiblePros;
+    return [...eligiblePros].sort((a, b) => (a.id === favId ? -1 : b.id === favId ? 1 : 0));
+  }, [eligiblePros, favoriteProId, suggestedProId]);
 
   // se o profissional escolhido deixou de ser elegível, limpa a seleção
   useEffect(() => {
@@ -186,18 +216,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
       .order("sort_order")
       .then(({ data }) => setGallery((data as GalleryPhoto[]) ?? []));
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
-        // sem sessão: restaura dados salvos localmente
-        try {
-          const saved = localStorage.getItem(`af_client_${salon.slug}`);
-          if (saved) {
-            const { name: n, phone: p } = JSON.parse(saved) as { name: string; phone: string };
-            if (n) { setName(n); setClientName(n); }
-            if (p) { setPhone(p); setSavedPhone(p); }
+      // favorito é sempre local (mesmo cliente logado pode usar outro aparelho
+      // sem o favorito — ok por ora, mesmo padrão de identificação por localStorage).
+      try {
+        const saved = localStorage.getItem(`af_client_${salon.slug}`);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { name?: string; phone?: string; favoriteProId?: string };
+          if (parsed.favoriteProId) setFavoriteProId(parsed.favoriteProId);
+          if (!data.user) {
+            if (parsed.name) { setName(parsed.name); setClientName(parsed.name); }
+            if (parsed.phone) { setPhone(parsed.phone); setSavedPhone(parsed.phone); }
           }
-        } catch { /* ignore */ }
-        return;
-      }
+        }
+      } catch { /* ignore */ }
+      if (!data.user) return;
       setUserId(data.user.id);
       const metaName = (data.user.user_metadata?.full_name as string | undefined) ?? "";
       const { data: c } = await supabase
@@ -242,21 +274,53 @@ export function BookingApp({ salon }: { salon: Salon }) {
     if (step === "time") loadSlots();
   }, [step, date, loadSlots]);
 
-  async function loadMine() {
-    if (userId) {
-      const { data } = await supabase.rpc("my_appointments", { p_salon: salon.id });
-      setMine((data as Appt[]) ?? []);
-    } else {
-      // O telefone é gravado em E164 no book_appointment; normalizar aqui também,
-      // senão a busca exata (c.phone = p_phone) não casa e a lista vem vazia.
-      const ph = toE164(savedPhone || phone);
-      const { data } = await supabase.rpc("public_appointments_by_phone" as never, {
-        p_salon: salon.id,
-        p_phone: ph,
-      } as never);
-      setMine((data as unknown as Appt[]) ?? []);
+  // sugestões de produto (revenda) para os serviços escolhidos
+  useEffect(() => {
+    if (selected.length === 0) {
+      setResaleProducts([]);
+      return;
     }
+    supabase
+      .rpc("public_resale_products" as never, { p_salon: salon.id, p_service_ids: selected } as never)
+      .then(({ data }) => setResaleProducts((data as unknown as ResaleProduct[]) ?? []));
+  }, [supabase, salon.id, selected]);
+
+  const fetchMine = useCallback(async () => {
+    // O telefone é gravado em E164 no book_appointment; normalizar aqui também,
+    // senão a busca exata (c.phone = p_phone) não casa e a lista vem vazia.
+    const ph = userId ? null : toE164(savedPhone || phone);
+    if (!userId && !ph) return;
+    const { data } = await supabase.rpc("public_my_appointments" as never, {
+      p_salon: salon.id,
+      p_phone: ph,
+    } as never);
+    setMine((data as unknown as Appt[]) ?? []);
+  }, [supabase, salon.id, userId, savedPhone, phone]);
+
+  // carrega o histórico em segundo plano assim que o cliente é conhecido —
+  // alimenta a sugestão de profissional favorito sem precisar abrir "Meus".
+  useEffect(() => {
+    if (userId || savedPhone) fetchMine();
+  }, [userId, savedPhone, fetchMine]);
+
+  async function loadMine() {
+    await fetchMine();
+    setMineTab("next");
     setShowMine(true);
+  }
+
+  function toggleFavoritePro(id: string) {
+    const next = favoriteProId === id ? null : id;
+    setFavoriteProId(next);
+    try {
+      const saved = localStorage.getItem(`af_client_${salon.slug}`);
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ ...parsed, favoriteProId: next }));
+    } catch { /* ignore */ }
+  }
+
+  function toggleProduct(id: string) {
+    setSelectedProductIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   async function cancelAppt(a: Appt) {
@@ -285,6 +349,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
     if (!pro || !slot) return;
     setBooking(true);
     setBookErr(null);
+    // produtos escolhidos não têm cobrança online — viram nota pra equipe
+    // preparar/oferecer no balcão (visível na agenda/comanda).
+    const productsNote =
+      selectedProducts.length > 0
+        ? `Produtos desejados: ${selectedProducts.map((p) => p.name).join(", ")}`
+        : undefined;
     const { error } = await supabase.rpc("book_appointment", {
       p_salon: salon.id,
       p_member: pro.id,
@@ -292,6 +362,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       p_starts_at: slot,
       p_client_name: name || "Cliente",
       p_client_phone: toE164(phone),
+      ...(productsNote ? { p_notes: productsNote } : {}),
     });
     if (error) {
       setBookErr(
@@ -314,57 +385,33 @@ export function BookingApp({ salon }: { salon: Salon }) {
   /* ---------------- render ---------------- */
   return (
     <div className="max-w-xl mx-auto px-4 pb-40">
-      {/* Cabeçalho do salão — limpo, sem gradiente */}
-      <header className="pt-8 pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {salon.logo_url ? (
-              <NextImage
-                src={salon.logo_url}
-                alt={salon.name}
-                width={56}
-                height={56}
-                className="h-14 w-14 rounded-2xl object-cover border border-border shrink-0"
-              />
-            ) : (
-              <span className="grid place-items-center h-14 w-14 rounded-2xl bg-secondary text-secondary-foreground font-display text-2xl shrink-0">
-                {salon.name.charAt(0)}
-              </span>
-            )}
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{nicheMeta.tagline}</p>
-              <h1 className="font-display text-2xl sm:text-3xl leading-tight">{salon.name}</h1>
-              {salon.address && (
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" /> {salon.address}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {gallery.length > 0 && (
-              <button
-                onClick={() => setShowGallery(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
-              >
-                <Images className="h-3.5 w-3.5" /> Galeria
-              </button>
-            )}
-            {(userId || savedPhone) && (
-              <button
-                onClick={loadMine}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs font-medium transition"
-              >
-                <ClockCounterClockwise className="h-3.5 w-3.5" /> Meus
-              </button>
-            )}
-          </div>
+      {/* Cabeçalho — leve, identidade completa do salão só aparece na confirmação */}
+      <header className="pt-6 pb-2">
+        <div className="flex items-center justify-end gap-1">
+          {gallery.length > 0 && (
+            <button
+              onClick={() => setShowGallery(true)}
+              aria-label="Ver galeria de fotos"
+              className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
+            >
+              <Images className="h-4.5 w-4.5" />
+            </button>
+          )}
+          {(userId || savedPhone) && (
+            <button
+              onClick={loadMine}
+              aria-label="Meus agendamentos"
+              className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
+            >
+              <ClockCounterClockwise className="h-4.5 w-4.5" />
+            </button>
+          )}
         </div>
 
-        {/* Saudação personalizada (cliente já conhecida) */}
+        {/* Saudação — a única coisa que permanece sempre visível no topo */}
         {step === "services" && (userId || savedPhone) && clientName && (
-          <div className="mt-5 rounded-[var(--radius)] border border-border bg-card p-4 af-rise">
-            <p className="font-display text-lg">
+          <div className="mt-2 af-rise">
+            <p className="font-display text-2xl">
               Olá, {clientName.split(" ")[0]}! <span aria-hidden>👋</span>
             </p>
             <p className="text-sm text-muted-foreground">
@@ -373,9 +420,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
           </div>
         )}
         {step === "services" && !userId && !savedPhone && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Agende seu horário em poucos toques.
-          </p>
+          <div className="mt-2 af-rise">
+            <p className="font-display text-2xl">Seja bem-vindo(a)!</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Agende seu horário em poucos toques.
+            </p>
+          </div>
         )}
       </header>
 
@@ -477,6 +527,39 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </button>
             );
           })}
+
+          {/* Sugestão de produto (revenda do estoque) para os serviços escolhidos */}
+          {selected.length > 0 && resaleProducts.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <Package className="h-4 w-4" /> Que tal levar também?
+              </h3>
+              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-4 px-4">
+                {resaleProducts.map((p) => {
+                  const on = selectedProductIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleProduct(p.id)}
+                      className={`shrink-0 w-36 text-left rounded-[var(--radius)] border p-3 transition ${
+                        on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                      }`}
+                    >
+                      <p className="text-sm font-medium leading-tight line-clamp-2">{p.name}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs font-semibold text-primary">{formatBRL(Number(p.sale_price))}</span>
+                        <span className={`grid place-items-center h-5 w-5 rounded-full border shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                          {on && <Check className="h-3 w-3" />}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Pagamento no balcão, junto do serviço.</p>
+            </div>
+          )}
         </section>
       )}
 
@@ -510,8 +593,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </button>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {eligiblePros.map((p) => {
+            {sortedEligiblePros.map((p) => {
               const on = !anyPro && pro?.id === p.id;
+              const isFavorite = favoriteProId === p.id;
+              const isSuggested = !favoriteProId && suggestedProId === p.id;
               return (
                 <button
                   key={p.id}
@@ -521,10 +606,25 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   }`}
                 >
                   {on && <Check className="absolute top-2 right-2 h-4 w-4 text-primary" />}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); toggleFavoritePro(p.id); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavoritePro(p.id); } }}
+                    aria-label={isFavorite ? "Remover profissional favorito" : "Marcar como favorito"}
+                    className="absolute top-2 left-2 grid place-items-center h-6 w-6 rounded-full text-muted-foreground hover:text-red-500 transition"
+                  >
+                    <Heart className="h-4 w-4" weight={isFavorite ? "fill" : "regular"} style={isFavorite ? { color: "#ef4444" } : undefined} />
+                  </span>
                   <BookingAvatar p={p} size={72} />
                   <div className="min-w-0 w-full">
                     <p className="font-medium text-sm leading-tight truncate">{p.display_name}</p>
                     {p.bio && <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{p.bio}</p>}
+                    {(isFavorite || isSuggested) && (
+                      <span className="inline-block mt-1 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                        {isFavorite ? "Seu favorito" : "Você costuma escolher"}
+                      </span>
+                    )}
                   </div>
                 </button>
               );
@@ -539,13 +639,15 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <CalendarDots className="h-5 w-5 text-primary" /> Escolha o horário
           </h2>
-          <div className="space-y-1.5">
-            <Label>Data</Label>
-            <Calendar
-              value={date}
-              onChange={setDate}
-              min={todayLocal()}
-            />
+          <div className="space-y-2">
+            <DateRuler value={date} onChange={setDate} />
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(true)}
+              className="text-primary text-sm font-medium hover:underline"
+            >
+              Ver mais datas →
+            </button>
           </div>
           <p className="text-sm text-muted-foreground capitalize">{formatDateLong(date + "T12:00:00")}</p>
           {loadingSlots ? (
@@ -605,7 +707,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
               className="w-full"
               onClick={() => {
                 try {
-                  localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ name, phone }));
+                  localStorage.setItem(
+                    `af_client_${salon.slug}`,
+                    JSON.stringify({ name, phone, favoriteProId }),
+                  );
                 } catch { /* ignore */ }
                 setSavedPhone(phone);
                 setStep("confirm");
@@ -635,6 +740,31 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <CheckCircle className="h-5 w-5 text-primary" /> Revise e confirme
           </h2>
           <Card className="p-6 space-y-4">
+            {/* Identidade do salão — só aparece aqui, na revisão final */}
+            <div className="flex items-center gap-3 pb-3 border-b border-border">
+              {salon.logo_url ? (
+                <NextImage
+                  src={salon.logo_url}
+                  alt={salon.name}
+                  width={44}
+                  height={44}
+                  className="h-11 w-11 rounded-xl object-cover border border-border shrink-0"
+                />
+              ) : (
+                <span className="grid place-items-center h-11 w-11 rounded-xl bg-secondary text-secondary-foreground font-display text-lg shrink-0">
+                  {salon.name.charAt(0)}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Você está agendando em</p>
+                <p className="font-display text-lg leading-tight truncate">{salon.name}</p>
+                {salon.address && (
+                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <MapPin className="h-3 w-3 shrink-0" /> {salon.address}
+                  </p>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-3 pb-1">
               <BookingAvatar p={pro} size={48} />
               <div className="min-w-0">
@@ -666,6 +796,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   )}
                 </div>
               ))}
+              {selectedProducts.map((p) => (
+                <div key={p.id} className="flex justify-between text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5" /> {p.name}
+                  </span>
+                  <span>{formatBRL(Number(p.sale_price))}</span>
+                </div>
+              ))}
             </div>
             <div className="border-t border-border pt-4 flex justify-between items-center">
               <span className="text-sm text-muted-foreground">
@@ -673,6 +811,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </span>
               <span className="font-display text-xl font-bold text-primary">{totalPriceLabel}</span>
             </div>
+            {selectedProducts.length > 0 && (
+              <p className="text-[11px] text-muted-foreground -mt-2">
+                + {formatBRL(productsTotal)} em produtos, pagos no balcão junto do serviço.
+              </p>
+            )}
           </Card>
           {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
           <div className="flex gap-3">
@@ -693,7 +836,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Check className="h-10 w-10" />
           </div>
           <h2 className="font-display text-2xl font-bold mt-6">Agendamento confirmado!</h2>
-          <p className="text-muted-foreground mt-2">
+          <p className="font-display text-lg mt-2">
+            {salon.name} agradece o seu agendamento! <span aria-hidden>💈</span>
+          </p>
+          <p className="text-muted-foreground mt-1">
             {pro?.display_name} te espera{" "}
             {slot && (
               <b className="capitalize">
@@ -711,6 +857,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               variant="outline"
               onClick={() => {
                 setSelected([]);
+                setSelectedProductIds([]);
                 setPro(null);
                 setSlot(null);
                 setStep("services");
@@ -730,6 +877,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
           priceLabel={totalPriceLabel}
           hasPrice={selectedServices.length > 0}
           totalDuration={totalDuration}
+          productsCount={step === "services" ? selectedProducts.length : 0}
           canNext={
             (step === "services" && selected.length > 0) ||
             (step === "professional" && (!!pro || anyPro)) ||
@@ -759,13 +907,36 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {/* Drawer: meus agendamentos */}
       <AnimatePresence>
         {showMine && (
-          <MineDrawer key="mine" mine={mine} onClose={() => { setShowMine(false); setCancelErr(null); }} />
+          <MineDrawer
+            key="mine"
+            mine={mine}
+            tab={mineTab}
+            onTabChange={setMineTab}
+            onClose={() => { setShowMine(false); setCancelErr(null); }}
+          />
         )}
       </AnimatePresence>
 
       {/* Modal: galeria de fotos */}
       {showGallery && gallery.length > 0 && (
         <GalleryModal photos={gallery} onClose={() => setShowGallery(false)} />
+      )}
+
+      {/* Modal: escolher outra data (além dos próximos 7 dias) */}
+      {showDatePicker && (
+        <MotionModal onClose={() => setShowDatePicker(false)}>
+          <Card className="w-full sm:max-w-md mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg font-bold">Escolher outra data</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowDatePicker(false)}>Fechar</Button>
+            </div>
+            <Calendar
+              value={date}
+              onChange={(d) => { setDate(d); setShowDatePicker(false); }}
+              min={todayLocal()}
+            />
+          </Card>
+        </MotionModal>
       )}
     </div>
   );
@@ -794,7 +965,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
     );
   }
 
-  function MineDrawer({ mine, onClose }: { mine: Appt[]; onClose: () => void }) {
+  function MineDrawer({
+    mine,
+    tab,
+    onTabChange,
+    onClose,
+  }: {
+    mine: Appt[];
+    tab: MineTab;
+    onTabChange: (t: MineTab) => void;
+    onClose: () => void;
+  }) {
+    const isUpcoming = (a: Appt) =>
+      UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > Date.now();
+    const filtered = mine.filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)));
     return (
       <MotionModal onClose={onClose}>
         <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
@@ -802,18 +986,31 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <h3 className="font-display text-lg font-bold">Meus agendamentos</h3>
             <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
           </div>
+          <div className="flex gap-1.5 mb-4 rounded-full bg-muted p-1">
+            {(["next", "history"] as MineTab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => onTabChange(t)}
+                className={`flex-1 rounded-full py-1.5 text-sm font-medium transition ${
+                  tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                {t === "next" ? "Próximos" : "Histórico"}
+              </button>
+            ))}
+          </div>
           {cancelErr && (
             <div className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
               {cancelErr}
             </div>
           )}
-          {mine.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              Você ainda não tem agendamentos aqui.
+              {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
             </p>
           ) : (
             <div className="space-y-3">
-              {mine.map((a) => {
+              {filtered.map((a) => {
                 const cancellable =
                   (a.status === "pending" || a.status === "confirmed") &&
                   new Date(a.starts_at).getTime() > Date.now();
@@ -972,6 +1169,7 @@ function BottomBar({
   priceLabel,
   hasPrice,
   totalDuration,
+  productsCount,
   canNext,
   onBack,
   onNext,
@@ -981,6 +1179,7 @@ function BottomBar({
   priceLabel: string;
   hasPrice: boolean;
   totalDuration: number;
+  productsCount: number;
   canNext: boolean;
   onBack: () => void;
   onNext: () => void;
@@ -990,7 +1189,10 @@ function BottomBar({
     <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur safe-bottom">
       {hasPrice && (
         <div className="border-b border-border/50 px-4 py-2 max-w-xl mx-auto flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground truncate flex-1">{serviceLabel}</p>
+          <p className="text-xs text-muted-foreground truncate flex-1">
+            {serviceLabel}
+            {productsCount > 0 && ` · +${productsCount} produto${productsCount > 1 ? "s" : ""}`}
+          </p>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-muted-foreground">{formatDuration(totalDuration)}</span>
             <span className="font-semibold text-primary text-sm">{priceLabel}</span>
@@ -1007,6 +1209,39 @@ function BottomBar({
           Continuar
         </Button>
       </div>
+    </div>
+  );
+}
+
+function DateRuler({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const days = useMemo(() => {
+    const base = new Date();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dow = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+      return { ds, dow, day: d.getDate() };
+    });
+  }, []);
+
+  return (
+    <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 pb-1">
+      {days.map((d, i) => {
+        const on = d.ds === value;
+        return (
+          <button
+            key={d.ds}
+            type="button"
+            onClick={() => onChange(d.ds)}
+            className={`shrink-0 w-14 rounded-[var(--radius)] border py-2.5 flex flex-col items-center transition ${
+              on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:border-foreground/25"
+            }`}
+          >
+            <span className="text-[11px] uppercase tracking-wide opacity-80">{i === 0 ? "Hoje" : d.dow}</span>
+            <span className="text-lg font-semibold leading-none mt-1">{d.day}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -2866,6 +2866,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      public_my_appointments: {
+        Args: { p_phone?: string; p_salon: string }
+        Returns: {
+          ends_at: string
+          id: string
+          member_id: string
+          member_name: string
+          salon_id: string
+          salon_name: string
+          services: string[]
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          total_price: number
+        }[]
+      }
       public_professional_services: {
         Args: { p_salon: string }
         Returns: {
@@ -2881,6 +2896,16 @@ export type Database = {
           display_name: string
           id: string
           photo_url: string
+        }[]
+      }
+      public_resale_products: {
+        Args: { p_salon: string; p_service_ids?: string[] }
+        Returns: {
+          id: string
+          linked: boolean
+          name: string
+          sale_price: number
+          unit: string
         }[]
       }
       public_salon: {
