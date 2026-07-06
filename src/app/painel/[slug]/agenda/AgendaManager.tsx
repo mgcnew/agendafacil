@@ -52,7 +52,7 @@ type Appt    = {
   member_id: string;
   client_id: string | null;
   notes: string | null;
-  clients: { full_name: string; phone: string | null; alert_summary: string | null } | null;
+  clients: { full_name: string; phone: string | null; alert_summary: string | null; photo_url: string | null } | null;
   salon_members: { display_name: string | null } | null;
   appointment_services?: { service_id: string | null }[] | null;
   color?: string;
@@ -235,6 +235,24 @@ function ProAvatar({ pro, size = 24 }: { pro: Pro; size?: number }) {
   );
 }
 
+// Avatar do cliente: foto (registro) ou inicial. Usa o mesmo fallback neutro
+// da ficha do cliente (bg-secondary), pra não confundir com a cor do profissional.
+function ClientAvatar({ name, photoUrl, size = 32 }: { name: string | null | undefined; photoUrl: string | null | undefined; size?: number }) {
+  if (photoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={photoUrl} alt={name ?? "Cliente"} className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }} />
+    );
+  }
+  return (
+    <span className="rounded-full grid place-items-center bg-secondary text-secondary-foreground font-semibold shrink-0"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
+      {(name ?? "?").charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 // ── Bloqueios de horário (almoço, intervalo, compromisso) ──────
 function rangeTop(startIso: string, hourStart: number) {
   const d = new Date(startIso);
@@ -379,7 +397,6 @@ function ApptDetailModal({
       .then(({ data }) => setAnamnesis(data ? (data as unknown as ClientAnamnesis) : "empty"));
   }, [showAnam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const clientInitial = (appt.clients?.full_name ?? "?").charAt(0).toUpperCase();
   const isFinished    = appt.status === "completed" || appt.status === "cancelled" || appt.status === "no_show";
   const phone         = waPhone(appt.clients?.phone);
 
@@ -411,12 +428,7 @@ function ApptDetailModal({
         <div className="p-5 space-y-4">
           {/* ── Cliente ─────────────────────────────────────── */}
           <div className="flex items-center gap-3">
-            <span
-              className="grid place-items-center h-11 w-11 rounded-full text-white font-display text-lg font-bold shrink-0"
-              style={{ background: color }}
-            >
-              {clientInitial}
-            </span>
+            <ClientAvatar name={appt.clients?.full_name} photoUrl={appt.clients?.photo_url} size={44} />
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{appt.clients?.full_name ?? "Cliente"}</p>
               {appt.clients?.phone && (
@@ -833,6 +845,8 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
                     </div>
                     {/* Barra colorida do profissional */}
                     <span className="h-9 w-1 rounded-full shrink-0" style={{ background: color }} />
+                    {/* Foto do cliente (ou inicial) */}
+                    <ClientAvatar name={a.clients?.full_name} photoUrl={a.clients?.photo_url} size={36} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate flex items-center gap-1">
                         {a.clients?.alert_summary && <Warning className="h-3.5 w-3.5 text-red-500 shrink-0" />}
@@ -1292,7 +1306,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary), salon_members(display_name), appointment_services(service_id)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)

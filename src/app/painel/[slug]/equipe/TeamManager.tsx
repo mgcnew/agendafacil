@@ -6,6 +6,7 @@ import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
+import { compressImage } from "@/lib/image";
 import { generateCommissionReceiptPdf } from "./commissionReceipt";
 import type { SalonInfo } from "../financeiro/receipt";
 import { formatBRL, currentMonthBR, monthRangeBR, cn } from "@/lib/utils";
@@ -1138,48 +1139,6 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
       <p className={`mt-1 font-bold ${highlight ? "text-primary text-lg" : "text-foreground"}`}>{value}</p>
     </div>
   );
-}
-
-/* ── Compressão de imagem no cliente (para avatares) ────────────── */
-/**
- * Redimensiona para no máx. `maxDim` px no maior lado e exporta JPEG.
- * Fotos grandes de celular (5–12MB) viram ~50–150KB, o que evita limites
- * de upload e deixa o avatar leve. Lança erro se a imagem não decodificar
- * (ex.: formatos não suportados pelo navegador).
- */
-async function compressImage(file: File, maxDim = 512, quality = 0.85): Promise<Blob> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result as string);
-    fr.onerror = () => reject(new Error("read_failed"));
-    fr.readAsDataURL(file);
-  });
-
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("decode_failed"));
-    i.src = dataUrl;
-  });
-
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  const w = Math.max(1, Math.round(img.width * scale));
-  const h = Math.max(1, Math.round(img.height * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("no_canvas");
-  ctx.drawImage(img, 0, 0, w, h);
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("encode_failed"))),
-      "image/jpeg",
-      quality,
-    );
-  });
 }
 
 /* ── Aba Serviços ───────────────────────────────────────────────── */

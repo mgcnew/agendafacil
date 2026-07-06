@@ -797,6 +797,7 @@ export type Database = {
           last_contacted_at: string | null
           notes: string | null
           phone: string | null
+          photo_url: string | null
           profile_id: string | null
           referral_source: string | null
           salon_id: string
@@ -811,6 +812,7 @@ export type Database = {
           last_contacted_at?: string | null
           notes?: string | null
           phone?: string | null
+          photo_url?: string | null
           profile_id?: string | null
           referral_source?: string | null
           salon_id: string
@@ -825,6 +827,7 @@ export type Database = {
           last_contacted_at?: string | null
           notes?: string | null
           phone?: string | null
+          photo_url?: string | null
           profile_id?: string | null
           referral_source?: string | null
           salon_id?: string
@@ -2881,6 +2884,10 @@ export type Database = {
           total_price: number
         }[]
       }
+      public_needs_anamnesis: {
+        Args: { p_client_id: string; p_phone?: string }
+        Returns: boolean
+      }
       public_professional_services: {
         Args: { p_salon: string }
         Returns: {
@@ -2921,6 +2928,30 @@ export type Database = {
           slug: string
           theme: Json
         }[]
+      }
+      public_save_anamnesis: {
+        Args: {
+          p_alert_summary?: string
+          p_allergies?: string
+          p_client_id: string
+          p_consent_given: boolean
+          p_consent_name?: string
+          p_general_notes?: string
+          p_has_cancer_treatment?: boolean
+          p_has_coagulation_issue?: boolean
+          p_has_diabetes?: boolean
+          p_has_epilepsy?: boolean
+          p_has_heart_condition?: boolean
+          p_has_hypertension?: boolean
+          p_has_thyroid?: boolean
+          p_is_breastfeeding?: boolean
+          p_is_pregnant?: boolean
+          p_medications?: string
+          p_phone?: string
+          p_recent_procedures?: string
+          p_skin_hair_notes?: string
+        }
+        Returns: undefined
       }
       public_service_categories: {
         Args: { p_salon: string }

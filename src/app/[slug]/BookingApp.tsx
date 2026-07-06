@@ -3,11 +3,19 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import NextImage from "next/image";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
+import {
+  EMPTY_ANAMNESIS,
+  computeAlertSummary,
+  getAnamnesisConfig,
+  type AnamnesisForm,
+  type ConditionKey,
+  type Niche,
+} from "@/lib/anamnesis";
 import {
   CalendarDots,
   CaretLeft,
@@ -18,10 +26,12 @@ import {
   Clock,
   ClockCounterClockwise,
   Heart,
+  Heartbeat,
   Images,
   MapPin,
   Package,
   Phone,
+  ShieldCheck,
   Sparkle,
   User,
   X,
@@ -63,8 +73,11 @@ type ResaleProduct = { id: string; name: string; sale_price: number; unit: strin
 type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done";
 type GalleryPhoto = { id: string; url: string };
 type MineTab = "next" | "history";
+type AnamnesisFlow = "invite" | "conditions" | "details" | "thanks" | null;
 
 const UPCOMING_STATUSES = new Set(["pending", "confirmed", "in_progress"]);
+// se o cliente disser "mais tarde", só voltamos a convidar depois de um tempo
+const ANAMNESIS_COOLDOWN_DAYS = 14;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando",
@@ -128,6 +141,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [bookedClientId, setBookedClientId] = useState<string | null>(null);
+  const [anamnesisFlow, setAnamnesisFlow] = useState<AnamnesisFlow>(null);
+  const [anaForm, setAnaForm] = useState<AnamnesisForm>(EMPTY_ANAMNESIS);
+  const [savingAnamnesis, setSavingAnamnesis] = useState(false);
+  const [anaErr, setAnaErr] = useState<string | null>(null);
+
   // preço com desconto da campanha (ignora "sob consulta")
   const discPct = (s: Service) => (s.price_type === "on_request" ? 0 : discounts[s.id] ?? 0);
   const effPrice = (s: Service) => {
@@ -140,6 +159,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
   const selectedProducts = resaleProducts.filter((p) => selectedProductIds.includes(p.id));
   const productsTotal = selectedProducts.reduce((a, p) => a + Number(p.sale_price), 0);
+  const anaCfg = getAnamnesisConfig(salon.niche as Niche);
+  const anaNoneSelected = anaCfg.conditions.every((c) => !anaForm[c.key as ConditionKey]);
 
   // profissional mais frequentado no histórico (mesma lógica do painel do dono)
   const suggestedProId = useMemo(() => {
@@ -355,7 +376,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       selectedProducts.length > 0
         ? `Produtos desejados: ${selectedProducts.map((p) => p.name).join(", ")}`
         : undefined;
-    const { error } = await supabase.rpc("book_appointment", {
+    const { data, error } = await supabase.rpc("book_appointment", {
       p_salon: salon.id,
       p_member: pro.id,
       p_service_ids: selected,
@@ -374,7 +395,79 @@ export function BookingApp({ salon }: { salon: Salon }) {
       return;
     }
     setBooking(false);
+    setBookedClientId(data?.client_id ?? null);
     setStep("done");
+  }
+
+  // convite pra ficha de anamnese: só se o cliente ainda não tem uma (nem
+  // preenchida pela equipe presencialmente) e não recusou recentemente.
+  useEffect(() => {
+    if (step !== "done" || !bookedClientId) return;
+    try {
+      const saved = localStorage.getItem(`af_client_${salon.slug}`);
+      const parsed = saved ? JSON.parse(saved) : {};
+      const dismissedAt = parsed.anamnesisDismissedAt as string | undefined;
+      if (dismissedAt) {
+        const days = (Date.now() - new Date(dismissedAt).getTime()) / 86_400_000;
+        if (days < ANAMNESIS_COOLDOWN_DAYS) return;
+      }
+    } catch { /* ignore */ }
+    const ph = userId ? null : toE164(savedPhone || phone);
+    supabase
+      .rpc("public_needs_anamnesis" as never, { p_client_id: bookedClientId, p_phone: ph } as never)
+      .then(({ data }) => {
+        if (data === true) setAnamnesisFlow("invite");
+      });
+  }, [step, bookedClientId, supabase, salon.slug, userId, savedPhone, phone]);
+
+  function dismissAnamnesis() {
+    setAnamnesisFlow(null);
+    try {
+      const saved = localStorage.getItem(`af_client_${salon.slug}`);
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem(
+        `af_client_${salon.slug}`,
+        JSON.stringify({ ...parsed, anamnesisDismissedAt: new Date().toISOString() }),
+      );
+    } catch { /* ignore */ }
+  }
+
+  function setAnaField<K extends keyof AnamnesisForm>(k: K, v: AnamnesisForm[K]) {
+    setAnaForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function saveAnamnesis() {
+    if (!bookedClientId || !anaForm.consent_given) return;
+    setSavingAnamnesis(true);
+    setAnaErr(null);
+    const ph = userId ? null : toE164(savedPhone || phone);
+    const { error } = await supabase.rpc("public_save_anamnesis" as never, {
+      p_client_id: bookedClientId,
+      p_consent_given: anaForm.consent_given,
+      p_phone: ph,
+      p_is_pregnant: anaForm.is_pregnant,
+      p_is_breastfeeding: anaForm.is_breastfeeding,
+      p_has_diabetes: anaForm.has_diabetes,
+      p_has_hypertension: anaForm.has_hypertension,
+      p_has_heart_condition: anaForm.has_heart_condition,
+      p_has_coagulation_issue: anaForm.has_coagulation_issue,
+      p_has_epilepsy: anaForm.has_epilepsy,
+      p_has_cancer_treatment: anaForm.has_cancer_treatment,
+      p_has_thyroid: anaForm.has_thyroid,
+      p_allergies: anaForm.allergies || null,
+      p_medications: anaForm.medications || null,
+      p_recent_procedures: anaForm.recent_procedures || null,
+      p_skin_hair_notes: anaForm.skin_hair_notes || null,
+      p_general_notes: anaForm.general_notes || null,
+      p_consent_name: anaForm.consent_name || null,
+      p_alert_summary: computeAlertSummary(anaForm),
+    } as never);
+    setSavingAnamnesis(false);
+    if (error) {
+      setAnaErr("Não foi possível salvar. Tente novamente.");
+      return;
+    }
+    setAnamnesisFlow("thanks");
   }
 
   function goAfterTime() {
@@ -441,40 +534,34 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Sparkle className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
 
-          {/* Pills de categoria — sticky com fade nas bordas */}
-          {categories.length > 0 && (
-            <div className="sticky top-0 z-10 -mx-4 bg-background/95 backdrop-blur-sm">
-              <div className="relative">
-                <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategory(null)}
-                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium border transition ${
-                      activeCategory === null
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border bg-card hover:border-foreground/25"
-                    }`}
-                  >
-                    Todos
-                  </button>
+          {/* Filtro de categoria (dropdown) + atalho pra loja de produtos */}
+          {(categories.length > 0 || resaleProducts.length > 0) && (
+            <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm flex items-center gap-2">
+              {categories.length > 0 ? (
+                <Select
+                  value={activeCategory ?? ""}
+                  onValueChange={(v) => setActiveCategory(v || null)}
+                  className="flex-1"
+                >
+                  <option value="">Todos os serviços</option>
                   {categories.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setActiveCategory(c.id)}
-                      className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium border transition ${
-                        activeCategory === c.id
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border bg-card hover:border-foreground/25"
-                      }`}
-                    >
-                      {c.name}
-                    </button>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </div>
-                {/* fade direita — indica mais conteúdo */}
-                <div className="pointer-events-none absolute right-0 inset-y-0 w-10 bg-gradient-to-l from-background/95 to-transparent" />
-              </div>
+                </Select>
+              ) : (
+                <div className="flex-1" />
+              )}
+              {resaleProducts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    document.getElementById("produtos-sugeridos")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                  className="shrink-0 inline-flex items-center gap-1.5 h-11 rounded-[var(--radius)] border border-border bg-card hover:border-foreground/25 px-3.5 text-sm font-medium transition"
+                >
+                  <Package className="h-4 w-4" /> Loja
+                </button>
+              )}
             </div>
           )}
 
@@ -530,7 +617,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
           {/* Sugestão de produto (revenda do estoque) para os serviços escolhidos */}
           {selected.length > 0 && resaleProducts.length > 0 && (
-            <div className="pt-2 space-y-2">
+            <div id="produtos-sugeridos" className="pt-2 space-y-2 scroll-mt-16">
               <h3 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
                 <Package className="h-4 w-4" /> Que tal levar também?
               </h3>
@@ -935,6 +1022,137 @@ export function BookingApp({ salon }: { salon: Salon }) {
               onChange={(d) => { setDate(d); setShowDatePicker(false); }}
               min={todayLocal()}
             />
+          </Card>
+        </MotionModal>
+      )}
+
+      {/* Modal: convite pra ficha de anamnese (só na primeira vez) */}
+      {anamnesisFlow && (
+        <MotionModal onClose={dismissAnamnesis}>
+          <Card className="w-full sm:max-w-md mx-auto max-h-[85vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+            {anamnesisFlow === "invite" && (
+              <div className="text-center space-y-3 py-2">
+                <div className="grid place-items-center h-14 w-14 rounded-full bg-secondary text-secondary-foreground mx-auto">
+                  <Heartbeat className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-display text-xl font-bold">Podemos te conhecer melhor?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Perguntamos isso só na primeira vez — ajuda a gente a te atender de um jeito
+                  mais preparado e seguro. Leva menos de um minuto.
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={dismissAnamnesis}>Mais tarde</Button>
+                  <Button className="flex-1" onClick={() => setAnamnesisFlow("conditions")}>Vamos lá</Button>
+                </div>
+              </div>
+            )}
+
+            {anamnesisFlow === "conditions" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-display text-lg font-bold">Alguma dessas situações se aplica a você?</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Pode marcar mais de uma, ou nenhuma.</p>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleared = { ...anaForm };
+                      for (const c of anaCfg.conditions) cleared[c.key as ConditionKey] = false;
+                      setAnaForm(cleared);
+                    }}
+                    className={`col-span-full flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm font-medium transition ${
+                      anaNoneSelected ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                    }`}
+                  >
+                    <span className={`grid place-items-center h-5 w-5 rounded-full border shrink-0 ${anaNoneSelected ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                      {anaNoneSelected && <Check className="h-3.5 w-3.5" />}
+                    </span>
+                    Nenhuma dessas se aplica a mim
+                  </button>
+                  {anaCfg.conditions.map((c) => {
+                    const on = anaForm[c.key as ConditionKey];
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setAnaField(c.key as ConditionKey, !on)}
+                        className={`flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm transition ${
+                          on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                        }`}
+                      >
+                        <span className={`grid place-items-center h-5 w-5 rounded border shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                          {on && <Check className="h-3.5 w-3.5" />}
+                        </span>
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" onClick={dismissAnamnesis}>Pular</Button>
+                  <Button className="flex-1" onClick={() => setAnamnesisFlow("details")}>Continuar</Button>
+                </div>
+              </div>
+            )}
+
+            {anamnesisFlow === "details" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-display text-lg font-bold">Mais alguma coisa que a gente deveria saber?</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Tudo opcional — pode deixar em branco se não se aplicar.</p>
+                </div>
+                {anaCfg.textFields.map(({ key, label, placeholder }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label htmlFor={`ana-${key}`}>{label}</Label>
+                    <Textarea
+                      id={`ana-${key}`}
+                      rows={2}
+                      value={anaForm[key]}
+                      onChange={(e) => setAnaField(key, e.target.value)}
+                      placeholder={placeholder}
+                    />
+                  </div>
+                ))}
+                <div className="rounded-[var(--radius)] border border-border p-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={anaForm.consent_given}
+                      onChange={(e) => setAnaField("consent_given", e.target.checked)}
+                      className="mt-1 h-4 w-4 accent-[var(--primary)]"
+                    />
+                    <span className="text-xs text-muted-foreground flex items-start gap-1.5">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+                      Declaro que as informações acima são verdadeiras e autorizo o uso desses
+                      dados de saúde para o meu atendimento, conforme a LGPD.
+                    </span>
+                  </label>
+                </div>
+                {anaErr && <p className="text-sm text-red-600">{anaErr}</p>}
+                <div className="flex gap-3 pt-1">
+                  <Button variant="outline" onClick={() => setAnamnesisFlow("conditions")} disabled={savingAnamnesis}>
+                    <CaretLeft className="h-4 w-4" />
+                  </Button>
+                  <Button className="flex-1" onClick={saveAnamnesis} disabled={savingAnamnesis || !anaForm.consent_given}>
+                    {savingAnamnesis && <CircleNotch className="h-4 w-4 animate-spin" />} Concluir
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {anamnesisFlow === "thanks" && (
+              <div className="text-center space-y-3 py-4">
+                <div className="grid place-items-center h-14 w-14 rounded-full bg-primary text-primary-foreground mx-auto">
+                  <Check className="h-7 w-7" />
+                </div>
+                <h3 className="font-display text-xl font-bold">Prontinho!</h3>
+                <p className="text-sm text-muted-foreground">
+                  Isso vai ajudar bastante no seu próximo atendimento. Obrigado por compartilhar! 🙌
+                </p>
+                <Button className="mt-2" onClick={() => setAnamnesisFlow(null)}>Fechar</Button>
+              </div>
+            )}
           </Card>
         </MotionModal>
       )}

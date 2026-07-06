@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { formatBRL, formatDate, formatTime, waLink } from "@/lib/utils";
+import { compressImage } from "@/lib/image";
 import type { Tables } from "@/lib/database.types";
+import { uploadClientPhoto, removeClientPhoto } from "./clientPhotoActions";
 import {
   getAnamnesisConfig,
   anamnesisToForm,
@@ -21,6 +23,7 @@ import {
   Cake,
   Calendar,
   CalendarPlus,
+  Camera,
   ChatCircle,
   Check,
   CircleNotch,
@@ -31,6 +34,7 @@ import {
   ShieldCheck,
   Sparkle,
   Star,
+  Trash,
   User,
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
@@ -80,6 +84,7 @@ export function ClientDetail({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("dados");
   const [alert, setAlert] = useState<string | null>(client.alert_summary);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(client.photo_url);
 
   const firstName = client.full_name.split(" ")[0];
   const wa = client.phone ? waLink(client.phone, `Oi ${firstName}! Tudo bem? 😊`) : null;
@@ -95,9 +100,14 @@ export function ClientDetail({
       </Link>
 
       <div className="flex items-center gap-4 flex-wrap">
-        <span className="grid place-items-center h-14 w-14 rounded-full bg-secondary text-secondary-foreground font-display text-xl font-bold shrink-0">
-          {client.full_name.charAt(0)}
-        </span>
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt={client.full_name} className="h-14 w-14 rounded-full object-cover shrink-0" />
+        ) : (
+          <span className="grid place-items-center h-14 w-14 rounded-full bg-secondary text-secondary-foreground font-display text-xl font-bold shrink-0">
+            {client.full_name.charAt(0)}
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-display text-2xl">{client.full_name}</h1>
@@ -195,7 +205,14 @@ export function ClientDetail({
       </div>
 
       {tab === "dados" && (
-        <DadosTab supabase={supabase} client={client} canManage={canManage} onSaved={() => router.refresh()} />
+        <DadosTab
+          supabase={supabase}
+          client={client}
+          canManage={canManage}
+          photoUrl={photoUrl}
+          onPhotoChange={setPhotoUrl}
+          onSaved={() => router.refresh()}
+        />
       )}
       {tab === "anamnese" && (
         <AnamneseTab
@@ -215,11 +232,13 @@ export function ClientDetail({
 
 /* ---------------- Dados ---------------- */
 function DadosTab({
-  supabase, client, canManage, onSaved,
+  supabase, client, canManage, photoUrl, onPhotoChange, onSaved,
 }: {
   supabase: ReturnType<typeof createClient>;
   client: Client;
   canManage: boolean;
+  photoUrl: string | null;
+  onPhotoChange: (url: string | null) => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(client.full_name);
@@ -231,6 +250,36 @@ function DadosTab({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true); setErr(null);
+    try {
+      // Comprime no navegador (~512px JPEG) e sobe pelo servidor (admin client) —
+      // o upload direto do navegador é barrado pela RLS do Storage.
+      const blob = await compressImage(file);
+      const form = new FormData();
+      form.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+      const res = await uploadClientPhoto(client.salon_id, client.id, form);
+      if ("error" in res) { setErr(`Não foi possível enviar a foto: ${res.error}`); return; }
+      onPhotoChange(res.url);
+    } catch {
+      setErr("Não consegui processar essa imagem. Tente uma foto JPG ou PNG.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function removePhoto() {
+    setUploading(true); setErr(null);
+    const res = await removeClientPhoto(client.salon_id, client.id);
+    setUploading(false);
+    if ("error" in res) { setErr(res.error); return; }
+    onPhotoChange(null);
+  }
 
   async function save() {
     setSaving(true); setSaved(false); setErr(null);
@@ -251,6 +300,32 @@ function DadosTab({
 
   return (
     <Card className="p-6 space-y-5 max-w-2xl">
+      {/* Foto do cliente (registro) — aparece na Agenda junto do agendamento */}
+      <div className="flex items-center gap-4">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt="Foto do cliente" className="h-16 w-16 rounded-full object-cover" />
+        ) : (
+          <span className="grid h-16 w-16 place-items-center rounded-full bg-secondary text-secondary-foreground text-xl font-semibold">
+            {client.full_name.charAt(0)}
+          </span>
+        )}
+        {canManage && (
+          <div className="flex flex-col gap-1.5">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm hover:bg-muted">
+              {uploading ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {photoUrl ? "Trocar foto" : "Enviar foto"}
+              <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} disabled={uploading} />
+            </label>
+            {photoUrl && (
+              <button onClick={removePhoto} disabled={uploading} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 disabled:opacity-50">
+                <Trash className="h-3.5 w-3.5" /> Remover foto
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="n">Nome</Label>
