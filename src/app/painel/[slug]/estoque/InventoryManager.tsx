@@ -439,8 +439,8 @@ export function InventoryManager({
             const daysLeft = daysUntilStockout(Number(p.quantity), insight);
             const dormant = p.is_resale && p.is_active && (!insight || insight.consumedQty === 0);
             return (
-              <div key={p.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
-                <div className="flex-1 min-w-0">
+              <div key={p.id} className="flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4">
+                <div className="min-w-0 sm:flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium truncate">{p.name}</p>
                     <span className={`text-[10px] font-medium rounded-full px-1.5 py-0.5 shrink-0 ${p.is_resale ? "bg-emerald-500/12 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
@@ -482,44 +482,51 @@ export function InventoryManager({
                     ? `${Number(p.quantity).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${UNIT_LABEL[u]}`
                     : String(Number(p.quantity));
                   return (
-                    <>
-                      {canManage && (
-                        <button
-                          onClick={() => adjust(p, -step)}
-                          title={weight ? "Remover 1 embalagem" : "Remover 1"}
-                          className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted shrink-0"
+                    <div className="flex items-center gap-1.5 self-end shrink-0 sm:self-auto">
+                      {canManage ? (
+                        <div className="inline-flex items-center rounded-full border border-border">
+                          <button
+                            onClick={() => adjust(p, -step)}
+                            title={weight ? "Remover 1 embalagem" : "Remover 1"}
+                            className="grid place-items-center h-8 w-8 rounded-l-full hover:bg-muted transition"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span
+                            title={weight ? fmtQty(p) : undefined}
+                            className={`font-display font-bold text-center px-1 ${weight ? "min-w-[56px] text-sm" : "min-w-[2.5rem]"} ${low ? "text-amber-600" : ""}`}
+                          >
+                            {qtyText}
+                          </span>
+                          <button
+                            onClick={() => adjust(p, step)}
+                            title={weight ? "Adicionar 1 embalagem" : "Adicionar 1"}
+                            className="grid place-items-center h-8 w-8 rounded-r-full hover:bg-muted transition"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          title={weight ? fmtQty(p) : undefined}
+                          className={`font-display font-bold ${low ? "text-amber-600" : ""}`}
                         >
-                          <Minus className="h-4 w-4" />
+                          {qtyText}
+                        </span>
+                      )}
+                      {canManage && (
+                        <button onClick={() => openEdit(p)} title="Editar" className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition">
+                          <PencilSimple className="h-4 w-4" />
                         </button>
                       )}
-                      <span
-                        title={weight ? fmtQty(p) : undefined}
-                        className={`font-display font-bold text-center shrink-0 ${weight ? "min-w-[64px] text-sm" : "w-10"} ${low ? "text-amber-600" : ""}`}
-                      >
-                        {qtyText}
-                      </span>
                       {canManage && (
-                        <button
-                          onClick={() => adjust(p, step)}
-                          title={weight ? "Adicionar 1 embalagem" : "Adicionar 1"}
-                          className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted shrink-0"
-                        >
-                          <Plus className="h-4 w-4" />
+                        <button onClick={() => remove(p.id)} title="Remover" className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-red-600 hover:bg-muted transition">
+                          <Trash className="h-4 w-4" />
                         </button>
                       )}
-                    </>
+                    </div>
                   );
                 })()}
-                {canManage && (
-                  <button onClick={() => openEdit(p)} title="Editar" className="p-2 text-muted-foreground hover:text-primary shrink-0">
-                    <PencilSimple className="h-4 w-4" />
-                  </button>
-                )}
-                {canManage && (
-                  <button onClick={() => remove(p.id)} title="Remover" className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
-                    <Trash className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             );
           })}
