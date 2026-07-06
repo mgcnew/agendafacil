@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Clock, Tag } from "@phosphor-icons/react/dist/ssr";
 import { getPost, getPostSummaries, formatPostDate, type PostSummary } from "@/lib/blog/posts";
+import { JsonLd } from "@/components/InlineScript";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -49,10 +50,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={jsonLd} />
 
       <main className="min-h-full bg-background text-foreground">
         <div className="mx-auto w-full max-w-6xl px-5 py-10 md:py-16">

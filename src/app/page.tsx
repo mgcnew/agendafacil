@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui";
+import { JsonLd } from "@/components/InlineScript";
 import { PLANS, priceLabel, SUBSCRIBABLE_PLANS } from "@/lib/plans";
 import { Hero } from "@/components/landing/Hero";
 import { SiteHeader } from "@/components/landing/SiteHeader";
@@ -357,12 +358,7 @@ function StructuredData() {
     ],
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
-    />
-  );
+  return <JsonLd data={graph} />;
 }
 
 // ── Barra de confiança (stats acima da dobra) ──────────────────────────────
