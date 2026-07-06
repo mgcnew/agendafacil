@@ -36,7 +36,7 @@ export function LoginButton() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         Entrar
       </Button>
 

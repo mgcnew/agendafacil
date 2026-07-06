@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Bell, CalendarPlus, CalendarX } from "@phosphor-icons/react/dist/ssr";
+import { Bell, CalendarPlus, CalendarX, Trash } from "@phosphor-icons/react/dist/ssr";
 
 export type NotifItem = {
   id: string;
@@ -72,6 +72,8 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  const [clearing, setClearing] = useState(false);
+
   async function toggle() {
     const opening = !open;
     setOpen(opening);
@@ -80,6 +82,16 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
       setItems((prev) => prev.map((i) => (i.read_at ? i : { ...i, read_at: now })));
       await supabase.from("notifications").update({ read_at: now }).is("read_at", null);
     }
+  }
+
+  async function clearAll() {
+    if (items.length === 0) return;
+    setClearing(true);
+    const prev = items;
+    setItems([]); // some na hora; RLS garante que só apaga as do próprio usuário
+    const { error } = await supabase.from("notifications").delete().not("id", "is", null);
+    setClearing(false);
+    if (error) setItems(prev); // restaura se falhou
   }
 
   return (
@@ -100,8 +112,18 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
 
       {open && (
         <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] z-50 rounded-[var(--radius)] border border-border bg-card shadow-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
             <p className="text-sm font-semibold">Notificações</p>
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={clearing}
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 transition"
+              >
+                <Trash className="h-3.5 w-3.5" /> Limpar
+              </button>
+            )}
           </div>
           <div className="max-h-[22rem] overflow-auto">
             {items.length === 0 ? (
