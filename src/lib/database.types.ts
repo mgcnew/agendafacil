@@ -2154,6 +2154,7 @@ export type Database = {
       }
       services: {
         Row: {
+          bring_own_tools: boolean
           category_id: string | null
           color: string | null
           commission_percent: number | null
@@ -2170,6 +2171,7 @@ export type Database = {
           salon_id: string
         }
         Insert: {
+          bring_own_tools?: boolean
           category_id?: string | null
           color?: string | null
           commission_percent?: number | null
@@ -2186,6 +2188,7 @@ export type Database = {
           salon_id: string
         }
         Update: {
+          bring_own_tools?: boolean
           category_id?: string | null
           color?: string | null
           commission_percent?: number | null
@@ -2964,6 +2967,7 @@ export type Database = {
       public_services: {
         Args: { p_salon: string }
         Returns: {
+          bring_own_tools: boolean
           category_id: string
           color: string
           description: string

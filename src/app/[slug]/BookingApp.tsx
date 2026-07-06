@@ -54,6 +54,7 @@ type Service = {
   price: number;
   price_type: string | null;
   category_id: string | null;
+  bring_own_tools?: boolean | null;
 };
 type Category = { id: string; name: string; sort_order: number };
 type Professional = { id: string; display_name: string; color: string | null; bio: string | null; photo_url: string | null };
@@ -157,6 +158,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const selectedServices = services.filter((s) => selected.includes(s.id));
   const totalPrice = selectedServices.reduce((a, s) => a + effPrice(s), 0);
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
+  const showBringOwnTools = selectedServices.some((s) => s.bring_own_tools);
   const selectedProducts = resaleProducts.filter((p) => selectedProductIds.includes(p.id));
   const productsTotal = selectedProducts.reduce((a, p) => a + Number(p.sale_price), 0);
   const anaCfg = getAnamnesisConfig(salon.niche as Niche);
@@ -614,6 +616,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </button>
             );
           })}
+
+          {/* Aviso: cliente pode trazer o próprio material (manicure/pedicure) */}
+          {showBringOwnTools && (
+            <div className="rounded-[var(--radius)] border border-primary/25 bg-primary/5 p-4 flex items-start gap-3 af-rise">
+              <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <p className="text-sm text-foreground/90">
+                <span aria-hidden>💅 </span>
+                Se você tiver seu próprio alicate ou esmalte e quiser trazer, fique à vontade — é
+                sempre a opção mais segura para itens de uso pessoal. De qualquer forma, seguimos
+                todos os protocolos de higienização e esterilização dos nossos materiais.
+              </p>
+            </div>
+          )}
 
           {/* Sugestão de produto (revenda do estoque) para os serviços escolhidos */}
           {selected.length > 0 && resaleProducts.length > 0 && (

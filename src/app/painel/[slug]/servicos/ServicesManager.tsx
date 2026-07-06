@@ -21,6 +21,7 @@ import {
   PencilSimple,
   Percent,
   Plus,
+  ShieldCheck,
   Sparkle,
   Stack,
   Tag,
@@ -79,6 +80,7 @@ export function ServicesManager({
   const [hasProcessing, setHasProcessing] = useState(false);
   const [processing, setProcessing] = useState("30");
   const [finish, setFinish] = useState("15");
+  const [bringOwnTools, setBringOwnTools] = useState(false);
   const [recipe, setRecipe] = useState<RecipeRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -126,6 +128,7 @@ export function ServicesManager({
     setPriceType("fixed"); setCategoryId(null);
     setColor(defaultServiceColor(services.length));
     setHasProcessing(false); setProcessing("30"); setFinish("15");
+    setBringOwnTools(false);
     setRecipe([]);
     setEditingId(null);
   }
@@ -146,6 +149,7 @@ export function ServicesManager({
     setHasProcessing(svc.processing_time_min > 0);
     setProcessing(String(svc.processing_time_min || 30));
     setFinish(String(svc.finish_time_min || 15));
+    setBringOwnTools(svc.bring_own_tools ?? false);
     setRecipe(
       svcProducts
         .filter((sp) => sp.service_id === svc.id)
@@ -179,6 +183,7 @@ export function ServicesManager({
       color,
       processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
       finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
+      bring_own_tools: bringOwnTools,
     };
     let saved: Service | null = null;
     if (editingId) {
@@ -504,6 +509,30 @@ export function ServicesManager({
                 </p>
               </>
             )}
+          </div>
+
+          {/* Selo: cliente pode trazer o próprio material (manicure/pedicure) */}
+          <div className="rounded-[var(--radius)] border border-border p-4">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => setBringOwnTools((v) => !v)}
+                className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${bringOwnTools ? "bg-primary" : "bg-muted-foreground/30"}`}
+                aria-pressed={bringOwnTools}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${bringOwnTools ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-primary" /> Cliente pode trazer o próprio material?
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Para manicure/pedicure e afins: mostra no agendamento um convite para a cliente
+                  trazer o próprio alicate/esmalte se quiser (uso pessoal). Deixa claro que é opcional
+                  e que o salão segue todos os protocolos de higiene.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Insumos consumidos por atendimento (estoque inteligente) */}
