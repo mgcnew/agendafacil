@@ -72,7 +72,7 @@ type Appt = {
 type ResaleProduct = { id: string; name: string; sale_price: number; unit: string; linked: boolean };
 
 type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done";
-type GalleryPhoto = { id: string; url: string };
+type GalleryPhoto = { id: string; url: string; caption: string | null };
 type MineTab = "next" | "history";
 type AnamnesisFlow = "invite" | "conditions" | "details" | "thanks" | null;
 
@@ -137,6 +137,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
   const [showGallery, setShowGallery] = useState(false);
+  const [inspirationIds, setInspirationIds] = useState<string[]>([]);
   const [favoriteProId, setFavoriteProId] = useState<string | null>(null);
   const [resaleProducts, setResaleProducts] = useState<ResaleProduct[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -235,7 +236,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
     });
     supabase
       .from("salon_gallery")
-      .select("id, url")
+      .select("id, url, caption")
       .eq("salon_id", salon.id)
       .order("sort_order")
       .then(({ data }) => setGallery((data as GalleryPhoto[]) ?? []));
@@ -399,7 +400,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
     }
     setBooking(false);
     setBookedClientId(data?.client_id ?? null);
+    // fotos de inspiração escolhidas na galeria — o profissional vê na Agenda
+    if (inspirationIds.length > 0 && data?.id) {
+      await supabase.rpc("public_set_appointment_inspiration" as never, {
+        p_appointment: data.id,
+        p_gallery_ids: inspirationIds,
+        p_phone: userId ? null : toE164(phone),
+      } as never);
+    }
     setStep("done");
+  }
+
+  function toggleInspiration(id: string) {
+    setInspirationIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   // convite pra ficha de anamnese: só se o cliente ainda não tem uma (nem
@@ -919,6 +932,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 + {formatBRL(productsTotal)} em produtos, pagos no balcão junto do serviço.
               </p>
             )}
+            {inspirationIds.length > 0 && (
+              <div className="border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2">
+                  <Heart className="h-3.5 w-3.5 text-primary" weight="fill" /> Inspiração — o profissional vai ver estas fotos
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {gallery.filter((g) => inspirationIds.includes(g.id)).map((g) => (
+                    <span key={g.id} className="relative h-16 w-16 rounded-lg overflow-hidden border border-border">
+                      <NextImage src={g.url} alt={g.caption ?? ""} fill sizes="64px" className="object-cover" />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
           {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
           <div className="flex gap-3">
@@ -961,6 +988,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               onClick={() => {
                 setSelected([]);
                 setSelectedProductIds([]);
+                setInspirationIds([]);
                 setPro(null);
                 setSlot(null);
                 setStep("services");
@@ -1022,7 +1050,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
       {/* Modal: galeria de fotos */}
       {showGallery && gallery.length > 0 && (
-        <GalleryModal photos={gallery} onClose={() => setShowGallery(false)} />
+        <GalleryModal
+          photos={gallery}
+          selectedIds={inspirationIds}
+          onToggle={toggleInspiration}
+          onClose={() => setShowGallery(false)}
+        />
       )}
 
       {/* Modal: escolher outra data (além dos próximos 7 dias) */}
@@ -1285,13 +1318,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
 function GalleryModal({
   photos,
+  selectedIds,
+  onToggle,
   onClose,
 }: {
   photos: GalleryPhoto[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
   onClose: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const touchX = useRef<number | null>(null);
+  const current = photos[idx];
+  const isSelected = current ? selectedIds.includes(current.id) : false;
 
   const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
   const next = () => setIdx((i) => (i + 1) % photos.length);
@@ -1359,20 +1398,49 @@ function GalleryModal({
         )}
       </div>
 
+      {/* Legenda + botão "quero fazer este" */}
+      <div className="shrink-0 px-4 pt-2 flex flex-col items-center gap-2">
+        {current?.caption && (
+          <p className="text-white/70 text-sm text-center max-w-md line-clamp-2">{current.caption}</p>
+        )}
+        <button
+          onClick={() => current && onToggle(current.id)}
+          className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
+            isSelected
+              ? "bg-white text-black"
+              : "bg-primary text-primary-foreground hover:brightness-110"
+          }`}
+        >
+          {isSelected ? (
+            <><Check className="h-4 w-4" /> Selecionado como inspiração</>
+          ) : (
+            <><Heart className="h-4 w-4" /> Quero fazer este</>
+          )}
+        </button>
+      </div>
+
       {/* miniaturas */}
       {photos.length > 1 && (
         <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 justify-center">
-          {photos.map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setIdx(i)}
-              className={`relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
-                i === idx ? "border-primary opacity-100" : "border-transparent opacity-50 hover:opacity-75"
-              }`}
-            >
-              <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
-            </button>
-          ))}
+          {photos.map((p, i) => {
+            const sel = selectedIds.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => setIdx(i)}
+                className={`relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
+                  i === idx ? "border-primary opacity-100" : sel ? "border-white/80 opacity-100" : "border-transparent opacity-50 hover:opacity-75"
+                }`}
+              >
+                <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
+                {sel && (
+                  <span className="absolute top-0.5 right-0.5 grid place-items-center h-4 w-4 rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

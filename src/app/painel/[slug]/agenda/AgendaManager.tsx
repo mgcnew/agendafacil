@@ -24,6 +24,7 @@ import {
   ChatCircle,
   CircleNotch,
   ClockCountdown,
+  Heart,
   Lock,
   Minus,
   Monitor,
@@ -55,6 +56,7 @@ type Appt    = {
   clients: { full_name: string; phone: string | null; alert_summary: string | null; photo_url: string | null } | null;
   salon_members: { display_name: string | null } | null;
   appointment_services?: { service_id: string | null }[] | null;
+  inspiration_gallery_ids?: string[] | null;
   color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
@@ -359,6 +361,19 @@ function ApptDetailModal({
   const [anamnesis, setAnamnesis]     = useState<ClientAnamnesis | null | "empty">(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showAnam, setShowAnam]       = useState(false);
+  const [inspiration, setInspiration] = useState<{ id: string; url: string; caption: string | null }[]>([]);
+  const [lightbox, setLightbox]       = useState<string | null>(null);
+
+  // Fotos de inspiração escolhidas pela cliente na galeria (leitura pública).
+  useEffect(() => {
+    const ids = appt.inspiration_gallery_ids ?? [];
+    if (ids.length === 0) return;
+    supabase
+      .from("salon_gallery")
+      .select("id, url, caption")
+      .in("id", ids)
+      .then(({ data }) => setInspiration((data as { id: string; url: string; caption: string | null }[]) ?? []));
+  }, [appt.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch services on mount
   useEffect(() => {
@@ -512,6 +527,29 @@ function ApptDetailModal({
             )}
           </div>
 
+          {/* ── Inspiração da cliente (fotos que ela marcou na galeria) ── */}
+          {inspiration.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Heart className="h-3.5 w-3.5 text-primary" weight="fill" /> Inspiração da cliente
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {inspiration.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setLightbox(g.url)}
+                    title={g.caption ?? "Ver foto"}
+                    className="relative h-20 w-20 rounded-[var(--radius)] overflow-hidden border border-border hover:opacity-90 transition"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={g.url} alt={g.caption ?? "Inspiração"} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Status e ações ──────────────────────────────── */}
           <div className="space-y-2.5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
@@ -652,6 +690,24 @@ function ApptDetailModal({
           )}
         </div>
       </div>
+
+      {/* Lightbox da foto de inspiração */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition"
+            aria-label="Fechar"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="Inspiração" className="max-h-full max-w-full object-contain rounded-lg" />
+        </div>
+      )}
     </MotionModal>
   );
 }
@@ -1306,7 +1362,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)

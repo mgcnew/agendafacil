@@ -211,6 +211,7 @@ export type Database = {
           created_by: string | null
           ends_at: string
           id: string
+          inspiration_gallery_ids: string[]
           member_id: string
           notes: string | null
           payment_method: string | null
@@ -227,6 +228,7 @@ export type Database = {
           created_by?: string | null
           ends_at: string
           id?: string
+          inspiration_gallery_ids?: string[]
           member_id: string
           notes?: string | null
           payment_method?: string | null
@@ -243,6 +245,7 @@ export type Database = {
           created_by?: string | null
           ends_at?: string
           id?: string
+          inspiration_gallery_ids?: string[]
           member_id?: string
           notes?: string | null
           payment_method?: string | null
@@ -2582,6 +2585,7 @@ export type Database = {
           created_by: string | null
           ends_at: string
           id: string
+          inspiration_gallery_ids: string[]
           member_id: string
           notes: string | null
           payment_method: string | null
@@ -2724,6 +2728,7 @@ export type Database = {
           created_by: string | null
           ends_at: string
           id: string
+          inspiration_gallery_ids: string[]
           member_id: string
           notes: string | null
           payment_method: string | null
@@ -2858,6 +2863,7 @@ export type Database = {
           created_by: string | null
           ends_at: string
           id: string
+          inspiration_gallery_ids: string[]
           member_id: string
           notes: string | null
           payment_method: string | null
@@ -2980,6 +2986,14 @@ export type Database = {
           price: number
           price_type: string
         }[]
+      }
+      public_set_appointment_inspiration: {
+        Args: {
+          p_appointment: string
+          p_gallery_ids: string[]
+          p_phone?: string
+        }
+        Returns: undefined
       }
       receivable_today: { Args: { p_salon: string }; Returns: Json }
       redeem_package: {
