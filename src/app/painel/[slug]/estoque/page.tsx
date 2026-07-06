@@ -23,7 +23,7 @@ export default async function EstoquePage({
     supabase.from("products").select("*").eq("salon_id", membership.salon_id).order("name"),
     supabase
       .from("stock_movements")
-      .select("id, type, quantity, reason, created_at, products(name)")
+      .select("id, type, quantity, reason, created_at, products(name, unit)")
       .eq("salon_id", membership.salon_id)
       .order("created_at", { ascending: false })
       .range(0, MOVEMENTS_PAGE_SIZE), // +1 p/ saber se há mais sem query de contagem

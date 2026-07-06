@@ -16,7 +16,7 @@ export async function loadMoreMovements(
   const supabase = await createClient();
   const { data } = await supabase
     .from("stock_movements")
-    .select("id, type, quantity, reason, created_at, products(name)")
+    .select("id, type, quantity, reason, created_at, products(name, unit)")
     .eq("salon_id", membership.salon_id)
     .order("created_at", { ascending: false })
     .range(offset, offset + MOVEMENTS_PAGE_SIZE); // +1 p/ detectar se há mais sem query de contagem

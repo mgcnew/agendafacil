@@ -33,7 +33,7 @@ import {
 
 type Service = Tables<"services">;
 type PriceType = "fixed" | "from" | "on_request";
-type Prod = { id: string; name: string; unit: string | null; cost_price?: number };
+type Prod = { id: string; name: string; unit: string | null; cost_price?: number; package_size?: number | null };
 type SP = { service_id: string; product_id: string; quantity: number };
 type RecipeRow = { product_id: string; quantity: string };
 type Category = { id: string; name: string; sort_order: number };
@@ -88,9 +88,12 @@ export function ServicesManager({
   const supabase = createClient();
 
   // Custo de insumos por serviço → margem (preço − comissão − insumos).
+  // Guarda o custo por UNIDADE BASE: pra produto de peso, custo por embalagem
+  // dividido pelo tamanho da embalagem (ex.: R$45 / 1000g). Pra 'un',
+  // package_size = 1, então continua sendo o custo por unidade.
   const productCost = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const p of products) m[p.id] = Number(p.cost_price ?? 0);
+    for (const p of products) m[p.id] = Number(p.cost_price ?? 0) / (Number(p.package_size) || 1);
     return m;
   }, [products]);
 

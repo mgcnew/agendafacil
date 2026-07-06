@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
 import { isLowStock } from "@/lib/signals/rules";
 import type { Tables } from "@/lib/database.types";
@@ -16,6 +16,7 @@ import {
   ClockCounterClockwise,
   MagnifyingGlass,
   Minus,
+  PencilSimple,
   Plus,
   Stack,
   Trash,
@@ -30,6 +31,24 @@ import { loadMoreMovements } from "./inventoryActions";
 import { type Movement } from "./types";
 
 type Product = Tables<"products">;
+type Unit = "un" | "g" | "ml";
+
+// Rótulo curto e nome por extenso de cada unidade de controle.
+const UNIT_LABEL: Record<Unit, string> = { un: "un", g: "g", ml: "ml" };
+const UNIT_NAME: Record<Unit, string> = { un: "Unidade", g: "Grama (peso)", ml: "Mililitro (volume)" };
+
+// Formata a quantidade em estoque com a unidade; para peso/volume, mostra também
+// o equivalente aproximado em embalagens.
+function fmtQty(p: Product): string {
+  const u = (p.unit as Unit) ?? "un";
+  const q = Number(p.quantity);
+  if (u === "un") return `${q}`;
+  const nice = Number.isInteger(q) ? q.toLocaleString("pt-BR") : q.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const pkg = Number(p.package_size) || 0;
+  const emb = pkg > 0 ? q / pkg : null;
+  const embLabel = emb != null ? ` · ≈ ${emb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} emb.` : "";
+  return `${nice} ${UNIT_LABEL[u]}${embLabel}`;
+}
 
 export function InventoryManager({
   slug,
@@ -51,14 +70,50 @@ export function InventoryManager({
   const supabase = createClient();
   const [products, setProducts] = useState<Product[]>(initial);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [qty, setQty] = useState("0");
   const [min, setMin] = useState("0");
   const [cost, setCost] = useState("");
   const [sale, setSale] = useState("");
   const [isResale, setIsResale] = useState(false);
+  const [unit, setUnit] = useState<Unit>("un");
+  const [packageSize, setPackageSize] = useState("1000");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const num = (s: string) => parseFloat(s.replace(",", ".")) || 0;
+  const isWeight = unit !== "un";
+  // Para peso, "quantidade" no formulário é o Nº de embalagens; o estoque é
+  // guardado na unidade base (qtd de embalagens × tamanho da embalagem).
+  const formTotalBase = isWeight ? num(qty) * num(packageSize) : num(qty);
+
+  function resetForm() {
+    setName(""); setQty("0"); setMin("0"); setCost(""); setSale("");
+    setIsResale(false); setUnit("un"); setPackageSize("1000");
+    setEditingId(null); setErr(null);
+  }
+
+  function openNew() {
+    resetForm();
+    setAdding(true);
+  }
+
+  function openEdit(p: Product) {
+    const u = (p.unit as Unit) ?? "un";
+    const pkg = Number(p.package_size) || 1;
+    setName(p.name);
+    setUnit(u);
+    setPackageSize(String(pkg));
+    // em peso, mostra o estoque atual convertido de volta pra embalagens
+    setQty(u === "un" ? String(Number(p.quantity)) : String(Number(p.quantity) / pkg));
+    setMin(String(Number(p.min_quantity)));
+    setCost(p.cost_price ? String(Number(p.cost_price)).replace(".", ",") : "");
+    setSale(p.sale_price ? String(Number(p.sale_price)).replace(".", ",") : "");
+    setIsResale(p.is_resale);
+    setEditingId(p.id);
+    setAdding(true);
+  }
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "resale" | "supply">("all");
@@ -78,30 +133,38 @@ export function InventoryManager({
     setLoadingMore(false);
   }
 
-  async function add() {
+  async function save() {
     if (!name) return;
     setBusy(true);
     setErr(null);
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        salon_id: salonId,
-        name,
-        quantity: parseFloat(qty.replace(",", ".")) || 0,
-        min_quantity: parseFloat(min.replace(",", ".")) || 0,
-        cost_price: parseFloat(cost.replace(",", ".")) || 0,
-        sale_price: isResale ? parseFloat(sale.replace(",", ".")) || 0 : 0,
-        is_resale: isResale,
-      })
-      .select()
-      .single();
-    setBusy(false);
-    if (error || !data) {
-      setErr("Não foi possível cadastrar o produto. Tente novamente.");
-      return;
+    // peso é sempre insumo (revenda continua por unidade)
+    const resale = isWeight ? false : isResale;
+    const payload = {
+      salon_id: salonId,
+      name,
+      unit,
+      package_size: isWeight ? num(packageSize) || 1 : 1,
+      quantity: formTotalBase,
+      min_quantity: num(min),
+      cost_price: num(cost),
+      sale_price: resale ? num(sale) : 0,
+      is_resale: resale,
+    };
+    if (editingId) {
+      const { data, error } = await supabase
+        .from("products").update(payload).eq("id", editingId).select().single();
+      setBusy(false);
+      if (error || !data) { setErr("Não foi possível salvar o produto. Tente novamente."); return; }
+      setProducts((list) => list.map((x) => (x.id === editingId ? data : x)).sort((a, b) => a.name.localeCompare(b.name)));
+    } else {
+      const { data, error } = await supabase
+        .from("products").insert(payload).select().single();
+      setBusy(false);
+      if (error || !data) { setErr("Não foi possível cadastrar o produto. Tente novamente."); return; }
+      setProducts((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
     }
-    setProducts((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
-    setName(""); setQty("0"); setMin("0"); setCost(""); setSale(""); setIsResale(false); setAdding(false);
+    resetForm();
+    setAdding(false);
   }
 
   async function adjust(p: Product, delta: number) {
@@ -176,7 +239,7 @@ export function InventoryManager({
           </p>
         </div>
         {canManage && (
-          <Button onClick={() => setAdding((v) => !v)}>
+          <Button onClick={openNew}>
             <Plus className="h-4 w-4" /> Novo produto
           </Button>
         )}
@@ -197,11 +260,11 @@ export function InventoryManager({
 
       <AnimatePresence>
         {adding && (
-          <MotionModal key="add-product" onClose={() => setAdding(false)}>
+          <MotionModal key="add-product" onClose={() => { setAdding(false); resetForm(); }}>
             <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-display text-lg font-bold">Novo produto</h3>
-                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
+                <h3 className="font-display text-lg font-bold">{editingId ? "Editar produto" : "Novo produto"}</h3>
+                <button onClick={() => { setAdding(false); resetForm(); }} className="p-1 rounded hover:bg-muted">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -210,48 +273,99 @@ export function InventoryManager({
                   <Label htmlFor="pn">Produto</Label>
                   <Input id="pn" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Shampoo profissional" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pq">Quantidade</Label>
-                  <Input id="pq" value={qty} onChange={(e) => setQty(e.target.value)} />
+
+                {/* Unidade de controle do estoque */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="pu">Como controlar o estoque?</Label>
+                  <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
+                    {(["un", "g", "ml"] as Unit[]).map((u) => (
+                      <option key={u} value={u}>{UNIT_NAME[u]}</option>
+                    ))}
+                  </Select>
+                  {isWeight && (
+                    <p className="text-xs text-muted-foreground">
+                      Produtos por peso/volume são insumos: você compra por embalagem e o sistema
+                      dá baixa por {UNIT_LABEL[unit]} conforme o consumo nos serviços.
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pm">Estoque mínimo</Label>
-                  <Input id="pm" value={min} onChange={(e) => setMin(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="pc">Custo (R$)</Label>
-                  <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
-                </div>
-                {isResale && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ps">Preço de venda (R$)</Label>
-                    <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
-                  </div>
+
+                {isWeight ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pkg">Tamanho da embalagem ({UNIT_LABEL[unit]})</Label>
+                      <Input id="pkg" value={packageSize} onChange={(e) => setPackageSize(e.target.value)} placeholder="Ex: 1000" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pq">Nº de embalagens</Label>
+                      <Input id="pq" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2 -mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Total em estoque:{" "}
+                        <b className="text-foreground">
+                          {formTotalBase.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} {UNIT_LABEL[unit]}
+                        </b>
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pm">Estoque mínimo ({UNIT_LABEL[unit]})</Label>
+                      <Input id="pm" value={min} onChange={(e) => setMin(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pc">Custo por embalagem (R$)</Label>
+                      <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pq">Quantidade</Label>
+                      <Input id="pq" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pm">Estoque mínimo</Label>
+                      <Input id="pm" value={min} onChange={(e) => setMin(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pc">Custo (R$)</Label>
+                      <Input id="pc" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
+                    </div>
+                    {isResale && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ps">Preço de venda (R$)</Label>
+                        <Input id="ps" value={sale} onChange={(e) => setSale(e.target.value)} placeholder="0,00" />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              <div className="flex items-start gap-3 rounded-[var(--radius)] border border-border p-4 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsResale((v) => !v)}
-                  aria-pressed={isResale}
-                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${isResale ? "bg-primary" : "bg-muted-foreground/30"}`}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${isResale ? "left-[22px]" : "left-0.5"}`} />
-                </button>
-                <div>
-                  <p className="text-sm font-medium">Produto para revenda?</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Ligue se você vende este produto direto à cliente (balcão). Desligado, é
-                    um <b>insumo</b> — usado nos serviços e contabilizado só pelo custo.
-                  </p>
+              {/* Revenda só faz sentido pra produto por unidade */}
+              {!isWeight && (
+                <div className="flex items-start gap-3 rounded-[var(--radius)] border border-border p-4 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsResale((v) => !v)}
+                    aria-pressed={isResale}
+                    className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${isResale ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  >
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${isResale ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
+                  <div>
+                    <p className="text-sm font-medium">Produto para revenda?</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Ligue se você vende este produto direto à cliente (balcão). Desligado, é
+                      um <b>insumo</b> — usado nos serviços e contabilizado só pelo custo.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex gap-2 mt-5">
-                <Button onClick={add} disabled={busy || !name} className="flex-1">
-                  {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Adicionar
+                <Button onClick={save} disabled={busy || !name} className="flex-1">
+                  {busy && <CircleNotch className="h-4 w-4 animate-spin" />} {editingId ? "Salvar" : "Adicionar"}
                 </Button>
-                <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
+                <Button variant="ghost" onClick={() => { setAdding(false); resetForm(); }}>Cancelar</Button>
               </div>
             </Card>
           </MotionModal>
@@ -350,7 +464,7 @@ export function InventoryManager({
                     )}
                     {insight && insight.consumedQty > 0 && (
                       <span className="flex items-center gap-1">
-                        <TrendDown className="h-3 w-3" /> {insight.consumedQty} em {PRODUCT_INSIGHTS_WINDOW_DAYS}d
+                        <TrendDown className="h-3 w-3" /> {insight.consumedQty}{p.unit && p.unit !== "un" ? ` ${p.unit}` : ""} em {PRODUCT_INSIGHTS_WINDOW_DAYS}d
                       </span>
                     )}
                     {daysLeft != null && (
@@ -360,21 +474,49 @@ export function InventoryManager({
                     )}
                   </p>
                 </div>
+                {(() => {
+                  const u = (p.unit as Unit) ?? "un";
+                  const weight = u !== "un";
+                  const step = weight ? (Number(p.package_size) || 1) : 1;
+                  const qtyText = weight
+                    ? `${Number(p.quantity).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${UNIT_LABEL[u]}`
+                    : String(Number(p.quantity));
+                  return (
+                    <>
+                      {canManage && (
+                        <button
+                          onClick={() => adjust(p, -step)}
+                          title={weight ? "Remover 1 embalagem" : "Remover 1"}
+                          className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted shrink-0"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                      )}
+                      <span
+                        title={weight ? fmtQty(p) : undefined}
+                        className={`font-display font-bold text-center shrink-0 ${weight ? "min-w-[64px] text-sm" : "w-10"} ${low ? "text-amber-600" : ""}`}
+                      >
+                        {qtyText}
+                      </span>
+                      {canManage && (
+                        <button
+                          onClick={() => adjust(p, step)}
+                          title={weight ? "Adicionar 1 embalagem" : "Adicionar 1"}
+                          className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted shrink-0"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
                 {canManage && (
-                  <button onClick={() => adjust(p, -1)} className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted">
-                    <Minus className="h-4 w-4" />
+                  <button onClick={() => openEdit(p)} title="Editar" className="p-2 text-muted-foreground hover:text-primary shrink-0">
+                    <PencilSimple className="h-4 w-4" />
                   </button>
                 )}
-                <span className={`font-display font-bold w-10 text-center ${low ? "text-amber-600" : ""}`}>
-                  {Number(p.quantity)}
-                </span>
                 {canManage && (
-                  <button onClick={() => adjust(p, 1)} className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                )}
-                {canManage && (
-                  <button onClick={() => remove(p.id)} className="p-2 text-muted-foreground hover:text-red-600">
+                  <button onClick={() => remove(p.id)} title="Remover" className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
                     <Trash className="h-4 w-4" />
                   </button>
                 )}
@@ -431,7 +573,7 @@ export function InventoryManager({
                     </p>
                   </div>
                   <span className={`text-sm font-semibold tabular-nums ${out ? "text-red-600" : "text-emerald-600"}`}>
-                    {out ? "−" : "+"}{Number(m.quantity)}
+                    {out ? "−" : "+"}{Number(m.quantity)}{m.products?.unit && m.products.unit !== "un" ? ` ${m.products.unit}` : ""}
                   </span>
                 </div>
               );

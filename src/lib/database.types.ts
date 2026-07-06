@@ -1426,6 +1426,7 @@ export type Database = {
           is_resale: boolean
           min_quantity: number
           name: string
+          package_size: number
           quantity: number
           sale_price: number
           salon_id: string
@@ -1440,6 +1441,7 @@ export type Database = {
           is_resale?: boolean
           min_quantity?: number
           name: string
+          package_size?: number
           quantity?: number
           sale_price?: number
           salon_id: string
@@ -1454,6 +1456,7 @@ export type Database = {
           is_resale?: boolean
           min_quantity?: number
           name?: string
+          package_size?: number
           quantity?: number
           sale_price?: number
           salon_id?: string

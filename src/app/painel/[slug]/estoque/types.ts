@@ -4,7 +4,7 @@ export type Movement = {
   quantity: number;
   reason: string | null;
   created_at: string;
-  products: { name: string } | null;
+  products: { name: string; unit: string | null } | null;
 };
 
 /** Tamanho do lote de "Movimentações recentes" — histórico cresce sem limite, então
