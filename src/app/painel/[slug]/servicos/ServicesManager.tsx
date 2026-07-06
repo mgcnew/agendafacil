@@ -511,29 +511,32 @@ export function ServicesManager({
             )}
           </div>
 
-          {/* Selo: cliente pode trazer o próprio material (manicure/pedicure) */}
-          <div className="rounded-[var(--radius)] border border-border p-4">
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={() => setBringOwnTools((v) => !v)}
-                className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${bringOwnTools ? "bg-primary" : "bg-muted-foreground/30"}`}
-                aria-pressed={bringOwnTools}
-              >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${bringOwnTools ? "left-[22px]" : "left-0.5"}`} />
-              </button>
-              <div>
-                <p className="text-sm font-medium flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-primary" /> Cliente pode trazer o próprio material?
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Para manicure/pedicure e afins: mostra no agendamento um convite para a cliente
-                  trazer o próprio alicate/esmalte se quiser (uso pessoal). Deixa claro que é opcional
-                  e que o salão segue todos os protocolos de higiene.
-                </p>
+          {/* Selo: cliente pode trazer o próprio material (manicure/pedicure).
+              Não faz sentido em barbearia — oculto nesse nicho. */}
+          {niche !== "barbearia" && (
+            <div className="rounded-[var(--radius)] border border-border p-4">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBringOwnTools((v) => !v)}
+                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${bringOwnTools ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  aria-pressed={bringOwnTools}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${bringOwnTools ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> Cliente pode trazer o próprio material?
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Para manicure/pedicure e afins: mostra no agendamento um convite para a cliente
+                    trazer o próprio alicate/esmalte se quiser (uso pessoal). Deixa claro que é opcional
+                    e que o salão segue todos os protocolos de higiene.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Insumos consumidos por atendimento (estoque inteligente) */}
           <div className="rounded-[var(--radius)] border border-border p-4">

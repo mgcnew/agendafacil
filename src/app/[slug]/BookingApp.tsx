@@ -158,7 +158,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const selectedServices = services.filter((s) => selected.includes(s.id));
   const totalPrice = selectedServices.reduce((a, s) => a + effPrice(s), 0);
   const totalDuration = selectedServices.reduce((a, s) => a + s.duration_min, 0);
-  const showBringOwnTools = selectedServices.some((s) => s.bring_own_tools);
+  // aviso "traga seu material" não se aplica a barbearia (só salão de beleza/estética)
+  const showBringOwnTools = salon.niche !== "barbearia" && selectedServices.some((s) => s.bring_own_tools);
   const selectedProducts = resaleProducts.filter((p) => selectedProductIds.includes(p.id));
   const productsTotal = selectedProducts.reduce((a, p) => a + Number(p.sale_price), 0);
   const anaCfg = getAnamnesisConfig(salon.niche as Niche);
