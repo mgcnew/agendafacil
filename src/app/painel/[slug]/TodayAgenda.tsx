@@ -6,13 +6,19 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
+import Link from "next/link";
 import { formatBRL, formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import type { Tables } from "@/lib/database.types";
+import { getAnamnesisConfig, anamnesisToForm, HEALTH_CONDITIONS, type Niche } from "@/lib/anamnesis";
 import {
   CaretDown,
   CircleNotch,
   Clock,
+  Heart,
+  Heartbeat,
   Scissors,
+  ShieldCheck,
   Sparkle,
   UserMinus,
   Warning,
@@ -35,12 +41,18 @@ const PAYMENT_METHODS = [
 ];
 
 export type AgendaService = { name: string; price: number; duration: number };
+export type AgendaAnamnesis = Tables<"client_anamnesis">;
+export type AgendaPhoto = { id: string; url: string; caption: string | null };
 export type AgendaItem = {
   id: string;
   starts_at: string;
   time: string;
   client: string;
+  clientId: string | null;
+  photoUrl: string | null;
   alert: string | null;
+  anamnesis: AgendaAnamnesis | null;
+  inspiration: AgendaPhoto[];
   prof: string;
   status: string;
   price: number;
@@ -133,19 +145,108 @@ function FinalizeModal({
   );
 }
 
+// Avatar do cliente: foto (registro) ou inicial. Fallback neutro (bg-secondary).
+function ClientAvatar({ name, photoUrl, size = 36 }: { name: string; photoUrl: string | null; size?: number }) {
+  if (photoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={photoUrl} alt={name} className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }} />
+    );
+  }
+  return (
+    <span className="rounded-full grid place-items-center bg-secondary text-secondary-foreground font-semibold shrink-0"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+// Resumo compacto da ficha de anamnese — só o que importa pro atendimento.
+// Condições críticas em vermelho, o resto em tom neutro (leitura em 1 segundo).
+function AnamnesisSummary({
+  anamnesis, niche, slug, clientId,
+}: {
+  anamnesis: AgendaAnamnesis;
+  niche: Niche;
+  slug: string;
+  clientId: string | null;
+}) {
+  const cfg = getAnamnesisConfig(niche);
+  const form = anamnesisToForm(anamnesis);
+  const criticalKeys = new Set<string>(HEALTH_CONDITIONS.filter((c) => c.critical).map((c) => c.key));
+  const marked = cfg.conditions.filter((c) => form[c.key]);
+  const texts = cfg.textFields
+    .map((f) => ({ label: f.label, value: form[f.key]?.trim() }))
+    .filter((t) => !!t.value);
+
+  return (
+    <div className="rounded-[var(--radius)] border border-border bg-card px-3 py-2.5 space-y-2">
+      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+        <Heartbeat className="h-3.5 w-3.5 text-primary" /> Ficha de anamnese
+      </p>
+      {marked.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {marked.map((c) => {
+            const crit = criticalKeys.has(c.key);
+            return (
+              <span
+                key={c.key}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  crit ? "bg-red-500/10 text-red-600" : "bg-muted text-foreground/75",
+                )}
+              >
+                {crit && <Warning className="h-3 w-3" />} {c.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {texts.length > 0 && (
+        <div className="space-y-1">
+          {texts.map((t) => (
+            <p key={t.label} className="text-xs">
+              <span className="text-muted-foreground">{t.label}: </span>
+              <span className={/alerg/i.test(t.label) ? "text-red-600 font-medium" : "text-foreground"}>{t.value}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      {marked.length === 0 && texts.length === 0 && (
+        <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5" /> Nenhuma restrição informada.
+        </p>
+      )}
+      {clientId && (
+        <Link
+          href={`/painel/${slug}/clientes/${clientId}`}
+          className="inline-block text-[11px] text-primary hover:underline"
+        >
+          Ver ficha completa
+        </Link>
+      )}
+    </div>
+  );
+}
+
 // ── Card de um agendamento ─────────────────────────────────────
 function ItemCard({
-  item, expanded, overdue, onToggle, onFinalize, onNoShow,
+  item, expanded, overdue, slug, niche, onToggle, onFinalize, onNoShow, onZoom,
 }: {
   item: AgendaItem;
   expanded: boolean;
   overdue: boolean;
+  slug: string;
+  niche: Niche;
   onToggle: () => void;
   onFinalize: () => void;
   onNoShow: () => void;
+  onZoom: (url: string) => void;
 }) {
   const st = STATUS[item.status] ?? STATUS.pending;
   const isActionable = ["pending", "confirmed", "in_progress"].includes(item.status);
+  const hasAnamnesis = !!item.anamnesis;
 
   return (
     <div className={cn(
@@ -164,19 +265,31 @@ function ItemCard({
           {overdue && <p className="text-[10px] text-amber-600 font-medium leading-tight">atrasado</p>}
         </div>
 
-        {/* Nome + profissional */}
+        {/* Avatar do cliente */}
+        <ClientAvatar name={item.client} photoUrl={item.photoUrl} size={38} />
+
+        {/* Nome + profissional + sinais (ficha/inspiração) */}
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate flex items-center gap-2">
-            {item.client}
-            {item.alert && (
-              <span
-                title={item.alert}
-                className="inline-flex items-center gap-1 rounded-full bg-red-500/10 text-red-600 px-2 py-0.5 text-[10px] font-medium shrink-0"
-              >
-                <Warning className="h-3 w-3" /> alerta
-              </span>
-            )}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium truncate min-w-0 flex-1">{item.client}</span>
+            {/* Sinais compactos — sempre depois do nome, sem espremê-lo */}
+            <span className="flex items-center gap-1 shrink-0">
+              {item.alert ? (
+                <span title={`Atenção — ${item.alert}`} className="grid place-items-center text-red-600">
+                  <Warning className="h-4 w-4" weight="fill" />
+                </span>
+              ) : hasAnamnesis && (
+                <span title="Ficha de anamnese preenchida" className="grid place-items-center text-primary">
+                  <Heartbeat className="h-4 w-4" />
+                </span>
+              )}
+              {item.inspiration.length > 0 && (
+                <span title="Inspiração escolhida pela cliente" className="grid place-items-center text-primary">
+                  <Heart className="h-3.5 w-3.5" weight="fill" />
+                </span>
+              )}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground truncate">
             {item.prof}
             {item.services.length > 0 && (
@@ -217,13 +330,48 @@ function ItemCard({
             </div>
           )}
 
-          {/* Alerta de anamnese em detalhe */}
+          {/* Inspiração escolhida pela cliente (clique = zoom) */}
+          {item.inspiration.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                <Heart className="h-3.5 w-3.5 text-primary" weight="fill" /> Inspiração da cliente
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {item.inspiration.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => onZoom(g.url)}
+                    title={g.caption ?? "Ver foto"}
+                    className="relative h-16 w-16 rounded-[var(--radius)] overflow-hidden border border-border hover:opacity-90 transition"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={g.url} alt={g.caption ?? "Inspiração"} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Alerta crítico em destaque */}
           {item.alert && (
             <div className="flex items-start gap-2 rounded-[var(--radius)] bg-red-500/10 border border-red-300/30 text-red-700 px-3 py-2 text-xs">
               <Warning className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               {item.alert}
             </div>
           )}
+
+          {/* Ficha de anamnese — resumo (só leitura) */}
+          {item.anamnesis ? (
+            <AnamnesisSummary anamnesis={item.anamnesis} niche={niche} slug={slug} clientId={item.clientId} />
+          ) : item.clientId ? (
+            <Link
+              href={`/painel/${slug}/clientes/${item.clientId}`}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+            >
+              <Heartbeat className="h-3.5 w-3.5" /> Sem ficha de anamnese — preencher
+            </Link>
+          ) : null}
 
           {/* Ações */}
           {isActionable && (
@@ -251,9 +399,13 @@ function ItemCard({
 export function TodayAgenda({
   items: initialItems,
   salonId,
+  slug,
+  niche,
 }: {
   items: AgendaItem[];
   salonId: string;
+  slug: string;
+  niche: Niche;
 }) {
   const router   = useRouter();
   const supabase = createClient();
@@ -264,6 +416,7 @@ export function TodayAgenda({
   useEffect(() => { setItems(initialItems); }, [initialItems]);
   const [showPast, setShowPast] = useState(false);
   const [finalizing, setFinalizing] = useState<AgendaItem | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const { upcoming, pastPending } = useMemo(() => {
     const now = Date.now();
@@ -313,9 +466,12 @@ export function TodayAgenda({
               item={a}
               expanded={open.has(a.id)}
               overdue={false}
+              slug={slug}
+              niche={niche}
               onToggle={() => toggle(a.id)}
               onFinalize={() => setFinalizing(a)}
               onNoShow={() => onNoShow(a)}
+              onZoom={setLightbox}
             />
           ))}
         </div>
@@ -359,9 +515,12 @@ export function TodayAgenda({
                   item={a}
                   expanded={open.has(a.id)}
                   overdue={true}
+                  slug={slug}
+                  niche={niche}
                   onToggle={() => toggle(a.id)}
                   onFinalize={() => setFinalizing(a)}
                   onNoShow={() => onNoShow(a)}
+                  onZoom={setLightbox}
                 />
               ))}
             </div>
@@ -380,6 +539,24 @@ export function TodayAgenda({
           />
         )}
       </AnimatePresence>
+
+      {/* ── Lightbox da foto de inspiração ────────────────── */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition"
+            aria-label="Fechar"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="Inspiração" className="max-h-full max-w-full object-contain rounded-lg" />
+        </div>
+      )}
     </div>
   );
 }

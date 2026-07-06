@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { daysUntil } from "@/lib/signals/rules";
 import { CalendarDots, Wallet, Clock, Users, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
-import { TodayAgenda, type AgendaItem } from "./TodayAgenda";
+import { TodayAgenda, type AgendaItem, type AgendaAnamnesis, type AgendaPhoto } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
@@ -42,7 +42,7 @@ export default async function DashboardPage({
     await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, status, total_price, member_id, clients(full_name, alert_summary), salon_members(display_name), appointment_services(name, price, duration_min)")
+        .select("id, starts_at, status, total_price, member_id, client_id, inspiration_gallery_ids, clients(full_name, alert_summary, photo_url), salon_members(display_name), appointment_services(name, price, duration_min)")
         .eq("salon_id", salonId)
         .gte("starts_at", startDay)
         .lt("starts_at", endDay)
@@ -188,15 +188,43 @@ export default async function DashboardPage({
     .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
     .reduce((sum, a) => sum + Number(a.total_price), 0);
 
+  // Ficha de anamnese (RLS por clients.view) e fotos de inspiração das clientes
+  // de hoje — 2 buscas leves pra o profissional já ver o essencial na inicial.
+  const clientIds = Array.from(
+    new Set(appts.map((a) => a.client_id).filter((x): x is string => !!x)),
+  );
+  const inspirationIds = Array.from(
+    new Set(appts.flatMap((a) => (a.inspiration_gallery_ids as string[] | null) ?? [])),
+  );
+  const [{ data: anamRows }, { data: galleryRows }] = await Promise.all([
+    clientIds.length
+      ? supabase.from("client_anamnesis").select("*").in("client_id", clientIds)
+      : Promise.resolve({ data: [] as AgendaAnamnesis[] }),
+    inspirationIds.length
+      ? supabase.from("salon_gallery").select("id, url, caption").in("id", inspirationIds)
+      : Promise.resolve({ data: [] as AgendaPhoto[] }),
+  ]);
+  const anamByClient = new Map<string, AgendaAnamnesis>();
+  for (const r of (anamRows as AgendaAnamnesis[] | null) ?? []) anamByClient.set(r.client_id, r);
+  const photoById = new Map<string, AgendaPhoto>();
+  for (const g of (galleryRows as AgendaPhoto[] | null) ?? []) photoById.set(g.id, g);
+
   const agendaItems: AgendaItem[] = appts.map((a) => {
-    const clientObj = a.clients as { full_name?: string; alert_summary?: string | null } | null;
+    const clientObj = a.clients as { full_name?: string; alert_summary?: string | null; photo_url?: string | null } | null;
     const svcs = (a.appointment_services as { name: string; price: number; duration_min: number }[] | null) ?? [];
+    const inspiration = ((a.inspiration_gallery_ids as string[] | null) ?? [])
+      .map((id) => photoById.get(id))
+      .filter((g): g is AgendaPhoto => !!g);
     return {
       id: a.id,
       starts_at: a.starts_at,
       time: formatTime(a.starts_at),
       client: clientObj?.full_name ?? "Cliente",
+      clientId: a.client_id ?? null,
+      photoUrl: clientObj?.photo_url ?? null,
       alert: clientObj?.alert_summary ?? null,
+      anamnesis: (a.client_id && anamByClient.get(a.client_id)) || null,
+      inspiration,
       prof: (a.salon_members as { display_name?: string } | null)?.display_name ?? "",
       status: a.status,
       price: Number(a.total_price),
@@ -272,7 +300,7 @@ export default async function DashboardPage({
                 Nenhum agendamento para hoje ainda.
               </div>
             ) : (
-              <TodayAgenda items={agendaItems} salonId={salonId} />
+              <TodayAgenda items={agendaItems} salonId={salonId} slug={slug} niche={membership.salons.niche} />
             )}
           </div>
         </div>
