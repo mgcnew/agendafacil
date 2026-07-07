@@ -13,6 +13,7 @@ import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
 import { AgendaTodaySignalsAsync, AgendaTodaySignalsSkeleton } from "./AgendaTodaySignals";
+import { GestorPanel } from "./GestorPanel";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
 
@@ -258,7 +259,24 @@ export default async function DashboardPage({
           </h1>
           <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
         </div>
-        <NotificationBell salonId={salonId} initialItems={notifItems} />
+        <div className="flex items-center gap-2">
+          {/* Gestor Zulan — resumo do dia atrás de um ícone, pra não poluir a tela */}
+          <GestorPanel>
+            <Suspense fallback={<AgendaTodaySignalsSkeleton />}>
+              <AgendaTodaySignalsAsync supabase={supabase} salonId={salonId} slug={slug} />
+            </Suspense>
+            <Suspense fallback={<GestorInsightsSkeleton />}>
+              <GestorInsightsAsync
+                slug={slug}
+                supabase={supabase}
+                salonId={salonId}
+                firstName={firstName}
+                salonName={membership.salons.name}
+              />
+            </Suspense>
+          </GestorPanel>
+          <NotificationBell salonId={salonId} initialItems={notifItems} />
+        </div>
       </div>
 
       {/* Desktop: 2 colunas. Mobile: coluna única */}
@@ -268,22 +286,6 @@ export default async function DashboardPage({
         <div className="space-y-6 min-w-0">
           {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
           {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
-
-          {/* Sinais de agora da Agenda — sempre frescos, sem IA/cache (streaming à parte) */}
-          <Suspense fallback={<AgendaTodaySignalsSkeleton />}>
-            <AgendaTodaySignalsAsync supabase={supabase} salonId={salonId} slug={slug} />
-          </Suspense>
-
-          {/* Resumo do Gestor Zulan — streaming: não bloqueia o resto da página */}
-          <Suspense fallback={<GestorInsightsSkeleton />}>
-            <GestorInsightsAsync
-              slug={slug}
-              supabase={supabase}
-              salonId={salonId}
-              firstName={firstName}
-              salonName={membership.salons.name}
-            />
-          </Suspense>
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

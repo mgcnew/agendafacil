@@ -148,7 +148,13 @@ export async function GestorInsightsAsync({
   const birthdayClients: BirthdayContact[] = birthdays
     .filter((b) => b.days_until === 0)
     .map((b) => ({ id: b.id, name: b.name, phone: b.phone }));
-  return <GestorInsightsCard slug={slug} insights={insights} birthdayClients={birthdayClients} />;
+  return (
+    <>
+      {/* Marcador invisível: acende a bolinha do ícone quando há aviso narrado. */}
+      {insights.length > 0 && <span data-gestor-signal hidden />}
+      <GestorInsightsCard slug={slug} insights={insights} birthdayClients={birthdayClients} />
+    </>
+  );
 }
 
 function GestorInsightsCard({

@@ -26,5 +26,12 @@ export async function AgendaTodaySignalsAsync({
   slug: string;
 }) {
   const signals = await collectAgendaTodaySignals(supabase, salonId);
-  return <AgendaSignalsBanner signals={signals} slug={slug} />;
+  // Marcador invisível: acende a bolinha do ícone quando há algo pra ver.
+  const has = signals.cancelled > 0 || signals.lateClients.length > 0 || signals.emptySlots > 0;
+  return (
+    <>
+      {has && <span data-gestor-signal hidden />}
+      <AgendaSignalsBanner signals={signals} slug={slug} />
+    </>
+  );
 }
