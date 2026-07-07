@@ -369,17 +369,28 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
       <div className={cn("h-full flex flex-col justify-start overflow-hidden py-1", narrow ? "px-1" : "px-2 gap-0.5")}>
         {stacked ? (
           <>
-            <p className={cn("font-semibold truncate text-foreground/80 leading-none", narrow ? "text-[9px]" : "text-[11px]")}>
-              {timeLabel}
+            <p className={cn(
+              "font-semibold truncate leading-tight flex items-center gap-1",
+              narrow ? "text-[9px]" : "text-[11px]",
+            )}>
+              {a.clients?.alert_summary && (
+                <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
+              )}
+              <span className="truncate text-foreground/80 min-w-0">{timeLabel}</span>
             </p>
-            <p className={cn("font-medium text-foreground truncate leading-none", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5")}>
+            <p className={cn("font-medium text-foreground truncate leading-tight", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5")}>
               {name}
             </p>
           </>
         ) : (
           /* Card baixo, sem sobreposição: cabe 1 linha combinando hora + nome. */
-          <p className="font-medium truncate leading-tight text-[11px] text-foreground/90">
-            <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
+          <p className="font-medium truncate leading-tight text-[11px] text-foreground/90 flex items-center gap-1">
+            {a.clients?.alert_summary && (
+              <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
+            )}
+            <span className="truncate min-w-0">
+              <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
+            </span>
           </p>
         )}
         {h > 58 && !compact && !narrow && (
@@ -387,9 +398,6 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
             <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
             {st.label}
           </span>
-        )}
-        {a.clients?.alert_summary && (
-          <Warning className="h-2.5 w-2.5 text-red-500 mt-0.5 shrink-0" aria-label="Restrição" />
         )}
       </div>
     </button>
