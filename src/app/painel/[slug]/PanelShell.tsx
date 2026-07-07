@@ -17,7 +17,6 @@ import {
   Stack,
   Package,
   Gear,
-  Scissors,
   SealPercent,
   ChartBar,
   CreditCard,
@@ -264,9 +263,10 @@ export function PanelShell({
         {/* Logo */}
         <Link
           href={base}
-          className="group relative flex items-center justify-center h-10 w-10 rounded-[var(--radius)] bg-primary text-primary-foreground mb-2"
+          className="group relative flex items-center justify-center h-10 w-10 rounded-[var(--radius)] overflow-hidden bg-white ring-1 ring-border mb-2"
         >
-          <Scissors className="h-[18px] w-[18px]" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
           <Tip label={salon.name} />
         </Link>
 
@@ -313,8 +313,9 @@ export function PanelShell({
         {/* Topbar mobile — marca à esquerda, alternar tema à direita */}
         <header className="lg:hidden shrink-0 relative z-20 flex items-center justify-between border-b border-border/70 bg-card px-4 h-14 shadow-[0_2px_10px_-6px_rgba(0,0,0,0.16)]">
           <Link href={base} className="flex items-center gap-2.5 font-display font-bold min-w-0">
-            <span className="grid place-items-center h-8 w-8 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
-              <Scissors className="h-[18px] w-[18px]" />
+            <span className="block h-8 w-8 shrink-0 overflow-hidden rounded-[var(--radius)] bg-white ring-1 ring-border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
             </span>
             <span className="truncate">{salon.name}</span>
           </Link>
@@ -408,8 +409,9 @@ export function PanelShell({
               <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="grid place-items-center h-9 w-9 shrink-0 rounded-[var(--radius)] bg-primary/10 text-primary ring-1 ring-primary/15">
-                    <Scissors className="h-[18px] w-[18px]" />
+                  <span className="block h-9 w-9 shrink-0 overflow-hidden rounded-[var(--radius)] bg-white ring-1 ring-border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
                   </span>
                   <div className="min-w-0">
                     <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
