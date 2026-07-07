@@ -877,10 +877,15 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
   onDeleteBlock: (b: Block) => void;
 }) {
   const canDelBlock = (b: Block) => canManageSchedule || (!!myMemberId && b.member_id === myMemberId);
-  const visible = (activePros.length > 0
-    ? appts.filter(a => activePros.some(p => p.id === a.member_id))
-    : appts
-  ).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  // Filtra pelo dia mostrado — na visão Dia `appts` já vem de um só dia (no-op),
+  // mas na Semana recebe a semana inteira, então o filtro é o que separa cada dia.
+  const visible = appts
+    .filter(a =>
+      datePart(a.starts_at) === date &&
+      (activePros.length === 0 || activePros.some(p => p.id === a.member_id)),
+    )
+    .slice()
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
   const visibleBlocks = (activePros.length > 0
     ? blocks.filter(b => b.member_id === null || activePros.some(p => p.id === b.member_id))
@@ -977,6 +982,63 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Mobile: faixa de dias da semana (seletor) ──────────────────
+// Em vez de espremer 7 colunas num celular, o usuário toca no dia e vê a lista
+// cronológica dele (AgendaList) logo abaixo — sem rolagem horizontal e sem a
+// grade alta que prendia o scroll mostrando só a 1ª hora.
+function WeekStrip({ days, selected, appts, activePros, onSelect }: {
+  days: string[]; selected: string; appts: Appt[]; activePros: Pro[];
+  onSelect: (d: string) => void;
+}) {
+  const countFor = (day: string) =>
+    appts.filter(a =>
+      datePart(a.starts_at) === day &&
+      (activePros.length === 0 || activePros.some(p => p.id === a.member_id)),
+    ).length;
+
+  return (
+    <div className="grid grid-cols-7 gap-1 rounded-[var(--radius)] border border-border bg-card p-1.5">
+      {days.map(day => {
+        const d     = parse(day);
+        const today = isToday(day);
+        const isSel = day === selected;
+        const n     = countFor(day);
+        return (
+          <button
+            key={day}
+            type="button"
+            onClick={() => onSelect(day)}
+            aria-pressed={isSel}
+            className={cn(
+              "flex flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 transition",
+              isSel ? "bg-primary/10" : "hover:bg-muted/60",
+            )}
+          >
+            <span className={cn(
+              "text-[10px] uppercase tracking-wide",
+              isSel ? "text-primary font-semibold" : "text-muted-foreground",
+            )}>
+              {DAY_SHORT[d.getDay()]}
+            </span>
+            <span className={cn(
+              "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold",
+              isSel
+                ? "bg-primary text-primary-foreground"
+                : today ? "text-primary ring-1 ring-primary/40" : "text-foreground",
+            )}>
+              {d.getDate()}
+            </span>
+            <span className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              n > 0 ? (isSel ? "bg-primary" : "bg-primary/50") : "bg-transparent",
+            )} />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1382,6 +1444,18 @@ export function AgendaManager({
     [pros, selectedPros],
   );
 
+  // Dia selecionado na visão semanal do celular (faixa de dias + lista). Fica
+  // separado de `date` (âncora da semana) pra tocar num dia não refazer a busca
+  // da semana inteira. Guardamos só a escolha explícita; o dia efetivo é
+  // derivado — se a escolha não pertence à semana exibida (troca de semana),
+  // recai em "hoje" (se estiver na semana) ou no 1º dia. Derivar evita
+  // efeito/refetch e não dispara o lint de setState em efeito.
+  const weekDays = useMemo(() => getWeekDays(date), [date]);
+  const [weekDayPick, setWeekDayPick] = useState<string | null>(null);
+  const weekDay = weekDayPick && weekDays.includes(weekDayPick)
+    ? weekDayPick
+    : weekDays.includes(toStr(new Date())) ? toStr(new Date()) : weekDays[0];
+
   // Cor de cada serviço, para colorir os eventos por serviço.
   const serviceColor = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1589,7 +1663,7 @@ export function AgendaManager({
   const detailColor = detailAppt ? (detailAppt.color ?? getColor(pros, detailAppt.member_id)) : "#6366f1";
 
   return (
-    <div className="flex flex-col gap-3 h-full af-rise">
+    <div className="flex flex-col gap-3 sm:h-full af-rise">
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -1708,14 +1782,35 @@ export function AgendaManager({
             onNewAppt={d => openCreate(d)}
           />
         ) : view === "semana" ? (
-          <WeekView
-            date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-            canManageSchedule={canManageSchedule} myMemberId={myMemberId}
-            onApptClick={a => setDetailAppt(a)}
-            onDayClick={d => { setDate(d); setView("dia"); }}
-            onSlotClick={(d, time) => openCreate(d, undefined, time)}
-            onDeleteBlock={deleteBlock}
-          />
+          <>
+            {/* Mobile: faixa de dias + lista cronológica do dia escolhido */}
+            <div className="sm:hidden h-full flex flex-col gap-3">
+              <WeekStrip
+                days={weekDays} selected={weekDay} appts={appts} activePros={activePros}
+                onSelect={setWeekDayPick}
+              />
+              <div className="flex-1 min-h-0">
+                <AgendaList
+                  date={weekDay} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
+                  canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                  onApptClick={a => setDetailAppt(a)}
+                  onNewAppt={d => openCreate(d)}
+                  onDeleteBlock={deleteBlock}
+                />
+              </div>
+            </div>
+            {/* Desktop: grade da semana */}
+            <div className="hidden sm:block h-full">
+              <WeekView
+                date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
+                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                onApptClick={a => setDetailAppt(a)}
+                onDayClick={d => { setDate(d); setView("dia"); }}
+                onSlotClick={(d, time) => openCreate(d, undefined, time)}
+                onDeleteBlock={deleteBlock}
+              />
+            </div>
+          </>
         ) : (
           <>
             {/* Mobile: lista cronológica · Desktop: grade por profissional */}

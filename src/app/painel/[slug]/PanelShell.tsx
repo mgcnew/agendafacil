@@ -327,7 +327,10 @@ export function PanelShell({
             className={cn(
               "w-full",
               fullBleed
-                ? "h-full p-3 sm:p-4"
+                // No celular a agenda flui como qualquer página (a página rola);
+                // só no ≥sm ela trava na altura da viewport (grade com scroll
+                // interno, padrão de calendário no desktop).
+                ? "sm:h-full p-3 sm:p-4"
                 : "flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 2xl:px-12",
             )}
           >
