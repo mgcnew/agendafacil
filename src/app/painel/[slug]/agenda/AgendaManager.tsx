@@ -340,38 +340,44 @@ function BlockCard({ b, canManage, onDelete }: {
 }
 
 // ── Appointment card (grid block, opens detail modal on click) ─
-function ApptCard({ a, color, compact = false, onOpen }: {
-  a: Appt; color: string; compact?: boolean; onOpen: () => void;
+// `compact` = card baixo (pouca altura) → 1 linha. `narrow` = faixa estreita
+// (sobreposição) → mostra só a hora de início e reduz o padding, pra não cortar.
+function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
+  a: Appt; color: string; compact?: boolean; narrow?: boolean; onOpen: () => void;
 }) {
   const st = STATUS_META[a.status];
   const h = apptH(a);
+  const name = a.clients?.full_name ?? "Cliente";
+  const timeLabel = narrow || compact
+    ? fmtHM(a.starts_at)
+    : `${fmtHM(a.starts_at)}${a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}`;
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${a.clients?.full_name ?? "Cliente"} às ${fmtHM(a.starts_at)} — ${st.label}`}
+      aria-label={`${name} às ${fmtHM(a.starts_at)} — ${st.label}`}
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
     >
-      <div className="px-2 py-1 h-full flex flex-col justify-start gap-0.5 overflow-hidden">
+      <div className={cn("h-full flex flex-col justify-start gap-0.5 overflow-hidden py-1", narrow ? "px-0.5" : "px-2")}>
         {compact ? (
-          /* Card compacto (< 44px): horário + nome na mesma linha */
-          <p className="text-[11px] font-medium truncate leading-tight text-foreground/90">
+          /* Card baixo: 1 linha. Em faixa estreita, só a hora (nome tap p/ abrir). */
+          <p className={cn("font-medium truncate leading-tight text-foreground/90", narrow ? "text-[10px]" : "text-[11px]")}>
             <span className="font-semibold">{fmtHM(a.starts_at)}</span>
-            {" · "}{a.clients?.full_name ?? "Cliente"}
+            {!narrow && <>{" · "}{name}</>}
           </p>
         ) : (
           <>
-            <p className="text-[11px] font-semibold truncate text-foreground/80 leading-tight">
-              {fmtHM(a.starts_at)}{a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}
+            <p className={cn("font-semibold truncate text-foreground/80 leading-tight", narrow ? "text-[10px]" : "text-[11px]")}>
+              {timeLabel}
             </p>
-            <p className="text-[12px] font-medium text-foreground truncate leading-tight">
-              {a.clients?.full_name ?? "Cliente"}
+            <p className={cn("font-medium text-foreground truncate leading-tight", narrow ? "text-[10px]" : "text-[12px]")}>
+              {name}
             </p>
           </>
         )}
-        {h > 58 && !compact && (
+        {h > 58 && !compact && !narrow && (
           <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
             <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
             {st.label}
@@ -846,7 +852,7 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
                     return (
                       <div key={a.id} className="absolute z-10" style={{ top, height: h, ...laneStyle(ln.lane, ln.lanes) }}
                         onClick={(e) => e.stopPropagation()}>
-                        <ApptCard a={a} color={a.color ?? NO_SERVICE_COLOR} compact={h < 44 || ln.lanes > 1} onOpen={() => onApptClick(a)} />
+                        <ApptCard a={a} color={a.color ?? NO_SERVICE_COLOR} compact={h < 44} narrow={ln.lanes > 1} onOpen={() => onApptClick(a)} />
                       </div>
                     );
                   });
@@ -986,7 +992,7 @@ function EmptyDay() {
 }
 
 // ── Week View ──────────────────────────────────────────────────
-const COL_W_WEEK = 90;
+const COL_W_WEEK = 116;
 
 function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
@@ -1101,7 +1107,7 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, my
                     return (
                       <div key={a.id} className="absolute z-10" style={{ top, height: h, ...laneStyle(ln.lane, ln.lanes) }}
                         onClick={(e) => e.stopPropagation()}>
-                        <ApptCard a={a} color={color} compact={h < 40 || ln.lanes > 1}
+                        <ApptCard a={a} color={color} compact={h < 40} narrow={ln.lanes > 1}
                           onOpen={() => onApptClick(a)} />
                       </div>
                     );
