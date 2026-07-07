@@ -341,7 +341,9 @@ function BlockCard({ b, canManage, onDelete }: {
 
 // ── Appointment card (grid block, opens detail modal on click) ─
 // `compact` = card baixo (pouca altura) → 1 linha. `narrow` = faixa estreita
-// (sobreposição) → mostra só a hora de início e reduz o padding, pra não cortar.
+// (sobreposição, comum com serviços curtos tipo manicure) → empilha hora +
+// nome em 2 linhas bem pequenas, mas NUNCA esconde o nome (era o que
+// deixava o card ilegível no desktop pra atendimentos curtos).
 function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
   a: Appt; color: string; compact?: boolean; narrow?: boolean; onOpen: () => void;
 }) {
@@ -351,6 +353,10 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
   const timeLabel = narrow || compact
     ? fmtHM(a.starts_at)
     : `${fmtHM(a.starts_at)}${a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}`;
+  // Estreito sempre empilha (2 linhas bem pequenas cabem melhor que uma linha
+  // longa "hh:mm · Nome" em ~60-80px de largura); baixo-mas-largo continua
+  // preferindo 1 linha combinada, que economiza altura sem sacrificar nome.
+  const stacked = narrow || !compact;
 
   return (
     <button
@@ -360,22 +366,21 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
     >
-      <div className={cn("h-full flex flex-col justify-start gap-0.5 overflow-hidden py-1", narrow ? "px-0.5" : "px-2")}>
-        {compact ? (
-          /* Card baixo: 1 linha. Em faixa estreita, só a hora (nome tap p/ abrir). */
-          <p className={cn("font-medium truncate leading-tight text-foreground/90", narrow ? "text-[10px]" : "text-[11px]")}>
-            <span className="font-semibold">{fmtHM(a.starts_at)}</span>
-            {!narrow && <>{" · "}{name}</>}
-          </p>
-        ) : (
+      <div className={cn("h-full flex flex-col justify-start overflow-hidden py-1", narrow ? "px-1" : "px-2 gap-0.5")}>
+        {stacked ? (
           <>
-            <p className={cn("font-semibold truncate text-foreground/80 leading-tight", narrow ? "text-[10px]" : "text-[11px]")}>
+            <p className={cn("font-semibold truncate text-foreground/80 leading-none", narrow ? "text-[9px]" : "text-[11px]")}>
               {timeLabel}
             </p>
-            <p className={cn("font-medium text-foreground truncate leading-tight", narrow ? "text-[10px]" : "text-[12px]")}>
+            <p className={cn("font-medium text-foreground truncate leading-none", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5")}>
               {name}
             </p>
           </>
+        ) : (
+          /* Card baixo, sem sobreposição: cabe 1 linha combinando hora + nome. */
+          <p className="font-medium truncate leading-tight text-[11px] text-foreground/90">
+            <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
+          </p>
         )}
         {h > 58 && !compact && !narrow && (
           <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
