@@ -75,10 +75,15 @@ export function GestorPanel({ children }: { children: React.ReactNode }) {
       </button>
 
       {/* Mantido montado (escondido) pra o conteúdo transmitir e a bolinha
-          refletir o estado real; só a visibilidade muda ao abrir/fechar. */}
+          refletir o estado real; só a visibilidade muda ao abrir/fechar.
+          Mobile: painel fixo na viewport (o ícone não é o elemento mais à
+          direita, então ancorar nele cortava o painel na esquerda). Desktop:
+          dropdown ancorado ao ícone. */}
       <div
         className={cn(
-          "absolute right-0 mt-2 w-[min(26rem,calc(100vw-2rem))] z-50 rounded-[var(--radius)] border border-border bg-card shadow-xl overflow-hidden",
+          "z-50 rounded-[var(--radius)] border border-border bg-card shadow-xl overflow-hidden",
+          "fixed inset-x-3 top-16",
+          "sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[min(26rem,calc(100vw-2rem))]",
           !open && "hidden",
         )}
       >
