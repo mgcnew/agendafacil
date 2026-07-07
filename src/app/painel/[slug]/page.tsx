@@ -12,6 +12,7 @@ import { TodayAgenda, type AgendaItem, type AgendaAnamnesis, type AgendaPhoto } 
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
+import { AgendaTodaySignalsAsync, AgendaTodaySignalsSkeleton } from "./AgendaTodaySignals";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
 
@@ -267,6 +268,11 @@ export default async function DashboardPage({
         <div className="space-y-6 min-w-0">
           {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
           {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
+
+          {/* Sinais de agora da Agenda — sempre frescos, sem IA/cache (streaming à parte) */}
+          <Suspense fallback={<AgendaTodaySignalsSkeleton />}>
+            <AgendaTodaySignalsAsync supabase={supabase} salonId={salonId} slug={slug} />
+          </Suspense>
 
           {/* Resumo do Gestor Zulan — streaming: não bloqueia o resto da página */}
           <Suspense fallback={<GestorInsightsSkeleton />}>

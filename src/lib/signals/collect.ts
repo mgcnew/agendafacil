@@ -34,6 +34,10 @@ export async function collectSignals(
     { data: bdayRaw },
     { data: pkgsRaw },
     { data: productsRaw },
+    { data: servicesRaw },
+    { data: serviceInsightRaw },
+    { data: productInsightRaw },
+    { data: winbackRaw },
   ] = await Promise.all([
     supabase
       .from("appointments")
@@ -48,7 +52,11 @@ export async function collectSignals(
       .select("purchased_at, expires_at, client_package_items(used)")
       .eq("salon_id", salonId)
       .eq("status", "active"),
-    supabase.from("products").select("name, quantity, min_quantity").eq("salon_id", salonId).eq("is_active", true),
+    supabase.from("products").select("id, name, quantity, min_quantity, is_resale").eq("salon_id", salonId).eq("is_active", true),
+    supabase.from("services").select("id, name").eq("salon_id", salonId).eq("is_active", true),
+    supabase.rpc("service_insights" as never, { p_salon: salonId } as never),
+    supabase.rpc("product_movement_stats" as never, { p_salon: salonId } as never),
+    supabase.rpc("marketing_winback" as never, { p_salon: salonId } as never),
   ]);
 
   // ── Contexto (tom, não é aviso) ──────────────────────────────────────────
@@ -117,7 +125,7 @@ export async function collectSignals(
   }
 
   // ── Estoque mínimo ───────────────────────────────────────────────────────
-  const products = (productsRaw ?? []) as { name: string; quantity: number; min_quantity: number }[];
+  const products = (productsRaw ?? []) as { id: string; name: string; quantity: number; min_quantity: number; is_resale: boolean }[];
   const low = products.filter((p) => isLowStock(p.quantity, p.min_quantity));
   if (low.length > 0) {
     const names = low.map((p) => p.name).slice(0, 5).join(", ");
@@ -125,6 +133,50 @@ export async function collectSignals(
       key: "low_stock",
       count: low.length,
       fact: `${low.length} produto${low.length === 1 ? "" : "s"} no estoque mínimo: ${names}`,
+    });
+  }
+
+  // ── Serviços parados (mesma regra de "isDormant" da página Serviços:
+  // ativo e zero agendamentos concluídos na janela de service_insights) ────
+  const services = (servicesRaw ?? []) as { id: string; name: string }[];
+  const serviceBookings = new Map<string, number>();
+  for (const r of (serviceInsightRaw ?? []) as { service_id: string; bookings: number }[]) {
+    serviceBookings.set(r.service_id, r.bookings);
+  }
+  const dormantServices = services.filter((s) => (serviceBookings.get(s.id) ?? 0) === 0);
+  if (dormantServices.length > 0) {
+    const names = dormantServices.map((s) => s.name).slice(0, 5).join(", ");
+    signals.push({
+      key: "service_dormant",
+      count: dormantServices.length,
+      fact: `${dormantServices.length} serviço${dormantServices.length === 1 ? "" : "s"} sem nenhum agendamento há 90+ dias: ${names}`,
+    });
+  }
+
+  // ── Produtos de revenda parados (mesma regra de "dormant" da página
+  // Estoque: revenda, ativo e zero saída na janela de product_movement_stats) ─
+  const productConsumed = new Map<string, number>();
+  for (const r of (productInsightRaw ?? []) as { product_id: string; consumed_qty: number }[]) {
+    productConsumed.set(r.product_id, Number(r.consumed_qty));
+  }
+  const dormantProducts = products.filter((p) => p.is_resale && (productConsumed.get(p.id) ?? 0) === 0);
+  if (dormantProducts.length > 0) {
+    const names = dormantProducts.map((p) => p.name).slice(0, 5).join(", ");
+    signals.push({
+      key: "product_dormant",
+      count: dormantProducts.length,
+      fact: `${dormantProducts.length} produto${dormantProducts.length === 1 ? "" : "s"} de revenda sem nenhuma venda há 30+ dias: ${names}`,
+    });
+  }
+
+  // ── Faltas recentes (mesmo balde "no_shows" que a Recuperação de clientes já usa) ─
+  const winback = (winbackRaw ?? { no_shows: [] }) as { no_shows: unknown[] };
+  const noShowCount = Array.isArray(winback.no_shows) ? winback.no_shows.length : 0;
+  if (noShowCount > 0) {
+    signals.push({
+      key: "recent_no_shows",
+      count: noShowCount,
+      fact: `${noShowCount} cliente${noShowCount === 1 ? "" : "s"} faltou recentemente sem remarcar`,
     });
   }
 

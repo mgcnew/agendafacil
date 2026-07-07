@@ -33,6 +33,12 @@ export function signalKeyForInsight(type: InsightType): SignalKey | null {
       return "package_dormant";
     case "low_stock":
       return "low_stock";
+    case "service_dormant":
+      return "service_dormant";
+    case "product_dormant":
+      return "product_dormant";
+    case "recent_no_shows":
+      return "recent_no_shows";
     default:
       return null; // revenue, general — sem categoria dispensável
   }

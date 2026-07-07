@@ -7,7 +7,10 @@ export type SignalKey =
   | "birthday_today"
   | "package_expiring"
   | "package_dormant"
-  | "low_stock";
+  | "low_stock"
+  | "service_dormant"
+  | "product_dormant"
+  | "recent_no_shows";
 
 export type Signal = {
   key: SignalKey;

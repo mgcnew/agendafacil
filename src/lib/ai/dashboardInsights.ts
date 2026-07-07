@@ -19,6 +19,9 @@ export type InsightType =
   | "package_dormant"
   | "revenue"
   | "low_stock"
+  | "service_dormant"
+  | "product_dormant"
+  | "recent_no_shows"
   | "general";
 
 export type Insight = {
@@ -79,7 +82,10 @@ const TOOL_SCHEMA = {
             properties: {
               type: {
                 type: "string",
-                enum: ["reactivation", "birthday", "package_expiring", "package_dormant", "revenue", "low_stock", "general"],
+                enum: [
+                  "reactivation", "birthday", "package_expiring", "package_dormant", "revenue", "low_stock",
+                  "service_dormant", "product_dormant", "recent_no_shows", "general",
+                ],
               },
               title: { type: "string", description: "Frase curta, até 60 caracteres." },
               detail: { type: "string", description: "1-2 frases explicando a oportunidade." },
@@ -120,6 +126,21 @@ const STUB: Record<Signal["key"], { type: InsightType; title: (c: number) => str
     type: "low_stock",
     title: (c) => `${c} produto${c === 1 ? "" : "s"} no estoque mínimo`,
     priority: "media",
+  },
+  service_dormant: {
+    type: "service_dormant",
+    title: (c) => `${c} serviço${c === 1 ? "" : "s"} parado${c === 1 ? "" : "s"} há 90+ dias`,
+    priority: "baixa",
+  },
+  product_dormant: {
+    type: "product_dormant",
+    title: (c) => `${c} produto${c === 1 ? "" : "s"} de revenda parado${c === 1 ? "" : "s"} há 30+ dias`,
+    priority: "baixa",
+  },
+  recent_no_shows: {
+    type: "recent_no_shows",
+    title: (c) => `${c} falta${c === 1 ? "" : "s"} recente${c === 1 ? "" : "s"} sem remarcar`,
+    priority: "alta",
   },
 };
 

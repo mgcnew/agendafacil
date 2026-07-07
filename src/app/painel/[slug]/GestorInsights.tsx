@@ -9,6 +9,8 @@ import {
   Sparkle,
   CaretRight,
   ChatCircle,
+  CalendarX,
+  XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   getOrGenerateDashboardInsights,
@@ -41,6 +43,9 @@ const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   package_dormant: Package,
   revenue: Wallet,
   low_stock: Stack,
+  service_dormant: CalendarX,
+  product_dormant: CalendarX,
+  recent_no_shows: XCircle,
   general: Sparkle,
 };
 
@@ -76,7 +81,12 @@ function hrefFor(slug: string, type: InsightType): string | null {
     case "revenue":
       return `/painel/${slug}/financeiro`;
     case "low_stock":
+    case "product_dormant":
       return `/painel/${slug}/estoque`;
+    case "service_dormant":
+      return `/painel/${slug}/servicos`;
+    case "recent_no_shows":
+      return `/painel/${slug}/recuperar`;
     default:
       return null;
   }
