@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment, type CSSProperties } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -209,6 +209,47 @@ function apptH(a: Appt) {
   if (!a.ends_at) return CELL_H;
   const mins = (new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 60000;
   return Math.max(28, (mins / 60) * CELL_H);
+}
+function apptEndMs(a: Appt) {
+  const s = new Date(a.starts_at).getTime();
+  return a.ends_at ? new Date(a.ends_at).getTime() : s + 60 * 60000;
+}
+/**
+ * Empacota agendamentos que se sobrepõem no tempo em "faixas" lado a lado
+ * (mesma técnica de calendários) — evita que fiquem um por cima do outro numa
+ * coluna estreita. Retorna, por id: a faixa (lane) e o total de faixas do
+ * cluster de sobreposição. Sem sobreposição → 1 faixa (largura cheia).
+ */
+function packLanes(appts: Appt[]): Map<string, { lane: number; lanes: number }> {
+  const res = new Map<string, { lane: number; lanes: number }>();
+  const sorted = [...appts].sort(
+    (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime() || apptEndMs(a) - apptEndMs(b),
+  );
+  let cluster: Appt[] = [];
+  let laneEnds: number[] = [];
+  let clusterEnd = -Infinity;
+  const flush = () => {
+    const n = Math.max(1, laneEnds.length);
+    for (const a of cluster) { const r = res.get(a.id); if (r) r.lanes = n; }
+    cluster = []; laneEnds = []; clusterEnd = -Infinity;
+  };
+  for (const a of sorted) {
+    const s = new Date(a.starts_at).getTime();
+    const e = apptEndMs(a);
+    if (cluster.length && s >= clusterEnd) flush();
+    let lane = laneEnds.findIndex((end) => end <= s);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(e); } else laneEnds[lane] = e;
+    res.set(a.id, { lane, lanes: laneEnds.length });
+    cluster.push(a);
+    clusterEnd = Math.max(clusterEnd, e);
+  }
+  flush();
+  return res;
+}
+// Estilo de posição horizontal de um agendamento dentro da coluna, conforme a faixa.
+function laneStyle(lane: number, lanes: number): CSSProperties {
+  const wPct = 100 / lanes;
+  return { left: `calc(${lane * wPct}% + 1px)`, width: `calc(${wPct}% - 3px)` };
 }
 function getColor(pros: Pro[], memberId: string) {
   const idx = pros.findIndex(p => p.id === memberId);
@@ -796,16 +837,20 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
                     <BlockCard b={b} canManage={canDelBlock(b)} onDelete={onDeleteBlock} />
                   </div>
                 ))}
-                {proAppts.map(a => {
-                  const top = apptTop(a, bounds.start);
-                  const h   = apptH(a);
-                  return (
-                    <div key={a.id} className="absolute left-1 right-1 z-10" style={{ top, height: h }}
-                      onClick={(e) => e.stopPropagation()}>
-                      <ApptCard a={a} color={a.color ?? NO_SERVICE_COLOR} compact={h < 44} onOpen={() => onApptClick(a)} />
-                    </div>
-                  );
-                })}
+                {(() => {
+                  const lanes = packLanes(proAppts);
+                  return proAppts.map(a => {
+                    const top = apptTop(a, bounds.start);
+                    const h   = apptH(a);
+                    const ln  = lanes.get(a.id) ?? { lane: 0, lanes: 1 };
+                    return (
+                      <div key={a.id} className="absolute z-10" style={{ top, height: h, ...laneStyle(ln.lane, ln.lanes) }}
+                        onClick={(e) => e.stopPropagation()}>
+                        <ApptCard a={a} color={a.color ?? NO_SERVICE_COLOR} compact={h < 44 || ln.lanes > 1} onOpen={() => onApptClick(a)} />
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             );
           })}
@@ -1046,18 +1091,22 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, my
                     <BlockCard b={b} canManage={canDelBlock(b)} onDelete={onDeleteBlock} />
                   </div>
                 ))}
-                {dayAppts.map(a => {
-                  const color = a.color ?? getColor(pros, a.member_id);
-                  const top   = apptTop(a, bounds.start);
-                  const h     = apptH(a);
-                  return (
-                    <div key={a.id} className="absolute left-0.5 right-0.5 z-10" style={{ top, height: h }}
-                      onClick={(e) => e.stopPropagation()}>
-                      <ApptCard a={a} color={color} compact={h < 40}
-                        onOpen={() => onApptClick(a)} />
-                    </div>
-                  );
-                })}
+                {(() => {
+                  const lanes = packLanes(dayAppts);
+                  return dayAppts.map(a => {
+                    const color = a.color ?? getColor(pros, a.member_id);
+                    const top   = apptTop(a, bounds.start);
+                    const h     = apptH(a);
+                    const ln    = lanes.get(a.id) ?? { lane: 0, lanes: 1 };
+                    return (
+                      <div key={a.id} className="absolute z-10" style={{ top, height: h, ...laneStyle(ln.lane, ln.lanes) }}
+                        onClick={(e) => e.stopPropagation()}>
+                        <ApptCard a={a} color={color} compact={h < 40 || ln.lanes > 1}
+                          onOpen={() => onApptClick(a)} />
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             );
           })}

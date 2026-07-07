@@ -295,6 +295,8 @@ function ItemCard({
             {item.services.length > 0 && (
               <>{item.prof ? " · " : ""}{item.services.length} serviço{item.services.length === 1 ? "" : "s"}</>
             )}
+            {/* Preço na 2ª linha só no mobile (libera espaço pro nome no topo) */}
+            <span className="sm:hidden"> · <span className="font-semibold text-primary">{formatBRL(item.price)}</span></span>
           </p>
         </div>
 
@@ -304,7 +306,8 @@ function ItemCard({
           <span className="hidden sm:inline">{st.label}</span>
         </span>
 
-        <span className="font-semibold text-primary text-sm shrink-0">{formatBRL(item.price)}</span>
+        {/* Preço à direita só no desktop */}
+        <span className="hidden sm:inline font-semibold text-primary text-sm shrink-0">{formatBRL(item.price)}</span>
         <CaretDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")} />
       </button>
 
