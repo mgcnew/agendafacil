@@ -912,16 +912,10 @@ function ActionTile({
   );
 }
 
-/* Dica de tecla de atalho exibida no rodapé dos botões do PDV (desktop). */
-function KbdHint({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="mt-1 text-[8px] font-mono font-semibold leading-none rounded border border-border bg-muted/60 text-muted-foreground/80 px-1 py-0.5">
-      {children}
-    </kbd>
-  );
-}
-
-/* ── Barra de ações PDV (4 botões compactos horizontais) ── */
+/* ── Barra de ações do PDV ──
+   Vertical (desktop): trilha compacta estilo caixa de mercado — a tecla de
+   função (F2/F3…) é o elemento em destaque, como no teclado de um PDV.
+   Horizontal (mobile): tabs compactas com ícone, dividindo a largura. */
 function CaixaBar({
   receivableCount, txCount, inCheckout, onReceber, onLancar, onHistorico, onFechar,
   orientation = "vertical",
@@ -930,45 +924,77 @@ function CaixaBar({
   onReceber: () => void; onLancar: () => void; onHistorico: () => void; onFechar: () => void;
   orientation?: "vertical" | "horizontal";
 }) {
-  const actions: { icon: React.ElementType; label: string; key?: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
+  const actions: { icon: React.ElementType; label: string; key: string; badge?: number; onClick: () => void; highlight?: boolean }[] = [
     { icon: Users,                 label: "Receber",   key: "F2", badge: receivableCount || undefined, onClick: onReceber,   highlight: inCheckout },
     { icon: Plus,                  label: "Lançar",    key: "F3",                                      onClick: onLancar },
     { icon: ClockCounterClockwise, label: "Histórico", key: "F4", badge: txCount || undefined,         onClick: onHistorico },
   ];
-  // Horizontal (mobile): botões dividem a largura igualmente; vertical (desktop): largura fixa.
-  const sizeCls = orientation === "horizontal" ? "flex-1 py-2.5" : "w-16 sm:w-20 py-3.5";
-  const dividerCls = orientation === "horizontal" ? "w-px self-stretch" : "h-px";
-  const showKeys = orientation === "vertical";
+
+  // ── Mobile: barra horizontal (ícone + rótulo, dividindo a largura) ──
+  if (orientation === "horizontal") {
+    return (
+      <>
+        {actions.map((a) => (
+          <button
+            key={a.label}
+            onClick={a.onClick}
+            title={a.label}
+            className={`relative flex-1 flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border py-2.5 transition ${
+              a.highlight ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
+            }`}
+          >
+            {a.badge !== undefined && a.badge > 0 && (
+              <span className="absolute top-1 right-1 text-[9px] font-bold rounded-full bg-primary text-primary-foreground min-w-[14px] h-3.5 px-1 grid place-items-center leading-none">
+                {a.badge > 9 ? "9+" : a.badge}
+              </span>
+            )}
+            <a.icon className="h-4 w-4 text-primary" />
+            <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground">{a.label}</span>
+          </button>
+        ))}
+        <div className="w-px self-stretch bg-border" />
+        <button
+          onClick={onFechar}
+          title="Fechar caixa"
+          className="group relative flex-1 flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card py-2.5 transition hover:border-red-300 hover:bg-red-500/5"
+        >
+          <Lock className="h-4 w-4 text-muted-foreground group-hover:text-red-500" />
+          <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground group-hover:text-red-500">Fechar</span>
+        </button>
+      </>
+    );
+  }
+
+  // ── Desktop: trilha vertical, tecla de função em destaque (keycap) ──
+  const keycap = "grid place-items-center h-5 min-w-[26px] px-1 rounded border text-[11px] font-mono font-bold leading-none transition-colors";
   return (
     <>
       {actions.map((a) => (
         <button
           key={a.label}
           onClick={a.onClick}
-          title={a.key ? `${a.label} (${a.key})` : a.label}
-          className={`relative flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border transition ${sizeCls} ${
-            a.highlight ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/60"
+          title={`${a.label} (${a.key})`}
+          className={`group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border py-2 transition ${
+            a.highlight ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40 hover:bg-muted/50"
           }`}
         >
           {a.badge !== undefined && a.badge > 0 && (
-            <span className="absolute top-1 right-1 text-[9px] font-bold rounded-full bg-primary text-primary-foreground min-w-[14px] h-3.5 px-1 grid place-items-center leading-none">
+            <span className="absolute -top-1.5 -right-1.5 text-[9px] font-bold rounded-full bg-primary text-primary-foreground min-w-[16px] h-4 px-1 grid place-items-center leading-none ring-2 ring-background">
               {a.badge > 9 ? "9+" : a.badge}
             </span>
           )}
-          <a.icon className="h-4 w-4 text-primary" />
-          <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground">{a.label}</span>
-          {showKeys && a.key && <KbdHint>{a.key}</KbdHint>}
+          <span className={`${keycap} border-border bg-muted text-foreground/75 group-hover:border-primary/50 group-hover:text-primary`}>{a.key}</span>
+          <span className="text-[10px] font-semibold leading-none text-muted-foreground group-hover:text-foreground">{a.label}</span>
         </button>
       ))}
-      <div className={`bg-border ${dividerCls}`} />
+      <div className="h-px w-full bg-border my-0.5" />
       <button
         onClick={onFechar}
         title="Fechar caixa (F8)"
-        className={`flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card transition hover:border-red-300 hover:bg-red-500/5 group ${sizeCls}`}
+        className="group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border border-border bg-card py-2 transition hover:border-red-300 hover:bg-red-500/5"
       >
-        <Lock className="h-4 w-4 text-muted-foreground group-hover:text-red-500" />
-        <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground group-hover:text-red-500">Fechar</span>
-        {showKeys && <KbdHint>F8</KbdHint>}
+        <span className={`${keycap} border-border bg-muted text-foreground/75 group-hover:border-red-300 group-hover:text-red-500`}>F8</span>
+        <span className="text-[10px] font-semibold leading-none text-muted-foreground group-hover:text-red-500">Fechar</span>
       </button>
     </>
   );
