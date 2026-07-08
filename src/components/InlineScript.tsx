@@ -1,16 +1,21 @@
 /**
  * Script inline que roda de forma síncrona durante o parse do HTML (antes do
- * primeiro paint), sem disparar o aviso do React sobre <script> renderizado
- * por componente. No servidor vira type="text/javascript" (executa); no
- * cliente vira "text/plain" (inerte) — o suppressHydrationWarning cobre essa
- * troca de atributo entre SSR e hidratação.
+ * primeiro paint) — ex.: aplicar o modo noturno antes de pintar, evitando o
+ * flash de tela clara.
+ *
+ * Renderizado por DENTRO do innerHTML de um <div> (não como elemento <script>
+ * próprio): o parser do HTML cria a tag e executa o script na carga inicial
+ * (SSR), mas o React nunca "vê" um <script>, então o aviso de dev
+ * ("Encountered a script tag while rendering React component") não dispara.
+ * Em navegação client-side não re-executa — e nem precisa: sem reload não há
+ * flash de tema pra prevenir (mesmo efeito prático do antigo type="text/plain").
  */
 export function InlineScript({ html }: { html: string }) {
   return (
-    <script
-      type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+    <div
+      style={{ display: "none" }}
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: `<script>${html}</script>` }}
     />
   );
 }
