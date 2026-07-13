@@ -215,6 +215,7 @@ export type Database = {
           member_id: string
           notes: string | null
           payment_method: string | null
+          reminder_sent_at: string | null
           salon_id: string
           source: string
           starts_at: string
@@ -232,6 +233,7 @@ export type Database = {
           member_id: string
           notes?: string | null
           payment_method?: string | null
+          reminder_sent_at?: string | null
           salon_id: string
           source?: string
           starts_at: string
@@ -249,6 +251,7 @@ export type Database = {
           member_id?: string
           notes?: string | null
           payment_method?: string | null
+          reminder_sent_at?: string | null
           salon_id?: string
           source?: string
           starts_at?: string
@@ -280,6 +283,64 @@ export type Database = {
           },
           {
             foreignKeyName: "appointments_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointment_waitlist: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          member_id: string | null
+          notes: string | null
+          preferred_date: string
+          salon_id: string
+          service_ids: string[]
+          status: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          preferred_date: string
+          salon_id: string
+          service_ids?: string[]
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          preferred_date?: string
+          salon_id?: string
+          service_ids?: string[]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_waitlist_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_waitlist_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "salon_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_waitlist_salon_id_fkey"
             columns: ["salon_id"]
             isOneToOne: false
             referencedRelation: "salons"

@@ -24,6 +24,7 @@ import {
   CaretRight,
   ChatCircle,
   CircleNotch,
+  Clock,
   Heart,
   Lock,
   Minus,
@@ -62,6 +63,15 @@ type ApptService = { id: string; name: string; price: number; duration_min: numb
 /** Amostra mínima de atendimentos concluídos naquele horário p/ confiar na média (evita estimativa enganosa). */
 const MIN_REVENUE_SAMPLES = 3;
 type Block = { id: string; member_id: string | null; starts_at: string; ends_at: string; reason: string | null };
+type WaitlistEntry = {
+  id: string;
+  client_id: string;
+  member_id: string | null;
+  service_ids: string[];
+  preferred_date: string;
+  notes: string | null;
+  clients: { full_name: string; phone: string | null } | null;
+};
 type HistoryAppt = {
   id: string;
   starts_at: string;
@@ -1308,6 +1318,9 @@ export function AgendaManager({
   const [createClientId, setCreateClientId] = useState<string | undefined>(undefined);
   const [detailAppt, setDetailAppt] = useState<Appt | null>(null);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
+  const [waitlist, setWaitlist]     = useState<WaitlistEntry[]>([]);
+  const [removingWaitlistId, setRemovingWaitlistId] = useState<string | null>(null);
+  const [convertingWaitlistId, setConvertingWaitlistId] = useState<string | null>(null);
 
   /** Abre o modal de criação, opcionalmente já com profissional, horário e cliente. */
   const openCreate = useCallback((d: string, pro?: string, time?: string, clientId?: string) => {
@@ -1398,6 +1411,34 @@ export function AgendaManager({
   }, [supabase, salonId, date, view, apptColor]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Lista de espera do dia selecionado — só faz sentido na visão "dia" (a
+  // cliente pede um dia, não um horário exato).
+  const loadWaitlist = useCallback(async () => {
+    const { data } = await supabase
+      .from("appointment_waitlist")
+      .select("id, client_id, member_id, service_ids, preferred_date, notes, clients(full_name, phone)")
+      .eq("salon_id", salonId)
+      .eq("preferred_date", date)
+      .eq("status", "waiting")
+      .order("created_at");
+    setWaitlist((data as unknown as WaitlistEntry[]) ?? []);
+  }, [supabase, salonId, date]);
+
+  useEffect(() => { if (view === "dia") loadWaitlist(); }, [view, loadWaitlist]);
+
+  async function removeWaitlistEntry(id: string) {
+    if (!window.confirm("Remover essa pessoa da lista de espera?")) return;
+    setRemovingWaitlistId(id);
+    await supabase.from("appointment_waitlist").delete().eq("id", id);
+    setRemovingWaitlistId(null);
+    loadWaitlist();
+  }
+
+  function convertWaitlistEntry(w: WaitlistEntry) {
+    setConvertingWaitlistId(w.id);
+    openCreate(w.preferred_date, w.member_id ?? undefined, undefined, w.client_id);
+  }
 
   // Sinais de "hoje" — independentes da view/data navegada (banner sempre
   // reflete o dia atual, mesmo se o usuário estiver olhando outro mês).
@@ -1622,6 +1663,46 @@ export function AgendaManager({
       {/* ── Sinais de hoje (cancelamento, atraso, vazios) ─── */}
       <AgendaSignalsBanner signals={todaySignals} slug={slug} />
 
+      {/* ── Lista de espera do dia ──────────────────────── */}
+      {view === "dia" && waitlist.length > 0 && (
+        <Card className="p-4 space-y-3 border-amber-300/60 bg-amber-500/5">
+          <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-700">
+            <Clock className="h-4 w-4" /> {waitlist.length} na lista de espera hoje
+          </p>
+          <div className="space-y-2">
+            {waitlist.map((w) => {
+              const proName = w.member_id ? pros.find((p) => p.id === w.member_id)?.name : null;
+              const svcNames = w.service_ids
+                .map((id) => services.find((s) => s.id === id)?.name)
+                .filter(Boolean)
+                .join(", ");
+              return (
+                <div key={w.id} className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-border bg-card p-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{w.clients?.full_name ?? "Cliente"}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {proName ?? "Qualquer profissional"}{svcNames ? ` · ${svcNames}` : ""}
+                      {w.clients?.phone ? ` · ${w.clients.phone}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" onClick={() => convertWaitlistEntry(w)}>Agendar</Button>
+                    <button
+                      onClick={() => removeWaitlistEntry(w.id)}
+                      disabled={removingWaitlistId === w.id}
+                      aria-label="Remover da lista de espera"
+                      className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-500/10 disabled:opacity-50 transition"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
@@ -1752,8 +1833,16 @@ export function AgendaManager({
             initialPro={createPro}
             initialTime={createTime}
             initialClient={createClientId}
-            onClose={() => setCreating(false)}
-            onCreated={() => { setCreating(false); load(); }}
+            onClose={() => { setCreating(false); setConvertingWaitlistId(null); }}
+            onCreated={() => {
+              setCreating(false);
+              load();
+              if (convertingWaitlistId) {
+                const id = convertingWaitlistId;
+                setConvertingWaitlistId(null);
+                supabase.from("appointment_waitlist").update({ status: "converted" }).eq("id", id).then(() => loadWaitlist());
+              }
+            }}
           />
         )}
       </AnimatePresence>

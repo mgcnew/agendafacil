@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     return new Response("forbidden", { status: 401 });
   }
 
-  const { event, appointment_id, salon_id } = await req.json();
+  const { event, appointment_id, salon_id, profile_id } = await req.json();
   if (!event || !appointment_id || !salon_id) {
     return new Response("bad_request", { status: 400 });
   }
@@ -65,10 +65,13 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const { data: tokenRows } = await supabase
-    .from("push_subscriptions")
-    .select("id, token")
-    .eq("salon_id", salon_id);
+  // Lembrete de véspera é só pra profissional do horário; created/cancelled
+  // avisa o salão inteiro.
+  let tokenQuery = supabase.from("push_subscriptions").select("id, token").eq("salon_id", salon_id);
+  if (event === "reminder" && profile_id) {
+    tokenQuery = tokenQuery.eq("profile_id", profile_id);
+  }
+  const { data: tokenRows } = await tokenQuery;
 
   if (!tokenRows || tokenRows.length === 0) {
     return new Response(JSON.stringify({ sent: 0 }), { headers: { "Content-Type": "application/json" } });
@@ -76,7 +79,7 @@ Deno.serve(async (req) => {
 
   const { data: appt } = await supabase
     .from("appointments")
-    .select("starts_at, clients(full_name), appointment_services(name)")
+    .select("starts_at, member_id, clients(full_name), appointment_services(name)")
     .eq("id", appointment_id)
     .maybeSingle();
 
@@ -84,10 +87,27 @@ Deno.serve(async (req) => {
   const services = ((appt?.appointment_services as { name: string }[] | null) ?? []).map((s) => s.name).join(", ");
   const time = appt ? formatTime(appt.starts_at) : "";
 
-  const title = event === "cancelled" ? "Agendamento cancelado" : "Novo agendamento";
-  const body = services
+  let waitingSuffix = "";
+  if (event === "cancelled" && appt) {
+    const preferredDate = appt.starts_at.slice(0, 10); // preferred_date é date, comparável ao prefixo YYYY-MM-DD do timestamptz em America/Sao_Paulo
+    const { count } = await supabase
+      .from("appointment_waitlist")
+      .select("id", { count: "exact", head: true })
+      .eq("salon_id", salon_id)
+      .eq("status", "waiting")
+      .eq("preferred_date", preferredDate)
+      .or(`member_id.is.null,member_id.eq.${appt.member_id}`);
+    if (count && count > 0) waitingSuffix = ` · ${count} na lista de espera`;
+  }
+
+  const title = event === "cancelled"
+    ? "Agendamento cancelado"
+    : event === "reminder"
+    ? "Amanhã você tem horário"
+    : "Novo agendamento";
+  const body = (services
     ? `${clientName} · ${services}${time ? ` às ${time}` : ""}`
-    : `${clientName}${time ? ` às ${time}` : ""}`;
+    : `${clientName}${time ? ` às ${time}` : ""}`) + waitingSuffix;
 
   const saJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
   if (!saJson) return new Response("missing_service_account", { status: 500 });

@@ -71,9 +71,16 @@ type Appt = {
 };
 type ResaleProduct = { id: string; name: string; sale_price: number; unit: string; linked: boolean };
 
-type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done";
+type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done" | "waitlist_done";
 type GalleryPhoto = { id: string; url: string; caption: string | null };
-type MineTab = "next" | "history";
+type MineTab = "next" | "history" | "waitlist";
+type WaitlistEntry = {
+  id: string;
+  preferred_date: string;
+  status: string;
+  member_name: string | null;
+  services: string[];
+};
 type AnamnesisFlow = "invite" | "conditions" | "details" | "thanks" | null;
 
 const UPCOMING_STATUSES = new Set(["pending", "confirmed", "in_progress"]);
@@ -133,6 +140,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [showMine, setShowMine] = useState(false);
   const [mineTab, setMineTab] = useState<MineTab>("next");
   const [mine, setMine] = useState<Appt[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [authIntent, setAuthIntent] = useState<"book" | "waitlist">("book");
+  const [joiningWaitlist, setJoiningWaitlist] = useState(false);
+  const [waitlistErr, setWaitlistErr] = useState<string | null>(null);
+  const [cancelingWaitlistId, setCancelingWaitlistId] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
@@ -320,6 +332,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
       p_phone: ph,
     } as never);
     setMine((data as unknown as Appt[]) ?? []);
+    const { data: wl } = await supabase.rpc("public_my_waitlist" as never, {
+      p_salon: salon.id,
+      p_phone: ph,
+    } as never);
+    setWaitlist((wl as unknown as WaitlistEntry[]) ?? []);
   }, [supabase, salon.id, userId, savedPhone, phone]);
 
   // carrega o histórico em segundo plano assim que o cliente é conhecido —
@@ -327,6 +344,46 @@ export function BookingApp({ salon }: { salon: Salon }) {
   useEffect(() => {
     if (userId || savedPhone) fetchMine();
   }, [userId, savedPhone, fetchMine]);
+
+  async function joinWaitlist() {
+    setJoiningWaitlist(true);
+    setWaitlistErr(null);
+    const { error } = await supabase.rpc("public_join_waitlist" as never, {
+      p_salon: salon.id,
+      p_client_name: name || "Cliente",
+      p_client_phone: toE164(phone),
+      p_service_ids: selected,
+      p_date: date,
+      p_member: anyPro ? null : (pro?.id ?? null),
+    } as never);
+    setJoiningWaitlist(false);
+    if (error) {
+      setWaitlistErr("Não foi possível entrar na lista de espera. Tente novamente.");
+      return;
+    }
+    try {
+      localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ name, phone, favoriteProId }));
+    } catch { /* ignore */ }
+    setSavedPhone(phone);
+    setStep("waitlist_done");
+  }
+
+  function goWaitlist() {
+    setWaitlistErr(null);
+    if (userId || savedPhone) joinWaitlist();
+    else { setAuthIntent("waitlist"); setStep("auth"); }
+  }
+
+  async function cancelWaitlistEntry(id: string) {
+    if (!window.confirm("Sair da lista de espera desse dia?")) return;
+    setCancelingWaitlistId(id);
+    const { error } = await supabase.rpc("public_cancel_waitlist" as never, {
+      p_id: id,
+      p_phone: userId ? null : toE164(savedPhone || phone),
+    } as never);
+    setCancelingWaitlistId(null);
+    if (!error) await fetchMine();
+  }
 
   async function loadMine() {
     await fetchMine();
@@ -487,6 +544,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }
 
   function goAfterTime() {
+    setAuthIntent("book");
     if (userId || savedPhone) setStep("confirm");
     else setStep("auth");
   }
@@ -771,10 +829,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
               <CircleNotch className="h-6 w-6 animate-spin" />
             </div>
           ) : slots.length === 0 ? (
-            <Card className="p-6 text-center text-sm text-muted-foreground">
+            <Card className="p-6 text-center text-sm text-muted-foreground space-y-3">
               <p>Sem horários livres nesse dia.</p>
               <button
-                className="mt-2 text-primary text-sm font-medium hover:underline"
+                className="text-primary text-sm font-medium hover:underline block mx-auto"
                 onClick={() => {
                   const next = new Date(date + "T12:00:00");
                   next.setDate(next.getDate() + 1);
@@ -783,6 +841,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
               >
                 Ver próximo dia →
               </button>
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs mb-2">Quer esse dia mesmo assim? Entre na lista de espera — avisamos a equipe se abrir um horário.</p>
+                <Button variant="outline" size="sm" onClick={goWaitlist} disabled={joiningWaitlist}>
+                  {joiningWaitlist && <CircleNotch className="h-4 w-4 animate-spin" />} Entrar na lista de espera
+                </Button>
+                {waitlistErr && <p className="text-xs text-red-600 mt-2">{waitlistErr}</p>}
+              </div>
             </Card>
           ) : (
             <SlotGrid
@@ -829,11 +894,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   );
                 } catch { /* ignore */ }
                 setSavedPhone(phone);
-                setStep("confirm");
+                if (authIntent === "waitlist") joinWaitlist();
+                else setStep("confirm");
               }}
-              disabled={!name || !phone}
+              disabled={!name || !phone || joiningWaitlist}
             >
-              Continuar
+              {joiningWaitlist && <CircleNotch className="h-4 w-4 animate-spin" />} Continuar
             </Button>
             <p className="text-xs text-muted-foreground text-center">
               Usamos seu número só para confirmar o agendamento.
@@ -1000,6 +1066,39 @@ export function BookingApp({ salon }: { salon: Salon }) {
         </section>
       )}
 
+      {/* STEP: entrou na lista de espera */}
+      {step === "waitlist_done" && (
+        <section className="af-rise text-center py-10">
+          <div className="grid place-items-center h-20 w-20 rounded-full bg-primary text-primary-foreground mx-auto af-float">
+            <Clock className="h-10 w-10" />
+          </div>
+          <h2 className="font-display text-2xl font-bold mt-6">Você entrou na lista de espera!</h2>
+          <p className="text-muted-foreground mt-1">
+            Se abrir um horário{" "}
+            <b className="capitalize">{formatDateLong(date + "T12:00:00")}</b>{" "}
+            com {pro?.display_name ?? "a equipe"}, {salon.name} vai te chamar.
+          </p>
+          <div className="flex flex-col gap-2 mt-8">
+            <Button onClick={loadMine}>
+              <ClockCounterClockwise className="h-4 w-4" /> Ver meus agendamentos
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelected([]);
+                setSelectedProductIds([]);
+                setInspirationIds([]);
+                setPro(null);
+                setSlot(null);
+                setStep("services");
+              }}
+            >
+              Agendar outro
+            </Button>
+          </div>
+        </section>
+      )}
+
       {/* Barra inferior de navegação */}
       {(step === "services" || step === "professional" || step === "time") && (
         <BottomBar
@@ -1041,9 +1140,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <MineDrawer
             key="mine"
             mine={mine}
+            waitlist={waitlist}
             tab={mineTab}
             onTabChange={setMineTab}
             onClose={() => { setShowMine(false); setCancelErr(null); }}
+            onCancelWaitlist={cancelWaitlistEntry}
+            cancelingWaitlistId={cancelingWaitlistId}
           />
         )}
       </AnimatePresence>
@@ -1234,18 +1336,25 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   function MineDrawer({
     mine,
+    waitlist,
     tab,
     onTabChange,
     onClose,
+    onCancelWaitlist,
+    cancelingWaitlistId,
   }: {
     mine: Appt[];
+    waitlist: WaitlistEntry[];
     tab: MineTab;
     onTabChange: (t: MineTab) => void;
     onClose: () => void;
+    onCancelWaitlist: (id: string) => void;
+    cancelingWaitlistId: string | null;
   }) {
     const isUpcoming = (a: Appt) =>
       UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > Date.now();
     const filtered = mine.filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)));
+    const waiting = waitlist.filter((w) => w.status === "waiting");
     return (
       <MotionModal onClose={onClose}>
         <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
@@ -1254,7 +1363,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
           </div>
           <div className="flex gap-1.5 mb-4 rounded-full bg-muted p-1">
-            {(["next", "history"] as MineTab[]).map((t) => (
+            {(["next", "history", "waitlist"] as MineTab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => onTabChange(t)}
@@ -1262,7 +1371,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
                 }`}
               >
-                {t === "next" ? "Próximos" : "Histórico"}
+                {t === "next" ? "Próximos" : t === "history" ? "Histórico" : "Espera"}
               </button>
             ))}
           </div>
@@ -1271,7 +1380,36 @@ export function BookingApp({ salon }: { salon: Salon }) {
               {cancelErr}
             </div>
           )}
-          {filtered.length === 0 ? (
+          {tab === "waitlist" ? (
+            waiting.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Você não está em nenhuma lista de espera.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {waiting.map((w) => (
+                  <div key={w.id} className="rounded-[var(--radius)] border border-border p-4">
+                    <div className="flex justify-between items-start">
+                      <p className="font-medium capitalize">{formatDateLong(w.preferred_date + "T12:00:00")}</p>
+                      <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
+                        Aguardando
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{w.member_name ?? "Qualquer profissional"}</p>
+                    {w.services.length > 0 && <p className="text-sm mt-1">{w.services.join(", ")}</p>}
+                    <button
+                      onClick={() => onCancelWaitlist(w.id)}
+                      disabled={cancelingWaitlistId === w.id}
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 transition"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      {cancelingWaitlistId === w.id ? "Saindo…" : "Sair da lista de espera"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
               {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
             </p>

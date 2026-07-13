@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Bell, CalendarPlus, CalendarX, Trash } from "@phosphor-icons/react/dist/ssr";
+import { Bell, CalendarPlus, CalendarX, Clock, Trash } from "@phosphor-icons/react/dist/ssr";
 
 export type NotifItem = {
   id: string;
@@ -131,7 +131,8 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
             ) : (
               items.map((n) => {
                 const cancelled = n.type === "appointment_cancelled";
-                const Icon = cancelled ? CalendarX : CalendarPlus;
+                const reminder = n.type === "appointment_reminder";
+                const Icon = cancelled ? CalendarX : reminder ? Clock : CalendarPlus;
                 return (
                   <div
                     key={n.id}
@@ -139,7 +140,11 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
                   >
                     <span
                       className={`grid place-items-center h-8 w-8 shrink-0 rounded-full ${
-                        cancelled ? "bg-red-500/12 text-red-600" : "bg-emerald-500/12 text-emerald-600"
+                        cancelled
+                          ? "bg-red-500/12 text-red-600"
+                          : reminder
+                          ? "bg-amber-500/12 text-amber-600"
+                          : "bg-emerald-500/12 text-emerald-600"
                       }`}
                     >
                       <Icon className="h-4 w-4" />
