@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { signUpOwnerAction } from "@/components/auth/authActions";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
 import {
@@ -40,28 +40,16 @@ export default function CriarSalaoPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: name } },
-    });
+    const res = await signUpOwnerAction(name, email, password);
 
-    if (error) {
-      setError(error.message);
+    if (res.status === "error") {
+      setError(res.message);
       setLoading(false);
       return;
     }
 
-    if (data.session) {
-      router.push("/novo-salao");
-      router.refresh();
-      return;
-    }
-
-    const { data: signIn } = await supabase.auth.signInWithPassword({ email, password });
-    if (signIn.session) {
+    if (res.status === "session") {
       router.push("/novo-salao");
       router.refresh();
       return;

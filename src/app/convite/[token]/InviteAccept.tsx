@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { acceptInviteAction } from "@/components/auth/authActions";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label, Textarea } from "@/components/ui";
 import type { Enums } from "@/lib/database.types";
@@ -96,94 +97,40 @@ export function InviteAccept({
     );
   }
 
-  async function acceptWithSession() {
-    const supabase = createClient();
-    const { data: slug, error } = await supabase.rpc("accept_invite", {
-      p_token: token,
-      p_full_name: fullName,
-      p_phone: phone,
-      p_display_name: displayName,
-      p_bio: bio,
-    });
-    if (error) {
-      setError(
-        error.message.includes("email_mismatch")
-          ? "O e-mail da conta não corresponde ao convite."
-          : "Não foi possível concluir. Tente novamente.",
-      );
-      setLoading(false);
-      return;
-    }
-    router.push(`/painel/${slug as string}`);
-    router.refresh();
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!invite) return;
     setLoading(true);
     setError(null);
-    const supabase = createClient();
 
-    // Já logada (voltou da confirmação de e-mail): só finaliza, sem mexer na senha.
-    if (authed) {
-      await acceptWithSession();
-      return;
-    }
-
-    // 1) tenta criar a conta com o e-mail do convite.
-    //    Após confirmar o e-mail, o link volta para este mesmo convite já logada.
-    const { data: signUp, error: signUpErr } = await supabase.auth.signUp({
+    // Quando já logada (voltou da confirmação de e-mail) o password vai null e
+    // a action só finaliza o convite; senão ela cria/loga a conta antes.
+    const res = await acceptInviteAction({
+      token,
       email: invite.email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-          `/convite/${token}`,
-        )}`,
-      },
+      password: authed ? null : password,
+      fullName,
+      phone,
+      displayName,
+      bio,
+      emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+        `/convite/${token}`,
+      )}`,
     });
 
-    if (signUpErr && !signUpErr.message.toLowerCase().includes("already")) {
-      const msg = signUpErr.message.toLowerCase();
-      const code = signUpErr.code ?? "";
-      let friendly = "Não foi possível criar a conta. Tente novamente.";
-      if (code === "email_provider_disabled" || msg.includes("signups are disabled")) {
-        friendly = "Cadastros por e-mail estão desativados no momento. Avise o administrador do salão.";
-      } else if (msg.includes("password") || msg.includes("weak") || msg.includes("6")) {
-        friendly = "Senha inválida. Use no mínimo 6 caracteres.";
-      } else if (code === "over_email_send_rate_limit" || msg.includes("rate limit")) {
-        friendly = "Muitas tentativas em sequência. Aguarde alguns minutos e tente de novo.";
-      }
-      setError(friendly);
+    if (res.status === "needs_confirm") {
+      setNeedsConfirm(true);
+      setLoading(false);
+      return;
+    }
+    if (res.status === "error") {
+      setError(res.message);
       setLoading(false);
       return;
     }
 
-    // 2) garante sessão (conta nova sem confirmação, ou conta já existente)
-    if (!signUp?.session) {
-      const { data: signIn, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: invite.email,
-        password,
-      });
-      if (!signIn.session) {
-        const notConfirmed =
-          signInErr?.code === "email_not_confirmed" ||
-          signInErr?.message.toLowerCase().includes("not confirmed");
-        if (notConfirmed || !signUpErr) {
-          // conta criada mas exige confirmação de e-mail
-          setNeedsConfirm(true);
-          setLoading(false);
-          return;
-        }
-        // já existia conta e a senha não bateu
-        setError("Já existe uma conta com este e-mail. Use 'Esqueci a senha' no login para redefinir.");
-        setLoading(false);
-        return;
-      }
-    }
-
-    await acceptWithSession();
+    router.push(`/painel/${res.slug}`);
+    router.refresh();
   }
 
   if (needsConfirm) {
