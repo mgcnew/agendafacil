@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signInAction } from "./authActions";
 import { Button, Input, Label } from "@/components/ui";
 import {
   Check,
@@ -47,8 +48,7 @@ export function LoginForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await signInAction(email, password);
     if (error) {
       const notConfirmed =
         error.code === "email_not_confirmed" ||
