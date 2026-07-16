@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      growth_leads: {
+        Row: {
+          channel: string
+          contact: string | null
+          created_at: string
+          id: string
+          name: string
+          neighborhood: string | null
+          notes: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          contact?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_audit_log: {
         Row: {
           action: string

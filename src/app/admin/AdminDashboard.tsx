@@ -40,6 +40,8 @@ import {
   XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { getSalonBilling } from "./actions";
+import { PlaybookPanel } from "./PlaybookPanel";
+import { ProspeccaoPanel } from "./ProspeccaoPanel";
 
 type BillingPayment = {
   id: string;
@@ -214,7 +216,7 @@ export function AdminDashboard({
   const [managing, setManaging] = useState<AdminSalon | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [tab, setTab] = useState<"atencao" | "geral" | "saloes" | "admin" | "avisos" | "blog">("atencao");
+  const [tab, setTab] = useState<"atencao" | "geral" | "saloes" | "admin" | "avisos" | "blog" | "playbook" | "prospeccao">("atencao");
 
   // "Precisa de atenção": trials vencendo, inadimplentes e salões parados.
   const TRIAL_SOON_DAYS = 3;
@@ -259,7 +261,7 @@ export function AdminDashboard({
 
         {/* Abas */}
         <div className="flex gap-1 border-b border-border">
-          {([["atencao", attentionCount > 0 ? `Atenção (${attentionCount})` : "Atenção"], ["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"], ["blog", "Blog"]] as const).map(([id, label]) => (
+          {([["atencao", attentionCount > 0 ? `Atenção (${attentionCount})` : "Atenção"], ["geral", "Visão geral"], ["saloes", "Salões"], ["admin", "Administração"], ["avisos", "Avisos"], ["blog", "Blog"], ["prospeccao", "Prospecção"], ["playbook", "Playbook"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -388,6 +390,10 @@ export function AdminDashboard({
         {tab === "avisos" && <AnnouncementsPanel announcements={announcements} />}
 
         {tab === "blog" && <BlogPanel posts={blogPosts} />}
+
+        {tab === "prospeccao" && <ProspeccaoPanel />}
+
+        {tab === "playbook" && <PlaybookPanel />}
       </div>
 
       <AnimatePresence>
