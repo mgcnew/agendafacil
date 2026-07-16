@@ -72,7 +72,23 @@ export default async function SalonBookingPage({
       data-color={colorAttr}
       className="min-h-dvh bg-background text-foreground"
     >
+      {salon.is_demo && <DemoBanner niche={salon.niche as string} />}
       <BookingApp salon={salon} />
     </div>
+  );
+}
+
+/**
+ * Faixa no topo dos salões demo: deixa claro que é um exemplo e convida a
+ * criar o próprio teste, já levando a vertical (tipo) pro cadastro.
+ */
+function DemoBanner({ niche }: { niche: string }) {
+  return (
+    <a
+      href={`/criar-salao?tipo=${encodeURIComponent(niche)}`}
+      className="block bg-primary text-primary-foreground text-center text-sm font-medium px-4 py-2.5 hover:brightness-110 transition"
+    >
+      ✨ Este é um exemplo do Zulan. Gostou? <span className="underline underline-offset-2">Crie o seu grátis →</span>
+    </a>
   );
 }

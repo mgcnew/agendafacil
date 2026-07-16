@@ -3033,6 +3033,7 @@ export type Database = {
           address: string
           color_theme: string
           id: string
+          is_demo: boolean
           logo_url: string
           name: string
           niche: Database["public"]["Enums"]["salon_niche"]

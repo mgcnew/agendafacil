@@ -50,7 +50,9 @@ export default function CriarSalaoPage() {
     }
 
     if (res.status === "session") {
-      router.push("/novo-salao");
+      // Propaga a vertical (?tipo) vinda do banner de demo pro onboarding.
+      const tipo = new URLSearchParams(window.location.search).get("tipo");
+      router.push(tipo ? `/novo-salao?tipo=${encodeURIComponent(tipo)}` : "/novo-salao");
       router.refresh();
       return;
     }

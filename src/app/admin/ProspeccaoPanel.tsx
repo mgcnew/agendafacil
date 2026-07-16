@@ -134,30 +134,49 @@ const WA_TEMPLATES: { id: string; label: string }[] = [
  * propósito — o gancho pessoal a dona edita na prévia antes de enviar.
  * O primeiro contato se adapta ao canal (indicação converte mais quente).
  */
-function buildMessage(lead: Lead, templateId: string, meuNome: string): string {
+function buildMessage(
+  lead: Lead,
+  templateId: string,
+  meuNome: string,
+  demoUrl: string | null,
+): string {
   const dono = lead.owner_name?.trim();
   const salao = lead.name.trim();
   const bairro = lead.neighborhood?.trim();
   const oi = dono ? `Oi, ${dono}! Tudo bem?` : "Oi, tudo bem?";
   const eu = meuNome.trim() ? ` Aqui é o ${meuNome.trim()}.` : "";
 
+  let msg: string;
   if (templateId === "followup") {
-    return `${oi} Como está indo o teste do sistema${dono ? "" : ` no ${salao}`}? Se quiser, te ajudo a deixar seus serviços e horários certinhos — leva uns minutos. Qualquer dúvida é só chamar!`;
+    msg = `${oi} Como está indo o teste do sistema${dono ? "" : ` no ${salao}`}? Se quiser, te ajudo a deixar seus serviços e horários certinhos — leva uns minutos. Qualquer dúvida é só chamar!`;
+  } else if (templateId === "ultimos_dias") {
+    msg = `${oi} Passando pra lembrar que seu teste está acabando. Curtiu o sistema? Se fizer sentido, a gente já deixa ativo e você não perde nada do que configurou. Tô à disposição!`;
+  } else if (lead.channel === "indicacao") {
+    msg = `${oi}${eu} Peguei seu contato numa indicação. Trabalho com um sistema de agenda pra salões e queria te mostrar rapidinho como a cliente marca sozinha por um link, com confirmação automática. Posso te mandar um exemplo?`;
+  } else if (lead.channel === "porta_a_porta") {
+    msg = `${oi}${eu} Passei ${bairro ? `aí no ${bairro} ` : ""}no ${salao} esses dias e queria te mostrar rapidinho o sistema de agenda que comentei. Posso te mandar um exemplo de como sua cliente agendaria?`;
+  } else {
+    msg = `${oi}${eu} Encontrei o ${salao}${bairro ? ` aqui no ${bairro}` : ""} e queria te mostrar uma forma simples de organizar os agendamentos — a cliente marca sozinha por um link, sem te chamar no WhatsApp toda hora. Posso te mandar um exemplo?`;
   }
-  if (templateId === "ultimos_dias") {
-    return `${oi} Passando pra lembrar que seu teste está acabando. Curtiu o sistema? Se fizer sentido, a gente já deixa ativo e você não perde nada do que configurou. Tô à disposição!`;
+
+  if (demoUrl) {
+    msg += `\n\nMontei um exemplo pra você já ver funcionando: ${demoUrl}`;
   }
-  // primeiro contato — adapta ao canal
-  if (lead.channel === "indicacao") {
-    return `${oi}${eu} Peguei seu contato numa indicação. Trabalho com um sistema de agenda pra salões e queria te mostrar rapidinho como a cliente marca sozinha por um link, com confirmação automática. Posso te mandar um exemplo?`;
-  }
-  if (lead.channel === "porta_a_porta") {
-    return `${oi}${eu} Passei ${bairro ? `aí no ${bairro} ` : ""}no ${salao} esses dias e queria te mostrar rapidinho o sistema de agenda que comentei. Posso te mandar um exemplo de como sua cliente agendaria?`;
-  }
-  return `${oi}${eu} Encontrei o ${salao}${bairro ? ` aqui no ${bairro}` : ""} e queria te mostrar uma forma simples de organizar os agendamentos — a cliente marca sozinha por um link, sem te chamar no WhatsApp toda hora. Posso te mandar um exemplo?`;
+  return msg;
 }
 
 const MEU_NOME_KEY = "prospeccao:meuNome";
+
+// Links dos salões demo (por vertical) pra anexar na mensagem de WhatsApp.
+const DEMO_PATHS: Record<string, string> = {
+  salao: "/demo-salao",
+  barbearia: "/demo-barbearia",
+};
+function demoUrlFor(seg: string): string | null {
+  if (seg !== "salao" && seg !== "barbearia") return null;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}${DEMO_PATHS[seg]}`;
+}
 
 export function ProspeccaoPanel() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -175,6 +194,7 @@ export function ProspeccaoPanel() {
   const [waTemplate, setWaTemplate] = useState("primeiro");
   const [waText, setWaText] = useState("");
   const [meuNome, setMeuNome] = useState("");
+  const [waDemo, setWaDemo] = useState<"none" | "salao" | "barbearia">("none");
 
   async function load() {
     setLoading(true);
@@ -237,19 +257,24 @@ export function ProspeccaoPanel() {
       typeof window !== "undefined" ? localStorage.getItem(MEU_NOME_KEY) ?? "" : "";
     setMeuNome(nome);
     setWaTemplate("primeiro");
-    setWaText(buildMessage(l, "primeiro", nome));
+    setWaDemo("none");
+    setWaText(buildMessage(l, "primeiro", nome, null));
     setEditing(null);
     setImporting(false);
     setWaLead(l);
   }
   function pickWaTemplate(id: string) {
     setWaTemplate(id);
-    if (waLead) setWaText(buildMessage(waLead, id, meuNome));
+    if (waLead) setWaText(buildMessage(waLead, id, meuNome, demoUrlFor(waDemo)));
   }
   function changeMeuNome(v: string) {
     setMeuNome(v);
     if (typeof window !== "undefined") localStorage.setItem(MEU_NOME_KEY, v);
-    if (waLead) setWaText(buildMessage(waLead, waTemplate, v));
+    if (waLead) setWaText(buildMessage(waLead, waTemplate, v, demoUrlFor(waDemo)));
+  }
+  function pickWaDemo(seg: "none" | "salao" | "barbearia") {
+    setWaDemo(seg);
+    if (waLead) setWaText(buildMessage(waLead, waTemplate, meuNome, demoUrlFor(seg)));
   }
   function sendWa() {
     if (!waLead) return;
@@ -550,8 +575,27 @@ export function ProspeccaoPanel() {
             </div>
           </div>
           <div className="space-y-1.5">
+            <Label>Anexar exemplo (demo)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {([["none", "Nenhum"], ["salao", "Salão"], ["barbearia", "Barbearia"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => pickWaDemo(id)}
+                  className={`text-sm rounded-full px-3 py-1.5 border transition ${
+                    waDemo === id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="wa-msg">Mensagem (ajuste o gancho pessoal antes de enviar)</Label>
-            <Textarea id="wa-msg" rows={5} value={waText} onChange={(e) => setWaText(e.target.value)} />
+            <Textarea id="wa-msg" rows={6} value={waText} onChange={(e) => setWaText(e.target.value)} />
           </div>
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setWaLead(null)}>Cancelar</Button>

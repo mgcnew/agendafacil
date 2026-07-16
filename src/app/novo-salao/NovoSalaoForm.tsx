@@ -132,6 +132,15 @@ export default function NovoSalaoPage() {
     setSelectedServices(new Set((SERVICE_PRESETS[niche] ?? []).map((p) => p.name)));
   }, [niche]);
 
+  // pré-seleciona a vertical vinda do banner de demo (?tipo=barbearia|feminino…)
+  useEffect(() => {
+    const tipo = new URLSearchParams(window.location.search).get("tipo");
+    if (tipo && CHOOSABLE_NICHES.some((n) => n.id === tipo)) {
+      setNiche(tipo as Niche);
+      setColorTheme("a");
+    }
+  }, []);
+
   function toggleSvc(name: string) {
     setSelectedServices((s) => {
       const n = new Set(s);
