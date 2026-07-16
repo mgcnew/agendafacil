@@ -23,6 +23,7 @@ export type Database = {
           name: string
           neighborhood: string | null
           notes: string | null
+          owner_name: string | null
           stage: string
           updated_at: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           name: string
           neighborhood?: string | null
           notes?: string | null
+          owner_name?: string | null
           stage?: string
           updated_at?: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           name?: string
           neighborhood?: string | null
           notes?: string | null
+          owner_name?: string | null
           stage?: string
           updated_at?: string
         }

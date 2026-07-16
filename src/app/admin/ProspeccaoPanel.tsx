@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { MotionModal } from "@/components/MotionModal";
+import { AnimatePresence } from "framer-motion";
 import {
   CircleNotch,
   DoorOpen,
@@ -14,7 +16,15 @@ import {
   CurrencyDollarSimple,
   Percent,
   UploadSimple,
+  MapPin,
+  ChatCircle,
+  Presentation,
+  Hourglass,
+  CheckCircle,
+  XCircle,
+  WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 /**
  * Prospecção — pipeline de vendas do dono do SaaS. Cada salão abordado é uma
@@ -26,6 +36,7 @@ import {
 type Lead = {
   id: string;
   name: string;
+  owner_name: string | null;
   neighborhood: string | null;
   channel: string;
   stage: string;
@@ -46,18 +57,20 @@ const CHANNELS: { id: string; label: string }[] = [
 ];
 const channelLabel = (id: string) => CHANNELS.find((c) => c.id === id)?.label ?? id;
 
-const STAGES: { id: string; label: string; cls: string }[] = [
-  { id: "a_visitar", label: "A visitar", cls: "bg-violet-500/12 text-violet-600" },
-  { id: "abordado", label: "Abordado", cls: "bg-slate-500/12 text-slate-600" },
-  { id: "demo", label: "Demo feita", cls: "bg-blue-500/12 text-blue-600" },
-  { id: "testando", label: "Testando", cls: "bg-amber-500/15 text-amber-600" },
-  { id: "pagante", label: "Pagante", cls: "bg-emerald-500/12 text-emerald-600" },
-  { id: "perdido", label: "Perdido", cls: "bg-red-500/12 text-red-600" },
+// Ordem do funil, cor "esquentando" até a venda + ícone próprio (dupla
+// codificação: reconhece pela cor E pelo desenho, sem depender do tom).
+const STAGES: { id: string; label: string; icon: PhosphorIcon; text: string; bar: string }[] = [
+  { id: "a_visitar", label: "A visitar", icon: MapPin, text: "text-slate-600", bar: "border-l-slate-400" },
+  { id: "abordado", label: "Abordado", icon: ChatCircle, text: "text-blue-600", bar: "border-l-blue-500" },
+  { id: "demo", label: "Demo feita", icon: Presentation, text: "text-violet-600", bar: "border-l-violet-500" },
+  { id: "testando", label: "Testando", icon: Hourglass, text: "text-amber-600", bar: "border-l-amber-500" },
+  { id: "pagante", label: "Pagante", icon: CheckCircle, text: "text-emerald-600", bar: "border-l-emerald-500" },
+  { id: "perdido", label: "Perdido", icon: XCircle, text: "text-red-600", bar: "border-l-red-500" },
 ];
-const stageMeta = (id: string) => STAGES.find((s) => s.id === id) ?? STAGES[0];
 
 type FormState = {
   name: string;
+  ownerName: string;
   neighborhood: string;
   channel: string;
   stage: string;
@@ -67,6 +80,7 @@ type FormState = {
 
 const emptyForm: FormState = {
   name: "",
+  ownerName: "",
   neighborhood: "",
   channel: "porta_a_porta",
   stage: "abordado",
@@ -102,6 +116,49 @@ function parseImport(text: string): ParsedRow[] {
   return out;
 }
 
+/** Normaliza o contato pra número wa.me (assume Brasil: +55 se faltar DDI). */
+function waPhone(contact: string | null): string {
+  const digits = (contact ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length <= 11 ? `55${digits}` : digits;
+}
+
+const WA_TEMPLATES: { id: string; label: string }[] = [
+  { id: "primeiro", label: "Primeiro contato" },
+  { id: "followup", label: "Follow-up do teste" },
+  { id: "ultimos_dias", label: "Últimos dias do teste" },
+];
+
+/**
+ * Monta a mensagem do template com os dados do lead. Curta e humana de
+ * propósito — o gancho pessoal a dona edita na prévia antes de enviar.
+ * O primeiro contato se adapta ao canal (indicação converte mais quente).
+ */
+function buildMessage(lead: Lead, templateId: string, meuNome: string): string {
+  const dono = lead.owner_name?.trim();
+  const salao = lead.name.trim();
+  const bairro = lead.neighborhood?.trim();
+  const oi = dono ? `Oi, ${dono}! Tudo bem?` : "Oi, tudo bem?";
+  const eu = meuNome.trim() ? ` Aqui é o ${meuNome.trim()}.` : "";
+
+  if (templateId === "followup") {
+    return `${oi} Como está indo o teste do sistema${dono ? "" : ` no ${salao}`}? Se quiser, te ajudo a deixar seus serviços e horários certinhos — leva uns minutos. Qualquer dúvida é só chamar!`;
+  }
+  if (templateId === "ultimos_dias") {
+    return `${oi} Passando pra lembrar que seu teste está acabando. Curtiu o sistema? Se fizer sentido, a gente já deixa ativo e você não perde nada do que configurou. Tô à disposição!`;
+  }
+  // primeiro contato — adapta ao canal
+  if (lead.channel === "indicacao") {
+    return `${oi}${eu} Peguei seu contato numa indicação. Trabalho com um sistema de agenda pra salões e queria te mostrar rapidinho como a cliente marca sozinha por um link, com confirmação automática. Posso te mandar um exemplo?`;
+  }
+  if (lead.channel === "porta_a_porta") {
+    return `${oi}${eu} Passei ${bairro ? `aí no ${bairro} ` : ""}no ${salao} esses dias e queria te mostrar rapidinho o sistema de agenda que comentei. Posso te mandar um exemplo de como sua cliente agendaria?`;
+  }
+  return `${oi}${eu} Encontrei o ${salao}${bairro ? ` aqui no ${bairro}` : ""} e queria te mostrar uma forma simples de organizar os agendamentos — a cliente marca sozinha por um link, sem te chamar no WhatsApp toda hora. Posso te mandar um exemplo?`;
+}
+
+const MEU_NOME_KEY = "prospeccao:meuNome";
+
 export function ProspeccaoPanel() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +171,10 @@ export function ProspeccaoPanel() {
   const [importText, setImportText] = useState("");
   const [importChannel, setImportChannel] = useState("porta_a_porta");
   const [importSaving, setImportSaving] = useState(false);
+  const [waLead, setWaLead] = useState<Lead | null>(null);
+  const [waTemplate, setWaTemplate] = useState("primeiro");
+  const [waText, setWaText] = useState("");
+  const [meuNome, setMeuNome] = useState("");
 
   async function load() {
     setLoading(true);
@@ -159,13 +220,43 @@ export function ProspeccaoPanel() {
   function openEdit(l: Lead) {
     setForm({
       name: l.name,
+      ownerName: l.owner_name ?? "",
       neighborhood: l.neighborhood ?? "",
       channel: l.channel,
       stage: l.stage,
       contact: l.contact ?? "",
       notes: l.notes ?? "",
     });
+    setImporting(false);
     setEditing(l);
+  }
+
+  // ── Chamar no WhatsApp (wa.me, envio manual) ──────────────────
+  function openWa(l: Lead) {
+    const nome =
+      typeof window !== "undefined" ? localStorage.getItem(MEU_NOME_KEY) ?? "" : "";
+    setMeuNome(nome);
+    setWaTemplate("primeiro");
+    setWaText(buildMessage(l, "primeiro", nome));
+    setEditing(null);
+    setImporting(false);
+    setWaLead(l);
+  }
+  function pickWaTemplate(id: string) {
+    setWaTemplate(id);
+    if (waLead) setWaText(buildMessage(waLead, id, meuNome));
+  }
+  function changeMeuNome(v: string) {
+    setMeuNome(v);
+    if (typeof window !== "undefined") localStorage.setItem(MEU_NOME_KEY, v);
+    if (waLead) setWaText(buildMessage(waLead, waTemplate, v));
+  }
+  function sendWa() {
+    if (!waLead) return;
+    const phone = waPhone(waLead.contact);
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setWaLead(null);
   }
 
   async function save(e: React.FormEvent) {
@@ -175,6 +266,7 @@ export function ProspeccaoPanel() {
     const supabase = createClient();
     const payload = {
       name: form.name.trim(),
+      owner_name: form.ownerName.trim() || null,
       neighborhood: form.neighborhood.trim() || null,
       channel: form.channel,
       stage: form.stage,
@@ -237,6 +329,15 @@ export function ProspeccaoPanel() {
     (l) =>
       (!channelFilter || l.channel === channelFilter) &&
       (!stageFilter || l.stage === stageFilter),
+  );
+
+  // Agrupa por etapa, na ordem do funil; só mostra etapas com salões.
+  const grouped = useMemo(
+    () =>
+      STAGES.map((s) => ({ stage: s, items: filtered.filter((l) => l.stage === s.id) })).filter(
+        (g) => g.items.length > 0,
+      ),
+    [filtered],
   );
 
   return (
@@ -304,8 +405,10 @@ export function ProspeccaoPanel() {
       )}
 
       {/* Importar lista (colar texto/CSV) */}
+      <AnimatePresence>
       {importing && (
-        <Card className="p-5 space-y-3">
+        <MotionModal key="import" onClose={() => setImporting(false)}>
+        <Card className="w-full sm:max-w-2xl mx-auto max-h-[90vh] overflow-auto p-5 space-y-3 rounded-b-none sm:rounded-[var(--radius)]">
           <p className="font-display font-bold">Importar lista de salões</p>
           <p className="text-sm text-muted-foreground">
             Cole uma linha por salão, na ordem <b>Nome, Bairro, Telefone</b> (só o nome é obrigatório).
@@ -338,11 +441,15 @@ export function ProspeccaoPanel() {
             </Button>
           </div>
         </Card>
+        </MotionModal>
       )}
+      </AnimatePresence>
 
       {/* Formulário (novo/editar) */}
+      <AnimatePresence>
       {editing && (
-        <Card className="p-5">
+        <MotionModal key="edit" onClose={() => setEditing(null)}>
+        <Card className="w-full sm:max-w-2xl mx-auto max-h-[90vh] overflow-auto p-5 rounded-b-none sm:rounded-[var(--radius)]">
           <p className="font-display font-bold mb-3">
             {editing === "new" ? "Novo salão no pipeline" : `Editar — ${editing.name}`}
           </p>
@@ -353,6 +460,12 @@ export function ProspeccaoPanel() {
                 <Input id="p-name" required value={form.name} autoFocus
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Ex.: Studio Bella" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="p-owner">Dono / responsável</Label>
+                <Input id="p-owner" value={form.ownerName}
+                  onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
+                  placeholder="Ex.: Marcos" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="p-bairro">Bairro / região</Label>
@@ -395,7 +508,61 @@ export function ProspeccaoPanel() {
             </div>
           </form>
         </Card>
+        </MotionModal>
       )}
+      </AnimatePresence>
+
+      {/* Chamar no WhatsApp — prévia editável antes de abrir */}
+      <AnimatePresence>
+      {waLead && (
+        <MotionModal key="wa" onClose={() => setWaLead(null)}>
+        <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-5 space-y-3 rounded-b-none sm:rounded-[var(--radius)]">
+          <div className="flex items-center gap-2">
+            <WhatsappLogo className="h-5 w-5 text-emerald-600" />
+            <p className="font-display font-bold truncate">WhatsApp — {waLead.name}</p>
+          </div>
+          {!waLead.contact && (
+            <p className="text-xs text-amber-600">
+              Esse salão não tem contato salvo — o WhatsApp vai abrir sem número e você escolhe a conversa.
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-nome">Seu nome (aparece na mensagem)</Label>
+            <Input id="wa-nome" value={meuNome} onChange={(e) => changeMeuNome(e.target.value)} placeholder="Ex.: João" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Modelo</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {WA_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => pickWaTemplate(t.id)}
+                  className={`text-sm rounded-full px-3 py-1.5 border transition ${
+                    waTemplate === t.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-msg">Mensagem (ajuste o gancho pessoal antes de enviar)</Label>
+            <Textarea id="wa-msg" rows={5} value={waText} onChange={(e) => setWaText(e.target.value)} />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setWaLead(null)}>Cancelar</Button>
+            <Button onClick={sendWa} disabled={!waText.trim()}>
+              <WhatsappLogo className="h-4 w-4" /> Abrir no WhatsApp
+            </Button>
+          </div>
+        </Card>
+        </MotionModal>
+      )}
+      </AnimatePresence>
 
       {/* Filtros */}
       {leads.length > 0 && (
@@ -423,42 +590,49 @@ export function ProspeccaoPanel() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">{filtered.length} salão(ões)</p>
-          {filtered.map((l) => {
-            const meta = stageMeta(l.stage);
+        <div className="space-y-6">
+          {grouped.map(({ stage, items }) => {
+            const Icon = stage.icon;
             return (
-              <Card key={l.id} className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium truncate">{l.name}</p>
-                      <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${meta.cls}`}>{meta.label}</span>
+              <div key={stage.id} className="space-y-2">
+                <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${stage.text}`}>
+                  <Icon className="h-4 w-4" />
+                  {stage.label} · {items.length}
+                </div>
+                {items.map((l) => (
+                  <Card key={l.id} className={`p-4 border-l-4 ${stage.bar}`}>
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{l.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {[l.owner_name, l.neighborhood, channelLabel(l.channel), l.contact].filter(Boolean).join(" · ")}
+                        </p>
+                        {l.notes && <p className="text-sm text-foreground/80 mt-1.5">{l.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => openEdit(l)} title="Editar"
+                          className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted">
+                          <PencilSimple className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => remove(l)} title="Remover"
+                          className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {[l.neighborhood, channelLabel(l.channel), l.contact].filter(Boolean).join(" · ")}
-                    </p>
-                    {l.notes && <p className="text-sm text-foreground/80 mt-1.5">{l.notes}</p>}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => openEdit(l)} title="Editar"
-                      className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted">
-                      <PencilSimple className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => remove(l)} title="Remover"
-                      className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
-                      <Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                {/* Avanço rápido de etapa */}
-                <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground shrink-0">Mudar etapa:</span>
-                  <Select value={l.stage} onValueChange={(v) => quickStage(l.id, v)} className="h-9 flex-1 sm:max-w-[200px]">
-                    {STAGES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
-                  </Select>
-                </div>
-              </Card>
+                    {/* Avanço rápido de etapa + WhatsApp */}
+                    <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">Mudar etapa:</span>
+                      <Select value={l.stage} onValueChange={(v) => quickStage(l.id, v)} className="h-9 flex-1 min-w-[130px] sm:max-w-[180px]">
+                        {STAGES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                      </Select>
+                      <Button size="sm" variant="outline" onClick={() => openWa(l)} className="text-emerald-600">
+                        <WhatsappLogo className="h-4 w-4" /> WhatsApp
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
             );
           })}
         </div>
