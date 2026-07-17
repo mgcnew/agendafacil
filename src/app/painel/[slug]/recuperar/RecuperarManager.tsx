@@ -49,9 +49,12 @@ const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 
 function waLink(phone: string | null, text: string): string | null {
   const digits = (phone ?? "").replace(/\D/g, "");
-  // 55 (país) + DDD (2) + 8/9 dígitos → mínimo 12
-  if (digits.length < 12) return null;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  // Quase todo cadastro vem como (11) 99100-0001 — DDD + número, sem o 55 do
+  // país. Exigir os 12 dígitos aqui fazia a tela dizer "sem telefone" pra
+  // cliente que o resto do painel (aniversário, Gestor) chamava numa boa.
+  if (digits.length < 10) return null;
+  const full = digits.length <= 11 ? `55${digits}` : digits;
+  return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
 }
 
 type PriorityPick = { client: WinbackClient; bucket: Bucket; headline: string };
