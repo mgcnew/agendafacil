@@ -12,6 +12,7 @@ import { LoginButton } from "@/components/auth/LoginButton";
 const NAV_LINKS = [
   { label: "Funcionalidades", href: "#funcionalidades" },
   { label: "Como funciona", href: "#como-funciona" },
+  { label: "Ver demo", href: "#demo" },
   { label: "Planos", href: "#planos" },
 ];
 

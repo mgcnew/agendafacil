@@ -249,6 +249,11 @@ export default async function DashboardPage({
     { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
   ];
 
+  // Salão demo: destaca o link público de agendamento pra o visitante testar
+  // a experiência da cliente sem sair do painel de demonstração.
+  const isDemo = !!(membership.salons as { is_demo?: boolean }).is_demo;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+
   return (
     <div className="space-y-6 af-rise">
       {/* Header — sempre largura total */}
@@ -284,6 +289,35 @@ export default async function DashboardPage({
 
         {/* ── Coluna principal ──────────────────────────────────�� */}
         <div className="space-y-6 min-w-0">
+          {/* Demo: link de agendamento em destaque, pra testar a visão da cliente */}
+          {isDemo && (
+            <div className="rounded-[var(--radius)] border-2 border-primary bg-primary/5 p-5">
+              <div className="flex items-start gap-3">
+                <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-primary text-primary-foreground">
+                  <CalendarDots className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-display font-bold">Este é o link de agendamento do seu salão</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    É por aqui que sua cliente marca sozinha, sem te chamar no WhatsApp.
+                    Clique pra ver — e testar — como fica pra ela.
+                  </p>
+                  <p className="text-xs text-primary font-medium mt-2 break-all">
+                    {siteUrl.replace(/^https?:\/\//, "")}/{slug}
+                  </p>
+                  <a
+                    href={`/${slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition"
+                  >
+                    Ver como a cliente agenda <CaretRight className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
           {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
 

@@ -168,9 +168,10 @@ function buildMessage(
 const MEU_NOME_KEY = "prospeccao:meuNome";
 
 // Links dos salões demo (por vertical) pra anexar na mensagem de WhatsApp.
+// Rota de 1 clique: entra direto no painel de exemplo (auto-login).
 const DEMO_PATHS: Record<string, string> = {
-  salao: "/demo-salao",
-  barbearia: "/demo-barbearia",
+  salao: "/demo/salao",
+  barbearia: "/demo/barbearia",
 };
 function demoUrlFor(seg: string): string | null {
   if (seg !== "salao" && seg !== "barbearia") return null;

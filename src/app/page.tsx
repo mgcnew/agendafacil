@@ -541,6 +541,42 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── DEMO AO VIVO ──────────────────────────────────────────────── */}
+      {/* Links usam <a> puro (não Link) de propósito: /demo/[vertical] é uma
+          rota que faz login; o prefetch do Link dispararia o login sem clique. */}
+      <section
+        id="demo"
+        className="px-5 py-16 sm:py-20 border-y border-border"
+        style={{ background: "var(--card)" }}
+      >
+        <div className="mx-auto max-w-3xl text-center reveal">
+          <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+            <span className="h-px w-8 bg-primary" />
+            Sem criar conta
+            <span className="h-px w-8 bg-primary" />
+          </p>
+          <h2 className="font-display text-3xl sm:text-4xl tracking-tight">
+            Dê uma volta num salão de verdade
+          </h2>
+          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
+            Entre num painel de demonstração já com agenda, caixa e comissões —
+            explore como se fosse seu, sem cadastro. Escolha o tipo do seu negócio:
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+            <a href="/demo/salao" className="block">
+              <Button size="lg" className="w-full sm:w-auto font-semibold">
+                Ver demo de salão <ArrowRight className="h-4 w-4" />
+              </Button>
+            </a>
+            <a href="/demo/barbearia" className="block">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto font-semibold">
+                Ver demo de barbearia <ArrowRight className="h-4 w-4" />
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* ── Q&A BENEFÍCIOS — INTERATIVO ───────────────────────────────── */}
       <section
         id="funcionalidades"
