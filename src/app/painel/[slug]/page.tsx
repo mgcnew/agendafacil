@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { daysUntil } from "@/lib/signals/rules";
 import { CalendarDots, Wallet, Clock, Users, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { DemoTrialModal } from "./DemoTrialModal";
 import { TodayAgenda, type AgendaItem, type AgendaAnamnesis, type AgendaPhoto } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
@@ -253,9 +254,12 @@ export default async function DashboardPage({
   // a experiência da cliente sem sair do painel de demonstração.
   const isDemo = !!(membership.salons as { is_demo?: boolean }).is_demo;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+  const demoVertical = membership.salons.niche === "barbearia" ? "barbearia" : "salao";
 
   return (
     <div className="space-y-6 af-rise">
+      {/* Demo: passado um tempo de uso, oferece o teste e captura o contato */}
+      {isDemo && <DemoTrialModal vertical={demoVertical} />}
       {/* Header — sempre largura total */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

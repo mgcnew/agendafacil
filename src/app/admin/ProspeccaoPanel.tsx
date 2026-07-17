@@ -44,6 +44,9 @@ type Lead = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Preenchidos pelo lead que veio da demonstração (capture_demo_lead).
+  email: string | null;
+  accepts_marketing: boolean | null;
 };
 
 const CHANNELS: { id: string; label: string }[] = [
@@ -53,6 +56,8 @@ const CHANNELS: { id: string; label: string }[] = [
   { id: "whatsapp", label: "WhatsApp" },
   { id: "google", label: "Google" },
   { id: "parceria", label: "Parceria" },
+  // Entra sozinho: quem testou a demonstração e pediu os 14 dias.
+  { id: "demo", label: "Demonstração" },
   { id: "outro", label: "Outro" },
 ];
 const channelLabel = (id: string) => CHANNELS.find((c) => c.id === id)?.label ?? id;
@@ -650,8 +655,16 @@ export function ProspeccaoPanel() {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{l.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {[l.owner_name, l.neighborhood, channelLabel(l.channel), l.contact].filter(Boolean).join(" · ")}
+                          {[l.owner_name, l.neighborhood, channelLabel(l.channel), l.contact, l.email]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </p>
+                        {/* Só quem aceitou pode entrar em disparo de oferta. */}
+                        {l.accepts_marketing && (
+                          <span className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            aceita ofertas
+                          </span>
+                        )}
                         {l.notes && <p className="text-sm text-foreground/80 mt-1.5">{l.notes}</p>}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">

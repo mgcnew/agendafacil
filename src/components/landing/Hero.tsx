@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { Button } from "@/components/ui";
 import {
   ArrowRight,
@@ -71,11 +70,11 @@ export function Hero() {
               className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3 af-rise"
               style={{ animationDelay: "0.28s" }}
             >
-              <Link href="/criar-salao">
+              <a href="#demo">
                 <Button size="lg" className="font-semibold">
-                  Começar grátis — 14 dias <ArrowRight className="h-4 w-4" />
+                  Ver o sistema por dentro <ArrowRight className="h-4 w-4" />
                 </Button>
-              </Link>
+              </a>
               <a href="#como-funciona">
                 <Button size="lg" variant="outline">
                   Ver como funciona
@@ -89,7 +88,7 @@ export function Hero() {
               style={{ animationDelay: "0.36s" }}
             >
               {[
-                "Sem cartão de crédito",
+                "Sem cadastro para testar",
                 "Configurado em 2 minutos",
                 "Cancele quando quiser",
               ].map((t) => (

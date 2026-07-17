@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     template: "%s · Zulan",
   },
   description:
-    "Software de agendamento online para salões de beleza, barbearias e clínicas de estética. Agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios. Teste grátis por 14 dias, sem cartão.",
+    "Software de agendamento online para salões de beleza, barbearias e clínicas de estética. Agenda, link de agendamento para clientes, comissões, caixa, estoque e relatórios. Veja o sistema por dentro numa demonstração, sem cadastro.",
   applicationName: "Zulan",
   keywords: [
     "sistema de agendamento para salão",
@@ -80,13 +80,13 @@ export const metadata: Metadata = {
     siteName: "Zulan",
     title: "Zulan — Agendamento online para salões e barbearias",
     description:
-      "A cliente agenda pelo seu link, recebe confirmação automática e você só aparece para atender. Agenda, comissões, caixa e estoque. Teste grátis por 14 dias.",
+      "A cliente agenda pelo seu link, recebe confirmação automática e você só aparece para atender. Agenda, comissões, caixa e estoque. Entre na demonstração, sem cadastro.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Zulan — Agendamento online para salões e barbearias",
     description:
-      "Menos WhatsApp, mais clientes na cadeira. Agenda online, comissões, caixa e estoque. Teste grátis por 14 dias.",
+      "Menos WhatsApp, mais clientes na cadeira. Agenda online, comissões, caixa e estoque. Entre na demonstração, sem cadastro.",
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Zulan", statusBarStyle: "default" },

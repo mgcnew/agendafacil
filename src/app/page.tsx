@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   title:
     "Sistema de agendamento online com IA para salões de beleza e barbearias",
   description:
-    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda, do caixa e do marketing. Teste grátis por 14 dias, sem cartão.",
+    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda, do caixa e do marketing. Entre na demonstração e veja o sistema por dentro, sem cadastro.",
   alternates: { canonical: "/" },
 };
 
@@ -412,7 +412,7 @@ function StickyMobileCTA() {
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 lg:hidden">
       <Link href="/criar-salao" className="block">
         <Button size="lg" className="w-full font-bold">
-          Criar meu salão grátis <ArrowRight className="h-4 w-4" />
+          Criar meu salão <ArrowRight className="h-4 w-4" />
         </Button>
       </Link>
     </div>
@@ -565,12 +565,12 @@ export default function Home() {
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
             <a href="/demo/salao" className="block">
               <Button size="lg" className="w-full sm:w-auto font-semibold">
-                Ver demo de salão <ArrowRight className="h-4 w-4" />
+                Entrar como salão <ArrowRight className="h-4 w-4" />
               </Button>
             </a>
             <a href="/demo/barbearia" className="block">
               <Button size="lg" variant="outline" className="w-full sm:w-auto font-semibold">
-                Ver demo de barbearia <ArrowRight className="h-4 w-4" />
+                Entrar como barbearia <ArrowRight className="h-4 w-4" />
               </Button>
             </a>
           </div>
@@ -708,16 +708,16 @@ export default function Home() {
                   Ainda na dúvida? O risco é zero.
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                  14 dias grátis, sem cartão. Se não for pra você, é só cancelar —
-                  sem multa, sem ligação de retenção.
+                  Entre na demonstração e veja tudo funcionando antes de decidir —
+                  sem cadastro, sem cartão, sem ligação de retenção.
                 </p>
               </div>
             </div>
-            <Link href="/criar-salao" className="shrink-0">
+            <a href="#demo" className="shrink-0">
               <Button size="lg" className="font-semibold whitespace-nowrap">
-                Começar grátis <ArrowRight className="h-4 w-4" />
+                Ver por dentro <ArrowRight className="h-4 w-4" />
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -730,8 +730,7 @@ export default function Home() {
               Monte a equipe virtual do seu salão
             </h2>
             <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-              Comece com 14 dias grátis. Sem cartão, sem fidelidade — cancele
-              quando quiser.
+              Sem cartão, sem fidelidade — cancele quando quiser.
             </p>
           </div>
 
@@ -796,7 +795,7 @@ export default function Home() {
                           variant={highlight ? "primary" : "outline"}
                           className="w-full"
                         >
-                          Começar grátis
+                          Criar meu salão
                         </Button>
                       </Link>
                     )}
@@ -846,28 +845,28 @@ export default function Home() {
                 Sem cartão de crédito · Sem compromisso
               </p>
               <h2 className="font-display text-3xl sm:text-5xl font-bold text-white leading-tight">
-                14 dias grátis.{" "}
+                Veja funcionando.{" "}
                 <br className="hidden sm:block" />
-                Sem compromisso.
+                Depois você decide.
               </h2>
               <p className="mt-4 text-white/90 max-w-lg leading-relaxed">
-                Cadastre agora, configure em 2 minutos e veja sua agenda se
-                organizar sozinha. Depois você decide se continua — sem pressão.
+                Entre num salão de demonstração já com agenda, caixa e comissões
+                rodando. Sem cadastro, sem cartão — dê uma volta e veja se é pra você.
               </p>
             </div>
 
             {/* CTA */}
             <div className="flex flex-col items-center gap-3 shrink-0">
-              <Link href="/criar-salao">
+              <a href="#demo">
                 <Button
                   size="lg"
                   className="bg-white text-[#0a565d] hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base shadow-lg"
                 >
-                  Criar meu salão grátis <ArrowRight className="h-4 w-4" />
+                  Entrar na demonstração <ArrowRight className="h-4 w-4" />
                 </Button>
-              </Link>
+              </a>
               <ul className="flex flex-col sm:flex-row gap-x-4 gap-y-1">
-                {["Configurado em 2 min", "Cancele quando quiser"].map((t) => (
+                {["Sem cadastro", "Sem cartão"].map((t) => (
                   <li key={t} className="flex items-center gap-1.5 text-xs text-white/80">
                     <Check className="h-3 w-3 text-white shrink-0" /> {t}
                   </li>
