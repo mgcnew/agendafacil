@@ -225,7 +225,11 @@ export async function getOrGenerateDashboardInsights(
   salonId: string,
   context: GestorContext,
   signals: Signal[],
+  isDemo = false,
 ): Promise<DashboardInsightsResult> {
+  // Salão demo nunca chama IA paga — usa o stub determinístico (grátis).
+  if (isDemo) return { ...stubPayload(signals), mode: "stub" };
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: cached } = await supabase
@@ -259,7 +263,11 @@ export async function refreshDashboardInsights(
   salonId: string,
   context: GestorContext,
   signals: Signal[],
+  isDemo = false,
 ): Promise<RefreshOutcome> {
+  // Salão demo: refresh não gasta IA — devolve o stub, sem bloquear.
+  if (isDemo) return { ...stubPayload(signals), mode: "stub", blocked: false };
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: cached } = await supabase

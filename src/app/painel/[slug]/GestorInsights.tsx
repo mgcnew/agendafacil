@@ -123,17 +123,19 @@ export async function GestorInsightsAsync({
   salonId,
   firstName,
   salonName,
+  isDemo = false,
 }: {
   slug: string;
   supabase: SupabaseClient;
   salonId: string;
   firstName: string;
   salonName: string;
+  isDemo?: boolean;
 }) {
   // Todo o trabalho de sinais (queries + IA) mora atrás do Suspense: coletamos
   // os avisos da mesma fonte única usada pelas páginas e só então narramos.
   const { context, signals, birthdays } = await collectSignals(supabase, salonId, { firstName, salonName });
-  const result = await getOrGenerateDashboardInsights(supabase, salonId, context, signals);
+  const result = await getOrGenerateDashboardInsights(supabase, salonId, context, signals, isDemo);
 
   // Remove o que o dono dispensou hoje — mesmo que já esteja no cache do dia,
   // o card sai da tela (o cache regenera sem ele na próxima análise/amanhã).

@@ -277,6 +277,7 @@ export default async function DashboardPage({
                 salonId={salonId}
                 firstName={firstName}
                 salonName={membership.salons.name}
+                isDemo={isDemo}
               />
             </Suspense>
           </GestorPanel>

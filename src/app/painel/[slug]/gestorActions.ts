@@ -22,7 +22,8 @@ export async function refreshGestorInsights(slug: string): Promise<RefreshGestor
     salonName: membership.salons.name,
   });
 
-  const result = await refreshDashboardInsights(supabase, membership.salon_id, context, signals);
+  const isDemo = !!(membership.salons as { is_demo?: boolean }).is_demo;
+  const result = await refreshDashboardInsights(supabase, membership.salon_id, context, signals, isDemo);
   if (result.blocked) {
     return {
       blocked: true,

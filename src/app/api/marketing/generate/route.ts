@@ -101,7 +101,9 @@ export async function POST(req: Request) {
     bookingUrl: `${new URL(req.url).origin}/${slug}`,
   });
 
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  // Salão demo nunca dispara geração paga — sempre cai no stub abaixo.
+  const isDemo = !!(salon as { is_demo?: boolean }).is_demo;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY && !isDemo;
 
   // ─────────────────────────────────────────────────────────────────────
   // MODO LIVE (quando OPENAI_API_KEY estiver configurada) — TODO concluir.
