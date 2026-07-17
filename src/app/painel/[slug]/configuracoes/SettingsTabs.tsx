@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Input, Label, Textarea } from "@/components/ui";
+import { Button, Card, Input, Label } from "@/components/ui";
 import { Select } from "@/components/Select";
 import { cn } from "@/lib/utils";
 import { COLOR_GROUPS, CHOOSABLE_NICHES, NICHE_DEFAULT_COLOR, BARBEARIA_DEFAULT_PREVIEW, type ColorTheme, type Niche } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
 import { HoursManager } from "../horarios/HoursManager";
+import { onlyDigits, formatCep, isValidCep } from "@/lib/cep";
+import { lookupCepAction } from "./cepActions";
 import { uploadLogo, removeLogo } from "./actions";
 import { PushNotificationsCard } from "./PushNotificationsCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
@@ -21,6 +23,8 @@ import {
   CreditCard,
   Image as ImageIcon,
   LinkSimple,
+  MagnifyingGlass,
+  MapPin,
   Palette,
   ShieldCheck,
   Storefront,
@@ -356,11 +360,25 @@ function EstablishmentPanel({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  // Colunas de endereço estruturado ainda não estão no tipo gerado — mesmo
+  // padrão de cast usado no resto do painel (is_demo etc.).
+  const s = salon as AddressColumns;
   const [name, setName] = useState(salon.name);
   const [niche, setNiche] = useState<Niche>(salon.niche);
   const [email, setEmail] = useState(salon.email ?? "");
   const [phone, setPhone] = useState(salon.phone ?? "");
-  const [address, setAddress] = useState(salon.address ?? "");
+  const [addr, setAddr] = useState<AddressState>({
+    cep: s.cep ?? "",
+    street: s.street ?? "",
+    number: s.street_number ?? "",
+    complement: s.complement ?? "",
+    neighborhood: s.neighborhood ?? "",
+    city: s.city ?? "",
+    uf: s.state ?? "",
+    lat: s.lat ?? null,
+    lng: s.lng ?? null,
+    visibility: (s.address_visibility as AddressVisibility) ?? "full",
+  });
   const [ownerName, setOwnerName] = useState(owner?.display_name ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -378,8 +396,20 @@ function EstablishmentPanel({
         niche,
         email: email.trim() || null,
         phone: phone || null,
-        address: address || null,
-      })
+        // `address` (texto) segue preenchido, derivado dos campos — a página
+        // pública e as metatags ainda o usam como fallback legível.
+        address: composeAddress(addr) || null,
+        cep: onlyDigits(addr.cep) || null,
+        street: addr.street.trim() || null,
+        street_number: addr.number.trim() || null,
+        complement: addr.complement.trim() || null,
+        neighborhood: addr.neighborhood.trim() || null,
+        city: addr.city.trim() || null,
+        state: addr.uf.trim() || null,
+        lat: addr.lat,
+        lng: addr.lng,
+        address_visibility: addr.visibility,
+      } as never)
       .eq("id", salon.id);
     if (!e && owner && ownerName.trim() !== (owner.display_name ?? "")) {
       const { error: oe } = await supabase
@@ -441,16 +471,7 @@ function EstablishmentPanel({
               placeholder="(11) 99999-9999"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="address">Endereço</Label>
-            <Textarea
-              id="address"
-              rows={2}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              disabled={!canEdit}
-            />
-          </div>
+          <AddressFields value={addr} onChange={setAddr} disabled={!canEdit} />
           {owner && (
             <div className="space-y-1.5">
               <Label htmlFor="ownerName">Nome do dono</Label>
@@ -475,6 +496,169 @@ function EstablishmentPanel({
       <LinkCard salon={salon} canEdit={canEdit} />
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
+    </div>
+  );
+}
+
+/* ───────────────────────── Endereço ───────────────────────── */
+
+type AddressVisibility = "full" | "neighborhood" | "hidden";
+
+// Colunas de endereço estruturado (ainda fora do tipo gerado).
+type AddressColumns = Tables<"salons"> & {
+  cep: string | null;
+  street: string | null;
+  street_number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  lat: number | null;
+  lng: number | null;
+  address_visibility: string | null;
+};
+
+type AddressState = {
+  cep: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  uf: string;
+  lat: number | null;
+  lng: number | null;
+  visibility: AddressVisibility;
+};
+
+/** Monta o endereço legível a partir dos campos (fallback de `address`). */
+function composeAddress(a: AddressState): string {
+  const linha1 = [a.street, a.number].filter((x) => x.trim()).join(", ");
+  const comp = a.complement.trim();
+  const bairro = a.neighborhood.trim();
+  const cidadeUf = [a.city.trim(), a.uf.trim()].filter(Boolean).join(" - ");
+  return [linha1, comp, bairro, cidadeUf].filter(Boolean).join(" · ");
+}
+
+const VISIBILITY_OPTIONS: { id: AddressVisibility; label: string; hint: string }[] = [
+  { id: "full", label: "Endereço completo", hint: "A cliente vê rua e número na sua página." },
+  { id: "neighborhood", label: "Só o bairro e a cidade", hint: "Bom pra quem atende em casa. O endereço exato fica pra depois do agendamento." },
+  { id: "hidden", label: "Não mostrar endereço", hint: "Nada de localização na página pública." },
+];
+
+function AddressFields({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: AddressState;
+  onChange: (next: AddressState) => void;
+  disabled?: boolean;
+}) {
+  const [looking, setLooking] = useState(false);
+  const [cepMsg, setCepMsg] = useState<string | null>(null);
+  const set = (patch: Partial<AddressState>) => onChange({ ...value, ...patch });
+
+  async function buscarCep() {
+    if (!isValidCep(value.cep)) {
+      setCepMsg("CEP incompleto.");
+      return;
+    }
+    setLooking(true);
+    setCepMsg(null);
+    const found = await lookupCepAction(value.cep);
+    setLooking(false);
+    if (!found) {
+      setCepMsg("Não encontrei esse CEP. Você pode preencher na mão.");
+      return;
+    }
+    // Coordenada só vem de alguns CEPs — mantém a que já existia se vier vazia.
+    set({
+      street: found.street ?? value.street,
+      neighborhood: found.neighborhood ?? value.neighborhood,
+      city: found.city ?? value.city,
+      uf: found.state ?? value.uf,
+      lat: found.lat ?? value.lat,
+      lng: found.lng ?? value.lng,
+    });
+    setCepMsg(found.lat ? null : "Endereço preenchido. (Sem mapa pra este CEP — não atrapalha.)");
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-primary shrink-0" />
+        <h3 className="text-sm font-semibold">Endereço</h3>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="cep">CEP</Label>
+        <div className="flex gap-2">
+          <Input
+            id="cep"
+            value={formatCep(value.cep)}
+            onChange={(e) => set({ cep: onlyDigits(e.target.value) })}
+            onBlur={() => { if (isValidCep(value.cep)) buscarCep(); }}
+            disabled={disabled}
+            inputMode="numeric"
+            placeholder="00000-000"
+            className="max-w-[160px]"
+          />
+          <Button type="button" variant="outline" onClick={buscarCep} disabled={disabled || looking}>
+            {looking ? <CircleNotch className="h-4 w-4 animate-spin" /> : <MagnifyingGlass className="h-4 w-4" />}
+            <span className="ml-1.5">Buscar</span>
+          </Button>
+        </div>
+        {cepMsg && <p className="text-xs text-muted-foreground">{cepMsg}</p>}
+      </div>
+
+      <div className="grid grid-cols-[1fr_100px] gap-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="street">Rua</Label>
+          <Input id="street" value={value.street} onChange={(e) => set({ street: e.target.value })} disabled={disabled} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="number">Número</Label>
+          <Input id="number" value={value.number} onChange={(e) => set({ number: e.target.value })} disabled={disabled} />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="complement">Complemento <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+        <Input id="complement" value={value.complement} onChange={(e) => set({ complement: e.target.value })} disabled={disabled} placeholder="Sala, andar, ponto de referência" />
+      </div>
+
+      <div className="grid grid-cols-[1fr_1fr_72px] gap-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="neighborhood">Bairro</Label>
+          <Input id="neighborhood" value={value.neighborhood} onChange={(e) => set({ neighborhood: e.target.value })} disabled={disabled} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="city">Cidade</Label>
+          <Input id="city" value={value.city} onChange={(e) => set({ city: e.target.value })} disabled={disabled} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="uf">UF</Label>
+          <Input id="uf" value={value.uf} onChange={(e) => set({ uf: e.target.value.toUpperCase().slice(0, 2) })} disabled={disabled} maxLength={2} />
+        </div>
+      </div>
+
+      <div className="space-y-1.5 pt-1">
+        <Label htmlFor="visibility">Quem pode ver seu endereço</Label>
+        <Select
+          id="visibility"
+          value={value.visibility}
+          onValueChange={(v) => set({ visibility: v as AddressVisibility })}
+          disabled={disabled}
+        >
+          {VISIBILITY_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>{o.label}</option>
+          ))}
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {VISIBILITY_OPTIONS.find((o) => o.id === value.visibility)?.hint}
+        </p>
+      </div>
     </div>
   );
 }

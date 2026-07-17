@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { JsonLd } from "@/components/InlineScript";
+import {
+  seoTitle,
+  seoDescription,
+  salonJsonLd,
+  type PublicSalonSeo,
+} from "@/lib/salonSeo";
 import { BookingApp } from "./BookingApp";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +28,9 @@ export async function generateMetadata({
     return { title: "Salão não encontrado" };
   }
 
-  const title = `${salon.name} · Agende online`;
-  const description = salon.address
-    ? `Agende seu horário no ${salon.name} — ${salon.address}.`
-    : `Agende seu horário online no ${salon.name} em poucos toques.`;
+  const seo = salon as unknown as PublicSalonSeo;
+  const title = seoTitle(seo);
+  const description = seoDescription(seo);
   const images = salon.logo_url ? [{ url: salon.logo_url as string }] : undefined;
 
   return {
@@ -56,6 +64,11 @@ export default async function SalonBookingPage({
   const salon = data?.[0];
   if (!salon) notFound();
 
+  // Negócio local pro Google — só nos salões reais (demo não entra no índice).
+  const jsonLd = salon.is_demo
+    ? null
+    : salonJsonLd(salon as unknown as PublicSalonSeo, `${SITE_URL}/${slug}`);
+
   // "" ou ausente → barbearia usa a identidade CSS nativa (:not([data-color]));
   // demais nichos caem em "a". Mesma regra do painel (layout.tsx).
   const rawColor = salon.color_theme as string | null | undefined;
@@ -72,6 +85,7 @@ export default async function SalonBookingPage({
       data-color={colorAttr}
       className="min-h-dvh bg-background text-foreground"
     >
+      {jsonLd && <JsonLd data={jsonLd} />}
       {salon.is_demo && <DemoBanner niche={salon.niche as string} />}
       <BookingApp salon={salon} />
     </div>
