@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
@@ -32,6 +32,11 @@ import {
   UploadSimple,
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
+
+// URL canônica (produção) — o prefixo do link mostrado pra dona. NEXT_PUBLIC_ é
+// embutida no build, igual no servidor/cliente, sem o render duplo do antigo
+// useEffect(setOrigin). Ela vê a URL que de fato vai compartilhar (não localhost).
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
@@ -687,8 +692,6 @@ function LinkCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
   const effective = slugify(slug);
   const changed = effective !== salon.slug;
 
@@ -729,7 +732,7 @@ function LinkCard({
       </p>
 
       <div className="mt-4 flex items-center gap-1 rounded-[var(--radius)] border border-border bg-secondary/40 px-3 py-2 text-sm">
-        <span className="text-muted-foreground shrink-0">{origin}/</span>
+        <span className="text-muted-foreground shrink-0">{SITE_URL}/</span>
         <input
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
@@ -739,7 +742,7 @@ function LinkCard({
       </div>
       {effective !== slug && (
         <p className="mt-1 text-xs text-muted-foreground">
-          Ficará: <strong>{origin}/{effective || "…"}</strong>
+          Ficará: <strong>{SITE_URL}/{effective || "…"}</strong>
         </p>
       )}
 

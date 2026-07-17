@@ -30,6 +30,11 @@ import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
 import { Narrator, narratorPct as pct } from "@/components/Narrator";
 
+// URL canônica (produção) — vai dentro da mensagem de WhatsApp; NEXT_PUBLIC_ é
+// embutida no build, igual no servidor/cliente, sem o render duplo do antigo
+// useEffect(setOrigin).
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+
 export type ReportData = {
   faturamento: number;
   atendimentos: number;
@@ -473,11 +478,6 @@ function ReativacaoTab({
   salonName: string;
   slug: string;
 }) {
-  // origin só fica disponível no cliente — definir via efeito evita
-  // divergência de hidratação no href do WhatsApp.
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
-
   if (loading || clients === null) {
     return (
       <div className="grid place-items-center py-20 text-muted-foreground">
@@ -497,7 +497,7 @@ function ReativacaoTab({
     );
   }
 
-  const bookingLink = `${origin}/${slug}`;
+  const bookingLink = `${SITE_URL}/${slug}`;
   const waHref = (c: ReactClient) => {
     const digits = (c.phone ?? "").replace(/\D/g, "");
     if (!digits) return null;

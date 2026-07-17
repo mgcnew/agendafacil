@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Card } from "@/components/ui";
 import {
   Cake,
@@ -15,6 +14,11 @@ export type BirthdayClient = {
   turning_age: number;
 };
 
+// URL canônica (produção) — vai dentro da mensagem de WhatsApp, então nunca
+// pode ser "localhost". NEXT_PUBLIC_ é embutida no build e igual no
+// servidor/cliente, sem o render duplo do antigo useEffect(setOrigin).
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+
 const firstName = (n: string) => (n || "").trim().split(" ")[0] || "";
 const whenLabel = (d: number) => (d === 0 ? "hoje 🎉" : d === 1 ? "amanhã" : `em ${d} dias`);
 
@@ -27,13 +31,9 @@ export function BirthdayCard({
   salonName: string;
   slug: string;
 }) {
-  // origin só no cliente — evita divergência de hidratação no href
-  const [origin, setOrigin] = useState("");
-  useEffect(() => setOrigin(window.location.origin), []);
-
   if (!clients.length) return null;
 
-  const bookingLink = `${origin}/${slug}`;
+  const bookingLink = `${SITE_URL}/${slug}`;
   const waHref = (c: BirthdayClient) => {
     const digits = (c.phone ?? "").replace(/\D/g, "");
     if (!digits) return null;
