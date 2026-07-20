@@ -529,6 +529,72 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── DOIS MUNDOS (salão + barbearia) ───────────────────────────── */}
+      <section className="px-5 py-16 sm:py-24 bg-background">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center max-w-xl mx-auto mb-12 reveal">
+            <p className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+              <span className="h-px w-8 bg-primary" />
+              Um sistema, dois mundos
+              <span className="h-px w-8 bg-primary" />
+            </p>
+            <h2 className="font-display text-3xl sm:text-5xl tracking-tight">
+              Feito pro salão <span className="text-primary">e</span> pra barbearia.
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Tema, serviços e linguagem se ajustam ao seu negócio — não é um sistema
+              genérico com cara de qualquer coisa.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            {[
+              {
+                img: "/ambiente-salao.jpg",
+                alt: "Ambiente de um salão de beleza acolhedor com cadeira, espelho redondo e plantas",
+                tag: "Para salões de beleza",
+                title: "Cabelo, unhas, estética e sobrancelha",
+              },
+              {
+                img: "/ambiente-barbearia.jpg",
+                alt: "Ambiente de uma barbearia com cadeira clássica de couro e tijolinho",
+                tag: "Para barbearias",
+                title: "Corte, barba e o clima da sua cadeira",
+              },
+            ].map((c) => (
+              <div
+                key={c.tag}
+                className="group relative overflow-hidden rounded-[var(--radius)] border border-border reveal"
+              >
+                <div className="relative aspect-[4/3]">
+                  <Image
+                    src={c.img}
+                    alt={c.alt}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 640px) 90vw, 560px"
+                  />
+                  {/* Gradiente pra o texto ficar legível sobre a foto */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{ background: "linear-gradient(to top, rgba(11,33,39,0.82) 0%, rgba(11,33,39,0.15) 45%, transparent 70%)" }}
+                  />
+                  <div className="absolute inset-x-0 bottom-0 p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-white/75">
+                      {c.tag}
+                    </p>
+                    <p className="mt-0.5 font-display text-lg sm:text-xl font-semibold text-white">
+                      {c.title}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── DEMO AO VIVO ──────────────────────────────────────────────── */}
       {/* Links usam <a> puro (não Link) de propósito: /demo/[vertical] é uma
           rota que faz login; o prefetch do Link dispararia o login sem clique. */}
