@@ -129,29 +129,17 @@ const OBJECTIONS = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: "Ana Paula Martins",
-    role: "Salão da Ana · São Paulo, SP",
-    initials: "AP",
-    text: "Antes eu passava horas no WhatsApp confirmando agendamento. Hoje as clientes agendam sozinhas e eu só apareço para atender. Não consigo imaginar sem o sistema.",
-    stars: 5,
-  },
-  {
-    name: "Rodrigo Feitosa",
-    role: "Barber Kings · Rio de Janeiro, RJ",
-    initials: "RF",
-    text: "A parte de comissão me salvou. O fechamento do mês que levava duas horas agora é feito em dez minutos. Minha equipe confia mais no processo.",
-    stars: 5,
-  },
-  {
-    name: "Carla Souza",
-    role: "Espaço Estético Carla · BH, MG",
-    initials: "CS",
-    text: "Minha cliente mais velha aprendeu a usar o link em cinco minutos. A ficha de anamnese online foi o que me convenceu — é exatamente o que eu precisava.",
-    stars: 5,
-  },
-];
+// Depoimentos REAIS apenas — nome, negócio e nota só entram com pessoa de
+// verdade e permissão. Enquanto estiver vazio, a seção não aparece (evita
+// publicar review inventado, que é propaganda enganosa). Assim que os
+// primeiros clientes derem retorno, é só adicionar aqui que a seção volta.
+const TESTIMONIALS: {
+  name: string;
+  role: string;
+  initials: string;
+  text: string;
+  stars: number;
+}[] = [];
 
 const FOOTER_COLS = [
   {
@@ -878,6 +866,8 @@ export default function Home() {
       </section>
 
       {/* ── DEPOIMENTOS ──────────────────────────────────────────────── */}
+      {/* Só renderiza com depoimentos reais cadastrados (ver TESTIMONIALS). */}
+      {TESTIMONIALS.length > 0 && (
       <section
         className="relative border-t border-border py-20 sm:py-28 overflow-hidden"
         style={{ background: "var(--card)" }}
@@ -923,10 +913,10 @@ export default function Home() {
                   {t.text}
                 </p>
 
-                {/* Estrelas */}
+                {/* Estrelas — weight="fill" pra render sólido (o padrão é contorno) */}
                 <div className="flex gap-0.5">
                   {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-current text-amber-400" />
+                    <Star key={i} weight="fill" className="h-3.5 w-3.5 text-amber-400" />
                   ))}
                 </div>
 
@@ -948,6 +938,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── FOOTER ───────────────────────────────────────────────────── */}
       <footer className="relative bg-background border-t border-border overflow-hidden">
