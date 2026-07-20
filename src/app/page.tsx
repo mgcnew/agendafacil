@@ -745,33 +745,14 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Faixa de garantia — fecha a objeção e empurra pro CTA */}
-          <div
-            className="mt-14 sm:mt-16 rounded-[1.75rem] px-6 py-8 sm:px-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left reveal"
-            style={{ background: "var(--secondary)" }}
-          >
-            <div className="flex items-start gap-4">
-              <span
-                className="hidden sm:grid place-items-center h-12 w-12 rounded-2xl shrink-0"
-                style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
-              >
-                <ShieldCheck className="h-6 w-6" />
-              </span>
-              <div>
-                <p className="font-display text-lg font-semibold tracking-tight">
-                  Ainda na dúvida? O risco é zero.
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                  Entre na demonstração e veja tudo funcionando antes de decidir —
-                  sem cadastro, sem cartão, sem ligação de retenção.
-                </p>
-              </div>
-            </div>
-            <a href="#demo" className="shrink-0">
-              <Button size="lg" className="font-semibold whitespace-nowrap">
-                Ver por dentro <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
+          {/* Linha de tranquilização — fecha a objeção sem competir com o CTA
+              final (o banner "Veja funcionando" é o único empurrão pra demo). */}
+          <div className="mt-14 sm:mt-16 flex items-center justify-center gap-3 text-center reveal">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-primary" weight="fill" />
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">O risco é zero:</span>{" "}
+              sem cadastro, sem cartão, sem ligação de retenção — cancele quando quiser.
+            </p>
           </div>
         </div>
       </section>
@@ -867,29 +848,44 @@ export default function Home() {
           className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20 reveal"
           style={{
             background: "linear-gradient(120deg, #0a565d 0%, #0e6f78 48%, #138a93 100%)",
+            boxShadow:
+              "inset 0 0 0 1px rgba(255,255,255,0.08), 0 30px 60px -30px rgba(10,86,93,0.55)",
           }}
         >
-          {/* Brilhos suaves — branco + dourado, decorativos */}
+          {/* Brilho branco (luz) no topo-direita */}
           <span
             aria-hidden
             className="absolute pointer-events-none rounded-full"
-            style={{ width: 440, height: 440, top: -170, right: -120, background: "radial-gradient(closest-side, rgba(255,255,255,0.20), transparent)" }}
+            style={{ width: 460, height: 460, top: -180, right: -140, background: "radial-gradient(closest-side, rgba(255,255,255,0.22), transparent)" }}
+          />
+          {/* Brilho teal-claro (frio, coeso com a marca) no rodapé-esquerda */}
+          <span
+            aria-hidden
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 340, height: 340, bottom: -160, left: -100, background: "radial-gradient(closest-side, rgba(120,222,222,0.24), transparent)" }}
+          />
+          {/* Anéis concêntricos sutis */}
+          <span
+            aria-hidden
+            className="absolute pointer-events-none rounded-full"
+            style={{ width: 300, height: 300, bottom: -100, right: 40, border: "1px solid rgba(255,255,255,0.16)" }}
           />
           <span
             aria-hidden
             className="absolute pointer-events-none rounded-full"
-            style={{ width: 320, height: 320, bottom: -150, left: -90, background: "radial-gradient(closest-side, rgba(201,162,74,0.45), transparent)" }}
+            style={{ width: 190, height: 190, bottom: 5, right: 95, border: "1px solid rgba(255,255,255,0.12)" }}
           />
-          {/* Anéis brancos sutis */}
+          {/* Grão fino — tira o "achatado" do gradiente, dá acabamento fosco */}
           <span
             aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 280, height: 280, bottom: -90, right: 50, border: "2px solid rgba(255,255,255,0.18)" }}
-          />
-          <span
-            aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 170, height: 170, bottom: 10, right: 110, border: "2px solid rgba(255,255,255,0.14)" }}
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+              backgroundSize: "140px 140px",
+              opacity: 0.06,
+              mixBlendMode: "overlay",
+            }}
           />
 
           <div className="relative flex flex-col lg:flex-row items-center justify-between gap-10">
