@@ -10,6 +10,7 @@ import { MotionModal } from "@/components/MotionModal";
 import { AnimatePresence } from "framer-motion";
 import { cn, formatBRL, formatDate, formatTime } from "@/lib/utils";
 import { PLANS, type PlanId } from "@/lib/plans";
+import { parsePastedSeo, stripSeoTail } from "@/lib/blog/sanitize";
 import {
   ArrowSquareOut,
   Buildings,
@@ -897,15 +898,36 @@ function BlogPostModal({
     if (!slugTouched) setSlug(slugify(v));
   }
 
+  /**
+   * Colar o bloco de SEO pronto (Título/Slug/Meta/Palavras-chave) no título
+   * separa cada parte em vez de jogar tudo no título. Slug e resumo só são
+   * preenchidos se ainda estiverem vazios (não sobrescreve o que já foi
+   * digitado). Se não for um bloco, deixa o paste normal acontecer.
+   */
+  function onTitlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const parsed = parsePastedSeo(e.clipboardData.getData("text"));
+    if (!parsed) return;
+    e.preventDefault();
+    setTitle(parsed.title);
+    if (parsed.slug && !slugTouched) { setSlug(slugify(parsed.slug)); setSlugTouched(true); }
+    else if (!slugTouched) setSlug(slugify(parsed.title));
+    if (parsed.excerpt && !excerpt.trim()) setExcerpt(parsed.excerpt);
+  }
+
   async function save() {
-    if (!title.trim() || !slug.trim() || !body.trim()) {
+    // Rede de segurança: se sobrou cauda de metadado no título, corta antes
+    // de gravar (mesmo que o colar inteligente não tenha pego).
+    const cleanTitle = stripSeoTail(title);
+    if (cleanTitle !== title) setTitle(cleanTitle);
+
+    if (!cleanTitle.trim() || !slug.trim() || !body.trim()) {
       setErr("Preencha título, slug e corpo do artigo.");
       return;
     }
     setBusy(true);
     setErr(null);
     const args = {
-      p_slug: slug.trim(), p_title: title.trim(), p_excerpt: excerpt.trim(), p_category: category.trim() || "Geral",
+      p_slug: slug.trim(), p_title: cleanTitle, p_excerpt: excerpt.trim(), p_category: category.trim() || "Geral",
       p_body: body, p_read_minutes: parseInt(readMinutes) || 1, p_published_at: publishedAt, p_is_published: isPublished,
     };
     const { error } = isNew
@@ -933,7 +955,15 @@ function BlogPostModal({
 
           <div className="space-y-1.5">
             <Label>Título</Label>
-            <Input value={title} onChange={(e) => onTitleChange(e.target.value)} placeholder="Ex.: Como reduzir faltas no salão" />
+            <Input
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              onPaste={onTitlePaste}
+              placeholder="Ex.: Como reduzir faltas no salão"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Pode colar o bloco pronto (Título / Slug / Meta Description) — a gente separa cada parte automaticamente.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
