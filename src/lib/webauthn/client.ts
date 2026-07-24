@@ -6,6 +6,29 @@ import {
   browserSupportsWebAuthn,
 } from "@simplewebauthn/browser";
 
+// IDs das credenciais cadastradas NESTE aparelho. Guardar isso permite passar
+// allowCredentials no login → o autenticador vai direto pra biometria, sem a
+// tela de "escolher/confirmar a conta" (que aparece com passkey descoberta).
+const CRED_IDS_KEY = "af:bio-cred-ids";
+
+function readCredIds(): string[] {
+  try {
+    const raw = localStorage.getItem(CRED_IDS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberCredId(id: string) {
+  try {
+    const ids = new Set(readCredIds());
+    ids.add(id);
+    localStorage.setItem(CRED_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
 /** Há autenticador de plataforma (Touch ID / Face ID / digital) disponível? */
 export async function biometricAvailable(): Promise<boolean> {
   if (typeof window === "undefined" || !browserSupportsWebAuthn()) return false;
@@ -36,6 +59,8 @@ export async function enrollBiometric(deviceName?: string): Promise<
       const j = await verifyRes.json().catch(() => ({}));
       return { ok: false, error: j.error ?? "verify_failed" };
     }
+    // Lembra a credencial deste aparelho → login vai direto pra digital.
+    rememberCredId(credential.id);
     return { ok: true };
   } catch (e) {
     // Usuário cancelou o gesto ou o navegador não suporta.
@@ -52,7 +77,14 @@ export async function loginWithBiometric(
   next = "/painel",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const optRes = await fetch("/api/webauthn/auth/options", { method: "POST" });
+    // Passa as credenciais deste aparelho → sem seletor de conta, vai direto
+    // pra digital. Sem nenhuma lembrada, cai no fluxo descoberto (com seletor).
+    const credentialIds = readCredIds();
+    const optRes = await fetch("/api/webauthn/auth/options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialIds }),
+    });
     if (!optRes.ok) return { ok: false, error: "options_failed" };
     const optionsJSON = await optRes.json();
 
@@ -68,6 +100,8 @@ export async function loginWithBiometric(
       return { ok: false, error: j.error ?? "verify_failed" };
     }
 
+    // Reforça a lembrança da credencial usada neste aparelho.
+    rememberCredId(credential.id);
     window.location.assign(`/auth/enter?next=${encodeURIComponent(next)}`);
     return { ok: true };
   } catch (e) {
