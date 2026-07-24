@@ -246,7 +246,7 @@ export function PanelShell({
 
   /** Nav usado na sidebar desktop — grupos com divisores */
   const desktopNav = (
-    <nav className="flex flex-col items-center gap-1 w-full">
+    <nav className="pointer-events-auto flex flex-col items-center gap-1 w-full">
       {mainGroups.map((group, gi) => (
         <div key={group.label} className="flex flex-col items-center gap-1 w-full">
           {gi > 0 && <div className="w-6 h-px bg-border/60 my-1.5" />}
@@ -270,9 +270,12 @@ export function PanelShell({
           <Tip label={salon.name} />
         </Link>
 
-        {/* Itens de navegação — rolagem interna invisível quando não cabem,
-            confinada à largura da sidebar (barra oculta via .no-scrollbar). */}
-        <div className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain no-scrollbar">
+        {/* Itens de navegação — rolagem interna invisível quando não cabem.
+            box-content + pr/-mr estende a área de recorte só à direita (sem
+            deslocar layout) para as tooltips não serem cortadas; a barra some
+            via .no-scrollbar e pointer-events-none deixa cliques passarem pro
+            conteúdo (os links reativam com pointer-events-auto). */}
+        <div className="flex-1 min-h-0 w-full box-content overflow-y-auto overscroll-contain no-scrollbar pointer-events-none pr-28 -mr-28">
           {desktopNav}
         </div>
 
@@ -303,7 +306,7 @@ export function PanelShell({
           </button>
           <button
             onClick={logout}
-            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
+            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-red-600 hover:bg-red-500/10 hover:text-red-700 transition"
           >
             <SignOut className="h-[18px] w-[18px]" />
             <Tip label="Sair" />
@@ -514,9 +517,9 @@ export function PanelShell({
               </button>
               <button
                 onClick={logout}
-                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm text-foreground/80 hover:bg-muted transition"
+                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition"
               >
-                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-muted text-foreground/70">
+                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-red-500/10 text-red-600">
                   <SignOut className="h-[18px] w-[18px]" />
                 </span>
                 Sair
