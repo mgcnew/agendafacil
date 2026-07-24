@@ -7,6 +7,7 @@ import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
 import { InlineScript } from "@/components/InlineScript";
 import { SessionKeepAlive } from "@/components/auth/SessionKeepAlive";
+import { SessionPersistence } from "@/components/auth/SessionPersistence";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,8 @@ export default async function PanelLayout({
       />
       {/* Mantém a sessão viva ao reabrir o app (evita logout no celular). */}
       <SessionKeepAlive />
+      {/* Espelha o refresh token no localStorage p/ restauração silenciosa. */}
+      <SessionPersistence />
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
