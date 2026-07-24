@@ -260,21 +260,24 @@ export function PanelShell({
     <div className="flex h-dvh overflow-hidden">
       {/* ── Sidebar desktop — recolhida, ícones + tooltip ───────── */}
       <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-4 overflow-visible">
-        {/* Logo */}
+        {/* Logo — nunca comprime (shrink-0) */}
         <Link
           href={base}
-          className="group relative flex items-center justify-center h-10 w-10 rounded-[var(--radius)] overflow-hidden bg-white ring-1 ring-border mb-2"
+          className="group relative flex shrink-0 items-center justify-center h-10 w-10 rounded-[var(--radius)] overflow-hidden bg-white ring-1 ring-border mb-2"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
           <Tip label={salon.name} />
         </Link>
 
-        {/* Itens de navegação */}
-        {desktopNav}
+        {/* Itens de navegação — rolagem interna invisível quando não cabem,
+            confinada à largura da sidebar (barra oculta via .no-scrollbar). */}
+        <div className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain no-scrollbar">
+          {desktopNav}
+        </div>
 
         {/* Rodapé: Sistema (ex: Configurações) + ações utilitárias */}
-        <div className="mt-auto flex flex-col items-center gap-1">
+        <div className="shrink-0 flex flex-col items-center gap-1">
           {systemGroup && (
             <>
               {systemGroup.items.map((it) => <NavLink key={it.href} it={it} />)}
