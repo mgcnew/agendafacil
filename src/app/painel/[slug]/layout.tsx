@@ -6,6 +6,7 @@ import { planAllowsHref } from "@/lib/plans";
 import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
 import { InlineScript } from "@/components/InlineScript";
+import { SessionKeepAlive } from "@/components/auth/SessionKeepAlive";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +143,8 @@ export default async function PanelLayout({
       <InlineScript
         html={`try{if(localStorage.getItem('af-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}`}
       />
+      {/* Mantém a sessão viva ao reabrir o app (evita logout no celular). */}
+      <SessionKeepAlive />
       <PanelShell
         salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
