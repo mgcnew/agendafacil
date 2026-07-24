@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signInAction } from "./authActions";
 import { Button, Input, Label } from "@/components/ui";
@@ -25,7 +24,6 @@ export function LoginForm({
   next?: string;
   onSuccess?: () => void;
 }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -66,8 +64,11 @@ export function LoginForm({
     else localStorage.removeItem(REMEMBER_KEY);
 
     onSuccess?.();
-    router.push(next);
-    router.refresh();
+    // Navegação de página REAL (não SPA) para /auth/enter: reemite o cookie de
+    // sessão via Set-Cookie numa resposta de navegação — o iOS/PWA persiste em
+    // disco, evitando o logout a cada reabertura. Também carrega o painel por
+    // completo, então o tema (modo noturno) aplica de primeira, sem flash claro.
+    window.location.assign(`/auth/enter?next=${encodeURIComponent(next)}`);
   }
 
   async function forgotPassword(e?: React.FormEvent) {
