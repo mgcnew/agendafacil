@@ -14,45 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      growth_leads: {
-        Row: {
-          channel: string
-          contact: string | null
-          created_at: string
-          id: string
-          name: string
-          neighborhood: string | null
-          notes: string | null
-          owner_name: string | null
-          stage: string
-          updated_at: string
-        }
-        Insert: {
-          channel?: string
-          contact?: string | null
-          created_at?: string
-          id?: string
-          name: string
-          neighborhood?: string | null
-          notes?: string | null
-          owner_name?: string | null
-          stage?: string
-          updated_at?: string
-        }
-        Update: {
-          channel?: string
-          contact?: string | null
-          created_at?: string
-          id?: string
-          name?: string
-          neighborhood?: string | null
-          notes?: string | null
-          owner_name?: string | null
-          stage?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       admin_audit_log: {
         Row: {
           action: string
@@ -243,6 +204,64 @@ export type Database = {
           },
         ]
       }
+      appointment_waitlist: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          member_id: string | null
+          notes: string | null
+          preferred_date: string
+          salon_id: string
+          service_ids: string[]
+          status: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          preferred_date: string
+          salon_id: string
+          service_ids?: string[]
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          preferred_date?: string
+          salon_id?: string
+          service_ids?: string[]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_waitlist_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_waitlist_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "salon_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_waitlist_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           client_id: string | null
@@ -322,64 +341,6 @@ export type Database = {
           },
           {
             foreignKeyName: "appointments_salon_id_fkey"
-            columns: ["salon_id"]
-            isOneToOne: false
-            referencedRelation: "salons"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      appointment_waitlist: {
-        Row: {
-          client_id: string
-          created_at: string
-          id: string
-          member_id: string | null
-          notes: string | null
-          preferred_date: string
-          salon_id: string
-          service_ids: string[]
-          status: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          id?: string
-          member_id?: string | null
-          notes?: string | null
-          preferred_date: string
-          salon_id: string
-          service_ids?: string[]
-          status?: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          id?: string
-          member_id?: string | null
-          notes?: string | null
-          preferred_date?: string
-          salon_id?: string
-          service_ids?: string[]
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointment_waitlist_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointment_waitlist_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "salon_members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointment_waitlist_salon_id_fkey"
             columns: ["salon_id"]
             isOneToOne: false
             referencedRelation: "salons"
@@ -1160,6 +1121,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      growth_leads: {
+        Row: {
+          accepts_marketing: boolean
+          channel: string
+          consent_at: string | null
+          consent_text: string | null
+          contact: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          neighborhood: string | null
+          notes: string | null
+          owner_name: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          accepts_marketing?: boolean
+          channel?: string
+          consent_at?: string | null
+          consent_text?: string | null
+          contact?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          owner_name?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          accepts_marketing?: boolean
+          channel?: string
+          consent_at?: string | null
+          consent_text?: string | null
+          contact?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          owner_name?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       member_permissions: {
         Row: {
@@ -2061,66 +2073,102 @@ export type Database = {
       salons: {
         Row: {
           address: string | null
+          address_visibility: string
           agenda_color_mode: string
           allow_simultaneous: boolean
           cash_discount_enabled: boolean
           cash_max_discount_percent: number
+          cep: string | null
+          city: string | null
           color_theme: string
+          complement: string | null
           created_at: string
           email: string | null
           id: string
           is_active: boolean
+          is_demo: boolean
+          lat: number | null
+          listed_in_directory: boolean
+          lng: number | null
           logo_url: string | null
           name: string
+          neighborhood: string | null
           niche: Database["public"]["Enums"]["salon_niche"]
           onboarding_done_at: string | null
           owner_id: string
           phone: string | null
           slug: string
+          state: string | null
+          street: string | null
+          street_number: string | null
           theme: Json
           timezone: string
           updated_at: string
         }
         Insert: {
           address?: string | null
+          address_visibility?: string
           agenda_color_mode?: string
           allow_simultaneous?: boolean
           cash_discount_enabled?: boolean
           cash_max_discount_percent?: number
+          cep?: string | null
+          city?: string | null
           color_theme?: string
+          complement?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          is_demo?: boolean
+          lat?: number | null
+          listed_in_directory?: boolean
+          lng?: number | null
           logo_url?: string | null
           name: string
+          neighborhood?: string | null
           niche?: Database["public"]["Enums"]["salon_niche"]
           onboarding_done_at?: string | null
           owner_id: string
           phone?: string | null
           slug: string
+          state?: string | null
+          street?: string | null
+          street_number?: string | null
           theme?: Json
           timezone?: string
           updated_at?: string
         }
         Update: {
           address?: string | null
+          address_visibility?: string
           agenda_color_mode?: string
           allow_simultaneous?: boolean
           cash_discount_enabled?: boolean
           cash_max_discount_percent?: number
+          cep?: string | null
+          city?: string | null
           color_theme?: string
+          complement?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          is_demo?: boolean
+          lat?: number | null
+          listed_in_directory?: boolean
+          lng?: number | null
           logo_url?: string | null
           name?: string
+          neighborhood?: string | null
           niche?: Database["public"]["Enums"]["salon_niche"]
           onboarding_done_at?: string | null
           owner_id?: string
           phone?: string | null
           slug?: string
+          state?: string | null
+          street?: string | null
+          street_number?: string | null
           theme?: Json
           timezone?: string
           updated_at?: string
@@ -2391,6 +2439,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      webauthn_credentials: {
+        Row: {
+          counter: number
+          created_at: string
+          credential_id: string
+          device_name: string | null
+          id: string
+          last_used_at: string | null
+          public_key: string
+          transports: string[] | null
+          user_id: string
+        }
+        Insert: {
+          counter?: number
+          created_at?: string
+          credential_id: string
+          device_name?: string | null
+          id?: string
+          last_used_at?: string | null
+          public_key: string
+          transports?: string[] | null
+          user_id: string
+        }
+        Update: {
+          counter?: number
+          created_at?: string
+          credential_id?: string
+          device_name?: string | null
+          id?: string
+          last_used_at?: string | null
+          public_key?: string
+          transports?: string[] | null
+          user_id?: string
+        }
+        Relationships: []
       }
       working_hours: {
         Row: {
@@ -2689,6 +2773,7 @@ export type Database = {
           member_id: string
           notes: string | null
           payment_method: string | null
+          reminder_sent_at: string | null
           salon_id: string
           source: string
           starts_at: string
@@ -2723,6 +2808,16 @@ export type Database = {
           discount_given: number
           revenue: number
         }[]
+      }
+      capture_demo_lead: {
+        Args: {
+          p_accepts_marketing: boolean
+          p_consent_text: string
+          p_contact: string
+          p_email: string
+          p_name: string
+        }
+        Returns: undefined
       }
       capture_mrr_snapshot: { Args: never; Returns: undefined }
       cash_sell_product: {
@@ -2785,22 +2880,34 @@ export type Database = {
         }
         Returns: {
           address: string | null
+          address_visibility: string
           agenda_color_mode: string
           allow_simultaneous: boolean
           cash_discount_enabled: boolean
           cash_max_discount_percent: number
+          cep: string | null
+          city: string | null
           color_theme: string
+          complement: string | null
           created_at: string
           email: string | null
           id: string
           is_active: boolean
+          is_demo: boolean
+          lat: number | null
+          listed_in_directory: boolean
+          lng: number | null
           logo_url: string | null
           name: string
+          neighborhood: string | null
           niche: Database["public"]["Enums"]["salon_niche"]
           onboarding_done_at: string | null
           owner_id: string
           phone: string | null
           slug: string
+          state: string | null
+          street: string | null
+          street_number: string | null
           theme: Json
           timezone: string
           updated_at: string
@@ -2832,6 +2939,7 @@ export type Database = {
           member_id: string
           notes: string | null
           payment_method: string | null
+          reminder_sent_at: string | null
           salon_id: string
           source: string
           starts_at: string
@@ -2967,6 +3075,7 @@ export type Database = {
           member_id: string
           notes: string | null
           payment_method: string | null
+          reminder_sent_at: string | null
           salon_id: string
           source: string
           starts_at: string
@@ -2977,6 +3086,38 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      public_cancel_waitlist: {
+        Args: { p_id: string; p_phone?: string }
+        Returns: undefined
+      }
+      public_join_waitlist: {
+        Args: {
+          p_client_name: string
+          p_client_phone: string
+          p_date: string
+          p_member?: string
+          p_notes?: string
+          p_salon: string
+          p_service_ids: string[]
+        }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          member_id: string | null
+          notes: string | null
+          preferred_date: string
+          salon_id: string
+          service_ids: string[]
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "appointment_waitlist"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2994,6 +3135,17 @@ export type Database = {
           starts_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           total_price: number
+        }[]
+      }
+      public_my_waitlist: {
+        Args: { p_phone?: string; p_salon: string }
+        Returns: {
+          created_at: string
+          id: string
+          member_name: string
+          preferred_date: string
+          services: string[]
+          status: string
         }[]
       }
       public_needs_anamnesis: {
@@ -3031,14 +3183,24 @@ export type Database = {
         Args: { p_slug: string }
         Returns: {
           address: string
+          address_visibility: string
+          cep: string
+          city: string
           color_theme: string
+          complement: string
           id: string
           is_demo: boolean
+          lat: number
+          lng: number
           logo_url: string
           name: string
+          neighborhood: string
           niche: Database["public"]["Enums"]["salon_niche"]
           phone: string
           slug: string
+          state: string
+          street: string
+          street_number: string
           theme: Json
         }[]
       }
@@ -3114,6 +3276,7 @@ export type Database = {
         Args: { p_min_days?: number; p_salon: string }
         Returns: Json
       }
+      reset_demo_salon: { Args: { p_salon: string }; Returns: undefined }
       reverse_cash_transaction: { Args: { p_tx: string }; Returns: Json }
       revoke_invite: { Args: { p_id: string }; Returns: undefined }
       salon_access_status: {
@@ -3159,6 +3322,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      send_appointment_reminders: { Args: never; Returns: undefined }
       service_insights: {
         Args: { p_salon: string; p_window_days?: number }
         Returns: {

@@ -13,6 +13,7 @@ import { onlyDigits, formatCep, isValidCep } from "@/lib/cep";
 import { lookupCepAction } from "./cepActions";
 import { uploadLogo, removeLogo } from "./actions";
 import { PushNotificationsCard } from "./PushNotificationsCard";
+import { BiometricCard } from "@/components/auth/BiometricCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
@@ -149,6 +150,7 @@ export function SettingsTabs({
         <div className="space-y-5">
           <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
           <PushNotificationsCard salonId={salon.id} />
+          <BiometricCard />
         </div>
       )}
       {active === "horarios" && (
