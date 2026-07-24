@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { signInAction } from "./authActions";
+import { biometricAvailable, loginWithBiometric } from "@/lib/webauthn/client";
 import { Button, Input, Label } from "@/components/ui";
 import {
   Check,
   CircleNotch,
   EnvelopeSimpleOpen,
+  Fingerprint,
 } from "@phosphor-icons/react/dist/ssr";
 
 const REMEMBER_KEY = "agendefacil:lastEmail";
@@ -32,6 +34,8 @@ export function LoginForm({
   const [resetting, setResetting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [mode, setMode] = useState<"login" | "forgot">("login");
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
 
   // pré-preenche o e-mail lembrado
   useEffect(() => {
@@ -41,6 +45,24 @@ export function LoginForm({
       setRemember(true);
     }
   }, []);
+
+  // mostra "Entrar com digital" só se o aparelho tiver biometria
+  useEffect(() => {
+    biometricAvailable().then(setBioAvailable);
+  }, []);
+
+  async function onBiometric() {
+    setBioLoading(true);
+    setError(null);
+    const res = await loginWithBiometric(next);
+    if (!res.ok) {
+      // em sucesso há navegação de página, então só tratamos falha aqui
+      if (res.error !== "cancelled") {
+        setError("Não foi possível entrar com a digital. Use e-mail e senha.");
+      }
+      setBioLoading(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -202,10 +224,26 @@ export function LoginForm({
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" size="lg" className="w-full" disabled={loading}>
+      <Button type="submit" size="lg" className="w-full" disabled={loading || bioLoading}>
         {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
         Entrar
       </Button>
+
+      {bioAvailable && (
+        <button
+          type="button"
+          onClick={onBiometric}
+          disabled={bioLoading || loading}
+          className="w-full flex items-center justify-center gap-2 rounded-[var(--radius)] border border-border py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted transition disabled:opacity-60"
+        >
+          {bioLoading ? (
+            <CircleNotch className="h-4 w-4 animate-spin" />
+          ) : (
+            <Fingerprint className="h-5 w-5 text-primary" />
+          )}
+          Entrar com digital
+        </button>
+      )}
     </form>
   );
 }

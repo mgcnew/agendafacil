@@ -16,6 +16,7 @@ import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
 import { AgendaTodaySignalsAsync, AgendaTodaySignalsSkeleton } from "./AgendaTodaySignals";
 import { GestorPanel } from "./GestorPanel";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
+import { BiometricCard } from "@/components/auth/BiometricCard";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
 
 export const dynamic = "force-dynamic";
@@ -322,6 +323,9 @@ export default async function DashboardPage({
               </div>
             </div>
           )}
+
+          {/* Convite p/ ativar a digital neste aparelho — some ao ativar/dispensar */}
+          <BiometricCard dismissible />
 
           {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
           {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
