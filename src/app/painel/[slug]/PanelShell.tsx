@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { clearStoredRefreshToken } from "@/lib/auth/persistentSession";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -219,6 +220,8 @@ export function PanelShell({
 
   async function logout() {
     const supabase = createClient();
+    // Limpa o backup de sessão ANTES de sair, senão o SilentRestore reentraria.
+    clearStoredRefreshToken();
     await supabase.auth.signOut();
     router.push("/entrar");
     router.refresh();
