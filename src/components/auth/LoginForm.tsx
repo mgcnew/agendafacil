@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { signInAction } from "./authActions";
-import { biometricAvailable, loginWithBiometric } from "@/lib/webauthn/client";
+import { biometricAvailable, loginWithBiometric, hasEnrolledBiometric } from "@/lib/webauthn/client";
 import { Button, Input, Label } from "@/components/ui";
 import {
   Check,
@@ -46,9 +46,20 @@ export function LoginForm({
     }
   }, []);
 
-  // mostra "Entrar com digital" só se o aparelho tiver biometria
+  const autoTried = useRef(false);
+
+  // mostra "Entrar com digital" só se o aparelho tiver biometria; e, se já há
+  // digital cadastrada NESTE aparelho, dispara a biometria direto ao abrir —
+  // se a pessoa cancelar, fica o formulário de e-mail/senha (teclado não sobe).
   useEffect(() => {
-    biometricAvailable().then(setBioAvailable);
+    biometricAvailable().then((ok) => {
+      setBioAvailable(ok);
+      if (ok && !autoTried.current && hasEnrolledBiometric()) {
+        autoTried.current = true;
+        onBiometric();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onBiometric() {
@@ -179,7 +190,6 @@ export function LoginForm({
           type="email"
           required
           autoComplete="email"
-          autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="voce@salao.com"

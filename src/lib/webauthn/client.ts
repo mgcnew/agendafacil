@@ -29,6 +29,11 @@ function rememberCredId(id: string) {
   } catch {}
 }
 
+/** Este aparelho já tem alguma digital cadastrada (permite auto-disparar). */
+export function hasEnrolledBiometric(): boolean {
+  return readCredIds().length > 0;
+}
+
 /** Há autenticador de plataforma (Touch ID / Face ID / digital) disponível? */
 export async function biometricAvailable(): Promise<boolean> {
   if (typeof window === "undefined" || !browserSupportsWebAuthn()) return false;
