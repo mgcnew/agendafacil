@@ -5,7 +5,7 @@
 //  - Dados (Supabase, outras origens, APIs): sempre rede, nunca cacheia.
 // Ao publicar uma nova versão, troque CACHE para invalidar o cache antigo.
 
-const CACHE = "af-v1";
+const CACHE = "af-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
