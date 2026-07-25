@@ -5,13 +5,18 @@ import {
   CalendarCheck,
   Check,
   Star,
+  UsersThree,
+  Scissors,
+  House,
+  ChartBar,
+  CaretRight,
 } from "@phosphor-icons/react/dist/ssr";
 
 /**
- * Hero da landing — layout dividido: texto/CTA à esquerda, foto do produto
- * (devices + profissional) à direita, com card flutuante "ao vivo" que mostra
- * um agendamento chegando — prova visual de que o sistema trabalha sozinho.
- * Revelação orquestrada no load (af-rise com delays escalonados).
+ * Hero da landing — layout dividido: texto/CTA à esquerda, à direita uma foto
+ * na marca (dona + salão) com um mockup do app RECONSTRUÍDO em HTML/CSS (não
+ * imagem chapada): telas sempre na marca teal, nítidas e responsivas. Card
+ * flutuante "ao vivo" reforça que o sistema trabalha sozinho.
  */
 export function Hero() {
   return (
@@ -102,7 +107,7 @@ export function Hero() {
             </ul>
           </div>
 
-          {/* ── Coluna da imagem ─────────────────────────────────── */}
+          {/* ── Coluna do visual ─────────────────────────────────── */}
           <div className="relative af-rise" style={{ animationDelay: "0.18s" }}>
             {/* Halo quente atrás da foto */}
             <div
@@ -113,22 +118,29 @@ export function Hero() {
                   "radial-gradient(55% 55% at 55% 45%, rgba(201,162,74,0.20), transparent 70%)",
               }}
             />
-            <Image
-              src="/hero-nova.webp"
-              alt="Zulan em uso — agenda no tablet e app no celular, num salão de beleza"
-              width={1254}
-              height={1254}
-              quality={92}
-              sizes="(max-width: 1024px) 90vw, 560px"
-              className="w-full h-auto max-w-[560px] mx-auto"
-              priority
-              draggable={false}
-            />
+
+            {/* Foto na marca (dona + salão) */}
+            <div className="relative mx-auto max-w-[520px] overflow-hidden rounded-[2rem] ring-1 ring-border shadow-card">
+              <Image
+                src="/hero-zulan.jpg"
+                alt="Dona de salão de beleza usando o Zulan no dia a dia"
+                width={886}
+                height={1182}
+                quality={92}
+                sizes="(max-width: 1024px) 90vw, 520px"
+                className="w-full h-auto"
+                priority
+                draggable={false}
+              />
+            </div>
+
+            {/* Mockup do app (HTML/CSS) — celular na marca, sobreposto */}
+            <AppPhoneMockup />
 
             {/* Card flutuante — agendamento chegando "ao vivo" */}
             <div
-              className="absolute left-0 sm:-left-2 bottom-8 sm:bottom-12 af-rise"
-              style={{ animationDelay: "0.6s" }}
+              className="absolute right-0 sm:-right-3 top-10 af-rise"
+              style={{ animationDelay: "0.66s" }}
             >
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card/95 backdrop-blur-sm pl-2.5 pr-4 py-2.5 shadow-card">
                 <span
@@ -140,7 +152,6 @@ export function Hero() {
                 <div className="leading-tight">
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-semibold">Novo agendamento</span>
-                    {/* Indicador "ao vivo" */}
                     <span className="relative flex h-1.5 w-1.5">
                       <span
                         className="absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping"
@@ -162,5 +173,101 @@ export function Hero() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Mockup do app da Zulan reconstruído em HTML/CSS (home do celular). Sempre na
+ * marca teal, nítido em qualquer tela. Fica sobreposto à foto, quebrando a
+ * moldura no canto inferior esquerdo.
+ */
+function AppPhoneMockup() {
+  const atalhos = [
+    { icon: CalendarCheck, label: "Novo" },
+    { icon: UsersThree, label: "Clientes" },
+    { icon: Scissors, label: "Serviços" },
+  ];
+  const tabs = [House, CalendarCheck, UsersThree, ChartBar];
+
+  return (
+    <div
+      className="absolute -left-2 sm:-left-6 bottom-6 sm:bottom-8 w-[184px] sm:w-[212px] af-rise"
+      style={{ animationDelay: "0.5s" }}
+      aria-hidden
+    >
+      <div className="rounded-[2rem] border border-border bg-card p-2 shadow-card">
+        <div className="overflow-hidden rounded-[1.6rem] bg-background">
+          {/* status bar */}
+          <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
+            <span className="text-[9px] font-semibold text-foreground/70">9:41</span>
+            <span className="flex gap-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/30" />
+              <span className="h-1.5 w-1.5 rounded-full bg-foreground/30" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            </span>
+          </div>
+
+          {/* saudação */}
+          <div className="px-4 pt-1">
+            <p className="text-[13px] font-display font-bold text-foreground">Olá, Juliana 👋</p>
+            <p className="text-[9px] text-muted-foreground">Quinta-feira, 23 de maio</p>
+          </div>
+
+          {/* próximo agendamento */}
+          <div className="px-3 pt-2.5">
+            <p className="px-1 pb-1 text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Próximo agendamento
+            </p>
+            <div className="rounded-xl border border-border bg-card p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-[10px] font-bold text-primary">
+                  RS
+                </span>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="truncate text-[10px] font-semibold text-foreground">Rafael Silva</p>
+                  <p className="text-[8.5px] text-muted-foreground">Corte Masculino · hoje 13:00</p>
+                </div>
+                <span className="h-2 w-2 rounded-full" style={{ background: "#10b981" }} />
+              </div>
+              <button
+                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[9px] font-semibold text-primary-foreground"
+                style={{ background: "var(--primary)" }}
+              >
+                Ver detalhes <CaretRight className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* atalhos rápidos */}
+          <div className="px-3 pt-2.5">
+            <p className="px-1 pb-1 text-[8px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Atalhos rápidos
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {atalhos.map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-1 rounded-lg border border-border bg-card py-2"
+                >
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[7.5px] font-medium text-foreground/70">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* tab bar */}
+          <div className="mt-2.5 flex items-center justify-around border-t border-border bg-card px-2 py-2">
+            {tabs.map((Icon, i) => (
+              <Icon
+                key={i}
+                className={`h-3.5 w-3.5 ${i === 0 ? "text-primary" : "text-foreground/35"}`}
+                weight={i === 0 ? "fill" : "regular"}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
