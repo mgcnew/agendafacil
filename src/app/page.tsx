@@ -25,9 +25,7 @@ import {
   Star,
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+import { SITE_URL } from "@/lib/siteUrl";
 
 // SEO específico da home — sobrescreve o default do layout com foco nas
 // buscas que a dona de salão/barbearia faz no Google.

@@ -9,8 +9,7 @@ import {
   type PublicSalonSeo,
 } from "@/lib/salonSeo";
 import { BookingApp } from "./BookingApp";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 

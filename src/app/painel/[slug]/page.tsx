@@ -18,6 +18,7 @@ import { GestorPanel } from "./GestorPanel";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 import { BiometricCard } from "@/components/auth/BiometricCard";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -254,7 +255,7 @@ export default async function DashboardPage({
   // Salão demo: destaca o link público de agendamento pra o visitante testar
   // a experiência da cliente sem sair do painel de demonstração.
   const isDemo = !!(membership.salons as { is_demo?: boolean }).is_demo;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+  const siteUrl = SITE_URL;
   const demoVertical = membership.salons.niche === "barbearia" ? "barbearia" : "salao";
 
   return (

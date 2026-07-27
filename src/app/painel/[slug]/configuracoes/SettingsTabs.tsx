@@ -33,11 +33,11 @@ import {
   UploadSimple,
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
+import { SITE_URL } from "@/lib/siteUrl";
 
 // URL canônica (produção) — o prefixo do link mostrado pra dona. NEXT_PUBLIC_ é
 // embutida no build, igual no servidor/cliente, sem o render duplo do antigo
 // useEffect(setOrigin). Ela vê a URL que de fato vai compartilhar (não localhost).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };

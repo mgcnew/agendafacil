@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Oswald, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
 import { MotionProvider } from "@/components/MotionProvider";
+import { SITE_URL } from "@/lib/siteUrl";
 
 // Fonte padrão do produto — moderna, levemente arredondada e familiar.
 const jakarta = Plus_Jakarta_Sans({
@@ -32,9 +33,6 @@ const playfair = Playfair_Display({
   display: "swap",
   preload: false,
 });
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

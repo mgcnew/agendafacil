@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { SITE_URL } from "@/lib/siteUrl";
 
 // Imagem Open Graph gerada dinamicamente (compartilhamento em WhatsApp,
 // Facebook, X, LinkedIn). Identidade petróleo + ícone da marca Zulan.
@@ -7,9 +8,6 @@ export const alt =
   "Zulan — sistema de agendamento online para salões e barbearias";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 export default function OpengraphImage() {
   return new ImageResponse(

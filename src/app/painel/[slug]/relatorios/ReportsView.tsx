@@ -29,11 +29,11 @@ import {
 import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
 import { Narrator, narratorPct as pct } from "@/components/Narrator";
+import { SITE_URL } from "@/lib/siteUrl";
 
 // URL canônica (produção) — vai dentro da mensagem de WhatsApp; NEXT_PUBLIC_ é
 // embutida no build, igual no servidor/cliente, sem o render duplo do antigo
 // useEffect(setOrigin).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 export type ReportData = {
   faturamento: number;

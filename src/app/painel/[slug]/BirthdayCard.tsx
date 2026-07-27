@@ -5,6 +5,7 @@ import {
   Cake,
   ChatCircle,
 } from "@phosphor-icons/react/dist/ssr";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export type BirthdayClient = {
   id: string;
@@ -17,7 +18,6 @@ export type BirthdayClient = {
 // URL canônica (produção) — vai dentro da mensagem de WhatsApp, então nunca
 // pode ser "localhost". NEXT_PUBLIC_ é embutida no build e igual no
 // servidor/cliente, sem o render duplo do antigo useEffect(setOrigin).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
 
 const firstName = (n: string) => (n || "").trim().split(" ")[0] || "";
 const whenLabel = (d: number) => (d === 0 ? "hoje 🎉" : d === 1 ? "amanhã" : `em ${d} dias`);

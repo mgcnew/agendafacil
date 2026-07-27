@@ -1,8 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllPosts } from "@/lib/blog/posts";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://agendafacil-chi.vercel.app";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
