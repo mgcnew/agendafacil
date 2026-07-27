@@ -231,6 +231,11 @@ $function$;
 revoke execute on function public.whatsapp_enqueue(uuid, public.whatsapp_message_kind, interval) from anon, authenticated;
 
 -- ── Triggers ─────────────────────────────────────────────────────────────
+-- Blindagem: este trigger roda DENTRO da transação que cria/atualiza o
+-- agendamento. Sem o exception handler, qualquer erro aqui (template torto,
+-- telefone esquisito, bug) derrubaria o INSERT e a cliente não conseguiria
+-- agendar. WhatsApp é acessório; agendar é o núcleo do produto. Acessório
+-- nunca pode quebrar o núcleo — na dúvida, perde-se a mensagem, não a venda.
 create or replace function public.whatsapp_on_appointment()
  returns trigger
  language plpgsql
@@ -259,6 +264,11 @@ begin
     end if;
   end if;
 
+  return NEW;
+exception when others then
+  -- Engole o erro de propósito: o agendamento tem que passar de qualquer
+  -- jeito. Registra no log do Postgres pra dar pra investigar depois.
+  raise warning 'whatsapp_on_appointment falhou (agendamento %): %', NEW.id, sqlerrm;
   return NEW;
 end;
 $function$;
