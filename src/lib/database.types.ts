@@ -2482,6 +2482,67 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_inbox: {
+        Row: {
+          acted: boolean
+          appointment_id: string | null
+          body: string
+          client_id: string | null
+          created_at: string
+          id: string
+          intent: string
+          phone: string
+          provider_message_id: string | null
+          salon_id: string
+        }
+        Insert: {
+          acted?: boolean
+          appointment_id?: string | null
+          body: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          intent: string
+          phone: string
+          provider_message_id?: string | null
+          salon_id: string
+        }
+        Update: {
+          acted?: boolean
+          appointment_id?: string | null
+          body?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          intent?: string
+          phone?: string
+          provider_message_id?: string | null
+          salon_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_inbox_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_inbox_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_inbox_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_instances: {
         Row: {
           connected_at: string | null
@@ -2503,6 +2564,7 @@ export type Database = {
           send_thank_you: boolean
           status: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at: string
+          webhook_set_at: string | null
         }
         Insert: {
           connected_at?: string | null
@@ -2524,6 +2586,7 @@ export type Database = {
           send_thank_you?: boolean
           status?: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at?: string
+          webhook_set_at?: string | null
         }
         Update: {
           connected_at?: string | null
@@ -2545,6 +2608,7 @@ export type Database = {
           send_thank_you?: boolean
           status?: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at?: string
+          webhook_set_at?: string | null
         }
         Relationships: [
           {
@@ -3217,6 +3281,7 @@ export type Database = {
         }[]
       }
       my_member_id: { Args: { p_salon: string }; Returns: string }
+      normalize_br_phone: { Args: { p_raw: string }; Returns: string }
       pay_commission: {
         Args: {
           p_amount: number
@@ -3531,6 +3596,96 @@ export type Database = {
         Args: { p_days?: number; p_salon: string }
         Returns: Json
       }
+      whatsapp_claim_next: {
+        Args: { p_max?: number }
+        Returns: {
+          appointment_id: string | null
+          attempts: number
+          body: string
+          client_id: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          last_error: string | null
+          phone: string
+          provider_message_id: string | null
+          salon_id: string
+          scheduled_for: string
+          sent_at: string | null
+          skip_reason: string | null
+          status: Database["public"]["Enums"]["whatsapp_outbox_status"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      whatsapp_classify: { Args: { p_body: string }; Returns: string }
+      whatsapp_daily_allowance: {
+        Args: { p_daily_cap: number; p_ramp_started_at: string }
+        Returns: number
+      }
+      whatsapp_drain: { Args: never; Returns: undefined }
+      whatsapp_enqueue: {
+        Args: {
+          p_appointment_id: string
+          p_delay?: string
+          p_kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+        }
+        Returns: undefined
+      }
+      whatsapp_enqueue_reminders: { Args: never; Returns: number }
+      whatsapp_handle_inbound: {
+        Args: {
+          p_body: string
+          p_instance_name: string
+          p_phone_raw: string
+          p_provider_message_id?: string
+        }
+        Returns: Json
+      }
+      whatsapp_mark_result: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_ok: boolean
+          p_provider_message_id?: string
+        }
+        Returns: undefined
+      }
+      whatsapp_normalize_text: { Args: { p_raw: string }; Returns: string }
+      whatsapp_notify_salon: {
+        Args: {
+          p_appointment_id: string
+          p_body: string
+          p_salon_id: string
+          p_title: string
+          p_type?: string
+        }
+        Returns: undefined
+      }
+      whatsapp_render: {
+        Args: {
+          p_appointment_id: string
+          p_kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+        }
+        Returns: string
+      }
+      whatsapp_reply: {
+        Args: {
+          p_appointment_id: string
+          p_body: string
+          p_client_id: string
+          p_kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          p_phone: string
+          p_salon_id: string
+        }
+        Returns: undefined
+      }
+      whatsapp_unstick: { Args: never; Returns: undefined }
     }
     Enums: {
       appointment_status:
@@ -3554,6 +3709,9 @@ export type Database = {
         | "thank_you"
         | "reminder_confirm"
         | "review_request"
+        | "opt_out_ack"
+        | "confirm_ack"
+        | "decline_ack"
       whatsapp_outbox_status:
         | "queued"
         | "sending"
@@ -3699,6 +3857,28 @@ export const Constants = {
       member_role: ["owner", "manager", "professional", "receptionist"],
       salon_niche: ["feminino", "barbearia", "estetica", "neutro"],
       stock_movement_type: ["in", "out", "adjustment"],
+      whatsapp_instance_status: [
+        "disconnected",
+        "connecting",
+        "connected",
+        "paused",
+      ],
+      whatsapp_message_kind: [
+        "booking_receipt",
+        "thank_you",
+        "reminder_confirm",
+        "review_request",
+        "opt_out_ack",
+        "confirm_ack",
+        "decline_ack",
+      ],
+      whatsapp_outbox_status: [
+        "queued",
+        "sending",
+        "sent",
+        "failed",
+        "skipped",
+      ],
     },
   },
 } as const

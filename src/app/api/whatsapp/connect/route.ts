@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardWhatsApp } from "@/lib/whatsapp/guard";
-import { createInstance, getQrCode } from "@/lib/whatsapp/evolution";
+import { createInstance, getQrCode, setWebhook } from "@/lib/whatsapp/evolution";
 
 /**
  * Inicia o pareamento: garante a instância na Evolution e devolve o QR code
@@ -22,6 +22,19 @@ export async function POST(req: Request) {
 
   try {
     await createInstance(instanceName);
+
+    // Antes do QR: assim que o aparelho parear, a instância já está apontada
+    // pra nós e a primeira resposta do cliente não se perde.
+    let webhookOk = false;
+    try {
+      webhookOk = await setWebhook(instanceName);
+    } catch (e) {
+      // Não impede o pareamento — sem webhook o salão ainda envia, só não
+      // recebe. Melhor conectar pela metade do que não conectar. A rota
+      // /status tenta de novo enquanto webhook_set_at estiver null.
+      console.error("setWebhook falhou", instanceName, (e as Error).message);
+    }
+
     const qr = await getQrCode(instanceName);
 
     // Admin client: a instância é escrita pelo sistema, não pelo usuário.
@@ -36,6 +49,7 @@ export async function POST(req: Request) {
           paused_at: null,
           paused_reason: null,
           failure_count: 0,
+          webhook_set_at: webhookOk ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "salon_id" },

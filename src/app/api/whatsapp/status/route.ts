@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardWhatsApp } from "@/lib/whatsapp/guard";
-import { getConnectionState, type ConnectionState } from "@/lib/whatsapp/evolution";
+import {
+  getConnectedNumber,
+  getConnectionState,
+  setWebhook,
+  type ConnectionState,
+} from "@/lib/whatsapp/evolution";
 import type { TablesUpdate } from "@/lib/database.types";
 
 /**
@@ -63,11 +68,11 @@ export async function GET(req: Request) {
     });
   }
 
+  let phoneNumber = row.phone_number;
+  const patch: TablesUpdate<"whatsapp_instances"> = {};
+
   if (state !== row.status) {
-    const patch: TablesUpdate<"whatsapp_instances"> = {
-      status: state,
-      updated_at: new Date().toISOString(),
-    };
+    patch.status = state;
 
     if (state === "connected") {
       patch.connected_at = new Date().toISOString();
@@ -77,14 +82,41 @@ export async function GET(req: Request) {
       // e sobe ao longo de 14 dias. Só na primeira — reconectar não zera.
       if (!row.ramp_started_at) patch.ramp_started_at = new Date().toISOString();
     }
+  }
 
+  if (state === "connected") {
+    // Só dá pra saber qual número foi pareado depois do pareamento — por isso
+    // aqui, e não na rota de conectar.
+    if (!phoneNumber) {
+      phoneNumber = await getConnectedNumber(instanceName);
+      if (phoneNumber) patch.phone_number = phoneNumber;
+    }
+
+    // Conserta sozinho a instância que conectou antes de o webhook existir:
+    // ela nunca transiciona de estado, então não bastava reagir à mudança.
+    // Uma vez aplicado, `webhook_set_at` impede repetir a cada polling.
+    if (!row.webhook_set_at) {
+      try {
+        if (await setWebhook(instanceName)) {
+          patch.webhook_set_at = new Date().toISOString();
+        }
+      } catch (e) {
+        // Recebimento é acessório: o salão continua enviando sem ele, e a
+        // próxima visita ao painel tenta de novo.
+        console.error("setWebhook falhou", instanceName, (e as Error).message);
+      }
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    patch.updated_at = new Date().toISOString();
     await admin.from("whatsapp_instances").update(patch).eq("salon_id", salonId);
   }
 
   return NextResponse.json({
     state,
     configured: true,
-    phoneNumber: row.phone_number,
+    phoneNumber,
     settings: pickSettings(row),
   });
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { SITE_URL } from "@/lib/siteUrl";
 
 /**
  * Cliente da Evolution API (v2) para gerenciar a instância de WhatsApp de cada
@@ -102,6 +103,62 @@ export async function getQrCode(instanceName: string): Promise<QrCode> {
     base64: data.base64 ?? null,
     pairingCode: data.pairingCode ?? null,
   };
+}
+
+/**
+ * Aponta o webhook da instância pra nossa rota e assina só MESSAGES_UPSERT.
+ *
+ * O segredo viaja num header porque a Evolution não assina o corpo — sem isso
+ * qualquer um que descobrisse a URL poderia forjar um "SAIR" ou um
+ * cancelamento em nome de um cliente.
+ *
+ * Chamado a cada conexão de propósito: é idempotente, e assim uma instância
+ * criada antes desta funcionalidade passa a receber ao reconectar.
+ */
+export async function setWebhook(instanceName: string): Promise<boolean> {
+  const secret = process.env.WHATSAPP_INBOUND_SECRET;
+  // Sem segredo configurado, segue sem webhook: pior é não receber resposta,
+  // não é quebrar a conexão que já funciona.
+  if (!secret) return false;
+
+  // A URL vem do mesmo lugar que o resto do site conhece, em vez de uma env
+  // própria — uma variável a menos pra apontar pro ambiente errado.
+  await call(`/webhook/set/${encodeURIComponent(instanceName)}`, {
+    method: "POST",
+    body: {
+      webhook: {
+        enabled: true,
+        url: `${SITE_URL}/api/whatsapp/webhook`,
+        headers: { "x-zulan-webhook-secret": secret },
+        byEvents: false,
+        base64: false,
+        events: ["MESSAGES_UPSERT"],
+      },
+    },
+  });
+  return true;
+}
+
+/**
+ * Número que está pareado na instância, em E.164 sem o sufixo do jid.
+ * Só serve pra mostrar no painel ("Conectado: 11 99999-9999") — é o que
+ * confirma pro dono que ele parou o aparelho certo.
+ */
+export async function getConnectedNumber(instanceName: string): Promise<string | null> {
+  try {
+    const data = await call<
+      Array<{ ownerJid?: string; number?: string }> | { ownerJid?: string; number?: string }
+    >(`/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`);
+
+    const inst = Array.isArray(data) ? data[0] : data;
+    const jid = inst?.ownerJid ?? inst?.number;
+    if (!jid) return null;
+    return jid.split("@")[0].split(":")[0] || null;
+  } catch {
+    // Detalhe cosmético: nunca vale derrubar a checagem de status por causa
+    // dele.
+    return null;
+  }
 }
 
 export async function getConnectionState(instanceName: string): Promise<ConnectionState> {

@@ -46,8 +46,7 @@ const MESSAGES: { key: keyof Settings; label: string; hint: string; soon?: boole
   {
     key: "reminderConfirm",
     label: "Confirmação na véspera",
-    hint: "Pergunta se ela confirma o horário do dia seguinte.",
-    soon: true,
+    hint: "Às 10h do dia anterior, pergunta se o horário está de pé. Quem responde SIM confirma sozinho; quem responde NÃO libera o horário e você é avisado.",
   },
   {
     key: "reviewRequest",

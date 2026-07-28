@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Bell, CalendarPlus, CalendarX, Clock, Trash } from "@phosphor-icons/react/dist/ssr";
+import {
+  Bell,
+  CalendarPlus,
+  CalendarX,
+  Clock,
+  Trash,
+  WhatsappLogo,
+} from "@phosphor-icons/react/dist/ssr";
 
 export type NotifItem = {
   id: string;
@@ -130,9 +137,19 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
               <p className="text-sm text-muted-foreground text-center py-8">Nenhuma notificação.</p>
             ) : (
               items.map((n) => {
-                const cancelled = n.type === "appointment_cancelled";
+                // whatsapp_cancelled entra junto com o cancelamento normal: o
+                // que importa pra quem lê é que o horário caiu, não por onde.
+                const cancelled =
+                  n.type === "appointment_cancelled" || n.type === "whatsapp_cancelled";
                 const reminder = n.type === "appointment_reminder";
-                const Icon = cancelled ? CalendarX : reminder ? Clock : CalendarPlus;
+                const whatsapp = n.type === "whatsapp_reply";
+                const Icon = cancelled
+                  ? CalendarX
+                  : reminder
+                  ? Clock
+                  : whatsapp
+                  ? WhatsappLogo
+                  : CalendarPlus;
                 return (
                   <div
                     key={n.id}
@@ -144,6 +161,8 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
                           ? "bg-red-500/12 text-red-600"
                           : reminder
                           ? "bg-amber-500/12 text-amber-600"
+                          : whatsapp
+                          ? "bg-sky-500/12 text-sky-600"
                           : "bg-emerald-500/12 text-emerald-600"
                       }`}
                     >
