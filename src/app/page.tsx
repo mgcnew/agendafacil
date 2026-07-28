@@ -552,18 +552,21 @@ export default function Home() {
                 alt: "Ambiente de um salão de beleza acolhedor com cadeira, espelho redondo e plantas",
                 tag: "Para salões de beleza",
                 title: "Cabelo, unhas, estética e sobrancelha",
+                href: null,
               },
               {
                 img: "/ambiente-barbearia.jpg",
                 alt: "Ambiente de uma barbearia com cadeira clássica de couro e tijolinho",
                 tag: "Para barbearias",
                 title: "Corte, barba e o clima da sua cadeira",
+                // Quem se reconhece aqui vai para a página que fala a língua
+                // dele, em vez de seguir numa home que atende os dois.
+                href: "/barbearia",
               },
-            ].map((c) => (
-              <div
-                key={c.tag}
-                className="group relative overflow-hidden rounded-[var(--radius)] border border-border reveal"
-              >
+            ].map((c) => {
+              // O conteúdo é o mesmo nos dois casos; só o container muda —
+              // Link quando há destino, div quando é apenas ilustrativo.
+              const conteudo = (
                 <div className="relative aspect-[4/3]">
                   <Image
                     src={c.img}
@@ -586,9 +589,27 @@ export default function Home() {
                       {c.title}
                     </p>
                   </div>
+                  {c.href && (
+                    <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#0b2127] shadow-sm">
+                      Ver página <ArrowRight className="h-3 w-3" />
+                    </span>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+
+              const base =
+                "group relative block overflow-hidden rounded-[var(--radius)] border border-border reveal";
+
+              return c.href ? (
+                <Link key={c.tag} href={c.href} className={`${base} transition-colors hover:border-primary`}>
+                  {conteudo}
+                </Link>
+              ) : (
+                <div key={c.tag} className={base}>
+                  {conteudo}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
