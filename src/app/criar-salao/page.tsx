@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signUpOwnerAction } from "@/components/auth/authActions";
+import { parsePlanParam } from "@/lib/plans";
+import { storeChosenPlan } from "@/lib/chosenPlan";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
 import {
@@ -49,10 +51,22 @@ export default function CriarSalaoPage() {
       return;
     }
 
+    // Guarda o plano escolhido antes de qualquer navegação: quando o cadastro
+    // exige confirmação de e-mail, a pessoa volta por um link e a query string
+    // se perde. O onboarding lê daqui como reserva.
+    storeChosenPlan(parsePlanParam(new URLSearchParams(window.location.search).get("plano")));
+
     if (res.status === "session") {
-      // Propaga a vertical (?tipo) vinda do banner de demo pro onboarding.
-      const tipo = new URLSearchParams(window.location.search).get("tipo");
-      router.push(tipo ? `/novo-salao?tipo=${encodeURIComponent(tipo)}` : "/novo-salao");
+      // Propaga pro onboarding a vertical (?tipo) vinda do banner de demo e o
+      // plano (?plano) do card clicado na landing.
+      const from = new URLSearchParams(window.location.search);
+      const next = new URLSearchParams();
+      const tipo = from.get("tipo");
+      const plano = parsePlanParam(from.get("plano"));
+      if (tipo) next.set("tipo", tipo);
+      if (plano) next.set("plano", plano);
+      const qs = next.toString();
+      router.push(qs ? `/novo-salao?${qs}` : "/novo-salao");
       router.refresh();
       return;
     }

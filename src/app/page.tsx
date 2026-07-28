@@ -823,7 +823,10 @@ export default function Home() {
                         Em breve
                       </Button>
                     ) : (
-                      <Link href="/criar-salao" className="block">
+                      // Leva o plano escolhido pelo funil inteiro: quem clicou
+                      // aqui já decidiu, e cai no checkout com ele marcado em
+                      // vez de ter que escolher de novo no fim.
+                      <Link href={`/criar-salao?plano=${plan.id}`} className="block">
                         <Button
                           variant={highlight ? "primary" : "outline"}
                           className="w-full"

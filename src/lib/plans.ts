@@ -36,6 +36,21 @@ export const SUBSCRIBABLE_PLANS: Plan[] = Object.values(PLANS).filter(
   (p) => !p.comingSoon,
 );
 
+/**
+ * Lê o plano vindo de `?plano=` na URL. O card clicado na landing carrega essa
+ * escolha por todo o funil (cadastro → onboarding → checkout), pra quem já
+ * decidiu não ter que escolher de novo lá no fim.
+ *
+ * Devolve null pra qualquer coisa inesperada — inclusive plano "em breve", que
+ * não é assinável e não pode virar destino de checkout.
+ */
+export function parsePlanParam(raw: string | null | undefined): PlanId | null {
+  if (!raw) return null;
+  const plan = PLANS[raw as PlanId];
+  if (!plan || plan.comingSoon) return null;
+  return plan.id;
+}
+
 /** Rotas do painel exclusivas do Pro/Max (bloqueadas no Básico). */
 export const PRO_ONLY_HREFS = [
   "/campanhas",

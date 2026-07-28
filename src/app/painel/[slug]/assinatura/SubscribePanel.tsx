@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowCircleDown,
   ArrowCircleUp,
@@ -13,7 +13,7 @@ import {
 import { Button, Card, Input } from "@/components/ui";
 import { createCheckout, changePlan } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
-import { PLANS, planRank, priceLabel, type PlanId } from "@/lib/plans";
+import { PLANS, parsePlanParam, planRank, priceLabel, type PlanId } from "@/lib/plans";
 
 const STATUS_LABEL: Record<SubStatus, { text: string; cls: string }> = {
   trialing: { text: "Período de teste", cls: "bg-accent/15 text-accent" },
@@ -47,11 +47,17 @@ export function SubscribePanel({
   pendingPlan: PlanId | null;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [doc, setDoc] = useState("");
-  const [selected, setSelected] = useState<PlanId>("pro");
+  // Vem marcado o plano que a pessoa clicou na landing (?plano=). Sem isso ela
+  // teria que escolher de novo aqui, o que parece que a escolha não registrou.
+  // Continua sendo só a pré-seleção — nada é cobrado sem ela confirmar.
+  const [selected, setSelected] = useState<PlanId>(
+    () => parsePlanParam(searchParams.get("plano")) ?? "pro",
+  );
   const badge = STATUS_LABEL[status];
 
   function subscribe() {

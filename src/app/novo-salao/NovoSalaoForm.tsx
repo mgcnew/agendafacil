@@ -7,6 +7,8 @@ import { Button, Input, Label, Select, Textarea } from "@/components/ui";
 import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import type { TablesUpdate } from "@/lib/database.types";
+import { parsePlanParam } from "@/lib/plans";
+import { readChosenPlan, clearChosenPlan } from "@/lib/chosenPlan";
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,6 +27,23 @@ import {
   WhatsappLogo,
   X,
 } from "@phosphor-icons/react/dist/ssr";
+
+/**
+ * Destino após criar o salão. Quem chegou por um card de plano na landing vai
+ * direto pro checkout com ele marcado — já decidiu, não deve ter que caçar a
+ * aba de assinatura e escolher de novo. Sem plano escolhido, vai pro painel
+ * normalmente e segue no trial de 14 dias.
+ */
+function destinationAfterSalon(slug: string): string {
+  const plano =
+    parsePlanParam(new URLSearchParams(window.location.search).get("plano")) ??
+    readChosenPlan();
+
+  if (!plano) return `/painel/${slug}`;
+
+  clearChosenPlan();
+  return `/painel/${slug}/configuracoes?tab=assinatura&plano=${plano}`;
+}
 
 // Cargos de convite — mesmos da aba Equipe (member_role, sem "owner").
 const ROLE_LABEL: Record<string, string> = {
@@ -236,7 +255,7 @@ export default function NovoSalaoPage() {
         }
       }
 
-      router.push(`/painel/${salon.slug}`);
+      router.push(destinationAfterSalon(salon.slug));
       router.refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -278,7 +297,7 @@ export default function NovoSalaoPage() {
             <Button
               variant="ghost"
               className="w-full"
-              onClick={() => { router.push(`/painel/${done.slug}`); router.refresh(); }}
+              onClick={() => { router.push(destinationAfterSalon(done.slug)); router.refresh(); }}
             >
               Ir para o painel
             </Button>
