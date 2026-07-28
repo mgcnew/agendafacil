@@ -45,7 +45,10 @@ export const SUBSCRIBABLE_PLANS: Plan[] = Object.values(PLANS).filter(
  * não é assinável e não pode virar destino de checkout.
  */
 export function parsePlanParam(raw: string | null | undefined): PlanId | null {
-  if (!raw) return null;
+  // hasOwn e não `PLANS[raw]`: chaves herdadas do protótipo ("__proto__",
+  // "constructor") devolvem objeto truthy e passariam pela checagem, deixando
+  // o checkout com um plano inexistente.
+  if (!raw || !Object.hasOwn(PLANS, raw)) return null;
   const plan = PLANS[raw as PlanId];
   if (!plan || plan.comingSoon) return null;
   return plan.id;
@@ -81,6 +84,36 @@ export function planAllowsHref(
     return true;
   }
   return effectivePlan === "pro" || effectivePlan === "max";
+}
+
+/** Como cada área restrita se chama no menu — usado para explicar o downgrade. */
+const HREF_LABEL: Record<string, string> = {
+  "/campanhas": "Campanhas",
+  "/recuperar": "Recuperar clientes",
+  "/pacotes": "Pacotes",
+  "/financeiro": "Caixa & Comissões",
+  "/relatorios": "Relatórios",
+  "/estoque": "Estoque",
+  "/marketing": "Divulgação",
+};
+
+/**
+ * O que se perde ao trocar do plano `from` para o `to`. Vazio quando não é
+ * downgrade.
+ *
+ * Importa porque o salão nasce no trial como "pro" (default da coluna `plan`):
+ * a pessoa passa 14 dias usando Caixa e Relatórios e, se assinar o Básico sem
+ * aviso, eles simplesmente somem — parece defeito, não regra de plano.
+ *
+ * A lista é derivada de planAllowsHref, a mesma função que de fato bloqueia as
+ * rotas, pra que o aviso nunca divirja do comportamento real.
+ */
+export function featuresLostDowngrading(from: PlanId, to: PlanId): string[] {
+  if (planRank(to) >= planRank(from)) return [];
+  const gated: string[] = [...PRO_ONLY_HREFS, ...MAX_ONLY_HREFS];
+  return gated
+    .filter((href) => planAllowsHref(from, href) && !planAllowsHref(to, href))
+    .map((href) => HREF_LABEL[href] ?? href);
 }
 
 const RANK: Record<PlanId, number> = { basic: 1, pro: 2, max: 3 };

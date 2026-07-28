@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   PLANS,
   SUBSCRIBABLE_PLANS,
+  featuresLostDowngrading,
+  parsePlanParam,
   planAllowsHref,
   planRank,
   priceLabel,
@@ -54,6 +56,45 @@ describe("planAllowsHref — gating por plano", () => {
   it("Max libera tudo que o Pro libera", () => {
     expect(planAllowsHref("max", "/financeiro")).toBe(true);
     expect(planAllowsHref("max", "/agenda")).toBe(true);
+  });
+});
+
+describe("parsePlanParam — plano vindo da URL", () => {
+  it("aceita os planos assináveis", () => {
+    expect(parsePlanParam("basic")).toBe("basic");
+    expect(parsePlanParam("pro")).toBe("pro");
+  });
+
+  it("recusa plano 'em breve', que não pode virar destino de checkout", () => {
+    expect(parsePlanParam("max")).toBeNull();
+  });
+
+  it("recusa vazio e valor inesperado", () => {
+    expect(parsePlanParam(null)).toBeNull();
+    expect(parsePlanParam("")).toBeNull();
+    expect(parsePlanParam("gratuito")).toBeNull();
+    expect(parsePlanParam("__proto__")).toBeNull();
+  });
+});
+
+describe("featuresLostDowngrading — aviso de downgrade", () => {
+  it("lista o que sai ao cair de Pro para Básico", () => {
+    const perdidos = featuresLostDowngrading("pro", "basic");
+    expect(perdidos).toContain("Caixa & Comissões");
+    expect(perdidos).toContain("Relatórios");
+    expect(perdidos).toContain("Estoque");
+  });
+
+  it("não avisa nada quando é upgrade ou mesmo plano", () => {
+    expect(featuresLostDowngrading("basic", "pro")).toEqual([]);
+    expect(featuresLostDowngrading("pro", "pro")).toEqual([]);
+    expect(featuresLostDowngrading("basic", "basic")).toEqual([]);
+  });
+
+  it("usa rótulos legíveis, não caminhos de rota", () => {
+    for (const item of featuresLostDowngrading("pro", "basic")) {
+      expect(item.startsWith("/")).toBe(false);
+    }
   });
 });
 

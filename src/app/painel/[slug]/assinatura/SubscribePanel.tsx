@@ -13,7 +13,14 @@ import {
 import { Button, Card, Input } from "@/components/ui";
 import { createCheckout, changePlan } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
-import { PLANS, parsePlanParam, planRank, priceLabel, type PlanId } from "@/lib/plans";
+import {
+  PLANS,
+  featuresLostDowngrading,
+  parsePlanParam,
+  planRank,
+  priceLabel,
+  type PlanId,
+} from "@/lib/plans";
 
 const STATUS_LABEL: Record<SubStatus, { text: string; cls: string }> = {
   trialing: { text: "Período de teste", cls: "bg-accent/15 text-accent" },
@@ -58,6 +65,8 @@ export function SubscribePanel({
   const [selected, setSelected] = useState<PlanId>(
     () => parsePlanParam(searchParams.get("plano")) ?? "pro",
   );
+  // Recursos que o plano selecionado tira em relação ao que o salão tem agora.
+  const lostFeatures = featuresLostDowngrading(plan, selected);
   const badge = STATUS_LABEL[status];
 
   function subscribe() {
@@ -254,6 +263,27 @@ export function SubscribePanel({
           );
         })}
       </div>
+
+      {/* O salão testa como Pro (default da coluna `plan`). Se a pessoa assina
+          um plano menor sem saber o que sai, os recursos somem depois de 14
+          dias de uso e parece defeito. Melhor ela decidir sabendo. */}
+      {lostFeatures.length > 0 && (
+        <div className="mt-4 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10">
+          <div className="flex items-start gap-2">
+            <WarningCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-900 dark:text-amber-200">
+                O {PLANS[selected].name} não inclui tudo que você usa hoje
+              </p>
+              <p className="mt-1 text-amber-800 dark:text-amber-200/80">
+                Ao assinar, você deixa de ter acesso a{" "}
+                <b>{lostFeatures.join(", ")}</b>. Seus dados continuam salvos —
+                se voltar para o {PLANS[plan].name}, tudo reaparece.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4">
         <label htmlFor="cpfCnpj" className="text-sm font-medium text-foreground">
