@@ -83,99 +83,146 @@ export default function BarbeariaPage() {
 
       <main className="bg-background">
         {/* ── Hero ─────────────────────────────────────────────── */}
+        {/* Mobile e desktop são blocos separados de propósito: a primeira
+            versão compartilhava um grid e posicionava o texto com `absolute
+            bottom`, mas no mobile o grid fica sem altura (o visual ao lado
+            está oculto) e o texto ia parar fora da tela. */}
         <section className="relative overflow-hidden">
-          {/* Mobile: foto ocupando a tela, texto ancorado embaixo */}
-          <div className="relative min-h-[92svh] lg:min-h-0 lg:py-24">
-            <div className="absolute inset-0 lg:hidden">
+          {/* ── MOBILE ─────────────────────────────────────────── */}
+          <div className="lg:hidden">
+            {/* Altura contida: a foto situa o contexto em um relance, não
+                precisa tomar a tela inteira e empurrar o CTA pra fora. */}
+            <div className="relative h-[34svh] min-h-[220px] w-full">
               <Image
                 src="/hero-barbearia.jpg"
                 alt="Barbearia com cadeira clássica de couro, espelho e parede de tijolinho"
                 fill
                 quality={88}
                 sizes="100vw"
-                className="object-cover object-top"
+                className="object-cover object-center"
                 priority
                 draggable={false}
               />
-              {/* Véu que funde a foto no fundo e dá leitura ao texto */}
+              {/* Véu que dissolve a base da foto no fundo da página */}
               <div
                 aria-hidden
-                className="absolute inset-0"
+                className="absolute inset-x-0 bottom-0 h-2/3"
                 style={{
                   background:
-                    "linear-gradient(to top, var(--background) 32%, color-mix(in srgb, var(--background) 80%, transparent) 46%, transparent 72%)",
+                    "linear-gradient(to top, var(--background) 12%, color-mix(in srgb, var(--background) 55%, transparent) 55%, transparent 100%)",
                 }}
               />
             </div>
 
-            <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-2">
-              {/* Texto */}
-              <div className="absolute inset-x-5 bottom-8 lg:static lg:inset-auto">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
-                  <Scissors className="h-3 w-3 text-primary" />
-                  Feito para barbearia
-                </span>
+            {/* Texto em fluxo normal, subindo um pouco sobre a foto */}
+            <div className="relative -mt-8 px-5 pb-10">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                <Scissors className="h-3 w-3 text-primary" />
+                Feito para barbearia
+              </span>
 
-                <h1 className="mt-4 font-display text-[2.5rem] font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
-                  Pare de largar a máquina{" "}
-                  <span className="text-primary">pra responder WhatsApp.</span>
-                </h1>
+              <h1 className="mt-3.5 font-display text-[2.1rem] font-bold leading-[1.08] tracking-tight sm:text-[2.6rem]">
+                Pare de largar a máquina{" "}
+                <span className="text-primary">pra responder WhatsApp.</span>
+              </h1>
 
-                <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-muted-foreground sm:text-lg">
-                  Seu cliente agenda sozinho pelo link, recebe a confirmação e é
-                  lembrado antes do horário.{" "}
-                  <strong className="font-semibold text-foreground">
-                    Você só corta.
-                  </strong>
-                </p>
+              <p className="mt-3.5 text-[15px] leading-relaxed text-muted-foreground">
+                Seu cliente agenda sozinho pelo link, recebe a confirmação e é
+                lembrado antes do horário.{" "}
+                <strong className="font-semibold text-foreground">Você só corta.</strong>
+              </p>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <Link href="/criar-salao?tipo=barbearia" className="block">
-                    <Button size="lg" className="w-full font-semibold sm:w-auto">
-                      Criar minha agenda grátis <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <a href="/demo/barbearia" className="block">
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                      Ver funcionando
-                    </Button>
-                  </a>
-                </div>
-
-                <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Check className="h-3 w-3 shrink-0 text-primary" /> 14 dias grátis
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Check className="h-3 w-3 shrink-0 text-primary" /> Sem cartão
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Check className="h-3 w-3 shrink-0 text-primary" /> Cancele quando quiser
-                  </span>
-                </p>
+              <div className="mt-5 space-y-2.5">
+                <Link href="/criar-salao?tipo=barbearia" className="block">
+                  <Button size="lg" className="w-full font-semibold">
+                    Criar minha agenda grátis <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <a href="/demo/barbearia" className="block">
+                  <Button size="lg" variant="outline" className="w-full">
+                    Ver funcionando
+                  </Button>
+                </a>
               </div>
 
-              {/* Visual — só no desktop, onde há espaço lado a lado */}
-              <div className="relative hidden lg:block">
-                <div className="relative mx-auto max-w-[460px] overflow-hidden rounded-[2rem] ring-1 ring-border shadow-card">
-                  <Image
-                    src="/hero-barbearia.jpg"
-                    alt="Barbearia com cadeira clássica de couro, espelho e parede de tijolinho"
-                    width={1000}
-                    height={1150}
-                    quality={88}
-                    sizes="460px"
-                    className="h-auto w-full"
-                    priority
-                    draggable={false}
-                  />
-                </div>
-                <div className="absolute -left-6 bottom-8 w-[200px]">
-                  <PhoneMockup content={BARBEARIA} />
-                </div>
-                <div className="absolute -right-3 top-8">
-                  <LiveCard name="Thiago Moura" detail="hoje, 14:30 · confirmado" />
-                </div>
+              <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> 14 dias grátis
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> Sem cartão
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> Cancele quando quiser
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* ── DESKTOP ────────────────────────────────────────── */}
+          <div className="mx-auto hidden max-w-6xl grid-cols-2 items-center gap-12 px-5 py-24 lg:grid">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                <Scissors className="h-3 w-3 text-primary" />
+                Feito para barbearia
+              </span>
+
+              <h1 className="mt-4 font-display text-[3.5rem] font-bold leading-[1.05] tracking-tight">
+                Pare de largar a máquina{" "}
+                <span className="text-primary">pra responder WhatsApp.</span>
+              </h1>
+
+              <p className="mt-4 max-w-lg text-lg leading-relaxed text-muted-foreground">
+                Seu cliente agenda sozinho pelo link, recebe a confirmação e é
+                lembrado antes do horário.{" "}
+                <strong className="font-semibold text-foreground">Você só corta.</strong>
+              </p>
+
+              <div className="mt-6 flex gap-3">
+                <Link href="/criar-salao?tipo=barbearia">
+                  <Button size="lg" className="font-semibold">
+                    Criar minha agenda grátis <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <a href="/demo/barbearia">
+                  <Button size="lg" variant="outline">
+                    Ver funcionando
+                  </Button>
+                </a>
+              </div>
+
+              <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> 14 dias grátis
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> Sem cartão
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-3 w-3 shrink-0 text-primary" /> Cancele quando quiser
+                </span>
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="relative mx-auto max-w-[460px] overflow-hidden rounded-[2rem] ring-1 ring-border shadow-card">
+                <Image
+                  src="/hero-barbearia.jpg"
+                  alt="Barbearia com cadeira clássica de couro, espelho e parede de tijolinho"
+                  width={1000}
+                  height={1150}
+                  quality={88}
+                  sizes="460px"
+                  className="h-auto w-full"
+                  priority
+                  draggable={false}
+                />
+              </div>
+              <div className="absolute -left-6 bottom-8 w-[200px]">
+                <PhoneMockup content={BARBEARIA} />
+              </div>
+              <div className="absolute -right-3 top-8">
+                <LiveCard name="Thiago Moura" detail="hoje, 14:30 · confirmado" />
               </div>
             </div>
           </div>
