@@ -21,6 +21,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
+      // Página por vertical: quem busca "sistema para barbearia" encontra uma
+      // página que fala só disso, em vez da home que atende os dois públicos.
+      url: `${SITE_URL}/barbearia`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
       url: `${SITE_URL}/criar-salao`,
       lastModified: now,
       changeFrequency: "monthly",
