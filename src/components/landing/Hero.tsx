@@ -1,6 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui";
-import { ArrowRight, Check, Star } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, Check, Scissors, Star } from "@phosphor-icons/react/dist/ssr";
 import { LiveCard, PhoneMockup } from "./AppMockup";
 
 /**
@@ -98,6 +99,28 @@ export function Hero() {
                 </li>
               ))}
             </ul>
+
+            {/* Desvio pra barbearia, acima da dobra de propósito: esta home
+                fala a língua de salão ("a cliente"), e o barbeiro que cai aqui
+                precisa da porta antes de decidir sair — não no meio do scroll. */}
+            <div
+              className="mt-6 flex justify-center lg:justify-start af-rise"
+              style={{ animationDelay: "0.44s" }}
+            >
+              <Link
+                href="/barbearia"
+                className="group inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary"
+              >
+                <Scissors className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>
+                  Tem barbearia?{" "}
+                  <span className="font-semibold text-foreground">
+                    Veja a página feita pra você
+                  </span>
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </div>
           </div>
 
           {/* ── Coluna do visual ─────────────────────────────────── */}

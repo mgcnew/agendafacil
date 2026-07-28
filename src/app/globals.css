@@ -417,6 +417,12 @@
     border-color: var(--border);
   }
 
+  /* O header da landing é sticky: sem isso o alvo de uma âncora (#planos,
+     #demo) para debaixo dele e o título fica escondido. */
+  html {
+    scroll-padding-top: 5rem;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);

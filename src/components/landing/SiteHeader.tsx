@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   List,
+  Scissors,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { LoginButton } from "@/components/auth/LoginButton";
 
+// Âncoras: a home e a /barbearia usam os mesmos ids de seção de propósito,
+// então o menu funciona igual nas duas sem precisar de variante por rota.
 const NAV_LINKS = [
   { label: "Funcionalidades", href: "#funcionalidades" },
   { label: "Como funciona", href: "#como-funciona" },
@@ -26,6 +30,15 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
+  const pathname = usePathname();
+
+  // Troca de vertical, sempre visível. A home fala a língua de salão e a
+  // /barbearia a de barbearia; quem caiu na página errada precisa de uma saída
+  // óbvia acima da dobra, não de um card no meio do scroll.
+  const vertical =
+    pathname === "/barbearia"
+      ? { label: "Salões de beleza", href: "/" }
+      : { label: "Barbearias", href: "/barbearia" };
 
   // Auto-hide inteligente: some ao descer, reaparece ao subir.
   useEffect(() => {
@@ -64,6 +77,13 @@ export function SiteHeader() {
                 {l.label}
               </a>
             ))}
+            <Link
+              href={vertical.href}
+              className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:opacity-80 transition-opacity"
+            >
+              <Scissors className="h-3.5 w-3.5" />
+              {vertical.label}
+            </Link>
           </nav>
           <button
             type="button"
@@ -116,6 +136,14 @@ export function SiteHeader() {
                 {l.label}
               </a>
             ))}
+            <Link
+              href={vertical.href}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 py-3.5 text-sm font-semibold text-primary border-b border-border"
+            >
+              <Scissors className="h-4 w-4" />
+              {vertical.label}
+            </Link>
             <div className="py-3">
               <LoginButton />
             </div>

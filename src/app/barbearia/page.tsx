@@ -251,7 +251,10 @@ export default function BarbeariaPage() {
         </section>
 
         {/* ── Como funciona ────────────────────────────────────── */}
-        <section className="border-y border-border bg-muted/30">
+        {/* Os ids batem com os do menu (SiteHeader): sem eles os links do
+            header ficavam mortos aqui, apontando pra âncoras que só a home
+            tinha. */}
+        <section id="como-funciona" className="border-y border-border bg-muted/30">
           <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
             <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
               Três passos e tá rodando.
@@ -284,7 +287,7 @@ export default function BarbeariaPage() {
         </section>
 
         {/* ── WhatsApp ─────────────────────────────────────────── */}
-        <section className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
+        <section id="funcionalidades" className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
           <div className="grid items-center gap-10 lg:grid-cols-2">
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
@@ -337,7 +340,7 @@ export default function BarbeariaPage() {
         </section>
 
         {/* ── Preço ────────────────────────────────────────────── */}
-        <section className="border-t border-border bg-muted/30">
+        <section id="planos" className="border-t border-border bg-muted/30">
           <div className="mx-auto max-w-4xl px-5 py-16 sm:py-20">
             <div className="text-center">
               <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
@@ -406,7 +409,7 @@ export default function BarbeariaPage() {
         </section>
 
         {/* ── CTA final ────────────────────────────────────────── */}
-        <section className="mx-auto max-w-4xl px-5 py-16 text-center sm:py-20">
+        <section id="demo" className="mx-auto max-w-4xl px-5 py-16 text-center sm:py-20">
           <h2 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
             Dá uma volta na demo antes.
           </h2>

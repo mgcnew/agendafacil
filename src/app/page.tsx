@@ -82,7 +82,13 @@ const PLAN_CARDS: {
   },
 ];
 
-const OBJECTIONS = [
+const OBJECTIONS: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  answer: string;
+  /** Destino opcional depois da resposta — só onde a dúvida tem página própria. */
+  link?: { label: string; href: string };
+}[] = [
   {
     icon: Sparkle,
     title: "Isso é só agenda com nome bonito de IA?",
@@ -123,7 +129,10 @@ const OBJECTIONS = [
     icon: SealCheck,
     title: "Funciona para barbearia também?",
     answer:
-      "Sim. O sistema tem temas e lógica específica para salão feminino, barbearia, estética e negócios mistos.",
+      "Sim. O sistema tem temas e lógica específica para salão feminino, barbearia, estética e negócios mistos. Para barbearia existe até uma página só sobre isso.",
+    // Quem faz esta pergunta é exatamente quem a /barbearia atende: é o
+    // momento de maior intenção da página inteira pra esse público.
+    link: { label: "Ver o Zulan para barbearia", href: "/barbearia" },
   },
 ];
 
@@ -145,6 +154,7 @@ const FOOTER_COLS = [
     links: [
       { label: "Funcionalidades", href: "#funcionalidades" },
       { label: "Planos e preços", href: "#planos" },
+      { label: "Para barbearias", href: "/barbearia" },
       { label: "Novidades", href: "/blog" },
     ],
   },
@@ -747,9 +757,20 @@ export default function Home() {
                   >
                     <Check className="h-3 w-3" strokeWidth={3} />
                   </span>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {o.answer}
-                  </p>
+                  <div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {o.answer}
+                    </p>
+                    {o.link && (
+                      <Link
+                        href={o.link.href}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                      >
+                        {o.link.label}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
 
                 {/* Índice discreto */}
