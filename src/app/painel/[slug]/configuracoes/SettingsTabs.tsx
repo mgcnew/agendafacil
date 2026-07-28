@@ -15,6 +15,7 @@ import { uploadLogo, removeLogo } from "./actions";
 import { PushNotificationsCard } from "./PushNotificationsCard";
 import { BiometricCard } from "@/components/auth/BiometricCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
+import { WhatsAppPanel } from "./WhatsAppPanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
   Check,
@@ -22,6 +23,7 @@ import {
   Clock,
   Copy,
   CreditCard,
+  WhatsappLogo,
   Image as ImageIcon,
   LinkSimple,
   MagnifyingGlass,
@@ -41,7 +43,7 @@ import { SITE_URL } from "@/lib/siteUrl";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
-type TabId = "estabelecimento" | "horarios" | "agendamento" | "caixa" | "aparencia" | "acessos" | "assinatura";
+type TabId = "estabelecimento" | "horarios" | "agendamento" | "caixa" | "aparencia" | "acessos" | "whatsapp" | "assinatura";
 type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
@@ -53,6 +55,7 @@ const TAB_META: { id: TabId; label: string; icon: typeof Storefront; need: "salo
   { id: "caixa", label: "Caixa", icon: Wallet, need: "salon" },
   { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
+  { id: "whatsapp", label: "WhatsApp", icon: WhatsappLogo, need: "salon" },
   { id: "assinatura", label: "Assinatura", icon: CreditCard, need: "salon" },
 ];
 
@@ -173,6 +176,7 @@ export function SettingsTabs({
           salonRolePerms={salonRolePerms}
         />
       )}
+      {active === "whatsapp" && <WhatsAppPanel slug={salon.slug} />}
       {active === "assinatura" &&
         (access ? (
           <SubscribePanel
