@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardWhatsApp } from "@/lib/whatsapp/guard";
-import { getConnectionState } from "@/lib/whatsapp/evolution";
+import { getConnectionState, type ConnectionState } from "@/lib/whatsapp/evolution";
+import type { TablesUpdate } from "@/lib/database.types";
 
 /**
  * Estado da conexão. A Evolution é a fonte da verdade (o aparelho pode ter
@@ -43,7 +44,9 @@ export async function GET(req: Request) {
     });
   }
 
-  let state: string;
+  // ConnectionState é subconjunto do enum do banco (não inclui 'paused', que é
+  // decisão nossa, não da Evolution) — daí dar pra gravar direto na coluna.
+  let state: ConnectionState;
   try {
     state = await getConnectionState(instanceName);
   } catch (e) {
@@ -61,7 +64,10 @@ export async function GET(req: Request) {
   }
 
   if (state !== row.status) {
-    const patch: Record<string, unknown> = { status: state, updated_at: new Date().toISOString() };
+    const patch: TablesUpdate<"whatsapp_instances"> = {
+      status: state,
+      updated_at: new Date().toISOString(),
+    };
 
     if (state === "connected") {
       patch.connected_at = new Date().toISOString();

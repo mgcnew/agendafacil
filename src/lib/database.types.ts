@@ -865,6 +865,8 @@ export type Database = {
           profile_id: string | null
           referral_source: string | null
           salon_id: string
+          whatsapp_opt_out: boolean
+          whatsapp_opt_out_at: string | null
         }
         Insert: {
           alert_summary?: string | null
@@ -880,6 +882,8 @@ export type Database = {
           profile_id?: string | null
           referral_source?: string | null
           salon_id: string
+          whatsapp_opt_out?: boolean
+          whatsapp_opt_out_at?: string | null
         }
         Update: {
           alert_summary?: string | null
@@ -895,6 +899,8 @@ export type Database = {
           profile_id?: string | null
           referral_source?: string | null
           salon_id?: string
+          whatsapp_opt_out?: boolean
+          whatsapp_opt_out_at?: string | null
         }
         Relationships: [
           {
@@ -2476,6 +2482,194 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_instances: {
+        Row: {
+          connected_at: string | null
+          created_at: string
+          daily_cap: number
+          failure_count: number
+          id: string
+          instance_name: string
+          last_error: string | null
+          next_send_at: string | null
+          paused_at: string | null
+          paused_reason: string | null
+          phone_number: string | null
+          ramp_started_at: string | null
+          salon_id: string
+          send_booking_receipt: boolean
+          send_reminder_confirm: boolean
+          send_review_request: boolean
+          send_thank_you: boolean
+          status: Database["public"]["Enums"]["whatsapp_instance_status"]
+          updated_at: string
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string
+          daily_cap?: number
+          failure_count?: number
+          id?: string
+          instance_name: string
+          last_error?: string | null
+          next_send_at?: string | null
+          paused_at?: string | null
+          paused_reason?: string | null
+          phone_number?: string | null
+          ramp_started_at?: string | null
+          salon_id: string
+          send_booking_receipt?: boolean
+          send_reminder_confirm?: boolean
+          send_review_request?: boolean
+          send_thank_you?: boolean
+          status?: Database["public"]["Enums"]["whatsapp_instance_status"]
+          updated_at?: string
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string
+          daily_cap?: number
+          failure_count?: number
+          id?: string
+          instance_name?: string
+          last_error?: string | null
+          next_send_at?: string | null
+          paused_at?: string | null
+          paused_reason?: string | null
+          phone_number?: string | null
+          ramp_started_at?: string | null
+          salon_id?: string
+          send_booking_receipt?: boolean
+          send_reminder_confirm?: boolean
+          send_review_request?: boolean
+          send_thank_you?: boolean
+          status?: Database["public"]["Enums"]["whatsapp_instance_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: true
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_outbox: {
+        Row: {
+          appointment_id: string | null
+          attempts: number
+          body: string
+          client_id: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          last_error: string | null
+          phone: string
+          provider_message_id: string | null
+          salon_id: string
+          scheduled_for: string
+          sent_at: string | null
+          skip_reason: string | null
+          status: Database["public"]["Enums"]["whatsapp_outbox_status"]
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          attempts?: number
+          body: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          last_error?: string | null
+          phone: string
+          provider_message_id?: string | null
+          salon_id: string
+          scheduled_for?: string
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: Database["public"]["Enums"]["whatsapp_outbox_status"]
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          attempts?: number
+          body?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["whatsapp_message_kind"]
+          last_error?: string | null
+          phone?: string
+          provider_message_id?: string | null
+          salon_id?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: Database["public"]["Enums"]["whatsapp_outbox_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_outbox_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_outbox_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_outbox_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          salon_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          salon_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["whatsapp_message_kind"]
+          salon_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       working_hours: {
         Row: {
           created_at: string
@@ -3350,6 +3544,22 @@ export type Database = {
       member_role: "owner" | "manager" | "professional" | "receptionist"
       salon_niche: "feminino" | "barbearia" | "estetica" | "neutro"
       stock_movement_type: "in" | "out" | "adjustment"
+      whatsapp_instance_status:
+        | "disconnected"
+        | "connecting"
+        | "connected"
+        | "paused"
+      whatsapp_message_kind:
+        | "booking_receipt"
+        | "thank_you"
+        | "reminder_confirm"
+        | "review_request"
+      whatsapp_outbox_status:
+        | "queued"
+        | "sending"
+        | "sent"
+        | "failed"
+        | "skipped"
     }
     CompositeTypes: {
       [_ in never]: never
