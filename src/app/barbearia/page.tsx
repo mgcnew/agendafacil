@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { SiteHeader } from "@/components/landing/SiteHeader";
+import { SiteFooter } from "@/components/landing/SiteFooter";
 import { BARBEARIA, LiveCard, PhoneMockup } from "@/components/landing/AppMockup";
 import { PLANS, priceLabel } from "@/lib/plans";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -431,6 +432,8 @@ export default function BarbeariaPage() {
           </div>
         </section>
       </main>
+
+      <SiteFooter vertical="barbearia" />
     </>
   );
 }
