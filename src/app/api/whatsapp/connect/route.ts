@@ -8,6 +8,7 @@ import {
   setWebhook,
   type QrCode,
 } from "@/lib/whatsapp/evolution";
+import { normalizeBrPhone } from "@/lib/whatsapp/phone";
 
 /**
  * Inicia o pareamento: garante a instância na Evolution e devolve o QR code
@@ -18,18 +19,32 @@ import {
  * confiamos que o QR foi mesmo escaneado.
  */
 export async function POST(req: Request) {
-  const { slug } = await req.json().catch(() => ({ slug: "" }));
+  const body = await req.json().catch(() => ({}));
+  const { slug, phone } = body as { slug?: string; phone?: string };
 
-  const guard = await guardWhatsApp(slug);
+  const guard = await guardWhatsApp(slug ?? "");
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }
   const { salonId, instanceName } = guard.ctx;
 
+  // Com telefone, o dono pediu o código de pareamento — e o WhatsApp vincula
+  // esse código ao número, então ele precisa chegar até a Evolution. Sem
+  // número não existe código, só QR.
+  let numero: string | null = null;
+  if (phone) {
+    numero = normalizeBrPhone(phone);
+    if (!numero) {
+      return NextResponse.json({ error: "telefone_invalido" }, { status: 400 });
+    }
+  }
+
   try {
     // A criação já abre o socket e emite o primeiro código: aproveitá-lo evita
-    // a corrida que fazia a segunda instância nascer sem QR.
-    let qr: QrCode | null = await createInstance(instanceName);
+    // a corrida que fazia a segunda instância nascer sem QR. Quando o pedido é
+    // por código, não serve — o QR da criação não vem vinculado ao número.
+    let qr: QrCode | null = numero ? null : await createInstance(instanceName);
+    if (numero) await createInstance(instanceName);
 
     // Antes do QR chegar ao usuário: assim que o aparelho parear, a instância
     // já está apontada pra nós e a primeira resposta do cliente não se perde.
@@ -44,11 +59,17 @@ export async function POST(req: Request) {
 
     // Instância que já existia não devolve QR na criação; aí sim se pede.
     if (!qr?.base64 && !qr?.pairingCode) {
-      qr = await getQrCode(instanceName);
+      qr = await getQrCode(instanceName, { number: numero });
     }
 
     if (!qr.base64 && !qr.pairingCode) {
-      return NextResponse.json({ error: "qr_indisponivel" }, { status: 503 });
+      // Com número pedido e nada de volta, o problema é específico: a Evolution
+      // não emitiu o código de pareamento. Dizer "sem QR" mandaria a pessoa
+      // procurar no lugar errado.
+      return NextResponse.json(
+        { error: numero ? "codigo_indisponivel" : "qr_indisponivel" },
+        { status: 503 },
+      );
     }
 
     const admin = createAdminClient();

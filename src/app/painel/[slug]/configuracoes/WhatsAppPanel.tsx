@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 import {
   ArrowClockwise,
   CheckCircle,
@@ -72,6 +72,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
   // Alternativa ao QR: quem abre o painel no próprio celular não tem como
   // escanear um código exibido nesse mesmo aparelho.
   const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -134,14 +135,19 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
     return () => { clearInterval(id); clearTimeout(stop); };
   }, [pareando, loadStatus]);
 
-  async function connect() {
+  /**
+   * `phone` preenchido = pedido de código de pareamento. O WhatsApp vincula o
+   * código ao número que vai digitá-lo, então sem ele a Evolution só devolve
+   * QR — era exatamente por isso que "gerar código" não mostrava nada.
+   */
+  async function connect(phone?: string) {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/whatsapp/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify(phone ? { slug, phone } : { slug }),
       });
       const data = await res.json();
       // Código de pareamento sozinho já basta pra conectar — exigir o QR
@@ -152,6 +158,10 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
             ? "A integração ainda não está configurada no servidor."
             : data.error === "ja_conectada"
             ? "Este número já está conectado. Clique em Desconectar antes de parear outro aparelho."
+            : data.error === "telefone_invalido"
+            ? "Confira o número: precisa ser um celular com DDD, como (11) 98765-4321."
+            : data.error === "codigo_indisponivel"
+            ? "O WhatsApp não devolveu o código agora. Tente de novo em alguns segundos."
             : "Não foi possível gerar o código agora. Tente de novo em alguns segundos.",
         );
         return;
@@ -265,22 +275,53 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
               </div>
             )}
 
-            {pairingCode && (
-              <div className={qr ? "mt-5 border-t border-border pt-5" : ""}>
-                <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {qr ? "Ou conecte pelo código" : "Conecte pelo código"}
-                </p>
-                <p className="mt-2 text-center font-display text-3xl font-bold tracking-[0.2em] tabular-nums">
-                  {pairingCode}
-                </p>
-                <ol className="mx-auto mt-3 max-w-xs space-y-1 text-center text-xs text-muted-foreground">
-                  <li>1. Abra o WhatsApp no celular do salão</li>
-                  <li>2. Toque em <b className="text-foreground">Aparelhos conectados</b></li>
-                  <li>3. Toque em <b className="text-foreground">Conectar com número de telefone</b></li>
-                  <li>4. Digite o código acima</li>
-                </ol>
-              </div>
-            )}
+            <div className={qr ? "mt-5 border-t border-border pt-5" : ""}>
+              {pairingCode ? (
+                <>
+                  <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Seu código de pareamento
+                  </p>
+                  <p className="mt-2 text-center font-display text-3xl font-bold tracking-[0.2em]">
+                    {pairingCode}
+                  </p>
+                  <ol className="mx-auto mt-3 max-w-xs space-y-1 text-center text-xs text-muted-foreground">
+                    <li>1. Abra o WhatsApp no celular do salão</li>
+                    <li>2. Toque em <b className="text-foreground">Aparelhos conectados</b></li>
+                    <li>3. Toque em <b className="text-foreground">Conectar com número de telefone</b></li>
+                    <li>4. Digite o código acima</li>
+                  </ol>
+                </>
+              ) : (
+                // O código só existe vinculado a um número — por isso o campo.
+                // É o caminho de quem abriu o painel no próprio celular e não
+                // tem como escanear a tela em que está.
+                <>
+                  <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {qr ? "Está no celular? Conecte pelo número" : "Conecte pelo número"}
+                  </p>
+                  <div className="mx-auto mt-3 flex max-w-sm flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="(11) 98765-4321"
+                      inputMode="tel"
+                      aria-label="Número do WhatsApp do salão"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => void connect(phoneInput)}
+                      disabled={busy || phoneInput.trim().length < 10}
+                    >
+                      {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Gerar código
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    O número do aparelho que vai receber as mensagens.
+                  </p>
+                </>
+              )}
+            </div>
 
             <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <CircleNotch className="h-3 w-3 animate-spin" /> Aguardando conexão…
@@ -300,7 +341,9 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
             </>
           ) : (
             <>
-              <Button onClick={connect} disabled={busy}>
+              {/* Sem argumento: o React passaria o evento de clique como se
+                  fosse o telefone. */}
+              <Button onClick={() => void connect()} disabled={busy}>
                 {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <WhatsappLogo className="h-4 w-4" weight="fill" />}
                 {pareando ? "Gerar outro código" : state === "paused" ? "Reconectar" : "Conectar WhatsApp"}
               </Button>

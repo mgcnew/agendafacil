@@ -126,14 +126,25 @@ export async function createInstance(instanceName: string): Promise<QrCode | nul
 }
 
 /**
- * Recupera o QR de uma instância que já existe.
+ * Recupera o QR de uma instância que já existe — e, se o número for informado,
+ * o código de pareamento.
+ *
+ * O `number` não é opcional por capricho: o WhatsApp vincula o código de 8
+ * letras ao telefone que vai digitá-lo, então sem número a Evolution devolve
+ * `pairingCode: null` e só há QR. Pedir o código "do nada" nunca funcionou.
  *
  * Tenta mais de uma vez de propósito: o socket do Baileys leva um instante pra
  * emitir o código e a primeira resposta costuma vir vazia. Uma tentativa só
  * era a diferença entre conectar e ver "Não foi possível gerar o QR code".
  */
-export async function getQrCode(instanceName: string, tentativas = 3): Promise<QrCode> {
+export async function getQrCode(
+  instanceName: string,
+  options: { number?: string | null; tentativas?: number } = {},
+): Promise<QrCode> {
+  const { number = null, tentativas = 3 } = options;
   let ultimo: QrCode = { base64: null, pairingCode: null };
+
+  const query = number ? `?number=${encodeURIComponent(number)}` : "";
 
   for (let i = 0; i < tentativas; i++) {
     const data = await call<{
@@ -141,7 +152,7 @@ export async function getQrCode(instanceName: string, tentativas = 3): Promise<Q
       code?: string;
       pairingCode?: string;
       instance?: { state?: string };
-    }>(`/instance/connect/${encodeURIComponent(instanceName)}`);
+    }>(`/instance/connect/${encodeURIComponent(instanceName)}${query}`);
 
     // Instância já pareada não emite QR — e insistir não vai mudar isso.
     if (normalizeState(data.instance?.state) === "connected") {
@@ -149,7 +160,12 @@ export async function getQrCode(instanceName: string, tentativas = 3): Promise<Q
     }
 
     ultimo = { base64: data.base64 ?? null, pairingCode: data.pairingCode ?? null };
-    if (ultimo.base64 || ultimo.pairingCode) return ultimo;
+
+    // Com número, o que interessa é o código: sair no primeiro QR devolveria a
+    // tela errada pra quem escolheu conectar pelo telefone.
+    if (number ? ultimo.pairingCode : ultimo.base64 || ultimo.pairingCode) {
+      return ultimo;
+    }
 
     if (i < tentativas - 1) await sleep(1500);
   }
