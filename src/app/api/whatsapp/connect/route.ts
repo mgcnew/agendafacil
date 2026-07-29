@@ -7,7 +7,6 @@ import {
   EvolutionError,
   getConnectionState,
   getQrCode,
-  setWebhook,
   type QrCode,
 } from "@/lib/whatsapp/evolution";
 import { normalizeBrPhone } from "@/lib/whatsapp/phone";
@@ -57,24 +56,24 @@ export async function POST(req: Request) {
       await deleteInstance(instanceName);
     }
 
-    // A criação já abre o socket e emite o primeiro código: aproveitá-lo evita
-    // a corrida que fazia a segunda instância nascer sem QR. Com número, ela
+    // A criação já abre o socket e emite a credencial: aproveitá-la evita a
+    // corrida que fazia a segunda instância nascer sem QR. Com número, ela
     // também é o caminho documentado pro código de pareamento.
     // Instância que já existia devolve null na criação; o objeto vazio evita
     // ficar checando null em cada uso daqui pra baixo.
     const vazio: QrCode = { base64: null, pairingCode: null };
     let qr: QrCode = (await createInstance(instanceName, numero)) ?? vazio;
 
-    // Antes do QR chegar ao usuário: assim que o aparelho parear, a instância
-    // já está apontada pra nós e a primeira resposta do cliente não se perde.
-    let webhookOk = false;
-    try {
-      webhookOk = await setWebhook(instanceName);
-    } catch (e) {
-      // Não impede o pareamento — sem webhook o salão ainda envia, só não
-      // recebe. A rota /status tenta de novo enquanto webhook_set_at for null.
-      console.error("setWebhook falhou", instanceName, (e as Error).message);
-    }
+    // O webhook NÃO é configurado aqui de propósito. `/webhook/set` reinicia a
+    // conexão do Baileys, e a credencial que acabamos de gerar morre junto —
+    // o usuário digitava um código válido e o WhatsApp respondia "código
+    // incorreto", porque ele pertencia a um socket que não existia mais.
+    //
+    // Quem configura é a rota /status, assim que a instância aparece como
+    // conectada: nesse momento reiniciar não custa nada, e ela já faz isso
+    // sozinha enquanto webhook_set_at estiver null. Como o delete acima apaga
+    // a configuração do lado da Evolution, gravar null aqui é o que garante
+    // que ela seja refeita.
 
     // Instância que já existia não devolve nada na criação; aí sim se pede.
     // Com número, insiste até vir o código — o QR não substitui.
@@ -106,7 +105,7 @@ export async function POST(req: Request) {
         paused_at: null,
         paused_reason: null,
         failure_count: 0,
-        webhook_set_at: webhookOk ? new Date().toISOString() : null,
+        webhook_set_at: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "salon_id" },

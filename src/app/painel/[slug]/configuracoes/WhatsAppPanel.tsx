@@ -296,6 +296,13 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
                     <li>3. Toque em <b className="text-foreground">Conectar com número de telefone</b></li>
                     <li>4. Digite o código acima</li>
                   </ol>
+                  {/* O código vale por cerca de um minuto e some sem aviso do
+                      WhatsApp — que responde "código incorreto", não
+                      "expirado". Sem esta linha a pessoa culpa o sistema. */}
+                  <p className="mx-auto mt-3 max-w-xs text-center text-xs text-amber-600">
+                    Digite agora: o código vale por cerca de 1 minuto. Se demorar,
+                    o WhatsApp diz &quot;código incorreto&quot; — é só gerar outro.
+                  </p>
                 </>
               ) : (
                 // O código só existe vinculado a um número — por isso o campo.
