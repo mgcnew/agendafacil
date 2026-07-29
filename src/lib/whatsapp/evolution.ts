@@ -22,9 +22,23 @@ export type ConnectionState = "connected" | "connecting" | "disconnected";
 export type QrCode = {
   /** PNG em data-URI, pronto pra <img src>. */
   base64: string | null;
-  /** Código de pareamento por número, alternativa a escanear. */
+  /**
+   * Código de 8 caracteres pra digitar no aparelho, alternativa a escanear.
+   * Não é detalhe: quem abre o painel NO celular não consegue escanear um QR
+   * exibido nesse mesmo celular — pra essa pessoa, é o único caminho.
+   */
   pairingCode: string | null;
 };
+
+/** Erro da Evolution com o status HTTP preservado, pra decidir sem regex. */
+export class EvolutionError extends Error {
+  constructor(readonly status: number, readonly detail: string) {
+    super(`evolution_http_${status}: ${detail.slice(0, 200)}`);
+    this.name = "EvolutionError";
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function assertConfigured(): { baseUrl: string; apiKey: string } {
   if (!BASE_URL || !API_KEY) {
@@ -50,9 +64,15 @@ async function call<T>(
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`evolution_http_${res.status}: ${text.slice(0, 200)}`);
+    throw new EvolutionError(res.status, text);
   }
   return (text ? JSON.parse(text) : {}) as T;
+}
+
+/** Testa o status de verdade — antes era regex no texto todo, que casava com
+ *  um "403" que aparecesse por acaso no corpo da resposta. */
+function isStatus(e: unknown, ...codes: number[]): boolean {
+  return e instanceof EvolutionError && codes.includes(e.status);
 }
 
 /**
@@ -71,12 +91,22 @@ function normalizeState(raw: string | undefined): ConnectionState {
 }
 
 /**
- * Cria a instância. Idempotente na prática: se já existe, a Evolution devolve
- * 403/409 e nós seguimos em frente — o que importa é ter a instância de pé.
+ * Cria a instância e devolve o QR que a própria resposta já traz.
+ *
+ * Devolver o QR daqui importa: a criação abre o socket do Baileys e é ela que
+ * produz o primeiro código. Pedir de novo em `/instance/connect` logo depois
+ * chega cedo demais, o socket ainda não emitiu nada e a resposta volta sem
+ * base64 — que era exatamente por que a segunda instância "dava erro e não
+ * conectava". Agora só se pede de novo se este aqui vier vazio.
+ *
+ * Idempotente: se a instância já existe, a Evolution devolve 403/409 e nós
+ * seguimos — só sem QR, que o chamador busca com getQrCode.
  */
-export async function createInstance(instanceName: string): Promise<void> {
+export async function createInstance(instanceName: string): Promise<QrCode | null> {
   try {
-    await call("/instance/create", {
+    const data = await call<{
+      qrcode?: { base64?: string; pairingCode?: string };
+    }>("/instance/create", {
       method: "POST",
       body: {
         instanceName,
@@ -84,25 +114,47 @@ export async function createInstance(instanceName: string): Promise<void> {
         qrcode: true,
       },
     });
+
+    const base64 = data.qrcode?.base64 ?? null;
+    const pairingCode = data.qrcode?.pairingCode ?? null;
+    return base64 || pairingCode ? { base64, pairingCode } : null;
   } catch (e) {
-    const msg = (e as Error).message;
-    // "already in use" não é erro pro nosso fluxo.
-    if (!/40[39]/.test(msg)) throw e;
+    // "already in use" não é erro pro nosso fluxo; o resto é.
+    if (isStatus(e, 403, 409)) return null;
+    throw e;
   }
 }
 
-/** Gera/recupera o QR code pra parear o aparelho. */
-export async function getQrCode(instanceName: string): Promise<QrCode> {
-  const data = await call<{
-    base64?: string;
-    code?: string;
-    pairingCode?: string;
-  }>(`/instance/connect/${encodeURIComponent(instanceName)}`);
+/**
+ * Recupera o QR de uma instância que já existe.
+ *
+ * Tenta mais de uma vez de propósito: o socket do Baileys leva um instante pra
+ * emitir o código e a primeira resposta costuma vir vazia. Uma tentativa só
+ * era a diferença entre conectar e ver "Não foi possível gerar o QR code".
+ */
+export async function getQrCode(instanceName: string, tentativas = 3): Promise<QrCode> {
+  let ultimo: QrCode = { base64: null, pairingCode: null };
 
-  return {
-    base64: data.base64 ?? null,
-    pairingCode: data.pairingCode ?? null,
-  };
+  for (let i = 0; i < tentativas; i++) {
+    const data = await call<{
+      base64?: string;
+      code?: string;
+      pairingCode?: string;
+      instance?: { state?: string };
+    }>(`/instance/connect/${encodeURIComponent(instanceName)}`);
+
+    // Instância já pareada não emite QR — e insistir não vai mudar isso.
+    if (normalizeState(data.instance?.state) === "connected") {
+      throw new EvolutionError(409, "instancia_ja_conectada");
+    }
+
+    ultimo = { base64: data.base64 ?? null, pairingCode: data.pairingCode ?? null };
+    if (ultimo.base64 || ultimo.pairingCode) return ultimo;
+
+    if (i < tentativas - 1) await sleep(1500);
+  }
+
+  return ultimo;
 }
 
 /**
@@ -169,7 +221,7 @@ export async function getConnectionState(instanceName: string): Promise<Connecti
     return normalizeState(data.instance?.state);
   } catch (e) {
     // Instância inexistente = desconectada, não é falha da aplicação.
-    if (/40[34]/.test((e as Error).message)) return "disconnected";
+    if (isStatus(e, 403, 404)) return "disconnected";
     throw e;
   }
 }
@@ -179,7 +231,7 @@ export async function logoutInstance(instanceName: string): Promise<void> {
   try {
     await call(`/instance/logout/${encodeURIComponent(instanceName)}`, { method: "DELETE" });
   } catch (e) {
-    if (!/40[34]/.test((e as Error).message)) throw e;
+    if (!isStatus(e, 403, 404)) throw e;
   }
 }
 
@@ -188,6 +240,6 @@ export async function deleteInstance(instanceName: string): Promise<void> {
   try {
     await call(`/instance/delete/${encodeURIComponent(instanceName)}`, { method: "DELETE" });
   } catch (e) {
-    if (!/40[34]/.test((e as Error).message)) throw e;
+    if (!isStatus(e, 403, 404)) throw e;
   }
 }

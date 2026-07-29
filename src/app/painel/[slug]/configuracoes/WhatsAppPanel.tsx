@@ -69,6 +69,9 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
   const [pausedReason, setPausedReason] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  // Alternativa ao QR: quem abre o painel no próprio celular não tem como
+  // escanear um código exibido nesse mesmo aparelho.
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -111,19 +114,25 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
 
   // Enquanto o QR está na tela, pergunta o status a cada 3s — é assim que a
   // gente descobre que a pessoa escaneou (a Evolution não avisa).
+  const pareando = !!qr || !!pairingCode;
   useEffect(() => {
-    if (!qr) return;
+    if (!pareando) return;
     const id = setInterval(async () => {
       const s = await loadStatus();
       if (s === "connected") {
         setQr(null);
+        setPairingCode(null);
         clearInterval(id);
       }
     }, 3000);
-    // QR da Evolution expira; depois de 2min some e a pessoa pede outro.
-    const stop = setTimeout(() => { clearInterval(id); setQr(null); }, 120_000);
+    // O código da Evolution expira; depois de 2min some e a pessoa pede outro.
+    const stop = setTimeout(() => {
+      clearInterval(id);
+      setQr(null);
+      setPairingCode(null);
+    }, 120_000);
     return () => { clearInterval(id); clearTimeout(stop); };
-  }, [qr, loadStatus]);
+  }, [pareando, loadStatus]);
 
   async function connect() {
     setBusy(true);
@@ -135,15 +144,20 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
         body: JSON.stringify({ slug }),
       });
       const data = await res.json();
-      if (!res.ok || !data.qrCode) {
+      // Código de pareamento sozinho já basta pra conectar — exigir o QR
+      // deixava de fora justamente quem está no celular.
+      if (!res.ok || (!data.qrCode && !data.pairingCode)) {
         setError(
           data.error === "evolution_nao_configurada"
             ? "A integração ainda não está configurada no servidor."
-            : "Não foi possível gerar o QR code. Tente de novo.",
+            : data.error === "ja_conectada"
+            ? "Este número já está conectado. Clique em Desconectar antes de parear outro aparelho."
+            : "Não foi possível gerar o código agora. Tente de novo em alguns segundos.",
         );
         return;
       }
-      setQr(data.qrCode);
+      setQr(data.qrCode ?? null);
+      setPairingCode(data.pairingCode ?? null);
       setState("connecting");
     } finally {
       setBusy(false);
@@ -161,6 +175,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
         body: JSON.stringify({ slug }),
       });
       setQr(null);
+      setPairingCode(null);
       await loadStatus();
     } finally {
       setBusy(false);
@@ -228,24 +243,47 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* QR code */}
-        {qr && (
-          <div className="mt-5 flex flex-col items-center gap-3 rounded-[var(--radius)] border border-border bg-muted/40 p-5">
-            <Image
-              src={qr}
-              alt="QR code para conectar o WhatsApp"
-              width={240}
-              height={240}
-              unoptimized
-              className="rounded-lg bg-white p-2"
-            />
-            <ol className="max-w-xs space-y-1 text-center text-xs text-muted-foreground">
-              <li>1. Abra o WhatsApp no celular do salão</li>
-              <li>2. Toque em <b className="text-foreground">Aparelhos conectados</b></li>
-              <li>3. Toque em <b className="text-foreground">Conectar aparelho</b> e aponte para o código</li>
-            </ol>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CircleNotch className="h-3 w-3 animate-spin" /> Aguardando leitura…
+        {/* Pareamento: QR pra quem está no computador, código pra quem está
+            no celular — nesse caso não há como escanear a própria tela. */}
+        {pareando && (
+          <div className="mt-5 rounded-[var(--radius)] border border-border bg-muted/40 p-5">
+            {qr && (
+              <div className="flex flex-col items-center gap-3">
+                <Image
+                  src={qr}
+                  alt="QR code para conectar o WhatsApp"
+                  width={240}
+                  height={240}
+                  unoptimized
+                  className="rounded-lg bg-white p-2"
+                />
+                <ol className="max-w-xs space-y-1 text-center text-xs text-muted-foreground">
+                  <li>1. Abra o WhatsApp no celular do salão</li>
+                  <li>2. Toque em <b className="text-foreground">Aparelhos conectados</b></li>
+                  <li>3. Toque em <b className="text-foreground">Conectar aparelho</b> e aponte para o código</li>
+                </ol>
+              </div>
+            )}
+
+            {pairingCode && (
+              <div className={qr ? "mt-5 border-t border-border pt-5" : ""}>
+                <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {qr ? "Ou conecte pelo código" : "Conecte pelo código"}
+                </p>
+                <p className="mt-2 text-center font-display text-3xl font-bold tracking-[0.2em] tabular-nums">
+                  {pairingCode}
+                </p>
+                <ol className="mx-auto mt-3 max-w-xs space-y-1 text-center text-xs text-muted-foreground">
+                  <li>1. Abra o WhatsApp no celular do salão</li>
+                  <li>2. Toque em <b className="text-foreground">Aparelhos conectados</b></li>
+                  <li>3. Toque em <b className="text-foreground">Conectar com número de telefone</b></li>
+                  <li>4. Digite o código acima</li>
+                </ol>
+              </div>
+            )}
+
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <CircleNotch className="h-3 w-3 animate-spin" /> Aguardando conexão…
             </p>
           </div>
         )}
@@ -261,10 +299,20 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
               </Button>
             </>
           ) : (
-            <Button onClick={connect} disabled={busy}>
-              {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <WhatsappLogo className="h-4 w-4" weight="fill" />}
-              {qr ? "Gerar outro código" : state === "paused" ? "Reconectar" : "Conectar WhatsApp"}
-            </Button>
+            <>
+              <Button onClick={connect} disabled={busy}>
+                {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <WhatsappLogo className="h-4 w-4" weight="fill" />}
+                {pareando ? "Gerar outro código" : state === "paused" ? "Reconectar" : "Conectar WhatsApp"}
+              </Button>
+              {/* Saída pra instância que ficou presa em "conectando": o código
+                  expirou, ninguém escaneou e sem isto o único caminho era
+                  pedir código novo pra sempre. */}
+              {state === "connecting" && (
+                <Button variant="ghost" onClick={disconnect} disabled={busy}>
+                  <Power className="h-4 w-4" /> Cancelar e recomeçar
+                </Button>
+              )}
+            </>
           )}
         </div>
 
