@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { clearStoredRefreshToken } from "@/lib/auth/persistentSession";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { QuickAppointment } from "@/components/QuickAppointment";
 import {
   House,
   Plus,
@@ -162,13 +163,16 @@ function AnnouncementBanner({ announcements }: { announcements: PanelAnnouncemen
  * Elevado acima da barra de propósito: é o único item que não é navegação, e
  * o relevo é o que comunica isso sem precisar de rótulo diferente.
  */
-function AgendarButton({ base }: { base: string }) {
-  return (
-    <Link
-      href={`${base}/agenda?novo=1`}
-      aria-label="Novo agendamento"
-      className="flex flex-col items-center justify-center gap-1"
-    >
+/**
+ * Botão central da barra. Fora da Agenda ele abre o formulário POR CIMA da
+ * tela atual (`onOpen`); dentro da Agenda continua sendo link, porque lá o
+ * formulário já existe e já sabe qual dia está sendo olhado — o modal global
+ * abriria sempre em hoje, que é o dia errado pra quem está vendo a semana que
+ * vem.
+ */
+function AgendarButton({ href, onOpen }: { href?: string; onOpen?: () => void }) {
+  const conteudo = (
+    <>
       <span
         className="-mt-5 grid h-12 w-12 place-items-center rounded-full shadow-lg transition active:scale-95"
         style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
@@ -176,7 +180,18 @@ function AgendarButton({ base }: { base: string }) {
         <Plus className="h-6 w-6" weight="bold" />
       </span>
       <span className="text-[10px] font-semibold leading-none text-primary">Agendar</span>
+    </>
+  );
+  const classe = "flex flex-col items-center justify-center gap-1";
+
+  return href ? (
+    <Link href={href} aria-label="Novo agendamento" className={classe}>
+      {conteudo}
     </Link>
+  ) : (
+    <button type="button" onClick={onOpen} aria-label="Novo agendamento" className={classe}>
+      {conteudo}
+    </button>
   );
 }
 
@@ -189,7 +204,7 @@ export function PanelShell({
   announcements = [],
   canCreateAppointment = false,
 }: {
-  salon: { name: string; slug: string; niche: string };
+  salon: { id: string; name: string; slug: string; niche: string };
   role: string;
   groups: NavGroup[];
   children: React.ReactNode;
@@ -201,8 +216,10 @@ export function PanelShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [novoAgendamento, setNovoAgendamento] = useState(false);
   const base = `/painel/${salon.slug}`;
-  const fullBleed = pathname === `${base}/agenda`;
+  const naAgenda = pathname === `${base}/agenda`;
+  const fullBleed = naAgenda;
 
   const allItems = groups.flatMap((g) => g.items);
 
@@ -424,7 +441,10 @@ export function PanelShell({
               if (!inserirAgendar) return link;
               return (
                 <Fragment key={`ag-${it.href}`}>
-                  <AgendarButton base={base} />
+                  <AgendarButton
+                    href={naAgenda ? `${base}/agenda?novo=1` : undefined}
+                    onOpen={naAgenda ? undefined : () => setNovoAgendamento(true)}
+                  />
                   {link}
                 </Fragment>
               );
@@ -601,6 +621,17 @@ export function PanelShell({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Novo agendamento sem sair da tela. Fica no shell (e não em cada
+          página) porque é justamente o ponto: a tela de baixo continua
+          intacta. Só é montado quando o dono pode criar agendamento. */}
+      {canCreateAppointment && (
+        <QuickAppointment
+          salonId={salon.id}
+          open={novoAgendamento}
+          onClose={() => setNovoAgendamento(false)}
+        />
       )}
     </div>
   );

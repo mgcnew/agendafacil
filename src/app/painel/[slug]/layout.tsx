@@ -149,7 +149,7 @@ export default async function PanelLayout({
       {/* Espelha o refresh token no localStorage p/ restauração silenciosa. */}
       <SessionPersistence />
       <PanelShell
-        salon={{ name: membership.salons.name, slug, niche: membership.salons.niche }}
+        salon={{ id: membership.salon_id, name: membership.salons.name, slug, niche: membership.salons.niche }}
         role={membership.role}
         groups={groups}
         isPlatformAdmin={!!isPlatformAdmin}
