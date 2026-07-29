@@ -76,10 +76,12 @@ type SendState =
  * explica em vez de mostrar erro genérico.
  */
 const SEND_ERRORS: Record<string, string> = {
-  opt_out: "Esse cliente pediu para não receber mensagens.",
+  opt_out: "Esse cliente pediu para não receber mensagens. Dá pra religar na ficha dele.",
   sem_telefone: "O telefone cadastrado não é um celular válido.",
-  ja_chamado: "Você já chamou esse cliente nos últimos 21 dias.",
-  limite_semanal: "Esse cliente já recebeu 4 mensagens nesta semana.",
+  ja_chamado:
+    "Você já chamou esse cliente nos últimos 21 dias. Insistir antes disso costuma virar bloqueio, não retorno.",
+  limite_semanal:
+    "Esse cliente já recebeu 4 mensagens do salão nesta semana — é o limite que protege o número de ser bloqueado.",
   sem_template: "Não há mensagem cadastrada para esse caso.",
   cliente_invalido: "Cliente não encontrado neste salão.",
 };
@@ -453,21 +455,27 @@ export function RecuperarManager({
         </label>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      {/* Tabs — três colunas iguais em vez de largura pelo conteúdo, que no
+          celular empurrava "Inativos" pra fora da tela. O ícone sai no
+          celular: com o rótulo ao lado ele não informa nada, e é justamente a
+          largura que estava faltando. */}
+      <div className="grid grid-cols-3 border-b border-border">
         {TABS.map((t) => {
           const count = data[t.id].length;
+          const on = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-                tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+              aria-current={on ? "page" : undefined}
+              className={`flex items-center justify-center gap-1.5 px-1 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition sm:text-sm ${
+                on ? "border-primary text-primary" : "border-transparent text-muted-foreground"
               }`}
             >
-              <t.icon className="h-4 w-4" /> {t.label}
+              <t.icon className="hidden h-4 w-4 shrink-0 sm:block" />
+              <span className="truncate">{t.label}</span>
               {count > 0 && (
-                <span className="ml-0.5 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                <span className="shrink-0 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
                   {count}
                 </span>
               )}
