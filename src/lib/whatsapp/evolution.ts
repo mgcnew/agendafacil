@@ -28,6 +28,12 @@ export type QrCode = {
    * exibido nesse mesmo celular — pra essa pessoa, é o único caminho.
    */
   pairingCode: string | null;
+  /**
+   * Nomes dos campos que a Evolution devolveu — nunca os valores.
+   * Diagnóstico: quando o código de pareamento não vem, é o que diz se ela
+   * ignorou o parâmetro `number` ou respondeu outra coisa.
+   */
+  campos?: string[];
 };
 
 /** Erro da Evolution com o status HTTP preservado, pra decidir sem regex. */
@@ -102,7 +108,10 @@ function normalizeState(raw: string | undefined): ConnectionState {
  * Idempotente: se a instância já existe, a Evolution devolve 403/409 e nós
  * seguimos — só sem QR, que o chamador busca com getQrCode.
  */
-export async function createInstance(instanceName: string): Promise<QrCode | null> {
+export async function createInstance(
+  instanceName: string,
+  number?: string | null,
+): Promise<QrCode | null> {
   try {
     const data = await call<{
       qrcode?: { base64?: string; pairingCode?: string };
@@ -112,6 +121,9 @@ export async function createInstance(instanceName: string): Promise<QrCode | nul
         instanceName,
         integration: "WHATSAPP-BAILEYS",
         qrcode: true,
+        // Com número, a criação já devolve o código de pareamento — é o
+        // caminho documentado da v2 e o mais confiável dos dois.
+        ...(number ? { number } : {}),
       },
     });
 
@@ -159,7 +171,14 @@ export async function getQrCode(
       throw new EvolutionError(409, "instancia_ja_conectada");
     }
 
-    ultimo = { base64: data.base64 ?? null, pairingCode: data.pairingCode ?? null };
+    ultimo = {
+      base64: data.base64 ?? null,
+      pairingCode: data.pairingCode ?? null,
+      // Só os nomes dos campos, nunca os valores: o base64 é enorme e o
+      // pairingCode é credencial. Serve pra saber o que a Evolution mandou
+      // quando ela não manda o que a gente espera.
+      campos: Object.keys(data ?? {}),
+    };
 
     // Com número, o que interessa é o código: sair no primeiro QR devolveria a
     // tela errada pra quem escolheu conectar pelo telefone.

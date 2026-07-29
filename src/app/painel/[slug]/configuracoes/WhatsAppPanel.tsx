@@ -161,7 +161,13 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
             : data.error === "telefone_invalido"
             ? "Confira o número: precisa ser um celular com DDD, como (11) 98765-4321."
             : data.error === "codigo_indisponivel"
-            ? "O WhatsApp não devolveu o código agora. Tente de novo em alguns segundos."
+            ? // O detalhe técnico vai junto de propósito: é uma tela de dono,
+              // e sem ele não dá pra saber por que o código não veio.
+              `O WhatsApp não devolveu o código para esse número. Use o QR code acima. ${
+                Array.isArray(data.campos) && data.campos.length
+                  ? `(resposta do servidor: ${data.campos.join(", ")})`
+                  : ""
+              }`.trim()
             : "Não foi possível gerar o código agora. Tente de novo em alguns segundos.",
         );
         return;

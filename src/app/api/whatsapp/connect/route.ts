@@ -41,10 +41,12 @@ export async function POST(req: Request) {
 
   try {
     // A criação já abre o socket e emite o primeiro código: aproveitá-lo evita
-    // a corrida que fazia a segunda instância nascer sem QR. Quando o pedido é
-    // por código, não serve — o QR da criação não vem vinculado ao número.
-    let qr: QrCode | null = numero ? null : await createInstance(instanceName);
-    if (numero) await createInstance(instanceName);
+    // a corrida que fazia a segunda instância nascer sem QR. Com número, ela
+    // também é o caminho documentado pro código de pareamento.
+    // Instância que já existia devolve null na criação; o objeto vazio evita
+    // ficar checando null em cada uso daqui pra baixo.
+    const vazio: QrCode = { base64: null, pairingCode: null };
+    let qr: QrCode = (await createInstance(instanceName, numero)) ?? vazio;
 
     // Antes do QR chegar ao usuário: assim que o aparelho parear, a instância
     // já está apontada pra nós e a primeira resposta do cliente não se perde.
@@ -57,19 +59,25 @@ export async function POST(req: Request) {
       console.error("setWebhook falhou", instanceName, (e as Error).message);
     }
 
-    // Instância que já existia não devolve QR na criação; aí sim se pede.
-    if (!qr?.base64 && !qr?.pairingCode) {
+    // Instância que já existia não devolve nada na criação; aí sim se pede.
+    // Com número, insiste até vir o código — o QR não substitui.
+    if (numero ? !qr.pairingCode : !qr.base64 && !qr.pairingCode) {
       qr = await getQrCode(instanceName, { number: numero });
     }
 
-    if (!qr.base64 && !qr.pairingCode) {
-      // Com número pedido e nada de volta, o problema é específico: a Evolution
-      // não emitiu o código de pareamento. Dizer "sem QR" mandaria a pessoa
-      // procurar no lugar errado.
+    // Quem pediu código e recebeu só QR precisa ouvir isso. Antes o QR passava
+    // pela checagem e a tela voltava sem código e sem explicação — a pessoa
+    // clicava de novo achando que não tinha clicado direito.
+    if (numero && !qr.pairingCode) {
+      console.error("pairingCode ausente", instanceName, "campos:", qr.campos);
       return NextResponse.json(
-        { error: numero ? "codigo_indisponivel" : "qr_indisponivel" },
+        { error: "codigo_indisponivel", campos: qr.campos ?? [] },
         { status: 503 },
       );
+    }
+
+    if (!qr.base64 && !qr.pairingCode) {
+      return NextResponse.json({ error: "qr_indisponivel" }, { status: 503 });
     }
 
     const admin = createAdminClient();
