@@ -3,7 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { guardWhatsApp } from "@/lib/whatsapp/guard";
 import {
   createInstance,
+  deleteInstance,
   EvolutionError,
+  getConnectionState,
   getQrCode,
   setWebhook,
   type QrCode,
@@ -40,6 +42,21 @@ export async function POST(req: Request) {
   }
 
   try {
+    // O socket do Baileys nasce em modo QR ou em modo código de pareamento e
+    // não troca depois. Pedir o código de uma instância que já existe (criada
+    // sem número) devolve QR pra sempre — era exatamente o que acontecia.
+    // Recriar é o único caminho.
+    if (numero) {
+      const estado = await getConnectionState(instanceName);
+      // Só se pode apagar o que não está pareado. Numa instância conectada
+      // isso derrubaria a sessão do salão pra gerar um código que ele nem
+      // precisa — quem já está conectado desconecta primeiro, de propósito.
+      if (estado === "connected") {
+        return NextResponse.json({ error: "ja_conectada" }, { status: 409 });
+      }
+      await deleteInstance(instanceName);
+    }
+
     // A criação já abre o socket e emite o primeiro código: aproveitá-lo evita
     // a corrida que fazia a segunda instância nascer sem QR. Com número, ela
     // também é o caminho documentado pro código de pareamento.

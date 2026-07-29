@@ -323,15 +323,21 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
                     </Button>
                   </div>
                   <p className="mt-2 text-center text-xs text-muted-foreground">
-                    O número do aparelho que vai receber as mensagens.
+                    O número do aparelho que vai receber as mensagens. Gerar o
+                    código invalida o QR code acima.
                   </p>
                 </>
               )}
             </div>
 
-            <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-              <CircleNotch className="h-3 w-3 animate-spin" /> Aguardando conexão…
-            </p>
+            {/* Só quando há de fato um código na tela: antes aparecia junto do
+                formulário vazio e dava a impressão de que algo estava em
+                andamento quando nada tinha sido gerado. */}
+            {(qr || pairingCode) && (
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <CircleNotch className="h-3 w-3 animate-spin" /> Aguardando conexão…
+              </p>
+            )}
           </div>
         )}
 
