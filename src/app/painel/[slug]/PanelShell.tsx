@@ -523,18 +523,32 @@ export function PanelShell({
               )}
             </div>
 
-            {/* Rodapé fixo: sempre à mostra (Configurações, Compartilhar, Sair) */}
-            <div className="shrink-0 border-t border-border/60 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
+            {/* Rodapé fixo: sempre à mostra. Em linha, não empilhado — as quatro
+                ações ocupavam ~180px de altura para dizer o que quatro ícones
+                com legenda dizem em 80px, e o que sobra vira grade de páginas
+                visível sem rolar.
+
+                Sem fundo nos itens (diferente das páginas acima): a grade são
+                lugares, esta linha são ações. O contraste de tratamento é o que
+                evita ler a barra como "mais cinco telas". */}
+            <div
+              className={cn(
+                "shrink-0 grid gap-1 border-t border-border/60 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+                isPlatformAdmin ? "grid-cols-4" : "grid-cols-3",
+              )}
+            >
               {isPlatformAdmin && (
                 <Link
                   href="/admin"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-foreground/80 hover:bg-muted transition"
+                  className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-muted"
                 >
-                  <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-muted text-foreground/70">
+                  <span className="grid place-items-center h-9 w-9 rounded-full bg-muted text-foreground/70">
                     <ShieldCheck className="h-[18px] w-[18px]" />
                   </span>
-                  Painel da plataforma
+                  <span className="text-[10px] font-medium leading-tight text-center text-foreground/75">
+                    Plataforma
+                  </span>
                 </Link>
               )}
               {settingsItem && (
@@ -542,36 +556,47 @@ export function PanelShell({
                   href={base + settingsItem.href}
                   onClick={() => setOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium transition",
-                    isActive(settingsItem.href) ? "bg-primary/10 text-primary" : "text-foreground/80 hover:bg-muted",
+                    "flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97]",
+                    isActive(settingsItem.href) ? "bg-primary/10" : "hover:bg-muted",
                   )}
                 >
                   <span className={cn(
-                    "grid place-items-center h-9 w-9 rounded-[var(--radius)]",
-                    isActive(settingsItem.href) ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+                    "grid place-items-center h-9 w-9 rounded-full",
+                    isActive(settingsItem.href) ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
                   )}>
-                    <Gear className="h-[18px] w-[18px]" />
+                    <Gear className="h-[18px] w-[18px]" weight={isActive(settingsItem.href) ? "fill" : "regular"} />
                   </span>
-                  {settingsItem.label}
+                  <span className={cn(
+                    "text-[10px] font-medium leading-tight text-center",
+                    isActive(settingsItem.href) ? "text-primary" : "text-foreground/75",
+                  )}>
+                    {settingsItem.label}
+                  </span>
                 </Link>
               )}
               <button
                 onClick={() => { setOpen(false); sharePublic(); }}
-                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition"
+                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-primary/10"
               >
-                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-primary/10 text-primary">
+                <span className="grid place-items-center h-9 w-9 rounded-full bg-primary/10 text-primary">
                   <ShareNetwork className="h-[18px] w-[18px]" />
                 </span>
-                Compartilhar link
+                <span className="text-[10px] font-medium leading-tight text-center text-primary">
+                  Compartilhar
+                </span>
               </button>
+              {/* Sair fica em vermelho e no canto: é a única ação da linha que
+                  não dá pra desfazer com um toque de volta. */}
               <button
                 onClick={logout}
-                className="w-full flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition"
+                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-red-500/10"
               >
-                <span className="grid place-items-center h-9 w-9 rounded-[var(--radius)] bg-red-500/10 text-red-600">
+                <span className="grid place-items-center h-9 w-9 rounded-full bg-red-500/10 text-red-600">
                   <SignOut className="h-[18px] w-[18px]" />
                 </span>
-                Sair
+                <span className="text-[10px] font-medium leading-tight text-center text-red-600">
+                  Sair
+                </span>
               </button>
             </div>
           </div>
