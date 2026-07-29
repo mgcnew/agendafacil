@@ -18,11 +18,11 @@ import type { TodaySignals, LateClient } from "@/components/AgendaSignalsBanner"
 export async function collectAgendaTodaySignals(
   supabase: SupabaseClient,
   salonId: string,
-): Promise<TodaySignals> {
+): Promise<TodaySignals & { waiting: number }> {
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
 
-  const [{ data: todayAppts }, { data: activePros }, { data: proSvcRows }] = await Promise.all([
+  const [{ data: todayAppts }, { data: activePros }, { data: proSvcRows }, { count: waiting }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, starts_at, status, clients(full_name, phone)")
@@ -31,6 +31,14 @@ export async function collectAgendaTodaySignals(
       .lt("starts_at", endDay),
     supabase.from("salon_members").select("id").eq("salon_id", salonId).eq("is_active", true),
     supabase.from("professional_services").select("member_id").eq("salon_id", salonId),
+    // Quem pediu pra ser chamado se abrir vaga. É o que transforma "cancelou
+    // um horário" em ação concreta em vez de um aviso solto.
+    supabase
+      .from("appointment_waitlist")
+      .select("id", { count: "exact", head: true })
+      .eq("salon_id", salonId)
+      .eq("status", "waiting")
+      .gte("preferred_date", todayStrForWaitlist()),
   ]);
 
   type TodayAppt = {
@@ -66,5 +74,11 @@ export async function collectAgendaTodaySignals(
   const slots = new Set<string>();
   for (const r of availability) for (const slot of (r.data as string[] | null) ?? []) slots.add(slot);
 
-  return { cancelled, lateClients, emptySlots: slots.size, estimatedRevenue: null };
+  return { cancelled, lateClients, emptySlots: slots.size, estimatedRevenue: null, waiting: waiting ?? 0 };
+}
+
+/** Data de hoje no fuso do Brasil, no formato da coluna `preferred_date`. */
+function todayStrForWaitlist() {
+  const { year, month, day } = todayInBR();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }

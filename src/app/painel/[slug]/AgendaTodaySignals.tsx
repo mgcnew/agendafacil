@@ -25,13 +25,16 @@ export async function AgendaTodaySignalsAsync({
   salonId: string;
   slug: string;
 }) {
-  const signals = await collectAgendaTodaySignals(supabase, salonId);
+  const { waiting, ...signals } = await collectAgendaTodaySignals(supabase, salonId);
   // Marcador invisível: acende a bolinha do ícone quando há algo pra ver.
-  const has = signals.cancelled > 0 || signals.lateClients.length > 0 || signals.emptySlots > 0;
+  // Hor��rio livre sozinho não conta mais — o banner também deixou de mostrá-lo,
+  // e uma bolinha acesa todo dia é tão ignorável quanto um card fixo.
+  const has =
+    signals.cancelled > 0 || signals.lateClients.length > 0 || (signals.emptySlots > 0 && waiting > 0);
   return (
     <>
       {has && <span data-gestor-signal hidden />}
-      <AgendaSignalsBanner signals={signals} slug={slug} />
+      <AgendaSignalsBanner signals={signals} slug={slug} waiting={waiting} />
     </>
   );
 }

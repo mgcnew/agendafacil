@@ -210,7 +210,6 @@ export function RecuperarManager({
 
   const coupon = campaigns.find((c) => c.id === couponId) ?? null;
   const q = query.toLowerCase().trim();
-  const list = data[tab].filter((c) => !q || c.name.toLowerCase().includes(q));
 
   function message(c: WinbackClient, bucket: Bucket = tab): string {
     const couponTxt = coupon
@@ -300,6 +299,17 @@ export function RecuperarManager({
   const priorityPick = pickPriority(data);
   const suggestCampaign = data.inactive.length >= REACTIVATION_CAMPAIGN_MIN_INACTIVE;
 
+  // O destaque só vale na aba dele: "comece pelo Marcos" enquanto se olha
+  // Cancelaram, com o Marcos em Faltaram, não ajuda ninguém.
+  const destaqueId = priorityPick?.bucket === tab ? priorityPick.client.client_id : null;
+
+  // A prioridade sobe pro topo em vez de virar card acima da lista.
+  const list = data[tab]
+    .filter((c) => !q || c.name.toLowerCase().includes(q))
+    .sort((a, b) =>
+      a.client_id === destaqueId ? -1 : b.client_id === destaqueId ? 1 : 0,
+    );
+
   return (
     <div className="space-y-6 af-rise">
       <header>
@@ -330,59 +340,27 @@ export function RecuperarManager({
         </div>
       )}
 
-      {/* De olho na recuperação — regras diretas, sem IA, sempre refletem o dado carregado */}
-      {(priorityPick || suggestCampaign) && (
-        <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-              <Sparkle className="h-3.5 w-3.5" />
-            </span>
-            <p className="text-sm font-semibold">De olho na recuperação</p>
-          </div>
+      {/* A prioridade virou a PRIMEIRA LINHA da lista, não um card acima dela.
+          O card repetia a função da lista logo abaixo — dizia "chame o Marcos"
+          com o Marcos aparecendo de novo três centímetros depois. Agora a
+          resposta e a ação moram no mesmo lugar.
 
-          {priorityPick && (
-            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
-              <p className="text-sm">{priorityPick.headline}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    waLink(priorityPick.client.phone, "") === null ||
-                    !!sendState[priorityPick.client.client_id]
-                  }
-                  onClick={() => void chamar(priorityPick.client, priorityPick.bucket)}
-                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                >
-                  {sendState[priorityPick.client.client_id]?.status === "sending" ? (
-                    <CircleNotch className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <WhatsappLogo className="h-4 w-4" />
-                  )}
-                  Chamar {firstName(priorityPick.client.name)}
-                </Button>
-                {waLink(priorityPick.client.phone, "") === null && (
-                  <span className="text-xs text-muted-foreground">sem telefone cadastrado</span>
-                )}
-              </div>
-              <SendFeedback state={sendState[priorityPick.client.client_id]} />
-            </div>
-          )}
-
-          {suggestCampaign && (
-            <div className="rounded-[var(--radius)] border border-border bg-background p-3">
-              <p className="flex items-center gap-1.5 text-sm">
-                <UserMinus className="h-4 w-4 shrink-0 text-primary" />
-                {data.inactive.length} clientes estão inativos há mais de {inactiveDays} dias. Uma campanha de reativação pode trazer parte deles de volta.
-              </p>
-              <Link
-                href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent("Volta pra cá")}&desconto=15`}
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-              >
-                <SealPercent className="h-3.5 w-3.5" /> Criar campanha de reativação
-              </Link>
-            </div>
-          )}
+          Sobrou só a sugestão de campanha, que é de outra natureza: fala do
+          GRUPO (dezenas de inativos), não de uma pessoa da lista, e só aparece
+          a partir de 5 — é episódica de verdade. */}
+      {suggestCampaign && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius)] border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-sm">
+          <UserMinus className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            <b>{data.inactive.length} clientes</b> inativos há mais de {inactiveDays} dias — chamar um a
+            um dá trabalho.
+          </span>
+          <Link
+            href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent("Volta pra cá")}&desconto=15`}
+            className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
+          >
+            <SealPercent className="h-3.5 w-3.5" /> Criar campanha
+          </Link>
         </div>
       )}
 
@@ -508,15 +486,23 @@ export function RecuperarManager({
             const hasPhone = waLink(c.phone, "") !== null;
             const risky = (c.total_no_shows ?? 0) >= 2;
             const send = sendState[c.client_id];
+            const destaque = c.client_id === destaqueId;
             return (
               <div
                 key={c.client_id}
-                className="rounded-[var(--radius)] border border-border bg-card p-3.5"
+                className={`rounded-[var(--radius)] border bg-card p-3.5 ${
+                  destaque ? "border-primary/35 ring-1 ring-primary/15" : "border-border"
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium truncate">{c.name}</p>
+                      {destaque && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                          <Sparkle className="h-3 w-3" weight="fill" /> Comece por aqui
+                        </span>
+                      )}
                       {risky && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5">
                           <Warning className="h-3 w-3" /> {c.total_no_shows} faltas
@@ -529,6 +515,11 @@ export function RecuperarManager({
                         : `${tab === "no_shows" ? "Faltou" : "Cancelou"} em ${c.last_at ? formatDate(c.last_at) : "—"}`}
                       {!hasPhone && " · sem telefone"}
                     </p>
+                    {/* O porquê do destaque acompanha a pessoa, em vez de morar
+                        num card separado que repetia o nome dela logo acima. */}
+                    {destaque && priorityPick && (
+                      <p className="mt-1 text-xs text-primary">{priorityPick.headline}</p>
+                    )}
                   </div>
                   <Button
                     size="sm"

@@ -11,6 +11,7 @@ import {
   ChatCircle,
   CalendarX,
   XCircle,
+  BellRinging,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   getOrGenerateDashboardInsights,
@@ -46,6 +47,7 @@ const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   service_dormant: CalendarX,
   product_dormant: CalendarX,
   recent_no_shows: XCircle,
+  reminder_off: BellRinging,
   general: Sparkle,
 };
 
@@ -87,6 +89,10 @@ function hrefFor(slug: string, type: InsightType): string | null {
       return `/painel/${slug}/servicos`;
     case "recent_no_shows":
       return `/painel/${slug}/recuperar`;
+    // Direto na aba onde está o interruptor, não na página de configurações
+    // genérica: o aviso perde a força se ainda der trabalho encontrar.
+    case "reminder_off":
+      return `/painel/${slug}/configuracoes?tab=whatsapp`;
     default:
       return null;
   }

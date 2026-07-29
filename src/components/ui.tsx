@@ -42,7 +42,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 /* ---------------- Card ---------------- */
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+// ComponentPropsWithRef e não HTMLAttributes: no React 19 `ref` é prop normal
+// de componente de função, e sem isto o tipo recusa `ref` em quem precisa
+// rolar até um Card (ex.: a lista de espera na Agenda).
+export function Card({ className, ...props }: React.ComponentPropsWithRef<"div">) {
   return (
     <div
       className={cn(

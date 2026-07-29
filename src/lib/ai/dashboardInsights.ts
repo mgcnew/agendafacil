@@ -22,6 +22,7 @@ export type InsightType =
   | "service_dormant"
   | "product_dormant"
   | "recent_no_shows"
+  | "reminder_off"
   | "general";
 
 export type Insight = {
@@ -84,7 +85,7 @@ const TOOL_SCHEMA = {
                 type: "string",
                 enum: [
                   "reactivation", "birthday", "package_expiring", "package_dormant", "revenue", "low_stock",
-                  "service_dormant", "product_dormant", "recent_no_shows", "general",
+                  "service_dormant", "product_dormant", "recent_no_shows", "reminder_off", "general",
                 ],
               },
               title: { type: "string", description: "Frase curta, até 60 caracteres." },
@@ -140,6 +141,13 @@ const STUB: Record<Signal["key"], { type: InsightType; title: (c: number) => str
   recent_no_shows: {
     type: "recent_no_shows",
     title: (c) => `${c} falta${c === 1 ? "" : "s"} recente${c === 1 ? "" : "s"} sem remarcar`,
+    priority: "alta",
+  },
+  // Prioridade alta e título no imperativo: não é uma observação, é um
+  // interruptor pronto que resolve o problema listado logo acima.
+  reminder_off: {
+    type: "reminder_off",
+    title: () => "Ligue a confirmação da véspera",
     priority: "alta",
   },
 };

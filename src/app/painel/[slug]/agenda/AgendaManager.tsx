@@ -141,6 +141,16 @@ const totalHeight = (b: Bounds) => (b.end - b.start) * CELL_H;
 // ── Date helpers ───────────────────────────────────────────────
 const isToday = (s: string) => s === toStr(new Date());
 
+/** "Hoje" / "Amanhã" / "Sex, 31/07" — usado na lista de espera, que passou a
+ *  cobrir mais de um dia e precisa dizer de qual dia é cada pessoa. */
+function rotuloDia(s: string) {
+  const hoje = toStr(new Date());
+  if (s === hoje) return "Hoje";
+  if (s === addDays(hoje, 1)) return "Amanhã";
+  const d = parse(s);
+  return `${DAY_SHORT[d.getDay()]}, ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function addDays(s: string, n: number) {
   const d = parse(s); d.setDate(d.getDate() + n); return toStr(d);
 }
@@ -1318,6 +1328,7 @@ export function AgendaManager({
   const [detailAppt, setDetailAppt] = useState<Appt | null>(null);
   const [finalizing, setFinalizing] = useState<Appt | null>(null);
   const [waitlist, setWaitlist]     = useState<WaitlistEntry[]>([]);
+  const esperaRef = useRef<HTMLDivElement>(null);
   const [removingWaitlistId, setRemovingWaitlistId] = useState<string | null>(null);
   const [convertingWaitlistId, setConvertingWaitlistId] = useState<string | null>(null);
 
@@ -1417,18 +1428,23 @@ export function AgendaManager({
 
   // Lista de espera do dia selecionado — só faz sentido na visão "dia" (a
   // cliente pede um dia, não um horário exato).
+  // Hoje em diante, não só o dia aberto: quem pediu vaga pra amanhã ficava
+  // invisível hoje, e o bloco inteiro sumia fora da visão "dia" — ou seja, a
+  // pessoa que PEDIU pra ser chamada só existia se o dono estivesse olhando
+  // exatamente a data dela, na visão certa.
   const loadWaitlist = useCallback(async () => {
     const { data } = await supabase
       .from("appointment_waitlist")
       .select("id, client_id, member_id, service_ids, preferred_date, notes, clients(full_name, phone)")
       .eq("salon_id", salonId)
-      .eq("preferred_date", date)
+      .gte("preferred_date", toStr(new Date()))
       .eq("status", "waiting")
+      .order("preferred_date")
       .order("created_at");
     setWaitlist((data as unknown as WaitlistEntry[]) ?? []);
-  }, [supabase, salonId, date]);
+  }, [supabase, salonId]);
 
-  useEffect(() => { if (view === "dia") loadWaitlist(); }, [view, loadWaitlist]);
+  useEffect(() => { loadWaitlist(); }, [loadWaitlist]);
 
   async function removeWaitlistEntry(id: string) {
     if (!window.confirm("Remover essa pessoa da lista de espera?")) return;
@@ -1705,13 +1721,23 @@ export function AgendaManager({
       )}
 
       {/* ── Sinais de hoje (cancelamento, atraso, vazios) ─── */}
-      <AgendaSignalsBanner signals={todaySignals} slug={slug} />
+      <AgendaSignalsBanner
+        signals={todaySignals}
+        slug={slug}
+        waiting={waitlist.length}
+        onShowWaitlist={
+          waitlist.length > 0
+            ? () => esperaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+            : undefined
+        }
+      />
 
-      {/* ── Lista de espera do dia ──────────────────────── */}
-      {view === "dia" && waitlist.length > 0 && (
-        <Card className="p-4 space-y-3 border-amber-300/60 bg-amber-500/5">
+      {/* ── Lista de espera ─────────────────────────────── */}
+      {waitlist.length > 0 && (
+        <Card ref={esperaRef} className="p-4 space-y-3 border-amber-300/60 bg-amber-500/5">
           <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-700">
-            <Clock className="h-4 w-4" /> {waitlist.length} na lista de espera hoje
+            <Clock className="h-4 w-4" />
+            {waitlist.length === 1 ? "1 pessoa esperando vaga" : `${waitlist.length} pessoas esperando vaga`}
           </p>
           <div className="space-y-2">
             {waitlist.map((w) => {
@@ -1725,6 +1751,11 @@ export function AgendaManager({
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{w.clients?.full_name ?? "Cliente"}</p>
                     <p className="text-xs text-muted-foreground truncate">
+                      {/* Agora que a lista passa de um dia, o dia PRECISA
+                          aparecer — sem ele não dá pra saber pra quando a
+                          pessoa está esperando. */}
+                      {rotuloDia(w.preferred_date)}
+                      {" · "}
                       {proName ?? "Qualquer profissional"}{svcNames ? ` · ${svcNames}` : ""}
                       {w.clients?.phone ? ` · ${w.clients.phone}` : ""}
                     </p>

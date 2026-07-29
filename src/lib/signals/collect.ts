@@ -38,6 +38,7 @@ export async function collectSignals(
     { data: serviceInsightRaw },
     { data: productInsightRaw },
     { data: winbackRaw },
+    { data: whatsappRaw },
   ] = await Promise.all([
     supabase
       .from("appointments")
@@ -57,6 +58,11 @@ export async function collectSignals(
     supabase.rpc("service_insights" as never, { p_salon: salonId } as never),
     supabase.rpc("product_movement_stats" as never, { p_salon: salonId } as never),
     supabase.rpc("marketing_winback" as never, { p_salon: salonId } as never),
+    supabase
+      .from("whatsapp_instances")
+      .select("status, send_reminder_confirm")
+      .eq("salon_id", salonId)
+      .maybeSingle(),
   ]);
 
   // ── Contexto (tom, não é aviso) ──────────────────────────────────────────
@@ -177,6 +183,22 @@ export async function collectSignals(
       key: "recent_no_shows",
       count: noShowCount,
       fact: `${noShowCount} cliente${noShowCount === 1 ? "" : "s"} faltou recentemente sem remarcar`,
+    });
+  }
+
+  // ── Lembrete de confirmação desligado, com faltas acontecendo ────────────
+  // O aviso mais valioso do sistema é o que ele não estava dando: existe uma
+  // confirmação automática na véspera, pronta e desligada, e falta é justamente
+  // o que ela evita. Só aparece quando as duas coisas são verdade ao mesmo
+  // tempo — sem faltas, ligar ou não é preferência do salão, não problema.
+  const whats = whatsappRaw as { status: string; send_reminder_confirm: boolean } | null;
+  if (noShowCount > 0 && whats?.status === "connected" && !whats.send_reminder_confirm) {
+    signals.push({
+      key: "reminder_off",
+      count: noShowCount,
+      fact:
+        `${noShowCount} cliente${noShowCount === 1 ? " faltou" : "s faltaram"} recentemente e a confirmação ` +
+        `automática da véspera está DESLIGADA nas configurações do WhatsApp`,
     });
   }
 

@@ -10,7 +10,8 @@ export type SignalKey =
   | "low_stock"
   | "service_dormant"
   | "product_dormant"
-  | "recent_no_shows";
+  | "recent_no_shows"
+  | "reminder_off";
 
 export type Signal = {
   key: SignalKey;

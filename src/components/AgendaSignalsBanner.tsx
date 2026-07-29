@@ -4,6 +4,7 @@ import {
   ArrowSquareOut,
   CalendarDots,
   CalendarX,
+  CaretDown,
   ChatCircle,
   ClockCountdown,
   Sparkle,
@@ -45,16 +46,54 @@ function lateReminderUrl(client: LateClient) {
 }
 
 /**
+ * Atalho pra lista de espera. Dentro da Agenda o bloco já está na tela, então
+ * rola até ele; no Dashboard não existe, e aí vira link.
+ */
+function WaitlistAction({ slug, onShowWaitlist }: { slug: string; onShowWaitlist?: () => void }) {
+  const classe =
+    "mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline";
+  return onShowWaitlist ? (
+    <button type="button" onClick={onShowWaitlist} className={classe}>
+      Ver quem está esperando <CaretDown className="h-3 w-3" />
+    </button>
+  ) : (
+    <Link href={`/painel/${slug}/agenda`} className={classe}>
+      Ver quem está esperando <ArrowSquareOut className="h-3 w-3" />
+    </Link>
+  );
+}
+
+/**
  * Banner de sinais do dia — regra direta, sem IA (v1/v2 do roadmap, ver
  * docs/produto/zulan-2.0-roadmap-ia.md). Fala como alguém da equipe avisando
  * o dono, sempre propondo uma ação de 1 clique (nunca só o número cru) — o
  * clique do dono É a autorização; nada é enviado sozinho.
  * Some por completo se não houver nada relevante.
  */
-export function AgendaSignalsBanner({ signals, slug }: { signals: TodaySignals | null; slug: string }) {
+export function AgendaSignalsBanner({
+  signals,
+  slug,
+  waiting = 0,
+  onShowWaitlist,
+}: {
+  signals: TodaySignals | null;
+  slug: string;
+  /** Quantas pessoas pediram pra ser chamadas se abrir vaga (hoje em diante).
+   *  Prop separada porque vem de outra consulta, viva, e não do mesmo
+   *  cálculo dos sinais do dia. */
+  waiting?: number;
+  /** Na Agenda, leva até o bloco da lista de espera. Ausente no Dashboard, que
+   *  não tem o bloco — lá o botão vira link pra Agenda. */
+  onShowWaitlist?: () => void;
+}) {
   if (!signals) return null;
   const { cancelled, lateClients, emptySlots, estimatedRevenue } = signals;
-  if (cancelled === 0 && lateClients.length === 0 && emptySlots === 0) return null;
+
+  // Horário livre sozinho NÃO é aviso: é o estado normal de quase todo dia, e
+  // um alerta que aparece sempre vira mobília — a pessoa para de ler. Só vira
+  // notícia quando existe alguém esperando vaga, porque aí há o que fazer.
+  const mostrarVazios = emptySlots > 0 && waiting > 0;
+  if (cancelled === 0 && lateClients.length === 0 && !mostrarVazios) return null;
 
   return (
     <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
@@ -108,31 +147,38 @@ export function AgendaSignalsBanner({ signals, slug }: { signals: TodaySignals |
               {cancelled === 1
                 ? "Um horário cancelou hoje e ficou livre."
                 : `${cancelled} horários cancelaram hoje e ficaram livres.`}{" "}
-              Posso te mostrar quem pode vir no lugar.
+              {waiting > 0
+                ? waiting === 1
+                  ? "Tem 1 pessoa esperando vaga."
+                  : `Tem ${waiting} pessoas esperando vaga.`
+                : "Posso te mostrar quem pode vir no lugar."}
             </p>
-            <Link
-              href={`/painel/${slug}/recuperar`}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              Ver clientes pra chamar <ArrowSquareOut className="h-3 w-3" />
-            </Link>
+            {/* Quem está na lista de espera PEDIU pra ser chamado. Mandar pro
+                Recuperar nessa hora era a porta errada: lá estão os que
+                sumiram, que não pediram nada. Só cai no Recuperar quando não
+                há ninguém esperando. */}
+            {waiting > 0 ? (
+              <WaitlistAction slug={slug} onShowWaitlist={onShowWaitlist} />
+            ) : (
+              <Link
+                href={`/painel/${slug}/recuperar`}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                Ver clientes pra chamar <ArrowSquareOut className="h-3 w-3" />
+              </Link>
+            )}
           </div>
         )}
 
-        {emptySlots > 0 && (
+        {mostrarVazios && (
           <div className="rounded-[var(--radius)] border border-border bg-background p-3">
             <p className="flex items-center gap-1.5 text-sm">
               <CalendarDots className="h-4 w-4 shrink-0 text-primary" />
               Ainda {emptySlots === 1 ? "tem 1 horário livre" : `tem ${emptySlots} horários livres`} hoje
               {estimatedRevenue !== null ? ` — algo em torno de ${formatBRL(estimatedRevenue)} se preencher tudo.` : "."}{" "}
-              Quer que eu sugira algum cliente parado pra esses horários?
+              {waiting === 1 ? "E tem 1 pessoa na lista de espera." : `E tem ${waiting} pessoas na lista de espera.`}
             </p>
-            <Link
-              href={`/painel/${slug}/recuperar`}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              Ver quem chamar <ArrowSquareOut className="h-3 w-3" />
-            </Link>
+            <WaitlistAction slug={slug} onShowWaitlist={onShowWaitlist} />
           </div>
         )}
       </div>
