@@ -18,6 +18,8 @@ import { SubscribePanel } from "../assinatura/SubscribePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
+  ArrowLeft,
+  CaretRight,
   Check,
   CircleNotch,
   Clock,
@@ -48,15 +50,24 @@ type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
 
-const TAB_META: { id: TabId; label: string; icon: typeof Storefront; need: "salon" | "schedule" | "team" }[] = [
-  { id: "estabelecimento", label: "Estabelecimento", icon: Storefront, need: "salon" },
-  { id: "horarios", label: "Horários", icon: Clock, need: "schedule" },
-  { id: "agendamento", label: "Agendamento", icon: LinkSimple, need: "salon" },
-  { id: "caixa", label: "Caixa", icon: Wallet, need: "salon" },
-  { id: "acessos", label: "Acessos", icon: ShieldCheck, need: "team" },
-  { id: "aparencia", label: "Aparência", icon: Palette, need: "salon" },
-  { id: "whatsapp", label: "WhatsApp", icon: WhatsappLogo, need: "salon" },
-  { id: "assinatura", label: "Assinatura", icon: CreditCard, need: "salon" },
+// A descrição não é enfeite: com oito seções, o rótulo sozinho não diz onde
+// mexer no horário de almoço ou onde trocar a cor. Ela é o que evita entrar em
+// três seções até achar a certa.
+const TAB_META: {
+  id: TabId;
+  label: string;
+  hint: string;
+  icon: typeof Storefront;
+  need: "salon" | "schedule" | "team";
+}[] = [
+  { id: "estabelecimento", label: "Estabelecimento", hint: "Nome, endereço, contato e logo", icon: Storefront, need: "salon" },
+  { id: "horarios", label: "Horários", hint: "Dias e horários de atendimento", icon: Clock, need: "schedule" },
+  { id: "agendamento", label: "Agendamento", hint: "Link público e regras de reserva", icon: LinkSimple, need: "salon" },
+  { id: "caixa", label: "Caixa", hint: "Formas de pagamento e comissões", icon: Wallet, need: "salon" },
+  { id: "acessos", label: "Acessos", hint: "O que cada cargo pode ver e fazer", icon: ShieldCheck, need: "team" },
+  { id: "aparencia", label: "Aparência", hint: "Cores e tema da sua página", icon: Palette, need: "salon" },
+  { id: "whatsapp", label: "WhatsApp", hint: "Conexão e mensagens automáticas", icon: WhatsappLogo, need: "salon" },
+  { id: "assinatura", label: "Assinatura", hint: "Plano, cobrança e faturas", icon: CreditCard, need: "salon" },
 ];
 
 export function SettingsTabs({
@@ -100,85 +111,55 @@ export function SettingsTabs({
   );
 
   const validInitial = tabs.find((t) => t.id === initialTab)?.id;
-  const [active, setActive] = useState<TabId>(validInitial ?? tabs[0]?.id ?? "estabelecimento");
+
+  // `null` = nenhuma seção escolhida. No celular isso é a lista (padrão de
+  // app de configurações: toca, entra, volta); no desktop não existe estado
+  // vazio, então cai na primeira seção.
+  const [active, setActive] = useState<TabId | null>(validInitial ?? null);
+  const noDesktop = active ?? tabs[0]?.id ?? "estabelecimento";
+  const meta = TAB_META.find((t) => t.id === noDesktop);
 
   function selectTab(id: TabId) {
     setActive(id);
     router.replace(`${pathname}?tab=${id}`, { scroll: false });
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Configurações</h1>
-        <p className="text-muted-foreground text-sm">
-          Dados do salão, horários, agendamento e aparência.
-        </p>
-      </div>
+  function voltar() {
+    setActive(null);
+    router.replace(pathname, { scroll: false });
+  }
 
-      {/* Barra de tabs — mobile: pílulas com ícone (a ativa expande o rótulo);
-          desktop: abas sublinhadas com ícone + texto */}
-      <div className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
-        {tabs.map((t) => {
-          const on = active === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => selectTab(t.id)}
-              aria-label={t.label}
-              aria-current={on ? "page" : undefined}
-              className={cn(
-                "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
-                // Mobile (pílula)
-                "rounded-full px-3.5 py-2 text-sm",
-                on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-                // Desktop (aba sublinhada) — sobrescreve o visual de pílula
-                "sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-3.5 sm:py-2.5 sm:bg-transparent",
-                on
-                  ? "sm:border-primary sm:text-primary"
-                  : "sm:border-transparent sm:hover:bg-transparent sm:hover:text-foreground",
-              )}
-            >
-              <t.icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
-              <span className={cn("leading-none", on ? "inline" : "hidden", "sm:inline")}>
-                {t.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Painel ativo */}
-      {active === "estabelecimento" && (
-        <div className="space-y-5">
-          <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
-          <PushNotificationsCard salonId={salon.id} />
-          <BiometricCard />
-        </div>
-      )}
-      {active === "horarios" && (
-        <HoursManager salonId={salon.id} pros={pros} initialHours={initialHours} embedded />
-      )}
-      {active === "agendamento" && (
-        <BookingPanel salon={salon} canEdit={canEditSalon} />
-      )}
-      {active === "caixa" && (
-        <CashSettingsPanel salon={salon} canEdit={canEditSalon} />
-      )}
-      {active === "aparencia" && (
-        <AppearancePanel salon={salon} canEdit={canEditSalon} />
-      )}
-      {active === "acessos" && (
-        <AccessPanel
-          salonId={salon.id}
-          permissions={permissions}
-          roleDefaults={roleDefaults}
-          salonRolePerms={salonRolePerms}
-        />
-      )}
-      {active === "whatsapp" && <WhatsAppPanel slug={salon.slug} />}
-      {active === "assinatura" &&
-        (access ? (
+  function painel(id: TabId) {
+    switch (id) {
+      case "estabelecimento":
+        return (
+          <div className="space-y-5">
+            <EstablishmentPanel salon={salon} owner={owner} canEdit={canEditSalon} />
+            <PushNotificationsCard salonId={salon.id} />
+            <BiometricCard />
+          </div>
+        );
+      case "horarios":
+        return <HoursManager salonId={salon.id} pros={pros} initialHours={initialHours} embedded />;
+      case "agendamento":
+        return <BookingPanel salon={salon} canEdit={canEditSalon} />;
+      case "caixa":
+        return <CashSettingsPanel salon={salon} canEdit={canEditSalon} />;
+      case "aparencia":
+        return <AppearancePanel salon={salon} canEdit={canEditSalon} />;
+      case "acessos":
+        return (
+          <AccessPanel
+            salonId={salon.id}
+            permissions={permissions}
+            roleDefaults={roleDefaults}
+            salonRolePerms={salonRolePerms}
+          />
+        );
+      case "whatsapp":
+        return <WhatsAppPanel slug={salon.slug} />;
+      case "assinatura":
+        return access ? (
           <SubscribePanel
             slug={salon.slug}
             status={access.status}
@@ -191,7 +172,96 @@ export function SettingsTabs({
           <Card className="p-6 text-sm text-muted-foreground">
             Não foi possível carregar os dados da assinatura.
           </Card>
-        ))}
+        );
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho — no celular, dentro de uma seção ele vira o título dela,
+          com o voltar. Repetir "Configurações" ali gastaria a linha mais
+          valiosa da tela sem dizer onde a pessoa está. */}
+      <div className={cn(active ? "hidden lg:block" : "block")}>
+        <h1 className="font-display text-2xl font-bold">Configurações</h1>
+        <p className="text-muted-foreground text-sm">
+          Dados do salão, horários, agendamento e aparência.
+        </p>
+      </div>
+
+      {active && (
+        <div className="lg:hidden">
+          <button
+            onClick={voltar}
+            className="-ml-1 mb-3 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Configurações
+          </button>
+          <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
+          {meta?.hint && <p className="text-sm text-muted-foreground">{meta.hint}</p>}
+        </div>
+      )}
+
+      <div className="lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:gap-8 lg:items-start">
+        {/* ── Menu lateral (desktop) ────────────────────────────────────
+            Vertical em vez de barra horizontal: as oito seções cabem todas
+            na tela, com rótulo, sem rolagem lateral e sem adivinhar ícone. */}
+        <nav className="hidden lg:block lg:sticky lg:top-20">
+          <ul className="space-y-0.5">
+            {tabs.map((t) => {
+              const on = noDesktop === t.id;
+              return (
+                <li key={t.id}>
+                  <button
+                    onClick={() => selectTab(t.id)}
+                    aria-current={on ? "page" : undefined}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition",
+                      on
+                        ? "bg-secondary text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <t.icon
+                      className="h-[18px] w-[18px] shrink-0"
+                      weight={on ? "fill" : "regular"}
+                    />
+                    {t.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* ── Lista de seções (mobile) ──────────────────────────────── */}
+        <ul
+          className={cn(
+            "divide-y divide-border overflow-hidden rounded-[var(--radius)] border border-border bg-card lg:hidden",
+            active && "hidden",
+          )}
+        >
+          {tabs.map((t) => (
+            <li key={t.id}>
+              <button
+                onClick={() => selectTab(t.id)}
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
+                  <t.icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{t.label}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{t.hint}</span>
+                </span>
+                <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/* ── Conteúdo ──────────────────────────────────────────────── */}
+        <div className={cn("min-w-0", !active && "hidden lg:block")}>{painel(noDesktop)}</div>
+      </div>
     </div>
   );
 }
