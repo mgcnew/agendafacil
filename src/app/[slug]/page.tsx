@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -13,15 +14,26 @@ import { SITE_URL } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Next chama generateMetadata E o componente da página no MESMO request, e os
+ * dois precisam do salão. Sem memoizar, `public_salon` era executado duas
+ * vezes por visita — o pg_stat_statements mostrava o dobro de chamadas do que
+ * de páginas servidas. `cache()` vale por request, que é exatamente o escopo
+ * certo aqui: nada de dado velho entre visitantes.
+ */
+const getSalon = cache(async (slug: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("public_salon", { p_slug: slug });
+  return data?.[0] ?? null;
+});
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("public_salon", { p_slug: slug });
-  const salon = data?.[0];
+  const salon = await getSalon(slug);
 
   if (!salon) {
     return { title: "Salão não encontrado" };
@@ -57,10 +69,7 @@ export default async function SalonBookingPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-
-  const { data } = await supabase.rpc("public_salon", { p_slug: slug });
-  const salon = data?.[0];
+  const salon = await getSalon(slug);
   if (!salon) notFound();
 
   // Negócio local pro Google — só nos salões reais (demo não entra no índice).

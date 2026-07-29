@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getJwks } from "@/lib/supabase/jwks";
 import type { Tables, Enums } from "@/lib/database.types";
 
 export type Salon = Tables<"salons">;
@@ -17,13 +18,20 @@ export type MembershipWithSalon = Member & { salons: Salon };
  * Usa `getClaims()` em vez de `getUser()`: o middleware (proxy.ts) já valida e
  * renova a sessão a cada request, então aqui podemos ler o JWT *localmente* —
  * sem mais uma ida de rede ao servidor de auth do Supabase a cada navegação.
- * Para que a verificação seja realmente local (e rápida), habilite as chaves
- * de assinatura assimétricas do JWT no painel do Supabase.
+ *
+ * A JWKS é passada de fora ([[getJwks]]) porque o cache que a biblioteca tem é
+ * por INSTÂNCIA de cliente, e no servidor nasce um cliente por request: sem
+ * isto, "verificação local" buscava as chaves pela rede toda vez — trocava uma
+ * ida de rede por outra em vez de eliminá-la.
  */
 export const getMyMemberships = cache(
   async (): Promise<MembershipWithSalon[]> => {
     const supabase = await createClient();
-    const { data: claimsData } = await supabase.auth.getClaims();
+    const jwks = await getJwks();
+    const { data: claimsData } = await supabase.auth.getClaims(
+      undefined,
+      jwks ? { jwks } : undefined,
+    );
     const userId = claimsData?.claims?.sub;
     if (!userId) return [];
 
