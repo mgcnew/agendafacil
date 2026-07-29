@@ -26,6 +26,9 @@ import {
   Clock,
   Copy,
   CreditCard,
+  FacebookLogo,
+  GoogleLogo,
+  InstagramLogo,
   WhatsappLogo,
   Image as ImageIcon,
   LinkSimple,
@@ -39,6 +42,7 @@ import {
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
 import { SITE_URL } from "@/lib/siteUrl";
+import { instagramUrl, facebookUrl, googleUrl } from "@/lib/social";
 
 // URL canônica (produção) — o prefixo do link mostrado pra dona. NEXT_PUBLIC_ é
 // embutida no build, igual no servidor/cliente, sem o render duplo do antigo
@@ -620,11 +624,29 @@ function EstablishmentPanel({
     visibility: (s.address_visibility as AddressVisibility) ?? "full",
   });
   const [ownerName, setOwnerName] = useState(owner?.display_name ?? "");
+  const [instagram, setInstagram] = useState(s.instagram ?? "");
+  const [facebook, setFacebook] = useState(s.facebook ?? "");
+  const [google, setGoogle] = useState(s.google_business ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
+    // Campo preenchido que não vira link é pior que campo vazio: a página
+    // pública ganharia um botão quebrado, e quem publicou não ficaria sabendo.
+    const invalidas = [
+      instagram.trim() && !instagramUrl(instagram) ? "Instagram" : null,
+      facebook.trim() && !facebookUrl(facebook) ? "Facebook" : null,
+      google.trim() && !googleUrl(google) ? "Google" : null,
+    ].filter(Boolean);
+    if (invalidas.length > 0) {
+      setError(
+        `Não consegui montar o link de ${invalidas.join(" e ")}. ` +
+        "Instagram e Facebook aceitam o @ ou o link; o Google precisa do link que ele mesmo gera em Compartilhar.",
+      );
+      return;
+    }
+
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -649,6 +671,11 @@ function EstablishmentPanel({
         lat: addr.lat,
         lng: addr.lng,
         address_visibility: addr.visibility,
+        // Guarda o texto cru: quem digitou "@salao" volta e vê "@salao", não
+        // uma URL que ele não escreveu. A montagem do link é na leitura.
+        instagram: instagram.trim() || null,
+        facebook: facebook.trim() || null,
+        google_business: google.trim() || null,
       } as never)
       .eq("id", salon.id);
     if (!e && owner && ownerName.trim() !== (owner.display_name ?? "")) {
@@ -733,9 +760,106 @@ function EstablishmentPanel({
         <LogoCard salon={salon} canEdit={canEdit} />
       </div>
 
+      {/* Redes sociais — card próprio, e não mais um campo solto em "Dados do
+          salão": o que muda aqui aparece pro CLIENTE, não é cadastro interno.
+          Campo vazio some da página pública sozinho, sem interruptor. */}
+      <Card className="p-6 space-y-5">
+        <div>
+          <h2 className="font-display font-semibold">Redes sociais</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Aparecem no rodapé da sua página de agendamento e na tela de
+            confirmação, depois que o cliente marca. O que ficar em branco
+            simplesmente não aparece.
+          </p>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-3">
+          <SocialField
+            id="instagram"
+            label="Instagram"
+            icon={<InstagramLogo className="h-4 w-4" />}
+            placeholder="@seusalao"
+            value={instagram}
+            onChange={setInstagram}
+            disabled={!canEdit}
+            preview={instagramUrl(instagram)}
+            hint="Pode colar o @ ou o link do perfil."
+          />
+          <SocialField
+            id="facebook"
+            label="Facebook"
+            icon={<FacebookLogo className="h-4 w-4" />}
+            placeholder="@seusalao"
+            value={facebook}
+            onChange={setFacebook}
+            disabled={!canEdit}
+            preview={facebookUrl(facebook)}
+            hint="Pode colar o @ ou o link da página."
+          />
+          <SocialField
+            id="google"
+            label="Google Meu Negócio"
+            icon={<GoogleLogo className="h-4 w-4" />}
+            placeholder="https://g.page/..."
+            value={google}
+            onChange={setGoogle}
+            disabled={!canEdit}
+            preview={googleUrl(google)}
+            hint="No Google Meu Negócio: Compartilhar → copiar link."
+          />
+        </div>
+      </Card>
+
       <LinkCard salon={salon} canEdit={canEdit} />
 
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
+    </div>
+  );
+}
+
+/**
+ * Campo de rede social com conferência ao vivo.
+ *
+ * O link montado aparece embaixo enquanto se digita: é o que deixa claro que
+ * "@salao" e "instagram.com/salao" dão no mesmo lugar, e mostra na hora quando
+ * o valor não vira link nenhum — em vez de descobrir isso pela página pública
+ * quebrada, depois de já ter divulgado.
+ */
+function SocialField({
+  id, label, icon, placeholder, value, onChange, disabled, preview, hint,
+}: {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  preview: string | null;
+  hint: string;
+}) {
+  const invalido = value.trim().length > 0 && !preview;
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="flex items-center gap-1.5">
+        {icon} {label}
+      </Label>
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        aria-invalid={invalido || undefined}
+        className={invalido ? "border-amber-500/60" : undefined}
+      />
+      {preview ? (
+        <p className="truncate text-xs text-emerald-600">{preview}</p>
+      ) : invalido ? (
+        <p className="text-xs text-amber-600">Não consegui montar o link. {hint}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
     </div>
   );
 }
@@ -756,6 +880,9 @@ type AddressColumns = Tables<"salons"> & {
   lat: number | null;
   lng: number | null;
   address_visibility: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  google_business: string | null;
 };
 
 type AddressState = {

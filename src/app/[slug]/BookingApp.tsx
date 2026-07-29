@@ -6,6 +6,7 @@ import NextImage from "next/image";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
+import { SocialLinksRow } from "@/components/SocialLinksRow";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import {
@@ -45,6 +46,9 @@ type Salon = {
   logo_url: string | null;
   address: string | null;
   phone: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  google_business?: string | null;
 };
 type Service = {
   id: string;
@@ -1063,6 +1067,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
               Agendar outro
             </Button>
           </div>
+
+          <SocialLinksRow salon={salon} variant="confirmado" />
         </section>
       )}
 
@@ -1307,6 +1313,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
           </Card>
         </MotionModal>
       )}
+
+      {/* Rodapé: prova social pra quem ainda não marcou. Fica no fim da página
+          de propósito — no topo seria porta de saída antes de agendar.
+          Escondido no passo "confirmado", que já tem o bloco próprio. */}
+      {step !== "done" && <SocialLinksRow salon={salon} variant="rodape" />}
     </div>
   );
 

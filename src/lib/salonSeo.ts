@@ -11,6 +11,8 @@
  * quando a dona pediu "só o bairro", então aqui só montamos com o que veio.
  */
 
+import { socialLinks } from "@/lib/social";
+
 export type PublicSalonSeo = {
   name: string;
   niche: string | null;
@@ -26,6 +28,9 @@ export type PublicSalonSeo = {
   phone: string | null;
   logo_url: string | null;
   address_visibility: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  google_business?: string | null;
 };
 
 const NICHE_LABEL: Record<string, string> = {
@@ -102,6 +107,13 @@ export function salonJsonLd(s: PublicSalonSeo, url: string): object | null {
   if (typeof s.lat === "number" && typeof s.lng === "number") {
     data.geo = { "@type": "GeoCoordinates", latitude: s.lat, longitude: s.lng };
   }
+
+  // sameAs é o que faz o link render de verdade: diz ao Google que o perfil do
+  // Instagram, a página do Facebook e a ficha do Meu Negócio são ESTE negócio.
+  // Sem isso os perfis existem soltos e não reforçam um ao outro na busca.
+  const perfis = socialLinks(s);
+  const sameAs = [perfis.instagram, perfis.facebook, perfis.google].filter(Boolean);
+  if (sameAs.length > 0) data.sameAs = sameAs;
 
   return data;
 }
