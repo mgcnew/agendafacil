@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   House,
+  Plus,
   CalendarDots,
   Clock,
   Sparkle,
@@ -151,6 +152,34 @@ function AnnouncementBanner({ announcements }: { announcements: PanelAnnouncemen
   );
 }
 
+/**
+ * Atalho central de "Agendar" na barra inferior.
+ *
+ * Leva pra Agenda com ?novo=1, que é o gatilho que o AgendaManager já
+ * escutava pra abrir o formulário — e ele limpa o parâmetro depois, então o
+ * botão de voltar do navegador não reabre o modal.
+ *
+ * Elevado acima da barra de propósito: é o único item que não é navegação, e
+ * o relevo é o que comunica isso sem precisar de rótulo diferente.
+ */
+function AgendarButton({ base }: { base: string }) {
+  return (
+    <Link
+      href={`${base}/agenda?novo=1`}
+      aria-label="Novo agendamento"
+      className="flex flex-col items-center justify-center gap-1"
+    >
+      <span
+        className="-mt-5 grid h-12 w-12 place-items-center rounded-full shadow-lg transition active:scale-95"
+        style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+      >
+        <Plus className="h-6 w-6" weight="bold" />
+      </span>
+      <span className="text-[10px] font-semibold leading-none text-primary">Agendar</span>
+    </Link>
+  );
+}
+
 export function PanelShell({
   salon,
   role,
@@ -158,6 +187,7 @@ export function PanelShell({
   children,
   isPlatformAdmin = false,
   announcements = [],
+  canCreateAppointment = false,
 }: {
   salon: { name: string; slug: string; niche: string };
   role: string;
@@ -165,6 +195,8 @@ export function PanelShell({
   children: React.ReactNode;
   isPlatformAdmin?: boolean;
   announcements?: PanelAnnouncement[];
+  /** appointments.manage — sem ela o atalho de agendar não faz sentido. */
+  canCreateAppointment?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -350,12 +382,18 @@ export function PanelShell({
 
         {/* ── Bottom navigation (mobile) — fixa na viewport, leve efeito vidro ───────── */}
         <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/85 backdrop-blur-md rounded-t-2xl shadow-[0_-6px_24px_-10px_rgba(0,0,0,0.28)] pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-4 h-16">
-            {primaryItems.map((it) => {
+          {/* 5 colunas quando há atalho de agendar: os dois primeiros itens à
+              esquerda, o botão elevado no centro e o resto à direita. Criar
+              agendamento é a ação mais repetida do dia — deixá-la só dentro da
+              Agenda obrigava a navegar até lá primeiro. */}
+          <div className={cn("grid h-16", canCreateAppointment ? "grid-cols-5" : "grid-cols-4")}>
+            {primaryItems.map((it, i) => {
+              // Depois do 2º item entra o botão central.
+              const inserirAgendar = canCreateAppointment && i === 2;
               const active = isActive(it.href);
               const Icon = ICONS[it.icon];
               const label = it.href === "" ? "Início" : it.label;
-              return (
+              const link = (
                 <Link
                   key={it.href}
                   href={base + it.href}
@@ -381,6 +419,14 @@ export function PanelShell({
                     {label}
                   </span>
                 </Link>
+              );
+
+              if (!inserirAgendar) return link;
+              return (
+                <Fragment key={`ag-${it.href}`}>
+                  <AgendarButton base={base} />
+                  {link}
+                </Fragment>
               );
             })}
             <button

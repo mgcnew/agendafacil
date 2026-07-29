@@ -154,6 +154,7 @@ export default async function PanelLayout({
         groups={groups}
         isPlatformAdmin={!!isPlatformAdmin}
         announcements={announcements}
+        canCreateAppointment={perms.has("appointments.manage")}
       >
         {children}
       </PanelShell>

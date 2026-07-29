@@ -913,7 +913,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
             <CalendarX className="h-8 w-8 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
             {canCreate && (
-              <Button variant="outline" size="sm" className="mt-4 hidden lg:inline-flex" onClick={() => onNewAppt(date)}>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
                 <Plus className="h-4 w-4" /> Novo agendamento
               </Button>
             )}
@@ -1932,23 +1932,6 @@ export function AgendaManager({
         )}
       </AnimatePresence>
 
-      {/* Ação principal flutuante (só no celular, onde existe a barra de
-          navegação embaixo). Sai do topo, onde comia a altura que a agenda
-          precisa, e passa a ficar no alcance do polegar. Sobe acima da barra
-          pra não cobrir "Mais". */}
-      {canManageAppointments && (
-        <button
-          onClick={() => openCreate(date)}
-          className="lg:hidden fixed right-4 z-30 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold shadow-lg transition active:scale-95"
-          style={{
-            bottom: "calc(4rem + env(safe-area-inset-bottom) + 0.75rem)",
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-          }}
-        >
-          <Plus className="h-4 w-4" weight="bold" /> Agendar
-        </button>
-      )}
     </div>
   );
 }
