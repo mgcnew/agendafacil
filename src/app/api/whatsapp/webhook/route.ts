@@ -17,21 +17,32 @@ import { parseEvolutionWebhook } from "@/lib/whatsapp/inbound";
  * no banco, junto com o resto da regra.
  */
 
-// A Evolution não assina o corpo do webhook, então o segredo vai num header
-// que configuramos junto com a URL (ver setWebhook em lib/whatsapp/evolution).
-const SECRET = process.env.WHATSAPP_INBOUND_SECRET;
-
 /** Comparação em tempo constante — não entrega o segredo byte a byte. */
-function secretOk(received: string | null): boolean {
-  if (!SECRET || !received) return false;
+function secretOk(expected: string, received: string | null): boolean {
+  if (!received) return false;
   const a = Buffer.from(received);
-  const b = Buffer.from(SECRET);
+  const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
 
 export async function POST(req: Request) {
-  if (!secretOk(req.headers.get("x-zulan-webhook-secret"))) {
+  // Lido por requisição, não no escopo do módulo: é o que os docs do Next
+  // chamam de leitura em runtime, e sobrevive a trocar a variável sem rebuild.
+  //
+  // A Evolution não assina o corpo do webhook, então o segredo vai num header
+  // que configuramos junto com a URL (ver setWebhook em lib/whatsapp/evolution).
+  const expected = process.env.WHATSAPP_INBOUND_SECRET;
+
+  // Distinto do 401 de propósito: sem esta separação, "faltou configurar a
+  // variável" e "o segredo veio errado" respondiam a mesma coisa, e não havia
+  // como saber qual dos dois estava acontecendo sem acesso ao servidor.
+  if (!expected) {
+    console.error("WHATSAPP_INBOUND_SECRET ausente no ambiente");
+    return NextResponse.json({ error: "webhook_nao_configurado" }, { status: 503 });
+  }
+
+  if (!secretOk(expected, req.headers.get("x-zulan-webhook-secret"))) {
     return NextResponse.json({ error: "forbidden" }, { status: 401 });
   }
 
