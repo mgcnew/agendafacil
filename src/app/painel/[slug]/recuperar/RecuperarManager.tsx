@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { formatBRL, formatDate } from "@/lib/utils";
 import {
   ArrowCounterClockwise,
+  ArrowSquareOut,
+  Check,
+  ClockAfternoon,
   WhatsappLogo,
   Warning,
   XCircle,
@@ -57,6 +60,70 @@ function waLink(phone: string | null, text: string): string | null {
   return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
 }
 
+/**
+ * Estado do envio de cada cliente. Vive por client_id, não por linha: o dono
+ * troca de aba enquanto a mensagem entra na fila, e o resultado precisa
+ * continuar lá quando ele voltar.
+ */
+type SendState =
+  | { status: "sending" }
+  | { status: "sent"; preview: string; foraJanela: boolean }
+  | { status: "error"; message: string };
+
+/**
+ * Motivos que o RPC devolve, em português. São recusas previstas — "esse
+ * cliente pediu para não receber" não é falha, é resposta —, então a tela
+ * explica em vez de mostrar erro genérico.
+ */
+const SEND_ERRORS: Record<string, string> = {
+  opt_out: "Esse cliente pediu para não receber mensagens.",
+  sem_telefone: "O telefone cadastrado não é um celular válido.",
+  ja_chamado: "Você já chamou esse cliente nos últimos 21 dias.",
+  limite_semanal: "Esse cliente já recebeu 4 mensagens nesta semana.",
+  sem_template: "Não há mensagem cadastrada para esse caso.",
+  cliente_invalido: "Cliente não encontrado neste salão.",
+};
+
+/**
+ * Resultado do envio, embaixo da linha do cliente.
+ *
+ * O sucesso mostra a mensagem inteira, e não só um "enviado": é o que prova
+ * ao dono que o texto citou a data, o serviço e o profissional daquela pessoa
+ * — a diferença entre confiar no sistema e ir conferir no celular.
+ */
+function SendFeedback({ state }: { state: SendState | undefined }) {
+  if (!state || state.status === "sending") return null;
+
+  if (state.status === "error") {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 rounded-[var(--radius)] bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+        <Warning className="h-3.5 w-3.5 shrink-0 mt-px" /> {state.message}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-[var(--radius)] border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+        {state.foraJanela ? (
+          <>
+            <ClockAfternoon className="h-3.5 w-3.5 shrink-0" /> Na fila — sai a partir das 8h
+          </>
+        ) : (
+          <>
+            <Check className="h-3.5 w-3.5 shrink-0" /> Enviado pelo WhatsApp do salão
+          </>
+        )}
+      </p>
+      {state.preview && (
+        <p className="mt-1.5 whitespace-pre-line border-l-2 border-emerald-500/30 pl-2.5 text-xs leading-relaxed text-muted-foreground">
+          {state.preview}
+        </p>
+      )}
+    </div>
+  );
+}
+
 type PriorityPick = { client: WinbackClient; bucket: Bucket; headline: string };
 
 /**
@@ -100,6 +167,7 @@ function pickPriority(data: WinbackData): PriorityPick | null {
 
 export function RecuperarManager({
   salonId, initialData, campaigns, performance, salonName, slug,
+  whatsappReady, canConnectWhatsApp,
 }: {
   salonId: string;
   initialData: WinbackData;
@@ -107,8 +175,11 @@ export function RecuperarManager({
   performance: Record<string, CampaignPerformance>;
   salonName: string;
   slug: string;
+  whatsappReady: boolean;
+  canConnectWhatsApp: boolean;
 }) {
   const [supabase] = useState(() => createClient());
+  const [sendState, setSendState] = useState<Record<string, SendState>>({});
   const [tab, setTab] = useState<Bucket>("no_shows");
   const [couponId, setCouponId] = useState<string>("");
   const [query, setQuery] = useState("");
@@ -154,6 +225,7 @@ export function RecuperarManager({
     return base + couponTxt + (bookingUrl ? `\n\nAgende aqui: ${bookingUrl}` : "");
   }
 
+  /** Caminho manual: abre o WhatsApp Web/app com o texto pronto. */
   function openWhatsApp(c: WinbackClient, bucket: Bucket = tab) {
     const link = waLink(c.phone, message(c, bucket));
     if (!link) return;
@@ -161,6 +233,66 @@ export function RecuperarManager({
     // Registra o contato pra o Gestor Zulan não sugerir reativar de novo
     // logo em seguida — dá um tempo (7 dias) antes de voltar a avisar.
     supabase.from("clients").update({ last_contacted_at: new Date().toISOString() }).eq("id", c.client_id).then();
+  }
+
+  /**
+   * Caminho automático: enfileira pelo número do próprio salão.
+   *
+   * A mensagem NÃO é montada aqui. Quem monta é o banco, que enxerga a data
+   * real da falta, o serviço e o profissional daquela pessoa — o texto do
+   * front (`message`) é genérico por natureza, só sabe o nome e o balde.
+   *
+   * Sem instância conectada, cai no wa.me em silêncio: o dono quer chamar o
+   * cliente, não descobrir por que não deu.
+   */
+  async function chamar(c: WinbackClient, bucket: Bucket = tab) {
+    if (!whatsappReady) return openWhatsApp(c, bucket);
+
+    setSendState((s) => ({ ...s, [c.client_id]: { status: "sending" } }));
+
+    const { data, error } = await supabase.rpc("whatsapp_winback_send" as never, {
+      p_salon: salonId,
+      p_client: c.client_id,
+      p_bucket: bucket,
+      p_campaign: couponId || null,
+    } as never);
+
+    const res = (data ?? null) as { ok: boolean; reason?: string; preview?: string; fora_janela?: boolean } | null;
+
+    if (error || !res) {
+      setSendState((s) => ({
+        ...s,
+        [c.client_id]: { status: "error", message: "Não deu para enviar agora. Tente de novo." },
+      }));
+      return;
+    }
+
+    if (res.ok) {
+      setSendState((s) => ({
+        ...s,
+        [c.client_id]: { status: "sent", preview: res.preview ?? "", foraJanela: !!res.fora_janela },
+      }));
+      return;
+    }
+
+    // Desconectou entre o carregamento da página e o clique.
+    if (res.reason === "nao_conectado") {
+      setSendState((s) => {
+        const next = { ...s };
+        delete next[c.client_id];
+        return next;
+      });
+      openWhatsApp(c, bucket);
+      return;
+    }
+
+    setSendState((s) => ({
+      ...s,
+      [c.client_id]: {
+        status: "error",
+        message: SEND_ERRORS[res.reason ?? ""] ?? "Não deu para enviar agora.",
+      },
+    }));
   }
 
   const priorityPick = pickPriority(data);
@@ -173,9 +305,28 @@ export function RecuperarManager({
           <ArrowCounterClockwise className="h-6 w-6 text-primary" /> Recuperar clientes
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Traga de volta quem faltou, cancelou ou está sumido — com uma mensagem pronta no WhatsApp.
+          {whatsappReady
+            ? "Traga de volta quem faltou, cancelou ou está sumido. Cada mensagem sai do número do salão, escrita para aquela pessoa."
+            : "Traga de volta quem faltou, cancelou ou está sumido — com uma mensagem pronta no WhatsApp."}
         </p>
       </header>
+
+      {/* Sem instância conectada o botão continua funcionando (abre o WhatsApp
+          Web), então isto é convite, não bloqueio. */}
+      {!whatsappReady && canConnectWhatsApp && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius)] border border-border bg-muted/40 px-3.5 py-2.5 text-sm">
+          <WhatsappLogo className="h-4 w-4 shrink-0 text-emerald-600" />
+          <span className="text-muted-foreground">
+            Chamar abre o WhatsApp para você enviar na mão.
+          </span>
+          <Link
+            href={`/painel/${slug}/configuracoes?tab=whatsapp`}
+            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+          >
+            Conectar o número do salão <ArrowSquareOut className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* De olho na recuperação — regras diretas, sem IA, sempre refletem o dado carregado */}
       {(priorityPick || suggestCampaign) && (
@@ -194,16 +345,25 @@ export function RecuperarManager({
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={waLink(priorityPick.client.phone, "") === null}
-                  onClick={() => openWhatsApp(priorityPick.client, priorityPick.bucket)}
+                  disabled={
+                    waLink(priorityPick.client.phone, "") === null ||
+                    !!sendState[priorityPick.client.client_id]
+                  }
+                  onClick={() => void chamar(priorityPick.client, priorityPick.bucket)}
                   className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                 >
-                  <WhatsappLogo className="h-4 w-4" /> Chamar {firstName(priorityPick.client.name)}
+                  {sendState[priorityPick.client.client_id]?.status === "sending" ? (
+                    <CircleNotch className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <WhatsappLogo className="h-4 w-4" />
+                  )}
+                  Chamar {firstName(priorityPick.client.name)}
                 </Button>
                 {waLink(priorityPick.client.phone, "") === null && (
                   <span className="text-xs text-muted-foreground">sem telefone cadastrado</span>
                 )}
               </div>
+              <SendFeedback state={sendState[priorityPick.client.client_id]} />
             </div>
           )}
 
@@ -339,36 +499,50 @@ export function RecuperarManager({
           {list.map((c) => {
             const hasPhone = waLink(c.phone, "") !== null;
             const risky = (c.total_no_shows ?? 0) >= 2;
+            const send = sendState[c.client_id];
             return (
               <div
                 key={c.client_id}
-                className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5"
+                className="rounded-[var(--radius)] border border-border bg-card p-3.5"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium truncate">{c.name}</p>
-                    {risky && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5">
-                        <Warning className="h-3 w-3" /> {c.total_no_shows} faltas
-                      </span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium truncate">{c.name}</p>
+                      {risky && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5">
+                          <Warning className="h-3 w-3" /> {c.total_no_shows} faltas
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {tab === "inactive"
+                        ? `Última visita ${c.last_at ? formatDate(c.last_at) : "—"}${c.visits ? ` · ${c.visits} visita${c.visits > 1 ? "s" : ""}` : ""}`
+                        : `${tab === "no_shows" ? "Faltou" : "Cancelou"} em ${c.last_at ? formatDate(c.last_at) : "—"}`}
+                      {!hasPhone && " · sem telefone"}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {tab === "inactive"
-                      ? `Última visita ${c.last_at ? formatDate(c.last_at) : "—"}${c.visits ? ` · ${c.visits} visita${c.visits > 1 ? "s" : ""}` : ""}`
-                      : `${tab === "no_shows" ? "Faltou" : "Cancelou"} em ${c.last_at ? formatDate(c.last_at) : "—"}`}
-                    {!hasPhone && " · sem telefone"}
-                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    // Já chamado nesta sessão não volta a ficar clicável: o RPC
+                    // recusaria de qualquer jeito (21 dias), e um botão que
+                    // aceita clique pra depois dizer não é pior que um desligado.
+                    disabled={!hasPhone || !!send}
+                    onClick={() => void chamar(c)}
+                    className="shrink-0 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  >
+                    {send?.status === "sending" ? (
+                      <CircleNotch className="h-4 w-4 animate-spin" />
+                    ) : send?.status === "sent" ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <WhatsappLogo className="h-4 w-4" />
+                    )}
+                    {send?.status === "sent" ? "Chamado" : "Chamar"}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!hasPhone}
-                  onClick={() => openWhatsApp(c)}
-                  className="shrink-0 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                >
-                  <WhatsappLogo className="h-4 w-4" /> Chamar
-                </Button>
+                <SendFeedback state={send} />
               </div>
             );
           })}
