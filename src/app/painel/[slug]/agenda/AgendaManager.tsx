@@ -913,7 +913,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
             <CalendarX className="h-8 w-8 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
             {canCreate && (
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
+              <Button variant="outline" size="sm" className="mt-4 hidden lg:inline-flex" onClick={() => onNewAppt(date)}>
                 <Plus className="h-4 w-4" /> Novo agendamento
               </Button>
             )}
@@ -1607,71 +1607,99 @@ export function AgendaManager({
 
   return (
     <div className="flex flex-col gap-3 sm:h-full af-rise">
-      {/* ── Header ─────────────────────────────────────── */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
+      {/* ── Header ─────────────────────────────────────────────────────
+          No celular tudo isto empilhava: título, seletor de visão, navegação
+          de data, Modo TV, Bloquear e Novo agendamento — seis faixas antes de
+          aparecer um horário sequer. Agora são duas, as ações secundárias
+          viram ícone e a principal desce pro botão flutuante, que fica no
+          alcance do polegar em vez de comer altura do topo. */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="font-display text-2xl font-bold">Agenda</h1>
           <p className="text-sm text-muted-foreground">{title}</p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded-[var(--radius)] border border-border overflow-hidden text-sm">
-            {(["dia","semana","mes"] as View[]).map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={cn(
-                  "px-3 py-1.5 font-medium transition capitalize",
-                  v === view
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground/70 hover:bg-muted",
-                )}
-              >
-                {v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}
-              </button>
-            ))}
-          </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Modo TV abre uma tela pra espelhar em monitor: no celular não
+              tem uso, e ocupava uma faixa inteira. */}
+          <a
+            href={`/tv/${slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abre uma tela de próximos atendimentos, pra espelhar num monitor"
+            className="hidden lg:inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
+          >
+            <Monitor className="h-4 w-4" /> Modo TV
+          </a>
 
-          <div className="flex items-center gap-1">
+          {canBlock && (
+            <>
+              <button
+                onClick={() => setBlocking(true)}
+                aria-label="Bloquear horário"
+                title="Bloquear horário"
+                className="lg:hidden grid h-9 w-9 place-items-center rounded-[var(--radius)] border border-border transition active:bg-muted"
+              >
+                <Lock className="h-4 w-4" />
+              </button>
+              <Button variant="outline" className="hidden lg:inline-flex" onClick={() => setBlocking(true)}>
+                <Lock className="h-4 w-4" /> Bloquear
+              </Button>
+            </>
+          )}
+
+          {canManageAppointments && (
+            <Button className="hidden lg:inline-flex" onClick={() => openCreate(date)}>
+              <Plus className="h-4 w-4" /> Novo agendamento
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Visão + navegação de data numa linha só. No celular o seletor ocupa
+          a largura livre e "Hoje" só aparece quando há pra onde voltar —
+          botão que não faz nada é ruído. */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 lg:flex-none rounded-[var(--radius)] border border-border overflow-hidden text-sm">
+          {(["dia","semana","mes"] as View[]).map(v => (
             <button
-              onClick={() => navigate(-1)}
-              className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+              key={v}
+              onClick={() => setView(v)}
+              className={cn(
+                "flex-1 lg:flex-none px-3 py-1.5 font-medium transition",
+                v === view
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/70 hover:bg-muted",
+              )}
             >
-              <CaretLeft className="h-4 w-4" />
+              {v === "dia" ? "Dia" : v === "semana" ? "Semana" : "Mês"}
             </button>
+          ))}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Anterior"
+            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+          >
+            <CaretLeft className="h-4 w-4" />
+          </button>
+          {date !== toStr(new Date()) && (
             <button
               onClick={() => setDate(toStr(new Date()))}
               className="h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
             >
               Hoje
             </button>
-            <button
-              onClick={() => navigate(1)}
-              className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
-            >
-              <CaretRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          <a
-            href={`/tv/${slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abre uma tela de próximos atendimentos, pra espelhar num monitor"
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
+          )}
+          <button
+            onClick={() => navigate(1)}
+            aria-label="Próximo"
+            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
           >
-            <Monitor className="h-4 w-4" /> Modo TV
-          </a>
-          {canBlock && (
-            <Button variant="outline" onClick={() => setBlocking(true)}>
-              <Lock className="h-4 w-4" /> Bloquear
-            </Button>
-          )}
-          {canManageAppointments && (
-            <Button onClick={() => openCreate(date)}>
-              <Plus className="h-4 w-4" /> Novo agendamento
-            </Button>
-          )}
+            <CaretRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -1903,6 +1931,24 @@ export function AgendaManager({
           />
         )}
       </AnimatePresence>
+
+      {/* Ação principal flutuante (só no celular, onde existe a barra de
+          navegação embaixo). Sai do topo, onde comia a altura que a agenda
+          precisa, e passa a ficar no alcance do polegar. Sobe acima da barra
+          pra não cobrir "Mais". */}
+      {canManageAppointments && (
+        <button
+          onClick={() => openCreate(date)}
+          className="lg:hidden fixed right-4 z-30 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold shadow-lg transition active:scale-95"
+          style={{
+            bottom: "calc(4rem + env(safe-area-inset-bottom) + 0.75rem)",
+            background: "var(--primary)",
+            color: "var(--primary-foreground)",
+          }}
+        >
+          <Plus className="h-4 w-4" weight="bold" /> Agendar
+        </button>
+      )}
     </div>
   );
 }
