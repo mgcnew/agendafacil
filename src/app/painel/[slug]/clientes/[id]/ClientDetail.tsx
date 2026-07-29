@@ -37,6 +37,7 @@ import {
   Trash,
   User,
   Warning,
+  WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 
 type Client = Tables<"clients">;
@@ -281,6 +282,30 @@ function DadosTab({
     onPhotoChange(null);
   }
 
+  // Estado local pra o selo responder na hora; o `client` só recarrega no
+  // refresh da página.
+  const [optOut, setOptOut] = useState(client.whatsapp_opt_out);
+  const [religando, setReligando] = useState(false);
+
+  /**
+   * Religa as mensagens automáticas pra este cliente.
+   *
+   * Existe porque quem pede pra voltar quase sempre pede na cadeira, não por
+   * mensagem — e sem isto o "avise a gente" do nosso próprio aviso de saída
+   * não tinha onde ser atendido.
+   */
+  async function religarWhatsApp() {
+    setReligando(true); setErr(null);
+    const { error } = await supabase
+      .from("clients")
+      .update({ whatsapp_opt_out: false, whatsapp_opt_out_at: null })
+      .eq("id", client.id);
+    setReligando(false);
+    if (error) { setErr("Não foi possível religar. Tente novamente."); return; }
+    setOptOut(false);
+    onSaved();
+  }
+
   async function save() {
     setSaving(true); setSaved(false); setErr(null);
     const { error } = await supabase.from("clients").update({
@@ -325,6 +350,30 @@ function DadosTab({
           </div>
         )}
       </div>
+
+      {/* Opt-out do WhatsApp. Sem este aviso o cliente simplesmente sumia das
+          mensagens e o salão não tinha como descobrir por quê. */}
+      {optOut && (
+        <div className="flex flex-wrap items-start gap-3 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3.5 dark:border-amber-500/40 dark:bg-amber-500/10">
+          <WhatsappLogo className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" weight="fill" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+              Não recebe mensagens automáticas
+            </p>
+            <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200/80">
+              {client.whatsapp_opt_out_at
+                ? `Pediu para sair em ${formatDate(client.whatsapp_opt_out_at)}.`
+                : "Este cliente pediu para não receber."}{" "}
+              Comprovante, lembrete e agradecimento não saem para ele.
+            </p>
+          </div>
+          {canManage && (
+            <Button variant="outline" onClick={religarWhatsApp} disabled={religando}>
+              {religando && <CircleNotch className="h-4 w-4 animate-spin" />} Religar mensagens
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
