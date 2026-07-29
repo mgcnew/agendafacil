@@ -1,5 +1,5 @@
 import { FacebookLogo, GoogleLogo, InstagramLogo } from "@phosphor-icons/react/dist/ssr";
-import { socialLinks, instagramHandle } from "@/lib/social";
+import { socialLinks } from "@/lib/social";
 
 type Fonte = {
   instagram?: string | null;
@@ -12,23 +12,54 @@ type Fonte = {
  *
  * Duas variantes porque são dois momentos diferentes:
  *
- * `rodape` — o cliente ainda vai agendar. Aqui as redes são prova social
- * ("esse lugar existe, tem trabalho publicado, tem avaliação") e por isso
- * ficam discretas, no fim da página: um botão grande de Instagram no topo é
- * uma porta de saída antes da pessoa marcar.
+ * `cabecalho` — o cliente ainda vai agendar. Fica no topo, sem rolagem, mas
+ * como ícone: aqui a rede é prova social ("tem trabalho publicado, tem
+ * avaliação"), não chamada pra ação.
  *
  * `confirmado` — o horário já está marcado. Esse é o único momento em que
- * pedir para seguir não custa conversão: a pessoa terminou o que veio fazer e
- * está satisfeita.
+ * pedir para seguir não custa conversão nenhuma: a pessoa terminou o que veio
+ * fazer, não há mais nada disputando a atenção dela.
  */
 export function SocialLinksRow({
   salon,
   variant,
 }: {
   salon: Fonte;
-  variant: "rodape" | "confirmado";
+  variant: "cabecalho" | "confirmado";
 }) {
   const links = socialLinks(salon);
+
+  // `cabecalho` — visível sem rolar, na mesma fileira da galeria e dos "meus
+  // agendamentos". Ícone pequeno de propósito: é identidade, não chamada pra
+  // ação. Um cartão colorido de Instagram ali em cima competiria com o botão
+  // de agendar, e quem sai pro feed antes de marcar costuma não voltar.
+  if (variant === "cabecalho") {
+    const itens = [
+      links.instagram && { href: links.instagram, Icon: InstagramLogo, label: "Instagram" },
+      links.facebook && { href: links.facebook, Icon: FacebookLogo, label: "Facebook" },
+      links.google && { href: links.google, Icon: GoogleLogo, label: "Avaliações no Google" },
+    ].filter(Boolean) as { href: string; Icon: typeof InstagramLogo; label: string }[];
+
+    if (itens.length === 0) return null;
+
+    return (
+      <>
+        {itens.map(({ href, Icon, label }) => (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={label}
+            aria-label={label}
+            className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Icon className="h-[18px] w-[18px]" />
+          </a>
+        ))}
+      </>
+    );
+  }
 
   if (variant === "confirmado") {
     // Google fica de fora aqui de propósito: o link dele serve pra avaliação,
@@ -63,35 +94,5 @@ export function SocialLinksRow({
     );
   }
 
-  const rodape = [
-    links.instagram && {
-      href: links.instagram,
-      Icon: InstagramLogo,
-      // O @ é o que a pessoa reconhece e consegue procurar depois; "Instagram"
-      // ela já sabe que é.
-      label: instagramHandle(links.instagram) ?? "Instagram",
-    },
-    links.facebook && { href: links.facebook, Icon: FacebookLogo, label: "Facebook" },
-    links.google && { href: links.google, Icon: GoogleLogo, label: "Avaliações no Google" },
-  ].filter(Boolean) as { href: string; Icon: typeof InstagramLogo; label: string }[];
-
-  if (rodape.length === 0) return null;
-
-  return (
-    <div className="mt-10 border-t border-border pt-6">
-      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-        {rodape.map(({ href, Icon, label }) => (
-          <a
-            key={label}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-primary"
-          >
-            <Icon className="h-4 w-4 shrink-0" /> {label}
-          </a>
-        ))}
-      </div>
-    </div>
-  );
+  return null;
 }

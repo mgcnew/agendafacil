@@ -559,6 +559,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {/* Cabeçalho — leve, identidade completa do salão só aparece na confirmação */}
       <header className="pt-6 pb-2">
         <div className="flex items-center justify-end gap-1">
+          {/* Redes primeiro: são do salão, e galeria/meus agendamentos são
+              ferramentas de quem está navegando. */}
+          <SocialLinksRow salon={salon} variant="cabecalho" />
           {gallery.length > 0 && (
             <button
               onClick={() => setShowGallery(true)}
@@ -1313,11 +1316,6 @@ export function BookingApp({ salon }: { salon: Salon }) {
           </Card>
         </MotionModal>
       )}
-
-      {/* Rodapé: prova social pra quem ainda não marcou. Fica no fim da página
-          de propósito — no topo seria porta de saída antes de agendar.
-          Escondido no passo "confirmado", que já tem o bloco próprio. */}
-      {step !== "done" && <SocialLinksRow salon={salon} variant="rodape" />}
     </div>
   );
 
