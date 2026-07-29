@@ -30,6 +30,14 @@ export default async function FinanceiroPage({
   if (!membership) redirect("/painel");
   await guardFeature(slug, "/financeiro");
   const salonId = membership.salon_id;
+
+  // `cash.view` barrava só o link no menu, não a página: quem digitasse a URL
+  // entrava assim mesmo. O RLS já protegia os DADOS (a tela vinha vazia), mas
+  // esconder o link e deixar a rota aberta não é controle de acesso — é
+  // decoração. Mesmo padrão de /pacotes e /relatorios.
+  const perms = await getEffectivePermissions(salonId, membership);
+  if (!perms.has("cash.view")) redirect(`/painel/${slug}`);
+
   const supabase = await createClient();
 
   // ── período de comissões (fuso do Brasil; servidor roda em UTC) ──
@@ -182,7 +190,6 @@ export default async function FinanceiroPage({
     .select("cash_discount_enabled, cash_max_discount_percent")
     .eq("id", salonId)
     .maybeSingle();
-  const perms = await getEffectivePermissions(salonId, membership);
   const canDiscount = !!salonCfg?.cash_discount_enabled && perms.has("cash.discount");
   const maxDiscountPercent = Number(salonCfg?.cash_max_discount_percent ?? 0);
   // Abas opcionais do caixa: comissões e custos fixos (o dono libera por pessoa).
@@ -243,7 +250,11 @@ export default async function FinanceiroPage({
   return (
     <FinanceManager
       salonId={salonId}
-      canManage={membership.role !== "professional"}
+      // Era `role !== "professional"`: um cargo fixo no código, que ignorava
+      // "Gerenciar caixa" em Acessos. Desligar lá não mudava nada na tela — os
+      // botões continuavam ali e o RLS é que barrava na hora de salvar, com
+      // erro. A configuração existia e não fazia o que dizia.
+      canManage={perms.has("cash.manage")}
       canViewCommissions={canViewCommissions}
       canViewFixed={canViewFixed}
       openSession={openSession}
