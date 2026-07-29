@@ -16,6 +16,11 @@ export default async function AgendaPage({
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
   const canManageSchedule = perms.has("schedule.manage");
+  // Estas duas já valiam no RLS, mas sem efeito nenhum na tela: os botões
+  // continuavam ali e o erro só aparecia ao salvar. Desligar a permissão
+  // precisa ser visível pra quem usa, não só pro banco.
+  const canManageAppointments = perms.has("appointments.manage");
+  const canViewAllAppointments = perms.has("appointments.view_all");
 
   const supabase = await createClient();
   const [{ data: pros }, { data: services }, { data: clients }, { data: discountRows }, { data: proSvcRows }, { data: salonCfg }] = await Promise.all([
@@ -76,6 +81,8 @@ export default async function AgendaPage({
       clients={clients ?? []}
       discounts={discounts}
       canManageSchedule={canManageSchedule}
+      canManageAppointments={canManageAppointments}
+      canViewAllAppointments={canViewAllAppointments}
       myMemberId={membership.id}
       canDiscount={canDiscount}
       maxDiscountPercent={maxDiscountPercent}

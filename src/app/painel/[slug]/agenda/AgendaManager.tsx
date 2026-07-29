@@ -19,6 +19,7 @@ import {
   ArrowSquareOut,
   CalendarDots,
   CalendarX,
+  Eye,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -768,9 +769,9 @@ function ApptDetailModal({
 // ── Day View ───────────────────────────────────────────────────
 const COL_W_DAY = 160;
 
-function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onSlotClick, onDeleteBlock }: {
+function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, canCreate = true, myMemberId, onApptClick, onSlotClick, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean; myMemberId?: string;
+  canManageSchedule: boolean; canCreate?: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onSlotClick: (date: string, proId: string, time: string) => void;
   onDeleteBlock: (b: Block) => void;
@@ -868,16 +869,16 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, myM
           })}
         </div>
 
-        {isEmpty && <EmptyDay />}
+        {isEmpty && <EmptyDay canCreate={canCreate} />}
       </div>
     </div>
   );
 }
 
 // ── Mobile: lista cronológica do dia (mais confortável que a grade) ──
-function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onNewAppt, onDeleteBlock }: {
+function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, canCreate = true, myMemberId, onApptClick, onNewAppt, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean; myMemberId?: string;
+  canManageSchedule: boolean; canCreate?: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onNewAppt: (date: string) => void;
   onDeleteBlock: (b: Block) => void;
@@ -911,9 +912,11 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
           <div className="flex flex-col items-center justify-center text-center px-6 py-16">
             <CalendarX className="h-8 w-8 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
-              <Plus className="h-4 w-4" /> Novo agendamento
-            </Button>
+            {canCreate && (
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
+                <Plus className="h-4 w-4" /> Novo agendamento
+              </Button>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-border">
@@ -1049,12 +1052,12 @@ function WeekStrip({ days, selected, appts, activePros, onSelect }: {
   );
 }
 
-function EmptyDay() {
+function EmptyDay({ canCreate = true }: { canCreate?: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 top-12 flex flex-col items-center justify-center text-center px-6">
       <CalendarX className="h-8 w-8 text-muted-foreground/50" />
       <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
-      <p className="text-xs text-muted-foreground/70">Clique em "Novo agendamento" para começar.</p>
+      {canCreate && <p className="text-xs text-muted-foreground/70">Clique em &quot;Novo agendamento&quot; para começar.</p>}
     </div>
   );
 }
@@ -1062,9 +1065,9 @@ function EmptyDay() {
 // ── Week View ──────────────────────────────────────────────────
 const COL_W_WEEK = 116;
 
-function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, myMemberId, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
+function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, canCreate = true, myMemberId, onApptClick, onDayClick, onSlotClick, onDeleteBlock }: {
   date: string; appts: Appt[]; blocks: Block[]; pros: Pro[]; activePros: Pro[];
-  canManageSchedule: boolean; myMemberId?: string;
+  canManageSchedule: boolean; canCreate?: boolean; myMemberId?: string;
   onApptClick: (a: Appt) => void;
   onDayClick: (d: string) => void;
   onSlotClick: (date: string, time: string) => void;
@@ -1186,17 +1189,18 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, my
           })}
         </div>
 
-        {isEmpty && <EmptyDay />}
+        {isEmpty && <EmptyDay canCreate={canCreate} />}
       </div>
     </div>
   );
 }
 
 // ── Month View ─────────────────────────────────────────────────
-function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
+function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, canCreate = true }: {
   date: string; appts: Appt[]; pros: Pro[]; activePros: Pro[];
   onDayClick: (d: string) => void;
   onNewAppt: (d: string) => void;
+  canCreate?: boolean;
 }) {
   const d     = parse(date);
   const year  = d.getFullYear();
@@ -1292,10 +1296,15 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt }: {
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
   canManageSchedule = false, myMemberId, canDiscount = false, maxDiscountPercent = 0,
+  canManageAppointments = true, canViewAllAppointments = true,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
   canManageSchedule?: boolean;
+  /** appointments.manage — sem ela, a agenda vira só leitura. */
+  canManageAppointments?: boolean;
+  /** appointments.view_all — sem ela, o RLS já entrega só os próprios. */
+  canViewAllAppointments?: boolean;
   myMemberId?: string;
   canDiscount?: boolean;
   maxDiscountPercent?: number;
@@ -1324,12 +1333,16 @@ export function AgendaManager({
 
   /** Abre o modal de criação, opcionalmente já com profissional, horário e cliente. */
   const openCreate = useCallback((d: string, pro?: string, time?: string, clientId?: string) => {
+    // Trava num lugar só: criar tem várias portas (botão, clique no horário
+    // vazio, lista de espera, link com ?cliente=) e esquecer uma delas
+    // devolveria o formulário pra quem não pode salvar.
+    if (!canManageAppointments) return;
     setCreateDate(d);
     setCreatePro(pro);
     setCreateTime(time);
     setCreateClientId(clientId);
     setCreating(true);
-  }, []);
+  }, [canManageAppointments]);
 
   const openedFromUrl = useRef(false);
   useEffect(() => {
@@ -1654,11 +1667,24 @@ export function AgendaManager({
               <Lock className="h-4 w-4" /> Bloquear
             </Button>
           )}
-          <Button onClick={() => openCreate(date)}>
-            <Plus className="h-4 w-4" /> Novo agendamento
-          </Button>
+          {canManageAppointments && (
+            <Button onClick={() => openCreate(date)}>
+              <Plus className="h-4 w-4" /> Novo agendamento
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Sem appointments.view_all o RLS já entrega só os próprios horários.
+          A tela ficava parecendo vazia sem explicar por quê — a pessoa
+          concluía que os agendamentos tinham sumido. */}
+      {!canViewAllAppointments && (
+        <p className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground">
+          <Eye className="h-4 w-4 shrink-0" />
+          Você está vendo apenas os seus atendimentos. Para ver a agenda toda,
+          peça a permissão &quot;Ver todos os agendamentos&quot;.
+        </p>
+      )}
 
       {/* ── Sinais de hoje (cancelamento, atraso, vazios) ─── */}
       <AgendaSignalsBanner signals={todaySignals} slug={slug} />
@@ -1749,7 +1775,7 @@ export function AgendaManager({
           <MonthView
             date={date} appts={appts} pros={pros} activePros={activePros}
             onDayClick={d => { setDate(d); setView("dia"); }}
-            onNewAppt={d => openCreate(d)}
+            onNewAppt={d => openCreate(d)} canCreate={canManageAppointments}
           />
         ) : view === "semana" ? (
           <>
@@ -1762,7 +1788,7 @@ export function AgendaManager({
               <div className="flex-1 min-h-0">
                 <AgendaList
                   date={weekDay} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                  canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                  canManageSchedule={canManageSchedule} canCreate={canManageAppointments} myMemberId={myMemberId}
                   onApptClick={a => setDetailAppt(a)}
                   onNewAppt={d => openCreate(d)}
                   onDeleteBlock={deleteBlock}
@@ -1773,7 +1799,7 @@ export function AgendaManager({
             <div className="hidden sm:block h-full">
               <WeekView
                 date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                canManageSchedule={canManageSchedule} canCreate={canManageAppointments} myMemberId={myMemberId}
                 onApptClick={a => setDetailAppt(a)}
                 onDayClick={d => { setDate(d); setView("dia"); }}
                 onSlotClick={(d, time) => openCreate(d, undefined, time)}
@@ -1787,7 +1813,7 @@ export function AgendaManager({
             <div className="sm:hidden h-full">
               <AgendaList
                 date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                canManageSchedule={canManageSchedule} canCreate={canManageAppointments} myMemberId={myMemberId}
                 onApptClick={a => setDetailAppt(a)}
                 onNewAppt={d => openCreate(d)}
                 onDeleteBlock={deleteBlock}
@@ -1796,7 +1822,7 @@ export function AgendaManager({
             <div className="hidden sm:block h-full">
               <DayView
                 date={date} appts={appts} blocks={blocks} pros={pros} activePros={activePros}
-                canManageSchedule={canManageSchedule} myMemberId={myMemberId}
+                canManageSchedule={canManageSchedule} canCreate={canManageAppointments} myMemberId={myMemberId}
                 onApptClick={a => setDetailAppt(a)}
                 onSlotClick={(d, proId, time) => openCreate(d, proId, time)}
                 onDeleteBlock={deleteBlock}
