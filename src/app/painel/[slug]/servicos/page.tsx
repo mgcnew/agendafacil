@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { buildServiceInsightMap, type ServiceInsightRow } from "@/lib/serviceInsights";
 import { ServicesManager } from "./ServicesManager";
@@ -14,6 +14,12 @@ export default async function ServicosPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // O menu já exigia services.manage pra mostrar o link; a rota ficava
+  // aberta a quem digitasse a URL. Preço, custo e comissão de cada serviço
+  // não são informação de todo mundo do salão.
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
 
   const supabase = await createClient();
   const [{ data: services }, { data: products }, { data: serviceProducts }, { data: categories }, { data: insightRows }] =

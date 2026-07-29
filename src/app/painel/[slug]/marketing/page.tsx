@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { getCredits } from "@/lib/marketing/credits";
 import { MarketingManager } from "./MarketingManager";
@@ -14,6 +14,11 @@ export default async function MarketingPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // Mesma permissão que o menu já declarava. A tela gasta créditos de
+  // geração de arte, então não é só leitura.
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
 
   const supabase = await createClient();
   const salonId = membership.salon_id;

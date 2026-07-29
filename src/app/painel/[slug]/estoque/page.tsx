@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { buildProductInsightMap, type ProductInsightRow } from "@/lib/productInsights";
@@ -16,6 +16,11 @@ export default async function EstoquePage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // O menu já exigia inventory.view; a rota estava aberta. A tela mostra custo
+  // de compra de cada produto, que é margem do salão.
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  if (!perms.has("inventory.view")) redirect(`/painel/${slug}`);
   await guardFeature(slug, "/estoque");
 
   const supabase = await createClient();
@@ -31,7 +36,8 @@ export default async function EstoquePage({
     supabase.rpc("product_movement_stats" as never, { p_salon: membership.salon_id } as never),
   ]);
 
-  const canManage = membership.role === "owner" || membership.role === "manager";
+  // Era cargo fixo no código, ignorando "Gerenciar estoque" em Acessos.
+  const canManage = perms.has("inventory.manage");
   const insights = buildProductInsightMap((insightRows as ProductInsightRow[] | null) ?? []);
   const movementRows = (movements ?? []) as unknown as Movement[];
   const movementsHasMore = movementRows.length > MOVEMENTS_PAGE_SIZE;

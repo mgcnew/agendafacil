@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { computeVipIds, type ClientOverviewRow } from "@/lib/clients";
 import { ClientsManager } from "./ClientsManager";
@@ -14,6 +14,11 @@ export default async function ClientesPage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // O menu já exigia clients.view; a rota estava aberta a quem digitasse a URL.
+  // A ficha do cliente tem telefone, e-mail, aniversário e anamnese.
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  if (!perms.has("clients.view")) redirect(`/painel/${slug}`);
 
   const supabase = await createClient();
   const [{ data: clients }, { data: overview }] = await Promise.all([
@@ -33,10 +38,10 @@ export default async function ClientesPage({
 
   const vipIds = Array.from(computeVipIds((overview as ClientOverviewRow[] | null) ?? []));
 
-  const canManage =
-    membership.role === "owner" ||
-    membership.role === "manager" ||
-    membership.role === "receptionist";
+  // Era a lista de cargos no código, que ignorava "Gerenciar clientes" em
+  // Acessos: desligar lá não tirava os botões da tela. O RLS barrava no
+  // salvamento, então virava erro em vez de campo bloqueado.
+  const canManage = perms.has("clients.manage");
 
   return (
     <ClientsManager

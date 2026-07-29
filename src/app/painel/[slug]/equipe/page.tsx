@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +15,13 @@ export default async function EquipePage({
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
+
+  // Esta página carrega e-mail de todos os colegas, convites pendentes e o
+  // percentual de comissão de cada serviço. O menu já exigia team.manage pra
+  // mostrar o link, mas a rota estava aberta: bastava digitar a URL. Esconder
+  // link não é controle de acesso.
+  const perms = await getEffectivePermissions(membership.salon_id, membership);
+  if (!perms.has("team.manage")) redirect(`/painel/${slug}`);
 
   // Aba Finanças (comissões) é conceito do Caixa & Comissões → só Pro/Max.
   const access = await getAccessStatus(slug);
