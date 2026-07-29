@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import NextImage from "next/image";
 import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import {
   CaretRight,
   CircleNotch,
   Images,
+  MagnifyingGlassMinus,
   MagnifyingGlassPlus,
   Plus,
   Trash,
@@ -54,6 +56,8 @@ async function compressImage(file: File, maxDim = 1200, quality = 0.85): Promise
   }
 }
 
+const ZOOM = 2.5;
+
 function LightboxModal({
   photos,
   initialIdx,
@@ -64,13 +68,36 @@ function LightboxModal({
   onClose: () => void;
 }) {
   const [idx, setIdx] = useState(initialIdx);
-  const thumbRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const arrastando = useRef<{ x: number; y: number } | null>(null);
+  // Espelho do ref em estado: a transição da foto depende dele para renderizar,
+  // e ref não pode ser lido durante a renderização.
+  const [movendo, setMovendo] = useState(false);
+  const tiraRef = useRef<HTMLDivElement>(null);
+  const ativaRef = useRef<HTMLButtonElement>(null);
 
-  const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
-  const next = () => setIdx((i) => (i + 1) % photos.length);
+  // Trocar de foto sempre volta ao tamanho normal: a próxima entrando já
+  // ampliada ficaria deslocada no ponto errado.
+  const irPara = useCallback((i: number) => {
+    setIdx(i);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
-  // teclado
-  useState(() => {
+  const prev = useCallback(
+    () => irPara((idx - 1 + photos.length) % photos.length),
+    [irPara, idx, photos.length],
+  );
+  const next = useCallback(
+    () => irPara((idx + 1) % photos.length),
+    [irPara, idx, photos.length],
+  );
+
+  // Antes isto vivia dentro de um useState(() => …): o listener era registrado
+  // durante a renderização e o cleanup virava VALOR de estado, nunca chamado.
+  // Cada abertura do lightbox deixava mais um listener preso na window.
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
@@ -78,82 +105,182 @@ function LightboxModal({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  });
+  }, [prev, next, onClose]);
 
-  // swipe touch
-  const touchX = useRef<number | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0].clientX; };
+  // Sem isto a página continua rolando atrás da foto ampliada.
+  useEffect(() => {
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = antes; };
+  }, []);
+
+  // Com muitas fotos a tira passa da largura da tela: sem isto, navegar pelas
+  // setas movia a foto grande e a miniatura ativa ficava fora de vista.
+  useEffect(() => {
+    ativaRef.current?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [idx]);
+
+  const swipeX = useRef<number | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    // Com zoom, o arrasto é para deslocar a foto, não para trocar de foto.
+    swipeX.current = zoom > 1 ? null : e.touches[0].clientX;
+  };
   const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
-    touchX.current = null;
+    if (swipeX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeX.current;
+    if (Math.abs(dx) > 40) {
+      if (dx < 0) next(); else prev();
+    }
+    swipeX.current = null;
   };
 
-  const photo = photos[idx];
+  function alternarZoom() {
+    setZoom((z) => (z > 1 ? 1 : ZOOM));
+    setPan({ x: 0, y: 0 });
+  }
 
-  return (
+  function onPointerDown(e: React.PointerEvent) {
+    if (zoom === 1) return;
+    arrastando.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    setMovendo(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!arrastando.current) return;
+    setPan({ x: e.clientX - arrastando.current.x, y: e.clientY - arrastando.current.y });
+  }
+  function onPointerUp() {
+    arrastando.current = null;
+    setMovendo(false);
+  }
+
+  const photo = photos[idx];
+  // O lightbox só existe depois de um clique, então nunca renderiza no
+  // servidor — a guarda é só para o portal não procurar body onde não há DOM.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    // Portal para o body de propósito. A página da Galeria tem `af-rise`, que
+    // termina em `transform: translateY(0)` por causa do fill-mode `both` — e
+    // QUALQUER transform diferente de none faz o elemento virar bloco de
+    // contenção para descendentes `fixed`. O lightbox estava sendo medido
+    // contra a div da galeria, não contra a janela: com poucas fotos essa div
+    // é baixa, e a foto "ampliada" saía menor que a miniatura.
     <div
-      className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+      className="fixed inset-0 z-50 flex flex-col bg-black/95"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* top bar */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0">
-        <span className="text-white/60 text-sm">{idx + 1} / {photos.length}</span>
-        <button onClick={onClose} className="p-2 text-white/70 hover:text-white transition">
-          <X className="h-5 w-5" />
-        </button>
+      <div className="flex shrink-0 items-center justify-between px-4 py-3">
+        <span className="text-sm tabular-nums text-white/60">
+          {idx + 1} / {photos.length}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={alternarZoom}
+            aria-pressed={zoom > 1}
+            title={zoom > 1 ? "Reduzir" : "Ampliar"}
+            className={cn(
+              "rounded-full p-2 transition",
+              zoom > 1 ? "bg-white/20 text-white" : "text-white/70 hover:bg-white/10 hover:text-white",
+            )}
+          >
+            {zoom > 1
+              ? <MagnifyingGlassMinus className="h-5 w-5" />
+              : <MagnifyingGlassPlus className="h-5 w-5" />}
+          </button>
+          <button
+            onClick={onClose}
+            title="Fechar"
+            className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
-      {/* imagem principal */}
-      <div className="flex-1 flex items-center justify-center relative px-12 min-h-0">
-        {photos.length > 1 && (
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-2 sm:px-14">
+        {photos.length > 1 && zoom === 1 && (
           <button
             onClick={prev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+            aria-label="Foto anterior"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
           >
             <CaretLeft className="h-6 w-6" />
           </button>
         )}
+
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={photo.id}
           src={photo.url}
           alt={photo.caption ?? `Foto ${idx + 1}`}
-          className="max-h-full max-w-full object-contain rounded-lg select-none af-rise"
+          onClick={alternarZoom}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          draggable={false}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            // Só anima o zoom; animar o arrasto deixaria a foto "escorregando"
+            // atrás do dedo.
+            transition: movendo ? "none" : "transform 0.2s ease-out",
+          }}
+          className={cn(
+            "max-h-full max-w-full select-none rounded-lg object-contain",
+            zoom > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
+          )}
         />
-        {photos.length > 1 && (
+
+        {photos.length > 1 && zoom === 1 && (
           <button
             onClick={next}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+            aria-label="Próxima foto"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
           >
             <CaretRight className="h-6 w-6" />
           </button>
         )}
       </div>
 
-      {/* miniaturas */}
+      {/* A legenda existia no banco e na tela pública, e aqui era ignorada — o
+          dono não tinha onde conferir o que o cliente lê. */}
+      {photo.caption && (
+        <p className="shrink-0 px-6 pt-2 text-center text-sm text-white/70">{photo.caption}</p>
+      )}
+
       {photos.length > 1 && (
-        <div
-          ref={thumbRef}
-          className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 justify-center"
-        >
-          {photos.map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setIdx(i)}
-              className={cn(
-                "relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition",
-                i === idx ? "border-primary opacity-100" : "border-transparent opacity-50 hover:opacity-75",
-              )}
-            >
-              <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
-            </button>
-          ))}
+        <div ref={tiraRef} className="shrink-0 overflow-x-auto scrollbar-none px-4 py-3">
+          {/* w-max + mx-auto centraliza quando cabe e continua rolável quando
+              não cabe. Com justify-center num container que rola, o começo da
+              tira fica inalcançável. */}
+          <div className="mx-auto flex w-max gap-2">
+            {photos.map((p, i) => (
+              <button
+                key={p.id}
+                ref={i === idx ? ativaRef : undefined}
+                onClick={() => irPara(i)}
+                aria-label={`Ver foto ${i + 1}`}
+                className={cn(
+                  "relative h-14 w-20 shrink-0 overflow-hidden rounded-md border-2 transition",
+                  i === idx
+                    ? "border-primary opacity-100"
+                    : "border-transparent opacity-50 hover:opacity-75",
+                )}
+              >
+                <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
+              </button>
+            ))}
+          </div>
         </div>
       )}
-    </div>
+
+      <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-white/40">
+        {zoom > 1 ? "Arraste para mover · toque para reduzir" : "Toque na foto para ampliar"}
+      </p>
+    </div>,
+    document.body,
   );
 }
 
@@ -274,33 +401,41 @@ export function GaleriaManager({
           onDrop={canManage ? onDrop : undefined}
         >
           {photos.map((p, i) => (
-            <div key={p.id} className="group relative aspect-square rounded-[var(--radius)] overflow-hidden bg-muted">
-              <NextImage
-                src={p.url}
-                alt={p.caption ?? `Foto ${i + 1}`}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-cover transition group-hover:scale-105 duration-300"
-              />
-              {/* overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+            // A foto inteira abre o lightbox. Antes só a lupa abria, e ela
+            // vivia dentro de um overlay `group-hover` — no celular, onde não
+            // existe hover, tocar na foto simplesmente não fazia nada.
+            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-[var(--radius)] bg-muted">
+              <button
+                onClick={() => setLightbox(i)}
+                aria-label={`Ampliar foto ${i + 1}`}
+                className="absolute inset-0"
+              >
+                <NextImage
+                  src={p.url}
+                  alt={p.caption ?? `Foto ${i + 1}`}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-cover transition duration-300 group-hover:scale-105"
+                />
+                <span className="absolute inset-0 hidden items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100 sm:flex">
+                  <span className="rounded-full bg-white/20 p-2 text-white">
+                    <MagnifyingGlassPlus className="h-4 w-4" />
+                  </span>
+                </span>
+              </button>
+
+              {/* No celular fica sempre visível: com hover-only, apagar uma
+                  foto era impossível pelo telefone. */}
+              {canManage && (
                 <button
-                  onClick={() => setLightbox(i)}
-                  className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-                  title="Ampliar"
+                  onClick={() => remove(p.id)}
+                  title="Remover"
+                  aria-label={`Remover foto ${i + 1}`}
+                  className="absolute right-1.5 top-1.5 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-red-500/85 sm:opacity-0 sm:group-hover:opacity-100"
                 >
-                  <MagnifyingGlassPlus className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </button>
-                {canManage && (
-                  <button
-                    onClick={() => remove(p.id)}
-                    className="p-2 rounded-full bg-white/20 hover:bg-red-500/80 text-white transition"
-                    title="Remover"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           ))}
 
