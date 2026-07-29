@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { getCredits } from "@/lib/marketing/credits";
@@ -18,7 +19,9 @@ export default async function MarketingPage({
   // Mesma permissão que o menu já declarava. A tela gasta créditos de
   // geração de arte, então não é só leitura.
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
+  if (!perms.has("marketing.manage")) {
+    return <AccessDenied slug={slug} permissao="Criar artes de divulgação (usa créditos)" />;
+  }
 
   const supabase = await createClient();
   const salonId = membership.salon_id;

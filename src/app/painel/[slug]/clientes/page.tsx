@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { computeVipIds, type ClientOverviewRow } from "@/lib/clients";
@@ -18,7 +19,9 @@ export default async function ClientesPage({
   // O menu já exigia clients.view; a rota estava aberta a quem digitasse a URL.
   // A ficha do cliente tem telefone, e-mail, aniversário e anamnese.
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("clients.view")) redirect(`/painel/${slug}`);
+  if (!perms.has("clients.view")) {
+    return <AccessDenied slug={slug} permissao="Visualizar clientes" />;
+  }
 
   const supabase = await createClient();
   const [{ data: clients }, { data: overview }] = await Promise.all([

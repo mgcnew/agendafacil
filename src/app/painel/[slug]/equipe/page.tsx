@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
@@ -21,7 +22,9 @@ export default async function EquipePage({
   // mostrar o link, mas a rota estava aberta: bastava digitar a URL. Esconder
   // link não é controle de acesso.
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("team.manage")) redirect(`/painel/${slug}`);
+  if (!perms.has("team.manage")) {
+    return <AccessDenied slug={slug} permissao="Gerenciar equipe e permissões" />;
+  }
 
   // Aba Finanças (comissões) é conceito do Caixa & Comissões → só Pro/Max.
   const access = await getAccessStatus(slug);

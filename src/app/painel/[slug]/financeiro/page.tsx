@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +37,9 @@ export default async function FinanceiroPage({
   // esconder o link e deixar a rota aberta não é controle de acesso — é
   // decoração. Mesmo padrão de /pacotes e /relatorios.
   const perms = await getEffectivePermissions(salonId, membership);
-  if (!perms.has("cash.view")) redirect(`/painel/${slug}`);
+  if (!perms.has("cash.view")) {
+    return <AccessDenied slug={slug} permissao="Abrir a tela do Caixa" />;
+  }
 
   const supabase = await createClient();
 

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +20,9 @@ export default async function PacotesPage({
   const salonId = membership.salon_id;
 
   const perms = await getEffectivePermissions(salonId, membership);
-  if (!perms.has("packages.view")) redirect(`/painel/${slug}`);
+  if (!perms.has("packages.view")) {
+    return <AccessDenied slug={slug} permissao="Visualizar pacotes" />;
+  }
   const canManage = perms.has("packages.manage");
 
   const supabase = await createClient();

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -20,7 +21,9 @@ export default async function EstoquePage({
   // O menu já exigia inventory.view; a rota estava aberta. A tela mostra custo
   // de compra de cada produto, que é margem do salão.
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("inventory.view")) redirect(`/painel/${slug}`);
+  if (!perms.has("inventory.view")) {
+    return <AccessDenied slug={slug} permissao="Visualizar estoque" />;
+  }
   await guardFeature(slug, "/estoque");
 
   const supabase = await createClient();

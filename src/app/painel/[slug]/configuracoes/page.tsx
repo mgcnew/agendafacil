@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +23,16 @@ export default async function ConfigPage({
   const canManageSalon = perms.has("salon.manage");
   const canManageSchedule = perms.has("schedule.manage");
   const canManageTeam = perms.has("team.manage");
-  if (!canManageSalon && !canManageSchedule && !canManageTeam) redirect(`/painel/${slug}`);
+  // Assinatura e WhatsApp saíram de salon.manage: o dono passa a poder liberar
+  // "conectar o WhatsApp" sem entregar junto o cadastro inteiro do salão.
+  const canManageWhatsApp = perms.has("whatsapp.manage");
+  const canManageBilling = perms.has("billing.manage");
+  if (
+    !canManageSalon && !canManageSchedule && !canManageTeam &&
+    !canManageWhatsApp && !canManageBilling
+  ) {
+    return <AccessDenied slug={slug} titulo="Você não tem acesso às configurações" />;
+  }
 
   const supabase = await createClient();
   const [{ data: salon }, { data: pros }, { data: hours }, { data: permList }, { data: roleDefaults }, { data: salonRolePerms }, { data: ownerMember }] =
@@ -75,6 +85,8 @@ export default async function ConfigPage({
       canManageSalon={canManageSalon}
       canManageSchedule={canManageSchedule}
       canManageTeam={canManageTeam}
+      canManageWhatsApp={canManageWhatsApp}
+      canManageBilling={canManageBilling}
       pros={proList}
       initialHours={hours ?? []}
       initialTab={tab}

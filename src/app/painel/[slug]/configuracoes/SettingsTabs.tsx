@@ -18,6 +18,7 @@ import { SubscribePanel } from "../assinatura/SubscribePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
+  ArrowClockwise,
   ArrowLeft,
   CaretRight,
   Check,
@@ -58,7 +59,7 @@ const TAB_META: {
   label: string;
   hint: string;
   icon: typeof Storefront;
-  need: "salon" | "schedule" | "team";
+  need: "salon" | "schedule" | "team" | "whatsapp" | "billing";
 }[] = [
   { id: "estabelecimento", label: "Estabelecimento", hint: "Nome, endereço, contato e logo", icon: Storefront, need: "salon" },
   { id: "horarios", label: "Horários", hint: "Dias e horários de atendimento", icon: Clock, need: "schedule" },
@@ -66,8 +67,8 @@ const TAB_META: {
   { id: "caixa", label: "Caixa", hint: "Formas de pagamento e comissões", icon: Wallet, need: "salon" },
   { id: "acessos", label: "Acessos", hint: "O que cada cargo pode ver e fazer", icon: ShieldCheck, need: "team" },
   { id: "aparencia", label: "Aparência", hint: "Cores e tema da sua página", icon: Palette, need: "salon" },
-  { id: "whatsapp", label: "WhatsApp", hint: "Conexão e mensagens automáticas", icon: WhatsappLogo, need: "salon" },
-  { id: "assinatura", label: "Assinatura", hint: "Plano, cobrança e faturas", icon: CreditCard, need: "salon" },
+  { id: "whatsapp", label: "WhatsApp", hint: "Conexão e mensagens automáticas", icon: WhatsappLogo, need: "whatsapp" },
+  { id: "assinatura", label: "Assinatura", hint: "Plano, cobrança e faturas", icon: CreditCard, need: "billing" },
 ];
 
 export function SettingsTabs({
@@ -77,6 +78,8 @@ export function SettingsTabs({
   canManageSalon,
   canManageSchedule,
   canManageTeam,
+  canManageWhatsApp,
+  canManageBilling,
   pros,
   initialHours,
   initialTab,
@@ -91,6 +94,8 @@ export function SettingsTabs({
   canManageSalon: boolean;
   canManageSchedule: boolean;
   canManageTeam: boolean;
+  canManageWhatsApp: boolean;
+  canManageBilling: boolean;
   pros: Pro[];
   initialHours: Tables<"working_hours">[];
   initialTab?: string;
@@ -104,10 +109,16 @@ export function SettingsTabs({
 
   const tabs = useMemo(
     () =>
-      TAB_META.filter((t) =>
-        t.need === "schedule" ? canManageSchedule : t.need === "team" ? canManageTeam : canManageSalon,
-      ),
-    [canManageSalon, canManageSchedule, canManageTeam],
+      TAB_META.filter((t) => {
+        switch (t.need) {
+          case "schedule": return canManageSchedule;
+          case "team":     return canManageTeam;
+          case "whatsapp": return canManageWhatsApp;
+          case "billing":  return canManageBilling;
+          default:         return canManageSalon;
+        }
+      }),
+    [canManageSalon, canManageSchedule, canManageTeam, canManageWhatsApp, canManageBilling],
   );
 
   const validInitial = tabs.find((t) => t.id === initialTab)?.id;
@@ -291,37 +302,85 @@ function AccessPanel({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // estado efetivo inicial por cargo: default global ⊕ ajuste do salão
-  const initialFor = (r: Role) => {
-    const map: Record<string, boolean> = {};
-    for (const rd of roleDefaults) if (rd.role === r) map[rd.permission_key] = rd.allowed;
-    for (const sr of salonRolePerms) if (sr.role === r) map[sr.permission_key] = sr.allowed;
-    return map;
-  };
+  // Padrão global do cargo, sem os ajustes do salão. É o que permite mostrar
+  // "voltou ao padrão" e oferecer o botão de restaurar.
+  const padraoPorCargo = useMemo(() => {
+    const out: Record<string, Record<string, boolean>> = {
+      manager: {},
+      professional: {},
+      receptionist: {},
+    };
+    for (const rd of roleDefaults) {
+      if (out[rd.role]) out[rd.role][rd.permission_key] = rd.allowed;
+    }
+    return out;
+  }, [roleDefaults]);
 
-  const [state, setState] = useState<Record<Role, Record<string, boolean>>>({
-    manager: initialFor("manager"),
-    professional: initialFor("professional"),
-    receptionist: initialFor("receptionist"),
-  });
+  // Estado efetivo: padrão do cargo ⊕ ajuste que este salão já salvou.
+  const inicial = useMemo(() => {
+    const monta = (r: Role) => {
+      const map: Record<string, boolean> = { ...padraoPorCargo[r] };
+      for (const sr of salonRolePerms) if (sr.role === r) map[sr.permission_key] = sr.allowed;
+      return map;
+    };
+    return {
+      manager: monta("manager"),
+      professional: monta("professional"),
+      receptionist: monta("receptionist"),
+    } as Record<Role, Record<string, boolean>>;
+  }, [padraoPorCargo, salonRolePerms]);
+
+  const [state, setState] = useState(inicial);
 
   function toggle(key: string) {
     setState((s) => ({ ...s, [role]: { ...s[role], [key]: !s[role][key] } }));
     setSaved(false);
   }
 
+  function restaurarPadrao() {
+    setState((s) => ({ ...s, [role]: { ...padraoPorCargo[role] } }));
+    setSaved(false);
+  }
+
+  // Quantas mudanças não salvas existem em CADA cargo. É o que impede a perda
+  // silenciosa que existia antes: quem editava Gerente, trocava pra Recepção e
+  // salvava perdia o primeiro sem nenhum aviso.
+  const pendentes = useMemo(() => {
+    const conta = (r: Role) =>
+      permissions.filter((p) => !!state[r][p.key] !== !!inicial[r][p.key]).length;
+    return {
+      manager: conta("manager"),
+      professional: conta("professional"),
+      receptionist: conta("receptionist"),
+    } as Record<Role, number>;
+  }, [state, inicial, permissions]);
+
+  const totalPendente = pendentes.manager + pendentes.professional + pendentes.receptionist;
+  const liberadas = permissions.filter((p) => !!state[role][p.key]).length;
+
   async function save() {
     setSaving(true);
     setSaved(false);
     setError(null);
     const supabase = createClient();
-    // grava o cargo atual como overrides explícitos do salão
-    const rows = permissions.map((p) => ({
-      salon_id: salonId,
-      role,
-      permission_key: p.key,
-      allowed: !!state[role][p.key],
-    }));
+
+    // Grava TODOS os cargos com pendência, não só o que está na tela.
+    const rows = (Object.keys(pendentes) as Role[])
+      .filter((r) => pendentes[r] > 0)
+      .flatMap((r) =>
+        permissions.map((p) => ({
+          salon_id: salonId,
+          role: r,
+          permission_key: p.key,
+          allowed: !!state[r][p.key],
+        })),
+      );
+
+    if (rows.length === 0) {
+      setSaving(false);
+      return;
+    }
+
     const { error: e } = await supabase
       .from("salon_role_permissions")
       .upsert(rows, { onConflict: "salon_id,role,permission_key" });
@@ -341,60 +400,160 @@ function AccessPanel({
   }, {});
 
   return (
-    <div className="space-y-5">
-      <Card className="p-6 space-y-5">
-        <div>
-          <h2 className="font-display font-semibold">Acessos por cargo</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Defina o que cada cargo pode fazer no seu salão. Ajustes por pessoa (exceções) ficam na página Equipe.
-            A proprietária sempre tem acesso total.
+    <div className="space-y-4 pb-24">
+      <Card className="p-6">
+        <h2 className="font-display font-semibold">Acessos por cargo</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Defina o que cada cargo pode ver e fazer. Exceções para uma pessoa
+          específica ficam na página Equipe — quem é dono sempre tem acesso total.
+        </p>
+
+        {/* Seletor de cargo. O número de pendências fica no próprio botão:
+            é o que avisa que existe alteração esperando em outro cargo. */}
+        <div className="mt-5 flex flex-wrap gap-1 rounded-[var(--radius)] border border-border p-1">
+          {(Object.keys(ROLE_LABELS) as Role[]).map((r) => {
+            const on = role === r;
+            return (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className={cn(
+                  "flex items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-3.5 py-2 text-sm font-medium transition",
+                  on
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {ROLE_LABELS[r]}
+                {pendentes[r] > 0 && (
+                  <span
+                    className={cn(
+                      "grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums",
+                      on ? "bg-white/25 text-primary-foreground" : "bg-amber-500/15 text-amber-600",
+                    )}
+                    title={`${pendentes[r]} alteração(ões) não salva(s)`}
+                  >
+                    {pendentes[r]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground">
+            <b className="text-foreground tabular-nums">{liberadas}</b> de{" "}
+            <span className="tabular-nums">{permissions.length}</span> liberadas para{" "}
+            {ROLE_LABELS[role]}
           </p>
+          <button
+            onClick={restaurarPadrao}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ArrowClockwise className="h-4 w-4" /> Restaurar padrão do cargo
+          </button>
         </div>
+      </Card>
 
-        {/* Seletor de cargo */}
-        <div className="flex gap-1 rounded-[var(--radius)] border border-border p-1 w-fit">
-          {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-[calc(var(--radius)-0.25rem)] transition ${
-                role === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {ROLE_LABELS[r]}
-            </button>
-          ))}
-        </div>
+      {Object.entries(grouped).map(([cat, perms]) => {
+        const ligadas = perms.filter((p) => !!state[role][p.key]).length;
+        return (
+          <Card key={cat} className="overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {cat}
+              </p>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {ligadas}/{perms.length}
+              </span>
+            </div>
 
-        {/* Matriz de permissões do cargo */}
-        <div className="space-y-5">
-          {Object.entries(grouped).map(([cat, perms]) => (
-            <div key={cat}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cat}</p>
-              <div className="space-y-1">
-                {perms.map((p) => {
-                  const on = !!state[role][p.key];
-                  return (
-                    <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
+            <ul className="divide-y divide-border">
+              {perms.map((p) => {
+                const on = !!state[role][p.key];
+                const padrao = !!padraoPorCargo[role][p.key];
+                const alterado = on !== !!inicial[role][p.key];
+                return (
+                  <li key={p.key}>
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-muted/60",
+                        alterado && "bg-amber-500/[0.06]",
+                      )}
+                    >
                       <button
                         type="button"
                         onClick={() => toggle(p.key)}
                         aria-pressed={on}
-                        className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
+                        aria-label={p.label}
+                        className={cn(
+                          "relative h-6 w-11 shrink-0 rounded-full transition",
+                          on ? "bg-primary" : "bg-muted-foreground/30",
+                        )}
                       >
-                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+                        <span
+                          className={cn(
+                            "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all",
+                            on ? "left-[22px]" : "left-0.5",
+                          )}
+                        />
                       </button>
-                      <span className="flex-1 text-sm">{p.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
 
-      <SaveBar onSave={save} saving={saving} saved={saved} error={error} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm">{p.label}</span>
+                        {/* Só aparece quando difere do padrão: dizer "padrão:
+                            liberado" em tudo viraria ruído e ninguém leria. */}
+                        {on !== padrao && (
+                          <span className="block text-xs text-muted-foreground">
+                            Padrão do cargo: {padrao ? "liberado" : "bloqueado"}
+                          </span>
+                        )}
+                      </span>
+
+                      {alterado && (
+                        <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
+                          alterado
+                        </span>
+                      )}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })}
+
+      {/* Barra fixa: só existe quando há o que salvar, e diz exatamente o que
+          será gravado — inclusive de cargos que não estão na tela. */}
+      {(totalPendente > 0 || saving || saved || error) && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur-md lg:left-[var(--sidebar-w,0px)]">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-2">
+            <p className="text-sm">
+              {error ? (
+                <span className="text-red-600">{error}</span>
+              ) : saved ? (
+                <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+                  <Check className="h-4 w-4" /> Permissões salvas
+                </span>
+              ) : (
+                <>
+                  <b className="tabular-nums">{totalPendente}</b> alteraç
+                  {totalPendente === 1 ? "ão" : "ões"} em{" "}
+                  {(Object.keys(pendentes) as Role[])
+                    .filter((r) => pendentes[r] > 0)
+                    .map((r) => ROLE_LABELS[r])
+                    .join(", ")}
+                </>
+              )}
+            </p>
+            <Button onClick={save} disabled={saving || totalPendente === 0}>
+              {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar alterações
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

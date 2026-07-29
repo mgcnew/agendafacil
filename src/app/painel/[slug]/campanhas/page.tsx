@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,9 @@ export default async function CampanhasPage({
   await guardFeature(slug, "/campanhas");
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
+  if (!perms.has("campaigns.manage")) {
+    return <AccessDenied slug={slug} permissao="Disparar campanhas e recuperar clientes" />;
+  }
 
   const supabase = await createClient();
   const [{ data: campaigns }, { data: services }, { data: campaignServices }, { data: performanceRows }] = await Promise.all([

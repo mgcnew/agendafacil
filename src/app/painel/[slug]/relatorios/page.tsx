@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ export default async function RelatoriosPage({
   // Relatórios são restritos: dona sempre; demais só com permissão reports.view
   const perms = await getEffectivePermissions(membership.salon_id, membership);
   if (membership.role !== "owner" && !perms.has("reports.view")) {
-    redirect(`/painel/${slug}`);
+    return <AccessDenied slug={slug} permissao="Visualizar relatórios" />;
   }
 
   const cmes = currentMonthBR();

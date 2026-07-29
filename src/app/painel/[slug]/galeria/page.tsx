@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { GaleriaManager } from "./GaleriaManager";
@@ -15,7 +16,7 @@ export default async function GaleriaPage({
   if (!membership) redirect("/painel");
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  const canManage = perms.has("salon.manage");
+  const canManage = perms.has("gallery.manage");
 
   const supabase = await createClient();
   const { data: photos } = await supabase

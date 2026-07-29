@@ -34,10 +34,10 @@ const NAV_GROUPS: NavGroupDef[] = [
   {
     label: "Crescimento",
     items: [
-      { item: { href: "/campanhas", label: "Campanhas", icon: "BadgePercent" }, perms: ["services.manage"] },
-      { item: { href: "/recuperar", label: "Recuperar", icon: "Recover" }, perms: ["clients.view"] },
-      { item: { href: "/marketing", label: "Divulgação", icon: "Megaphone" }, perms: ["services.manage"] },
-      { item: { href: "/galeria", label: "Galeria", icon: "Images" }, perms: ["salon.manage"] },
+      { item: { href: "/campanhas", label: "Campanhas", icon: "BadgePercent" }, perms: ["campaigns.manage"] },
+      { item: { href: "/recuperar", label: "Recuperar", icon: "Recover" }, perms: ["campaigns.manage"] },
+      { item: { href: "/marketing", label: "Divulgação", icon: "Megaphone" }, perms: ["marketing.manage"] },
+      { item: { href: "/galeria", label: "Galeria", icon: "Images" }, perms: ["gallery.manage"] },
     ],
   },
   {
@@ -57,7 +57,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     label: "Sistema",
     items: [
       // Horários virou tab dentro de Configurações
-      { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage", "team.manage"] },
+      { item: { href: "/configuracoes", label: "Configurações", icon: "Settings" }, perms: ["salon.manage", "schedule.manage", "team.manage", "whatsapp.manage", "billing.manage"] },
     ],
   },
 ];

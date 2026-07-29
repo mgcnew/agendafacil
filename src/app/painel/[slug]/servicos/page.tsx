@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { buildServiceInsightMap, type ServiceInsightRow } from "@/lib/serviceInsights";
@@ -19,7 +20,9 @@ export default async function ServicosPage({
   // aberta a quem digitasse a URL. Preço, custo e comissão de cada serviço
   // não são informação de todo mundo do salão.
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("services.manage")) redirect(`/painel/${slug}`);
+  if (!perms.has("services.manage")) {
+    return <AccessDenied slug={slug} permissao="Gerenciar serviços e categorias" />;
+  }
 
   const supabase = await createClient();
   const [{ data: services }, { data: products }, { data: serviceProducts }, { data: categories }, { data: insightRows }] =
