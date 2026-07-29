@@ -1,4 +1,4 @@
-import { FacebookLogo, GoogleLogo, InstagramLogo } from "@phosphor-icons/react/dist/ssr";
+import { FacebookLogo, InstagramLogo } from "@phosphor-icons/react/dist/ssr";
 import { socialLinks } from "@/lib/social";
 
 type Fonte = {
@@ -33,31 +33,25 @@ export function SocialLinksRow({
   // agendamentos". Ícone pequeno de propósito: é identidade, não chamada pra
   // ação. Um cartão colorido de Instagram ali em cima competiria com o botão
   // de agendar, e quem sai pro feed antes de marcar costuma não voltar.
+  //
+  // SÓ Instagram aqui. É a rede onde salão e barbearia publicam trabalho, então
+  // é a única que o cliente tem motivo pra abrir ANTES de marcar (quer ver
+  // corte, unha, coloração). Facebook e Google não se veem antes: um é presença
+  // institucional, o outro é reputação — e reputação pesa depois do
+  // atendimento, na mensagem, não numa fileira de ícones no topo.
   if (variant === "cabecalho") {
-    const itens = [
-      links.instagram && { href: links.instagram, Icon: InstagramLogo, label: "Instagram" },
-      links.facebook && { href: links.facebook, Icon: FacebookLogo, label: "Facebook" },
-      links.google && { href: links.google, Icon: GoogleLogo, label: "Avaliações no Google" },
-    ].filter(Boolean) as { href: string; Icon: typeof InstagramLogo; label: string }[];
-
-    if (itens.length === 0) return null;
-
+    if (!links.instagram) return null;
     return (
-      <>
-        {itens.map(({ href, Icon, label }) => (
-          <a
-            key={label}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={label}
-            aria-label={label}
-            className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Icon className="h-[18px] w-[18px]" />
-          </a>
-        ))}
-      </>
+      <a
+        href={links.instagram}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Instagram"
+        aria-label="Ver o Instagram do salão"
+        className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+      >
+        <InstagramLogo className="h-[18px] w-[18px]" />
+      </a>
     );
   }
 
