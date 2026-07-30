@@ -268,6 +268,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string
+          home_address: string | null
           id: string
           inspiration_gallery_ids: string[]
           member_id: string
@@ -275,10 +276,13 @@ export type Database = {
           payment_method: string | null
           reminder_sent_at: string | null
           salon_id: string
+          service_mode: string
           source: string
           starts_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           total_price: number
+          travel_fee: number
+          travel_km: number | null
           updated_at: string
         }
         Insert: {
@@ -286,6 +290,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at: string
+          home_address?: string | null
           id?: string
           inspiration_gallery_ids?: string[]
           member_id: string
@@ -293,10 +298,13 @@ export type Database = {
           payment_method?: string | null
           reminder_sent_at?: string | null
           salon_id: string
+          service_mode?: string
           source?: string
           starts_at: string
           status?: Database["public"]["Enums"]["appointment_status"]
           total_price?: number
+          travel_fee?: number
+          travel_km?: number | null
           updated_at?: string
         }
         Update: {
@@ -304,6 +312,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at?: string
+          home_address?: string | null
           id?: string
           inspiration_gallery_ids?: string[]
           member_id?: string
@@ -311,10 +320,13 @@ export type Database = {
           payment_method?: string | null
           reminder_sent_at?: string | null
           salon_id?: string
+          service_mode?: string
           source?: string
           starts_at?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           total_price?: number
+          travel_fee?: number
+          travel_km?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -854,51 +866,75 @@ export type Database = {
         Row: {
           alert_summary: string | null
           birth_date: string | null
+          cep: string | null
+          city: string | null
+          complement: string | null
           created_at: string
+          distance_km: number | null
           email: string | null
           full_name: string
           id: string
           last_contacted_at: string | null
+          neighborhood: string | null
           notes: string | null
           phone: string | null
           photo_url: string | null
           profile_id: string | null
           referral_source: string | null
           salon_id: string
+          state: string | null
+          street: string | null
+          street_number: string | null
           whatsapp_opt_out: boolean
           whatsapp_opt_out_at: string | null
         }
         Insert: {
           alert_summary?: string | null
           birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          complement?: string | null
           created_at?: string
+          distance_km?: number | null
           email?: string | null
           full_name: string
           id?: string
           last_contacted_at?: string | null
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
           profile_id?: string | null
           referral_source?: string | null
           salon_id: string
+          state?: string | null
+          street?: string | null
+          street_number?: string | null
           whatsapp_opt_out?: boolean
           whatsapp_opt_out_at?: string | null
         }
         Update: {
           alert_summary?: string | null
           birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          complement?: string | null
           created_at?: string
+          distance_km?: number | null
           email?: string | null
           full_name?: string
           id?: string
           last_contacted_at?: string | null
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
           profile_id?: string | null
           referral_source?: string | null
           salon_id?: string
+          state?: string | null
+          street?: string | null
+          street_number?: string | null
           whatsapp_opt_out?: boolean
           whatsapp_opt_out_at?: string | null
         }
@@ -2090,7 +2126,15 @@ export type Database = {
           complement: string | null
           created_at: string
           email: string | null
+          facebook: string | null
+          google_business: string | null
+          home_extra_km_fee: number
+          home_first_km_fee: number
+          home_max_km: number | null
+          home_service_enabled: boolean
+          home_terms: string | null
           id: string
+          instagram: string | null
           is_active: boolean
           is_demo: boolean
           lat: number | null
@@ -2124,7 +2168,15 @@ export type Database = {
           complement?: string | null
           created_at?: string
           email?: string | null
+          facebook?: string | null
+          google_business?: string | null
+          home_extra_km_fee?: number
+          home_first_km_fee?: number
+          home_max_km?: number | null
+          home_service_enabled?: boolean
+          home_terms?: string | null
           id?: string
+          instagram?: string | null
           is_active?: boolean
           is_demo?: boolean
           lat?: number | null
@@ -2158,7 +2210,15 @@ export type Database = {
           complement?: string | null
           created_at?: string
           email?: string | null
+          facebook?: string | null
+          google_business?: string | null
+          home_extra_km_fee?: number
+          home_first_km_fee?: number
+          home_max_km?: number | null
+          home_service_enabled?: boolean
+          home_terms?: string | null
           id?: string
+          instagram?: string | null
           is_active?: boolean
           is_demo?: boolean
           lat?: number | null
@@ -2314,6 +2374,7 @@ export type Database = {
       }
       services: {
         Row: {
+          allows_home_service: boolean
           bring_own_tools: boolean
           category_id: string | null
           color: string | null
@@ -2331,6 +2392,7 @@ export type Database = {
           salon_id: string
         }
         Insert: {
+          allows_home_service?: boolean
           bring_own_tools?: boolean
           category_id?: string | null
           color?: string | null
@@ -2348,6 +2410,7 @@ export type Database = {
           salon_id: string
         }
         Update: {
+          allows_home_service?: boolean
           bring_own_tools?: boolean
           category_id?: string | null
           color?: string | null
@@ -3013,12 +3076,14 @@ export type Database = {
       }
       book_appointment: {
         Args: {
+          p_address?: Json
           p_client_name: string
           p_client_phone: string
           p_member: string
           p_notes?: string
           p_salon: string
           p_service_ids: string[]
+          p_service_mode?: string
           p_starts_at: string
         }
         Returns: {
@@ -3026,6 +3091,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string
+          home_address: string | null
           id: string
           inspiration_gallery_ids: string[]
           member_id: string
@@ -3033,10 +3099,13 @@ export type Database = {
           payment_method: string | null
           reminder_sent_at: string | null
           salon_id: string
+          service_mode: string
           source: string
           starts_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           total_price: number
+          travel_fee: number
+          travel_km: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3046,6 +3115,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      brl: { Args: { p: number }; Returns: string }
       campaign_discount: {
         Args: { p_on: string; p_salon: string; p_service: string }
         Returns: number
@@ -3149,7 +3219,15 @@ export type Database = {
           complement: string | null
           created_at: string
           email: string | null
+          facebook: string | null
+          google_business: string | null
+          home_extra_km_fee: number
+          home_first_km_fee: number
+          home_max_km: number | null
+          home_service_enabled: boolean
+          home_terms: string | null
           id: string
+          instagram: string | null
           is_active: boolean
           is_demo: boolean
           lat: number | null
@@ -3192,6 +3270,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string
+          home_address: string | null
           id: string
           inspiration_gallery_ids: string[]
           member_id: string
@@ -3199,10 +3278,13 @@ export type Database = {
           payment_method: string | null
           reminder_sent_at: string | null
           salon_id: string
+          service_mode: string
           source: string
           starts_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           total_price: number
+          travel_fee: number
+          travel_km: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3231,6 +3313,7 @@ export type Database = {
         }
         Returns: Json
       }
+      format_home_address: { Args: { p: Json }; Returns: string }
       get_availability: {
         Args: {
           p_date: string
@@ -3256,6 +3339,11 @@ export type Database = {
         Args: { p_perm: string; p_salon: string }
         Returns: boolean
       }
+      home_service_fee: {
+        Args: { p_km: number; p_salon: string }
+        Returns: number
+      }
+      instagram_handle: { Args: { p_raw: string }; Returns: string }
       is_platform_admin: { Args: never; Returns: boolean }
       is_salon_member: { Args: { p_salon: string }; Returns: boolean }
       marketing_winback: {
@@ -3329,6 +3417,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string
+          home_address: string | null
           id: string
           inspiration_gallery_ids: string[]
           member_id: string
@@ -3336,10 +3425,13 @@ export type Database = {
           payment_method: string | null
           reminder_sent_at: string | null
           salon_id: string
+          service_mode: string
           source: string
           starts_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           total_price: number
+          travel_fee: number
+          travel_km: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3352,6 +3444,20 @@ export type Database = {
       public_cancel_waitlist: {
         Args: { p_id: string; p_phone?: string }
         Returns: undefined
+      }
+      public_home_address: {
+        Args: { p_phone: string; p_salon: string }
+        Returns: {
+          cep: string
+          city: string
+          complement: string
+          distance_km: number
+          fee: number
+          neighborhood: string
+          state: string
+          street: string
+          street_number: string
+        }[]
       }
       public_join_waitlist: {
         Args: {
@@ -3447,7 +3553,15 @@ export type Database = {
           city: string
           color_theme: string
           complement: string
+          facebook: string
+          google_business: string
+          home_extra_km_fee: number
+          home_first_km_fee: number
+          home_max_km: number
+          home_service_enabled: boolean
+          home_terms: string
           id: string
+          instagram: string
           is_demo: boolean
           lat: number
           lng: number
@@ -3498,6 +3612,7 @@ export type Database = {
       public_services: {
         Args: { p_salon: string }
         Returns: {
+          allows_home_service: boolean
           bring_own_tools: boolean
           category_id: string
           color: string
@@ -3592,6 +3707,10 @@ export type Database = {
           service_id: string
         }[]
       }
+      set_appointment_travel: {
+        Args: { p_appointment: string; p_confirm?: boolean; p_km: number }
+        Returns: Json
+      }
       upcoming_birthdays: {
         Args: { p_days?: number; p_salon: string }
         Returns: Json
@@ -3638,6 +3757,7 @@ export type Database = {
         Returns: undefined
       }
       whatsapp_enqueue_reminders: { Args: never; Returns: number }
+      whatsapp_enqueue_reviews: { Args: never; Returns: number }
       whatsapp_handle_inbound: {
         Args: {
           p_body: string
@@ -3646,6 +3766,10 @@ export type Database = {
           p_provider_message_id?: string
         }
         Returns: Json
+      }
+      whatsapp_kind_iniciada: {
+        Args: { p_kind: Database["public"]["Enums"]["whatsapp_message_kind"] }
+        Returns: boolean
       }
       whatsapp_mark_result: {
         Args: {
@@ -3674,6 +3798,16 @@ export type Database = {
         }
         Returns: string
       }
+      whatsapp_render_winback: {
+        Args: {
+          p_client_id: string
+          p_cupom?: string
+          p_desconto?: number
+          p_kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+          p_salon_id: string
+        }
+        Returns: string
+      }
       whatsapp_reply: {
         Args: {
           p_appointment_id: string
@@ -3686,6 +3820,15 @@ export type Database = {
         Returns: undefined
       }
       whatsapp_unstick: { Args: never; Returns: undefined }
+      whatsapp_winback_send: {
+        Args: {
+          p_bucket: string
+          p_campaign?: string
+          p_client: string
+          p_salon: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       appointment_status:
@@ -3712,6 +3855,12 @@ export type Database = {
         | "opt_out_ack"
         | "confirm_ack"
         | "decline_ack"
+        | "opt_in_ack"
+        | "winback_no_show"
+        | "winback_cancelled"
+        | "winback_inactive"
+        | "home_request"
+        | "home_confirmed"
       whatsapp_outbox_status:
         | "queued"
         | "sending"
@@ -3871,6 +4020,12 @@ export const Constants = {
         "opt_out_ack",
         "confirm_ack",
         "decline_ack",
+        "opt_in_ack",
+        "winback_no_show",
+        "winback_cancelled",
+        "winback_inactive",
+        "home_request",
+        "home_confirmed",
       ],
       whatsapp_outbox_status: [
         "queued",
