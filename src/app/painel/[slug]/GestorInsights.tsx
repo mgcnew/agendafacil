@@ -12,6 +12,7 @@ import {
   CalendarX,
   XCircle,
   BellRinging,
+  Star,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   getOrGenerateDashboardInsights,
@@ -48,6 +49,7 @@ const ICON: Record<InsightType, React.ComponentType<{ className?: string }>> = {
   product_dormant: CalendarX,
   recent_no_shows: XCircle,
   reminder_off: BellRinging,
+  review_no_link: Star,
   general: Sparkle,
 };
 
@@ -93,6 +95,10 @@ function hrefFor(slug: string, type: InsightType): string | null {
     // genérica: o aviso perde a força se ainda der trabalho encontrar.
     case "reminder_off":
       return `/painel/${slug}/configuracoes?tab=whatsapp`;
+    // O link mora na aba do salão, não na do WhatsApp — mandar pro lugar onde
+    // o problema aparece, e não pra onde ele foi detectado.
+    case "review_no_link":
+      return `/painel/${slug}/configuracoes?tab=estabelecimento`;
     default:
       return null;
   }

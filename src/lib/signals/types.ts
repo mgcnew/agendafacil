@@ -11,7 +11,8 @@ export type SignalKey =
   | "service_dormant"
   | "product_dormant"
   | "recent_no_shows"
-  | "reminder_off";
+  | "reminder_off"
+  | "review_no_link";
 
 export type Signal = {
   key: SignalKey;

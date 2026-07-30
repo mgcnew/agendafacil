@@ -41,6 +41,8 @@ export function signalKeyForInsight(type: InsightType): SignalKey | null {
       return "recent_no_shows";
     case "reminder_off":
       return "reminder_off";
+    case "review_no_link":
+      return "review_no_link";
     default:
       return null; // revenue, general — sem categoria dispensável
   }

@@ -50,9 +50,11 @@ const MESSAGES: { key: keyof Settings; label: string; hint: string; soon?: boole
   },
   {
     key: "reviewRequest",
-    label: "Pedido de avaliação",
-    hint: "Convida a cliente a avaliar o atendimento.",
-    soon: true,
+    label: "Pedido de avaliação no Google",
+    // A regra de quem recebe fica escrita aqui porque muda o resultado: pedir
+    // pra todo mundo é como se junta avaliação de 2 estrelas.
+    hint:
+      "Um dia depois do atendimento, às 15h. Vai só pra quem já voltou ao salão (2+ atendimentos) e nunca recebeu o pedido antes. Precisa do link do Google na aba Estabelecimento → Redes sociais.",
   },
 ];
 

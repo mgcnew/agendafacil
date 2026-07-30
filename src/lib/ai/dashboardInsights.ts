@@ -23,6 +23,7 @@ export type InsightType =
   | "product_dormant"
   | "recent_no_shows"
   | "reminder_off"
+  | "review_no_link"
   | "general";
 
 export type Insight = {
@@ -85,7 +86,7 @@ const TOOL_SCHEMA = {
                 type: "string",
                 enum: [
                   "reactivation", "birthday", "package_expiring", "package_dormant", "revenue", "low_stock",
-                  "service_dormant", "product_dormant", "recent_no_shows", "reminder_off", "general",
+                  "service_dormant", "product_dormant", "recent_no_shows", "reminder_off", "review_no_link", "general",
                 ],
               },
               title: { type: "string", description: "Frase curta, até 60 caracteres." },
@@ -148,6 +149,13 @@ const STUB: Record<Signal["key"], { type: InsightType; title: (c: number) => str
   reminder_off: {
     type: "reminder_off",
     title: () => "Ligue a confirmação da véspera",
+    priority: "alta",
+  },
+  // Não é oportunidade, é conserto: algo que o dono já ligou não está
+  // funcionando. Por isso alta, mesmo sem número pra citar.
+  review_no_link: {
+    type: "review_no_link",
+    title: () => "Falta o link do Google",
     priority: "alta",
   },
 };

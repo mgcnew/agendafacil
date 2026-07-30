@@ -39,6 +39,7 @@ export async function collectSignals(
     { data: productInsightRaw },
     { data: winbackRaw },
     { data: whatsappRaw },
+    { data: salonRaw },
   ] = await Promise.all([
     supabase
       .from("appointments")
@@ -60,9 +61,10 @@ export async function collectSignals(
     supabase.rpc("marketing_winback" as never, { p_salon: salonId } as never),
     supabase
       .from("whatsapp_instances")
-      .select("status, send_reminder_confirm")
+      .select("status, send_reminder_confirm, send_review_request")
       .eq("salon_id", salonId)
       .maybeSingle(),
+    supabase.from("salons").select("google_business").eq("id", salonId).maybeSingle(),
   ]);
 
   // ── Contexto (tom, não é aviso) ──────────────────────────────────────────
@@ -72,6 +74,7 @@ export async function collectSignals(
     .reduce((sum, a) => sum + Number(a.total_price), 0);
 
   const signals: Signal[] = [];
+  const salonGoogle = (salonRaw as { google_business: string | null } | null)?.google_business?.trim();
 
   // ── Reativação de clientes ───────────────────────────────────────────────
   const reactCount = Array.isArray(reactRaw) ? reactRaw.length : 0;
@@ -191,7 +194,11 @@ export async function collectSignals(
   // confirmação automática na véspera, pronta e desligada, e falta é justamente
   // o que ela evita. Só aparece quando as duas coisas são verdade ao mesmo
   // tempo — sem faltas, ligar ou não é preferência do salão, não problema.
-  const whats = whatsappRaw as { status: string; send_reminder_confirm: boolean } | null;
+  const whats = whatsappRaw as {
+    status: string;
+    send_reminder_confirm: boolean;
+    send_review_request: boolean;
+  } | null;
   if (noShowCount > 0 && whats?.status === "connected" && !whats.send_reminder_confirm) {
     signals.push({
       key: "reminder_off",
@@ -199,6 +206,20 @@ export async function collectSignals(
       fact:
         `${noShowCount} cliente${noShowCount === 1 ? " faltou" : "s faltaram"} recentemente e a confirmação ` +
         `automática da véspera está DESLIGADA nas configurações do WhatsApp`,
+    });
+  }
+
+  // ── Pedido de avaliação ligado, sem link do Google ───────────────────────
+  // O interruptor está on, o dono acha que está pedindo avaliação, e a fila
+  // recusa toda mensagem porque não há pra onde mandar. Falha silenciosa é a
+  // pior espécie: nada quebra, só não acontece.
+  if (whats?.status === "connected" && whats.send_review_request && !salonGoogle) {
+    signals.push({
+      key: "review_no_link",
+      count: 1,
+      fact:
+        "o pedido de avaliação está LIGADO mas não há link do Google Meu Negócio cadastrado, " +
+        "então nenhuma avaliação está sendo pedida",
     });
   }
 
