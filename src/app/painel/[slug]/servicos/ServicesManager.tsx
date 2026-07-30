@@ -17,6 +17,7 @@ import {
   Check,
   CircleNotch,
   Clock,
+  House,
   MagicWand,
   PencilSimple,
   Percent,
@@ -47,6 +48,7 @@ const PRICE_TYPE_LABEL: Record<PriceType, string> = {
 export function ServicesManager({
   salonId,
   niche,
+  homeServiceEnabled = false,
   initial,
   products,
   serviceProducts,
@@ -55,6 +57,9 @@ export function ServicesManager({
 }: {
   salonId: string;
   niche: Niche;
+  /** Liga a marcação de domicílio. Desligado, o campo nem aparece — não
+      adianta escolher o que sai do salão se o salão não atende fora dele. */
+  homeServiceEnabled?: boolean;
   initial: Service[];
   products: Prod[];
   serviceProducts: SP[];
@@ -81,6 +86,7 @@ export function ServicesManager({
   const [processing, setProcessing] = useState("30");
   const [finish, setFinish] = useState("15");
   const [bringOwnTools, setBringOwnTools] = useState(false);
+  const [allowsHome, setAllowsHome] = useState(false);
   const [recipe, setRecipe] = useState<RecipeRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -132,6 +138,7 @@ export function ServicesManager({
     setColor(defaultServiceColor(services.length));
     setHasProcessing(false); setProcessing("30"); setFinish("15");
     setBringOwnTools(false);
+    setAllowsHome(false);
     setRecipe([]);
     setEditingId(null);
   }
@@ -153,6 +160,7 @@ export function ServicesManager({
     setProcessing(String(svc.processing_time_min || 30));
     setFinish(String(svc.finish_time_min || 15));
     setBringOwnTools(svc.bring_own_tools ?? false);
+    setAllowsHome(svc.allows_home_service ?? false);
     setRecipe(
       svcProducts
         .filter((sp) => sp.service_id === svc.id)
@@ -187,6 +195,7 @@ export function ServicesManager({
       processing_time_min: hasProcessing ? parseInt(processing) || 0 : 0,
       finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
       bring_own_tools: bringOwnTools,
+      allows_home_service: allowsHome,
     };
     let saved: Service | null = null;
     if (editingId) {
@@ -535,6 +544,34 @@ export function ServicesManager({
                     Para manicure/pedicure e afins: mostra no agendamento um convite para a cliente
                     trazer o próprio alicate/esmalte se quiser (uso pessoal). Deixa claro que é opcional
                     e que o salão segue todos os protocolos de higiene.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Domicílio por serviço, não por salão: dá pra fazer esmaltação na
+              casa da cliente e não dá pra fazer alongamento em fibra (precisa
+              de cabine, exaustor). Chave geral traria pedido do serviço errado
+              e a profissional só descobriria na porta. */}
+          {homeServiceEnabled && (
+            <div className="rounded-[var(--radius)] border border-border p-4">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAllowsHome((v) => !v)}
+                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${allowsHome ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  aria-pressed={allowsHome}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${allowsHome ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <House className="h-4 w-4 text-primary" /> Você faz este serviço em domicílio?
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Só os serviços marcados aqui podem ser pedidos para atendimento
+                    em casa. Deixe desligado o que depende de equipamento do salão.
                   </p>
                 </div>
               </div>

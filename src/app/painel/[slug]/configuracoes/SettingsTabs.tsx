@@ -16,6 +16,7 @@ import { PushNotificationsCard } from "./PushNotificationsCard";
 import { BiometricCard } from "@/components/auth/BiometricCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
+import { HomeServiceCard, type HomeServiceState } from "./HomeServiceCard";
 import type { AccessStatus } from "@/lib/subscription";
 import {
   ArrowClockwise,
@@ -1390,6 +1391,13 @@ function BookingPanel({
 }) {
   const router = useRouter();
   const [simultaneous, setSimultaneous] = useState(salon.allow_simultaneous);
+  const [home, setHome] = useState<HomeServiceState>({
+    enabled: salon.home_service_enabled,
+    firstKmFee: brlInput(salon.home_first_km_fee),
+    extraKmFee: brlInput(salon.home_extra_km_fee),
+    maxKm: salon.home_max_km == null ? "" : String(salon.home_max_km),
+    terms: salon.home_terms ?? "",
+  });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1413,7 +1421,16 @@ function BookingPanel({
     const supabase = createClient();
     const { error: e } = await supabase
       .from("salons")
-      .update({ allow_simultaneous: simultaneous })
+      .update({
+        allow_simultaneous: simultaneous,
+        home_service_enabled: home.enabled,
+        home_first_km_fee: numero(home.firstKmFee) ?? 0,
+        home_extra_km_fee: numero(home.extraKmFee) ?? 0,
+        // null e 0 são coisas diferentes: null é "não declarei limite", e o
+        // check do banco recusa 0.
+        home_max_km: numero(home.maxKm),
+        home_terms: home.terms.trim() || null,
+      })
       .eq("id", salon.id);
     setSaving(false);
     if (e) {
@@ -1476,9 +1493,23 @@ function BookingPanel({
       </Card>
       </div>
 
+      <HomeServiceCard value={home} onChange={setHome} canEdit={canEdit} slug={salon.slug} />
+
       {canEdit && <SaveBar onSave={save} saving={saving} saved={saved} error={error} />}
     </div>
   );
+}
+
+/** "5.00" (numeric do banco) → "5,00" no campo. Vazio quando é zero. */
+function brlInput(v: number | null | undefined): string {
+  if (v == null || Number(v) === 0) return "";
+  return String(v).replace(".", ",");
+}
+
+/** Campo de texto → número, aceitando vírgula. Vazio ou lixo vira null. */
+function numero(s: string): number | null {
+  const n = Number(s.replace(",", ".").trim());
+  return s.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : n;
 }
 
 /* ────────────────────────── Aparência ────────────────────────── */

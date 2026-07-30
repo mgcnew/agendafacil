@@ -57,6 +57,7 @@ export default async function ServicosPage({
     <ServicesManager
       salonId={membership.salon_id}
       niche={membership.salons.niche}
+      homeServiceEnabled={membership.salons.home_service_enabled}
       initial={services ?? []}
       products={products ?? []}
       serviceProducts={serviceProducts ?? []}
