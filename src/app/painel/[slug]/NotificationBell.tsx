@@ -142,7 +142,11 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
                 const cancelled =
                   n.type === "appointment_cancelled" || n.type === "whatsapp_cancelled";
                 const reminder = n.type === "appointment_reminder";
-                const whatsapp = n.type === "whatsapp_reply";
+                // Conversa de cliente NUNCA chega aqui (ver
+                // 20260730_whatsapp_sino_sem_conversa.sql). Sobrou só mudança
+                // de estado: saiu ou voltou às mensagens.
+                const whatsapp =
+                  n.type === "whatsapp_opt_out" || n.type === "whatsapp_opt_in";
                 const Icon = cancelled
                   ? CalendarX
                   : reminder
