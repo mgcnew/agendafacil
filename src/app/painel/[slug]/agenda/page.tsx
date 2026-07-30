@@ -46,7 +46,7 @@ export default async function AgendaPage({
       .eq("salon_id", membership.salon_id),
     supabase
       .from("salons")
-      .select("cash_discount_enabled, cash_max_discount_percent")
+      .select("cash_discount_enabled, cash_max_discount_percent, home_service_enabled, home_first_km_fee, home_extra_km_fee, home_max_km, street, street_number, neighborhood, city, state, address")
       .eq("id", membership.salon_id)
       .maybeSingle(),
   ]);
@@ -54,6 +54,27 @@ export default async function AgendaPage({
   // Mesma config de desconto do Caixa — o fechamento pela Agenda usa o mesmo modal.
   const canDiscount = !!salonCfg?.cash_discount_enabled && perms.has("cash.discount");
   const maxDiscountPercent = Number(salonCfg?.cash_max_discount_percent ?? 0);
+
+  // Origem do trajeto no Maps: o endereço estruturado quando existe, senão o
+  // texto livre antigo. Sem endereço nenhum o atalho vira busca pelo destino.
+  const origemMaps =
+    [salonCfg?.street, salonCfg?.street_number].filter(Boolean).join(", ") ||
+    salonCfg?.address ||
+    null;
+  const origemCompleta = origemMaps
+    ? [origemMaps, salonCfg?.neighborhood, [salonCfg?.city, salonCfg?.state].filter(Boolean).join("/")]
+        .filter(Boolean)
+        .join(" — ")
+    : null;
+
+  const homeVisit = {
+    tarifa: {
+      firstKmFee: Number(salonCfg?.home_first_km_fee ?? 0),
+      extraKmFee: Number(salonCfg?.home_extra_km_fee ?? 0),
+    },
+    maxKm: salonCfg?.home_max_km == null ? null : Number(salonCfg.home_max_km),
+    origem: origemCompleta,
+  };
 
   const discounts: Record<string, number> = {};
   for (const r of (discountRows as { service_id: string; discount_percent: number }[] | null) ?? []) {
@@ -77,6 +98,7 @@ export default async function AgendaPage({
       salonId={membership.salon_id}
       slug={slug}
       pros={proList}
+      homeVisit={homeVisit}
       services={services ?? []}
       clients={clients ?? []}
       discounts={discounts}

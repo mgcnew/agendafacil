@@ -15,6 +15,7 @@ import { PaymentPickerModal } from "@/components/PaymentPickerModal";
 import { chargeAppointment as chargeAppointmentRpc, addAppointmentService as addAppointmentServiceRpc } from "@/lib/checkout";
 import { AgendaSignalsBanner, waPhone, type TodaySignals, type LateClient } from "@/components/AgendaSignalsBanner";
 import { CreateAppointment } from "./CreateAppointment";
+import { HomeVisitCard, type HomeVisitConfig } from "./HomeVisitCard";
 import { DAY_SHORT, MONTH_NAMES, parse, toStr, type Client, type Pro, type Service } from "./shared";
 import {
   ArrowSquareOut,
@@ -26,6 +27,7 @@ import {
   CircleNotch,
   Clock,
   Heart,
+  House,
   Lock,
   Minus,
   Monitor,
@@ -54,6 +56,10 @@ type Appt    = {
   salon_members: { display_name: string | null } | null;
   appointment_services?: { service_id: string | null }[] | null;
   inspiration_gallery_ids?: string[] | null;
+  service_mode?: string | null;
+  travel_km?: number | null;
+  travel_fee?: number | null;
+  home_address?: string | null;
   color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
@@ -368,6 +374,11 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
               {a.clients?.alert_summary && (
                 <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
               )}
+              {/* Sai do salão: precisa saltar aos olhos na varredura do dia,
+                  senão a profissional só descobre o deslocamento na hora. */}
+              {a.service_mode === "home" && (
+                <House className="h-2.5 w-2.5 text-primary shrink-0" aria-label="Em domicílio" weight="fill" />
+              )}
               <span className="truncate text-foreground/80 min-w-0">{timeLabel}</span>
             </p>
             <p className={cn("font-medium text-foreground truncate leading-tight", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5")}>
@@ -379,6 +390,9 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
           <p className="font-medium truncate leading-tight text-[11px] text-foreground/90 flex items-center gap-1">
             {a.clients?.alert_summary && (
               <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
+            )}
+            {a.service_mode === "home" && (
+              <House className="h-2.5 w-2.5 text-primary shrink-0" aria-label="Em domicílio" weight="fill" />
             )}
             <span className="truncate min-w-0">
               <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
@@ -399,11 +413,15 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
 // ── Appointment detail modal ───────────────────────────────────
 function ApptDetailModal({
   appt, color, salonId, slug, onClose, onStatusChange, onFinalize,
+  homeVisit, canManage, onTravelSaved,
 }: {
   appt: Appt; color: string; salonId: string; slug: string;
   onClose: () => void;
   onStatusChange: (s: Status) => void;
   onFinalize: () => void;
+  homeVisit?: HomeVisitConfig;
+  canManage?: boolean;
+  onTravelSaved: (r: { km: number; taxa: number }) => void;
 }) {
   const supabase = createClient();
   const st = STATUS_META[appt.status];
@@ -552,6 +570,19 @@ function ApptDetailModal({
               </div>
             )}
           </div>
+
+          {/* ── Domicílio ───────────────────────────────────── */}
+          {appt.service_mode === "home" && homeVisit && (
+            <HomeVisitCard
+              appointmentId={appt.id}
+              endereco={appt.home_address ?? null}
+              km={appt.travel_km == null ? null : Number(appt.travel_km)}
+              taxa={Number(appt.travel_fee ?? 0)}
+              config={homeVisit}
+              podeEditar={!!canManage && !isFinished}
+              onSalvo={onTravelSaved}
+            />
+          )}
 
           {/* ── Serviços ────────────────────────────────────── */}
           <div>
@@ -1296,7 +1327,7 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, canCr
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
   canManageSchedule = false, myMemberId, canDiscount = false, maxDiscountPercent = 0,
-  canManageAppointments = true, canViewAllAppointments = true,
+  canManageAppointments = true, canViewAllAppointments = true, homeVisit,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
@@ -1308,6 +1339,8 @@ export function AgendaManager({
   myMemberId?: string;
   canDiscount?: boolean;
   maxDiscountPercent?: number;
+  /** Tarifa e endereço do salão — só usados em agendamento de domicílio. */
+  homeVisit?: HomeVisitConfig;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1407,7 +1440,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, service_mode, travel_km, travel_fee, home_address, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)
@@ -1893,6 +1926,21 @@ export function AgendaManager({
             onClose={() => setDetailAppt(null)}
             onStatusChange={s => onStatusChange(detailAppt, s)}
             onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
+            homeVisit={homeVisit}
+            canManage={canManageAppointments}
+            onTravelSaved={({ km, taxa }) => {
+              // A taxa entra no total: sem atualizar aqui, a ficha mostraria o
+              // valor antigo até recarregar a página.
+              const patch = (a: Appt): Appt => ({
+                ...a,
+                travel_km: km,
+                travel_fee: taxa,
+                total_price: Number(a.total_price) - Number(a.travel_fee ?? 0) + taxa,
+                status: a.status === "pending" ? "confirmed" : a.status,
+              });
+              setAppts(list => list.map(x => (x.id === detailAppt.id ? patch(x) : x)));
+              setDetailAppt(d => (d ? patch(d) : d));
+            }}
           />
         )}
       </AnimatePresence>
