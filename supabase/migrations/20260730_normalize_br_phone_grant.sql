@@ -1,0 +1,38 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- Devolve EXECUTE de normalize_br_phone ao papel `authenticated`.
+--
+-- Em 20260728_whatsapp_revoke_public.sql eu revoguei EXECUTE desta função de
+-- anon/authenticated, com a justificativa de que ela "não serve a ninguém fora
+-- do sistema". A justificativa estava errada, e o erro passou dois dias em
+-- produção sem ninguém ver.
+--
+-- Na MESMA data, 20260728_whatsapp_inbound.sql:58 criou:
+--
+--   create index clients_phone_normalized_idx
+--     on public.clients(salon_id, public.normalize_br_phone(phone));
+--
+-- Índice por expressão. O Postgres precisa AVALIAR essa expressão em todo
+-- INSERT ou UPDATE que toque `clients`, e avalia como o papel que está fazendo
+-- a escrita — que pelo PostgREST é `authenticated`, não `postgres`. Sem
+-- EXECUTE, a escrita morre em:
+--
+--   ERROR: permission denied for function normalize_br_phone
+--
+-- O que estava quebrado desde 28/07, tudo pelo painel:
+--   · editar a ficha do cliente
+--   · cadastrar cliente na lista de Clientes
+--   · agendar para cliente novo (a agenda cria a ficha antes do agendamento)
+--
+-- A página pública escapou por acaso: ela cria cliente via `book_appointment`,
+-- que é security definer e roda como o dono da função.
+--
+-- Conceder é seguro: a função é immutable, só mexe em texto, não lê tabela
+-- nenhuma e já está com search_path fixo. Quem a chama não descobre nada que
+-- já não tenha digitado.
+--
+-- `anon` fica de fora de propósito: a policy clients_insert exige
+-- has_permission(salon_id, 'clients.manage'), que é falso para anônimo — ou
+-- seja, anon nunca escreve em clients direto e não precisa da função.
+-- ─────────────────────────────────────────────────────────────────────────
+
+grant execute on function public.normalize_br_phone(text) to authenticated;

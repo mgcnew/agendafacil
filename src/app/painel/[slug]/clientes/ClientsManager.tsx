@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { waLink, formatDate, cn } from "@/lib/utils";
+import { mensagemErro, DUPLICADO } from "@/lib/erroSupabase";
 import type { Tables } from "@/lib/database.types";
 import {
   AddressBook,
@@ -96,7 +97,9 @@ export function ClientsManager({
       .single();
     setBusy(false);
     if (error || !data) {
-      setErr("Não foi possível cadastrar a cliente. Tente novamente.");
+      setErr(mensagemErro(error, "Não foi possível cadastrar a cliente. Tente novamente.", {
+        [DUPLICADO]: "Já existe uma cliente com esse telefone. Procure por ela na busca.",
+      }));
       return;
     }
     setClients((c) => [...c, data].sort((a, b) => a.full_name.localeCompare(b.full_name)));

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { formatBRL, formatDate, formatTime, waLink } from "@/lib/utils";
 import { compressImage } from "@/lib/image";
+import { mensagemErro, DUPLICADO } from "@/lib/erroSupabase";
 import type { Tables } from "@/lib/database.types";
 import { uploadClientPhoto, removeClientPhoto } from "./clientPhotoActions";
 import {
@@ -317,7 +318,13 @@ function DadosTab({
       notes: notes || null,
     }).eq("id", client.id);
     setSaving(false);
-    if (error) { setErr("Não foi possível salvar. Tente novamente."); return; }
+    if (error) {
+      setErr(mensagemErro(error, "Não foi possível salvar. Tente novamente.", {
+        // (salon_id, phone) é único: o telefone já está na ficha de outra pessoa.
+        [DUPLICADO]: "Já existe um cliente com esse telefone. Confira o número.",
+      }));
+      return;
+    }
     setSaved(true);
     onSaved();
     setTimeout(() => setSaved(false), 2500);
