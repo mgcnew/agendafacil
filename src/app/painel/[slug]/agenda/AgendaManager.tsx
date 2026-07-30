@@ -2107,6 +2107,26 @@ function FinalizeModal({
                   <span className="font-medium tabular-nums shrink-0 ml-2">{formatBRL(Number(it.price))}</span>
                 </div>
               ))}
+              {/* A taxa está dentro de total_price (o caixa precisa cobrar
+                  certo), mas não é appointment_service — sem esta linha a soma
+                  dos itens visíveis não bate com o Total e parece defeito.
+                  Aparece separada também porque não entra em comissão. */}
+              {Number(appt.travel_fee ?? 0) > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span className="flex items-center gap-1.5 truncate">
+                    <House className="h-3.5 w-3.5 text-primary shrink-0" />
+                    Deslocamento
+                    {appt.travel_km != null && (
+                      <span className="text-xs text-muted-foreground">
+                        ({Number(appt.travel_km).toLocaleString("pt-BR")} km)
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-medium tabular-nums shrink-0 ml-2">
+                    {formatBRL(Number(appt.travel_fee))}
+                  </span>
+                </div>
+              )}
               {extra.map(item => (
                 <div key={item.service.id} className="flex items-center gap-2 px-3 py-2">
                   <span className="text-sm flex-1 min-w-0 truncate">{item.service.name}</span>
