@@ -7,8 +7,11 @@ import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { SocialLinksRow } from "@/components/SocialLinksRow";
+import { HomeAddressForm, ENDERECO_VAZIO, enderecoCompleto, type Endereco } from "./HomeAddressForm";
+import { homeServiceFee, regraTarifa } from "@/lib/homeService";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
+import type { Json } from "@/lib/database.types";
 import {
   EMPTY_ANAMNESIS,
   computeAlertSummary,
@@ -28,12 +31,14 @@ import {
   ClockCounterClockwise,
   Heart,
   Heartbeat,
+  House,
   Images,
   MapPin,
   Package,
   Phone,
   ShieldCheck,
   Sparkle,
+  Storefront,
   User,
   X,
 } from "@phosphor-icons/react/dist/ssr";
@@ -49,6 +54,12 @@ type Salon = {
   instagram?: string | null;
   facebook?: string | null;
   google_business?: string | null;
+  city?: string | null;
+  home_service_enabled?: boolean | null;
+  home_first_km_fee?: number | null;
+  home_extra_km_fee?: number | null;
+  home_max_km?: number | null;
+  home_terms?: string | null;
 };
 type Service = {
   id: string;
@@ -59,6 +70,19 @@ type Service = {
   price_type: string | null;
   category_id: string | null;
   bring_own_tools?: boolean | null;
+  allows_home_service?: boolean | null;
+};
+/** Retorno de `public_home_address` — endereço e km já conhecidos da cliente. */
+type HomeAddressRow = {
+  cep: string | null;
+  street: string | null;
+  street_number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  distance_km: number | null;
+  fee: number | null;
 };
 type Category = { id: string; name: string; sort_order: number };
 type Professional = { id: string; display_name: string; color: string | null; bio: string | null; photo_url: string | null };
@@ -159,6 +183,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // ── Atendimento em domicílio ──────────────────────────────────────────
+  const [modo, setModo] = useState<"salon" | "home">("salon");
+  const [endereco, setEndereco] = useState<Endereco>(ENDERECO_VAZIO);
+  // km medido pela profissional numa visita anterior. Existindo, o valor sai
+  // fechado já aqui; faltando, a cliente vê a regra e recebe o valor depois.
+  const [kmConhecido, setKmConhecido] = useState<number | null>(null);
+
   const [bookedClientId, setBookedClientId] = useState<string | null>(null);
   const [anamnesisFlow, setAnamnesisFlow] = useState<AnamnesisFlow>(null);
   const [anaForm, setAnaForm] = useState<AnamnesisForm>(EMPTY_ANAMNESIS);
@@ -171,6 +202,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
     const d = discPct(s);
     return d > 0 ? Math.round(Number(s.price) * (1 - d / 100) * 100) / 100 : Number(s.price);
   };
+
+  const tarifa = {
+    firstKmFee: Number(salon.home_first_km_fee ?? 0),
+    extraKmFee: Number(salon.home_extra_km_fee ?? 0),
+  };
+  // A escolha só aparece se o salão liga E existe pelo menos um serviço que
+  // sai do salão. Sem as duas coisas, a pergunta não tem resposta possível.
+  const servicosEmCasa = services.filter((s) => s.allows_home_service);
+  const podeDomicilio = !!salon.home_service_enabled && servicosEmCasa.length > 0;
+  const emCasa = podeDomicilio && modo === "home";
+  // Escolhendo domicílio, a lista só mostra o que de fato pode ser feito fora
+  // do salão — em vez de deixar escolher e recusar depois.
+  const servicosVisiveis = emCasa ? servicosEmCasa : services;
 
   const selectedServices = services.filter((s) => selected.includes(s.id));
   const totalPrice = selectedServices.reduce((a, s) => a + effPrice(s), 0);
@@ -195,9 +239,15 @@ export function BookingApp({ salon }: { salon: Salon }) {
   // preço total varia se algum serviço é "sob consulta" (a combinar) ou "a partir de"
   const hasOnRequest = selectedServices.some((s) => s.price_type === "on_request");
   const hasFrom = selectedServices.some((s) => s.price_type === "from");
+  // Taxa só entra no total quando é número, não promessa. Somar uma
+  // estimativa aqui seria exatamente a surpresa que o fluxo evita.
+  const taxaDomicilio = emCasa && kmConhecido != null ? homeServiceFee(kmConhecido, tarifa) : 0;
+  // Primeiro domicílio dessa cliente: sai como PEDIDO, não como agendamento
+  // fechado. Conhecendo o km, é agendamento normal com valor e tudo.
+  const pedidoAConfirmar = emCasa && kmConhecido == null;
   const totalPriceLabel = hasOnRequest
     ? "A combinar"
-    : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice);
+    : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice + taxaDomicilio);
 
   // profissionais que fazem TODOS os serviços escolhidos.
   // Excluí profissionais sem nenhum serviço atribuído (ex: dono sem serviços).
@@ -431,6 +481,57 @@ export function BookingApp({ salon }: { salon: Salon }) {
     );
   }
 
+  /**
+   * Troca entre salão e domicílio.
+   *
+   * Ao ir pra domicílio, tira da seleção o que não sai do salão: senão a
+   * pessoa segue com um serviço escolhido que sumiu da lista e o pedido é
+   * recusado só no fim, sem ela entender o motivo.
+   */
+  function trocarModo(novo: "salon" | "home") {
+    setModo(novo);
+    if (novo === "home") {
+      const permitidos = new Set(servicosEmCasa.map((s) => s.id));
+      setSelected((prev) => prev.filter((id) => permitidos.has(id)));
+    }
+  }
+
+  // Endereço e quilometragem que o salão já tem dessa cliente. É o que faz a
+  // segunda visita ser instantânea: chega tudo preenchido e com valor fechado.
+  useEffect(() => {
+    const ph = toE164(savedPhone || phone);
+    if (!emCasa || !ph) return;
+    let vivo = true;
+    void (async () => {
+      const { data } = await supabase.rpc("public_home_address" as never, {
+        p_salon: salon.id,
+        p_phone: ph,
+      } as never);
+      if (!vivo) return;
+      const r = (data as HomeAddressRow[] | null)?.[0];
+      // Sem registro pra ESTE telefone o km volta a ser desconhecido. Sair
+      // cedo aqui deixaria na tela a quilometragem de outra pessoa — e ela
+      // vira preço.
+      if (!r) { setKmConhecido(null); return; }
+      setKmConhecido(r.distance_km == null ? null : Number(r.distance_km));
+      setEndereco((atual) =>
+        // Não sobrescreve o que ela já começou a digitar agora.
+        enderecoCompleto(atual)
+          ? atual
+          : {
+              cep: r.cep ?? "",
+              street: r.street ?? "",
+              street_number: r.street_number ?? "",
+              complement: r.complement ?? "",
+              neighborhood: r.neighborhood ?? "",
+              city: r.city ?? "",
+              state: r.state ?? "",
+            },
+      );
+    })();
+    return () => { vivo = false; };
+  }, [emCasa, supabase, salon.id, savedPhone, phone]);
+
   async function confirmBooking() {
     if (!pro || !slot) return;
     setBooking(true);
@@ -449,11 +550,21 @@ export function BookingApp({ salon }: { salon: Salon }) {
       p_client_name: name || "Cliente",
       p_client_phone: toE164(phone),
       ...(productsNote ? { p_notes: productsNote } : {}),
+      ...(emCasa
+        ? { p_service_mode: "home", p_address: endereco as unknown as Json }
+        : {}),
     });
     if (error) {
+      const m = error.message;
       setBookErr(
-        error.message.includes("slot_taken")
+        m.includes("slot_taken")
           ? "Esse horário acabou de ser reservado. Escolha outro."
+          : m.includes("home_address_required")
+          ? "Confira o endereço: precisamos da rua e do número."
+          : m.includes("service_not_home")
+          ? "Um dos serviços escolhidos não é feito fora do salão."
+          : m.includes("home_service_off")
+          ? "O atendimento em domicílio não está disponível no momento."
           : "Não foi possível concluir. Tente novamente.",
       );
       setBooking(false);
@@ -615,6 +726,42 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Sparkle className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
 
+          {/* A modalidade vem ANTES dos serviços de propósito: escolhendo
+              domicílio, a lista já mostra só o que sai do salão. O caminho
+              inverso deixaria escolher pra recusar depois. */}
+          {podeDomicilio && (
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: "salon", Icon: Storefront, label: "No espaço", hint: "Você vem até nós" },
+                { id: "home", Icon: House, label: "Em domicílio", hint: "A gente vai até você" },
+              ] as const).map(({ id, Icon, label, hint }) => {
+                const on = modo === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => trocarModo(id)}
+                    aria-pressed={on}
+                    className={`rounded-[var(--radius)] border p-3 text-left transition ${
+                      on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 ${on ? "text-primary" : "text-muted-foreground"}`} />
+                    <p className="mt-1.5 text-sm font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">{hint}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {emCasa && (
+            <p className="rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              Mostrando só os serviços que fazemos na sua casa. Deslocamento:{" "}
+              <b className="text-foreground">{regraTarifa(tarifa)}</b>.
+            </p>
+          )}
+
           {/* Filtro de categoria (dropdown) + atalho pra loja de produtos */}
           {(categories.length > 0 || resaleProducts.length > 0) && (
             <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm flex items-center gap-2">
@@ -655,7 +802,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               Este salão ainda não cadastrou serviços.
             </Card>
           ) : null}
-          {services.filter((s) => activeCategory === null || s.category_id === activeCategory).map((s) => {
+          {servicosVisiveis.filter((s) => activeCategory === null || s.category_id === activeCategory).map((s) => {
             const on = selected.includes(s.id);
             return (
               <button
@@ -966,6 +1113,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
               label="Horário"
               value={new Date(slot).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
             />
+            {emCasa && (
+              <div className="border-t border-border pt-4">
+                <HomeAddressForm
+                  value={endereco}
+                  onChange={setEndereco}
+                  tarifa={tarifa}
+                  kmConhecido={kmConhecido}
+                  maxKm={salon.home_max_km == null ? null : Number(salon.home_max_km)}
+                  terms={salon.home_terms ?? null}
+                  salonCity={salon.city ?? null}
+                />
+              </div>
+            )}
             <div className="border-t border-border pt-4 space-y-2">
               {selectedServices.map((s) => (
                 <div key={s.id} className="flex justify-between text-sm">
@@ -994,6 +1154,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 </div>
               ))}
             </div>
+            {taxaDomicilio > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="flex items-center gap-1.5">
+                  <House className="h-3.5 w-3.5" /> Deslocamento
+                </span>
+                <span className="text-muted-foreground">{formatBRL(taxaDomicilio)}</span>
+              </div>
+            )}
             <div className="border-t border-border pt-4 flex justify-between items-center">
               <span className="text-sm text-muted-foreground">
                 Total · {formatDuration(totalDuration)}
@@ -1025,8 +1193,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <Button variant="outline" size="lg" onClick={() => setStep("time")} disabled={booking}>
               <CaretLeft className="h-4 w-4" /> Voltar
             </Button>
-            <Button className="flex-1" size="lg" onClick={confirmBooking} disabled={booking}>
-              {booking && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar agendamento
+            <Button
+              className="flex-1"
+              size="lg"
+              onClick={confirmBooking}
+              disabled={booking || (emCasa && !enderecoCompleto(endereco))}
+            >
+              {booking && <CircleNotch className="h-4 w-4 animate-spin" />}
+              {pedidoAConfirmar ? "Enviar pedido" : "Confirmar agendamento"}
             </Button>
           </div>
         </section>
@@ -1038,20 +1212,47 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <div className="grid place-items-center h-20 w-20 rounded-full bg-primary text-primary-foreground mx-auto af-float">
             <Check className="h-10 w-10" />
           </div>
-          <h2 className="font-display text-2xl font-bold mt-6">Agendamento confirmado!</h2>
-          <p className="font-display text-lg mt-2">
-            {salon.name} agradece o seu agendamento! <span aria-hidden>💈</span>
-          </p>
-          <p className="text-muted-foreground mt-1">
-            {pro?.display_name} te espera{" "}
-            {slot && (
-              <b className="capitalize">
-                {formatDateLong(slot)} às{" "}
-                {new Date(slot).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
-              </b>
-            )}
-            .
-          </p>
+          <h2 className="font-display text-2xl font-bold mt-6">
+            {pedidoAConfirmar ? "Pedido enviado!" : "Agendamento confirmado!"}
+          </h2>
+          {pedidoAConfirmar ? (
+            <>
+              {/* Dizer "confirmado" aqui seria prometer o que ninguém confirmou:
+                  falta a profissional dizer se vai nesse endereço e nesse
+                  horário, e o valor do deslocamento vai junto da resposta. */}
+              <p className="font-display text-lg mt-2">
+                {salon.name} recebeu seu pedido <span aria-hidden>🏠</span>
+              </p>
+              <p className="text-muted-foreground mt-1 max-w-sm mx-auto">
+                Vamos conferir a distância até{" "}
+                <b className="text-foreground">{endereco.street}, {endereco.street_number}</b>{" "}
+                e te mandar o valor do deslocamento pelo WhatsApp. O horário{" "}
+                {slot && (
+                  <b className="capitalize">
+                    de {formatDateLong(slot)} às{" "}
+                    {new Date(slot).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                  </b>
+                )}{" "}
+                fica reservado até lá.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-display text-lg mt-2">
+                {salon.name} agradece o seu agendamento! <span aria-hidden>💈</span>
+              </p>
+              <p className="text-muted-foreground mt-1">
+                {pro?.display_name} te espera{" "}
+                {slot && (
+                  <b className="capitalize">
+                    {formatDateLong(slot)} às{" "}
+                    {new Date(slot).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                  </b>
+                )}
+                .
+              </p>
+            </>
+          )}
           <div className="flex flex-col gap-2 mt-8">
             <Button onClick={loadMine}>
               <ClockCounterClockwise className="h-4 w-4" /> Ver meus agendamentos
