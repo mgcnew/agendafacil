@@ -11,6 +11,7 @@ import {
   WarningCircle,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
+import { WhatsAppHistorico } from "./WhatsAppHistorico";
 
 type State = "disconnected" | "connecting" | "connected" | "paused";
 
@@ -433,6 +434,10 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
           </p>
         </Card>
       )}
+
+      {/* Também aparece pausado: é justamente quando o dono precisa ver o que
+          falhou. Só some pra quem nunca conectou, que não tem o que mostrar. */}
+      {state && state !== "disconnected" && <WhatsAppHistorico slug={slug} />}
     </div>
   );
 }
