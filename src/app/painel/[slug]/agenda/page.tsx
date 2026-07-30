@@ -31,12 +31,12 @@ export default async function AgendaPage({
       .eq("is_active", true),
     supabase
       .from("services")
-      .select("id, name, duration_min, price, commission_percent, color")
+      .select("id, name, duration_min, price, commission_percent, color, allows_home_service")
       .eq("salon_id", membership.salon_id)
       .eq("is_active", true),
     supabase
       .from("clients")
-      .select("id, full_name, phone")
+      .select("id, full_name, phone, cep, street, street_number, complement, neighborhood, city, state, distance_km")
       .eq("salon_id", membership.salon_id)
       .order("full_name"),
     supabase.rpc("public_campaign_discounts", { p_salon: membership.salon_id }),
@@ -66,6 +66,12 @@ export default async function AgendaPage({
         .filter(Boolean)
         .join(" — ")
     : null;
+
+  const homeConfig = {
+    enabled: !!salonCfg?.home_service_enabled,
+    firstKmFee: Number(salonCfg?.home_first_km_fee ?? 0),
+    extraKmFee: Number(salonCfg?.home_extra_km_fee ?? 0),
+  };
 
   const homeVisit = {
     tarifa: {
@@ -99,6 +105,7 @@ export default async function AgendaPage({
       slug={slug}
       pros={proList}
       homeVisit={homeVisit}
+      homeConfig={homeConfig}
       services={services ?? []}
       clients={clients ?? []}
       discounts={discounts}

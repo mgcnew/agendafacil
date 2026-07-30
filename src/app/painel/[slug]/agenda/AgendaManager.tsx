@@ -16,7 +16,7 @@ import { chargeAppointment as chargeAppointmentRpc, addAppointmentService as add
 import { AgendaSignalsBanner, waPhone, type TodaySignals, type LateClient } from "@/components/AgendaSignalsBanner";
 import { CreateAppointment } from "./CreateAppointment";
 import { HomeVisitCard, type HomeVisitConfig } from "./HomeVisitCard";
-import { DAY_SHORT, MONTH_NAMES, parse, toStr, type Client, type Pro, type Service } from "./shared";
+import { DAY_SHORT, MONTH_NAMES, parse, toStr, type Client, type HomeConfig, type Pro, type Service } from "./shared";
 import {
   ArrowSquareOut,
   CalendarX,
@@ -348,6 +348,9 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
   const st = STATUS_META[a.status];
   const h = apptH(a);
   const name = a.clients?.full_name ?? "Cliente";
+  const emCasa = a.service_mode === "home";
+  // Pedido sem quilometragem = cliente esperando o valor do deslocamento.
+  const aguardandoKm = emCasa && a.travel_km == null;
   const timeLabel = narrow || compact
     ? fmtHM(a.starts_at)
     : `${fmtHM(a.starts_at)}${a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}`;
@@ -360,9 +363,19 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${name} às ${fmtHM(a.starts_at)} — ${st.label}`}
+      aria-label={`${name} às ${fmtHM(a.starts_at)} — ${st.label}${emCasa ? " — em domicílio" : ""}`}
+      title={emCasa ? `${name} — atendimento em domicílio${aguardandoKm ? " (falta definir o valor do deslocamento)" : ""}` : undefined}
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-      style={{ borderLeft: `3px solid ${color}`, background: color + "1a" }}
+      style={{
+        borderLeft: `3px solid ${color}`,
+        background: color + "1a",
+        // Hachura diagonal só em domicílio. O bloco já usa a cor da
+        // profissional, então cor não estava disponível como sinal — a
+        // textura sobrevive ao card de 40px, onde não cabe texto nenhum.
+        backgroundImage: emCasa
+          ? `repeating-linear-gradient(45deg, transparent 0 5px, ${color}33 5px 10px)`
+          : undefined,
+      }}
     >
       <div className={cn("h-full flex flex-col justify-start overflow-hidden py-1", narrow ? "px-1" : "px-2 gap-0.5")}>
         {stacked ? (
@@ -376,8 +389,12 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
               )}
               {/* Sai do salão: precisa saltar aos olhos na varredura do dia,
                   senão a profissional só descobre o deslocamento na hora. */}
-              {a.service_mode === "home" && (
-                <House className="h-2.5 w-2.5 text-primary shrink-0" aria-label="Em domicílio" weight="fill" />
+              {emCasa && (
+                <House
+                  className={cn("shrink-0 text-primary", narrow ? "h-2.5 w-2.5" : "h-3 w-3")}
+                  aria-label="Em domicílio"
+                  weight="fill"
+                />
               )}
               <span className="truncate text-foreground/80 min-w-0">{timeLabel}</span>
             </p>
@@ -391,8 +408,8 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
             {a.clients?.alert_summary && (
               <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
             )}
-            {a.service_mode === "home" && (
-              <House className="h-2.5 w-2.5 text-primary shrink-0" aria-label="Em domicílio" weight="fill" />
+            {emCasa && (
+              <House className="h-3 w-3 shrink-0 text-primary" aria-label="Em domicílio" weight="fill" />
             )}
             <span className="truncate min-w-0">
               <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
@@ -400,9 +417,17 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
           </p>
         )}
         {h > 58 && !compact && !narrow && (
-          <span className="inline-flex items-center gap-1 mt-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
-            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
-            {st.label}
+          <span className="mt-0.5 flex flex-wrap items-center gap-1">
+            {emCasa && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                <House className="h-2.5 w-2.5" weight="fill" />
+                {aguardandoKm ? "Falta o valor" : "Em casa"}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: st.dot }} />
+              {st.label}
+            </span>
           </span>
         )}
       </div>
@@ -1327,7 +1352,7 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, canCr
 export function AgendaManager({
   salonId, slug, pros, services, clients: initialClients, discounts = {},
   canManageSchedule = false, myMemberId, canDiscount = false, maxDiscountPercent = 0,
-  canManageAppointments = true, canViewAllAppointments = true, homeVisit,
+  canManageAppointments = true, canViewAllAppointments = true, homeVisit, homeConfig,
 }: {
   salonId: string; slug: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts?: Record<string, number>;
@@ -1341,6 +1366,8 @@ export function AgendaManager({
   maxDiscountPercent?: number;
   /** Tarifa e endereço do salão — só usados em agendamento de domicílio. */
   homeVisit?: HomeVisitConfig;
+  /** Tarifa pra tela de criar agendamento. Desligada, a escolha nem aparece. */
+  homeConfig?: HomeConfig;
 }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -1501,7 +1528,7 @@ export function AgendaManager({
     const end   = new Date(todayStr + "T23:59:59").toISOString();
     const weekday = parse(todayStr).getDay(); // 0=domingo..6=sábado, mesma convenção do extract(dow) no Postgres
 
-    const [{ data: todayAppts }, { data: revenueRows }, ...availability] = await Promise.all([
+    const [{ data: todayAppts }, { data: revenueRows }, { data: homeRows }, ...availability] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, starts_at, status, clients(full_name, phone)")
@@ -1511,6 +1538,19 @@ export function AgendaManager({
       // Ticket médio histórico por hora, no mesmo dia da semana (v2 — estimativa de faturamento).
       // Sem permissão de relatórios, a RPC nega e a estimativa some sozinha (degrada bem).
       supabase.rpc("agenda_revenue_by_hour" as never, { p_salon: salonId, p_weekday: weekday } as never),
+      // Pedidos de domicílio sem quilometragem — de hoje em diante, não só de
+      // hoje: a cliente está esperando o valor AGORA, mesmo que o horário seja
+      // semana que vem.
+      supabase
+        .from("appointments")
+        .select("id, starts_at, clients(full_name)")
+        .eq("salon_id", salonId)
+        .eq("service_mode", "home")
+        .is("travel_km", null)
+        .eq("status", "pending")
+        .gte("starts_at", start)
+        .order("starts_at")
+        .limit(5),
       ...pros.map((p) =>
         supabase.rpc("get_availability", { p_salon: salonId, p_member: p.id, p_date: todayStr, p_duration: 30 }),
       ),
@@ -1559,8 +1599,17 @@ export function AgendaManager({
       }
     }
 
+    type HomeRow = { id: string; starts_at: string; clients: { full_name: string } | null };
+    const homeRequests = ((homeRows as HomeRow[] | null) ?? []).map((a) => ({
+      id: a.id,
+      name: a.clients?.full_name ?? "Cliente",
+      time: fmtHM(a.starts_at),
+      date: a.starts_at,
+    }));
+
     setTodaySignals({
       cancelled, lateClients, emptySlots: slots.size,
+      homeRequests,
       estimatedRevenue: hasEstimate ? estimatedRevenue : null,
     });
   }, [supabase, salonId, pros]);
@@ -1952,6 +2001,7 @@ export function AgendaManager({
             key="create"
             salonId={salonId} pros={pros} services={services} clients={initialClients}
             discounts={discounts}
+            homeConfig={homeConfig}
             date={createDate}
             initialPro={createPro}
             initialTime={createTime}

@@ -7,13 +7,14 @@ import { MotionModal } from "@/components/MotionModal";
 import { Card } from "@/components/ui";
 import { CircleNotch, Check, Warning } from "@phosphor-icons/react/dist/ssr";
 import { CreateAppointment } from "@/app/painel/[slug]/agenda/CreateAppointment";
-import { toStr, type Client, type Pro, type Service } from "@/app/painel/[slug]/agenda/shared";
+import { toStr, type Client, type HomeConfig, type Pro, type Service } from "@/app/painel/[slug]/agenda/shared";
 
 type Listas = {
   pros: Pro[];
   services: Service[];
   clients: Client[];
   discounts: Record<string, number>;
+  homeConfig: HomeConfig;
 };
 
 /**
@@ -58,12 +59,12 @@ export function QuickAppointment({
             .eq("is_active", true),
           supabase
             .from("services")
-            .select("id, name, duration_min, price, commission_percent, color")
+            .select("id, name, duration_min, price, commission_percent, color, allows_home_service")
             .eq("salon_id", salonId)
             .eq("is_active", true),
           supabase
             .from("clients")
-            .select("id, full_name, phone")
+            .select("id, full_name, phone, cep, street, street_number, complement, neighborhood, city, state, distance_km")
             .eq("salon_id", salonId)
             .order("full_name"),
           supabase.rpc("public_campaign_discounts", { p_salon: salonId }),
@@ -72,6 +73,12 @@ export function QuickAppointment({
             .select("member_id")
             .eq("salon_id", salonId),
         ]);
+
+      const { data: cfg } = await supabase
+        .from("salons")
+        .select("home_service_enabled, home_first_km_fee, home_extra_km_fee")
+        .eq("id", salonId)
+        .maybeSingle();
 
       if (!vivo) return;
 
@@ -90,6 +97,11 @@ export function QuickAppointment({
       const comServico = new Set((proSvcRows ?? []).map((r) => r.member_id));
 
       setListas({
+        homeConfig: {
+          enabled: !!cfg?.home_service_enabled,
+          firstKmFee: Number(cfg?.home_first_km_fee ?? 0),
+          extraKmFee: Number(cfg?.home_extra_km_fee ?? 0),
+        },
         pros: pros
           .filter((p) => comServico.has(p.id))
           .map((p) => ({
@@ -145,6 +157,7 @@ export function QuickAppointment({
           services={listas.services}
           clients={listas.clients}
           discounts={listas.discounts}
+          homeConfig={listas.homeConfig}
           date={toStr(new Date())}
           onClose={onClose}
           onCreated={() => {

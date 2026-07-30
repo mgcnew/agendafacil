@@ -22,7 +22,7 @@ export async function collectAgendaTodaySignals(
   const startDay = startOfTodayBR();
   const endDay = startOfTomorrowBR();
 
-  const [{ data: todayAppts }, { data: activePros }, { data: proSvcRows }, { count: waiting }] = await Promise.all([
+  const [{ data: todayAppts }, { data: activePros }, { data: proSvcRows }, { count: waiting }, { data: homeRows }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, starts_at, status, clients(full_name, phone)")
@@ -39,6 +39,19 @@ export async function collectAgendaTodaySignals(
       .eq("salon_id", salonId)
       .eq("status", "waiting")
       .gte("preferred_date", todayStrForWaitlist()),
+    // Pedidos de domicílio esperando a quilometragem. Não se limita a hoje de
+    // propósito: a cliente pediu pra semana que vem e está esperando o valor
+    // AGORA — esquecer isso não atrasa o atendimento, mata o agendamento.
+    supabase
+      .from("appointments")
+      .select("id, starts_at, clients(full_name)")
+      .eq("salon_id", salonId)
+      .eq("service_mode", "home")
+      .is("travel_km", null)
+      .eq("status", "pending")
+      .gte("starts_at", startDay)
+      .order("starts_at")
+      .limit(5),
   ]);
 
   type TodayAppt = {
@@ -74,7 +87,22 @@ export async function collectAgendaTodaySignals(
   const slots = new Set<string>();
   for (const r of availability) for (const slot of (r.data as string[] | null) ?? []) slots.add(slot);
 
-  return { cancelled, lateClients, emptySlots: slots.size, estimatedRevenue: null, waiting: waiting ?? 0 };
+  type HomeRow = { id: string; starts_at: string; clients: { full_name: string } | null };
+  const homeRequests = ((homeRows as HomeRow[] | null) ?? []).map((a) => ({
+    id: a.id,
+    name: a.clients?.full_name ?? "Cliente",
+    time: formatTime(a.starts_at),
+    date: a.starts_at,
+  }));
+
+  return {
+    cancelled,
+    lateClients,
+    emptySlots: slots.size,
+    estimatedRevenue: null,
+    homeRequests,
+    waiting: waiting ?? 0,
+  };
 }
 
 /** Data de hoje no fuso do Brasil, no formato da coluna `preferred_date`. */

@@ -7,8 +7,19 @@ import {
   CaretDown,
   ChatCircle,
   ClockCountdown,
+  House,
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
+
+/** "hoje" · "amanhã" · "05/08" — a data do pedido, curta o bastante pra caber. */
+function diaCurto(iso: string): string {
+  const d = new Date(iso);
+  const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((dia(d) - dia(new Date())) / 86_400_000);
+  if (diff === 0) return "hoje";
+  if (diff === 1) return "amanhã";
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 /**
  * Sinais "de agora" da Agenda (cancelamento, atraso, horário livre) — fonte
@@ -18,10 +29,14 @@ import {
  * lugar em vez de duas implementações divergentes.
  */
 export type LateClient = { id: string; name: string; phone: string | null; time: string };
+/** Pedido de domicílio ainda sem quilometragem — cliente esperando o valor. */
+export type HomeRequest = { id: string; name: string; time: string; date: string };
 export type TodaySignals = {
   cancelled: number;
   /** Lista (não só contagem) — cada atraso vira uma sugestão acionável de lembrete. */
   lateClients: LateClient[];
+  /** Pedidos de domicílio aguardando o valor do deslocamento. */
+  homeRequests?: HomeRequest[];
   emptySlots: number;
   /** Estimativa de faturamento dos horários vazios, com base no histórico (v2). null = sem amostra suficiente/não calculado. */
   estimatedRevenue: number | null;
@@ -88,12 +103,14 @@ export function AgendaSignalsBanner({
 }) {
   if (!signals) return null;
   const { cancelled, lateClients, emptySlots, estimatedRevenue } = signals;
+  const homeRequests = signals.homeRequests ?? [];
 
   // Horário livre sozinho NÃO é aviso: é o estado normal de quase todo dia, e
   // um alerta que aparece sempre vira mobília — a pessoa para de ler. Só vira
   // notícia quando existe alguém esperando vaga, porque aí há o que fazer.
   const mostrarVazios = emptySlots > 0 && waiting > 0;
-  if (cancelled === 0 && lateClients.length === 0 && !mostrarVazios) return null;
+  if (cancelled === 0 && lateClients.length === 0 && !mostrarVazios && homeRequests.length === 0)
+    return null;
 
   return (
     <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
@@ -105,6 +122,37 @@ export function AgendaSignalsBanner({
       </div>
 
       <div className="space-y-2">
+        {/* Primeiro de todos de propósito: nos outros avisos o dia continua
+            andando sozinho. Aqui tem alguém parada esperando um valor que só
+            você pode dar — e sem ele o agendamento não fecha. */}
+        {homeRequests.length > 0 && (
+          <div className="rounded-[var(--radius)] border border-primary/40 bg-background p-3">
+            <p className="flex items-center gap-1.5 text-sm">
+              <House className="h-4 w-4 shrink-0 text-primary" weight="fill" />
+              {homeRequests.length === 1 ? (
+                <span>
+                  <b>{homeRequests[0].name.split(" ")[0]}</b> pediu atendimento em
+                  casa e está esperando o valor do deslocamento.
+                </span>
+              ) : (
+                <span>
+                  <b>{homeRequests.length} clientes</b> pediram atendimento em casa
+                  e estão esperando o valor do deslocamento.
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {homeRequests.map((h) => `${h.name.split(" ")[0]} · ${diaCurto(h.date)} ${h.time}`).join(" · ")}
+            </p>
+            <Link
+              href={`/painel/${slug}/agenda`}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              Definir o valor na Agenda <ArrowSquareOut className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
+
         {lateClients.length > 0 && (
           <div className="rounded-[var(--radius)] border border-border bg-background p-3">
             <p className="flex items-center gap-1.5 text-sm">

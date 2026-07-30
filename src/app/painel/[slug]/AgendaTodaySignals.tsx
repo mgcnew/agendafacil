@@ -30,7 +30,10 @@ export async function AgendaTodaySignalsAsync({
   // Hor��rio livre sozinho não conta mais — o banner também deixou de mostrá-lo,
   // e uma bolinha acesa todo dia é tão ignorável quanto um card fixo.
   const has =
-    signals.cancelled > 0 || signals.lateClients.length > 0 || (signals.emptySlots > 0 && waiting > 0);
+    signals.cancelled > 0 ||
+    signals.lateClients.length > 0 ||
+    (signals.homeRequests?.length ?? 0) > 0 ||
+    (signals.emptySlots > 0 && waiting > 0);
   return (
     <>
       {has && <span data-gestor-signal hidden />}

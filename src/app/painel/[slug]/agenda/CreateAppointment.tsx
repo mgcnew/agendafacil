@@ -6,8 +6,11 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { MotionModal } from "@/components/MotionModal";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, cn } from "@/lib/utils";
+import type { Json } from "@/lib/database.types";
+import { HomeModePicker } from "./HomeModePicker";
+import { ENDERECO_VAZIO, type Endereco } from "@/app/[slug]/HomeAddressForm";
 import { CalendarDots, CaretDown, CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
-import { DAY_SHORT, MONTH_NAMES, parse, type Client, type Pro, type Service } from "./shared";
+import { DAY_SHORT, MONTH_NAMES, parse, type Client, type HomeConfig, type Pro, type Service } from "./shared";
 
 /**
  * Formulário de novo agendamento.
@@ -18,9 +21,12 @@ import { DAY_SHORT, MONTH_NAMES, parse, type Client, type Pro, type Service } fr
  */
 export function CreateAppointment({
   salonId, pros, services, clients, discounts, date: initialDate, initialPro, initialTime, initialClient, onClose, onCreated,
+  homeConfig,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts: Record<string, number>;
+  /** Ausente ou desligado = a escolha de modalidade nem aparece. */
+  homeConfig?: HomeConfig;
   date: string; initialPro?: string; initialTime?: string; initialClient?: string;
   onClose: () => void; onCreated: () => void;
 }) {
@@ -42,6 +48,13 @@ export function CreateAppointment({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [busy, setBusy]                 = useState(false);
   const [err, setErr]                   = useState<string | null>(null);
+  const [modo, setModo]                 = useState<"salon" | "home">("salon");
+  const [endereco, setEndereco]         = useState<Endereco>(ENDERECO_VAZIO);
+
+  const clienteEscolhido = clients.find(c => c.id === existingClient) ?? null;
+  const servicosDeCasa = services.filter(s => s.allows_home_service);
+  const temServicoDeCasa = selected.some(id => servicosDeCasa.some(s => s.id === id));
+  const emCasa = !!homeConfig?.enabled && modo === "home";
   const [svcSearch, setSvcSearch]       = useState("");
   const [lastSvcs, setLastSvcs]         = useState<{ id: string; name: string }[] | null>(null);
 
@@ -127,6 +140,16 @@ export function CreateAppointment({
         p_salon: salonId, p_member: proId, p_client: clientId,
         p_service_ids: selected,
         p_starts_at: slot,
+        ...(emCasa
+          ? {
+              p_service_mode: "home",
+              // Só manda endereço quando a recepcionista digitou algo; sem
+              // isso a RPC usa o que já está na ficha da cliente.
+              p_address: endereco.street_number.trim()
+                ? (endereco as unknown as Json)
+                : null,
+            }
+          : {}),
       });
       if (error) {
         const m = error.message;
@@ -135,7 +158,13 @@ export function CreateAppointment({
             ? "A profissional já está ocupada nesse horário."
             : m.includes("client_busy")
               ? "Esta cliente já tem um atendimento nesse horário. Ative simultâneos nas Configurações para permitir."
-              : "Não foi possível criar o agendamento.",
+              : m.includes("home_address_required")
+                ? "Informe a rua e o número do atendimento em domicílio."
+                : m.includes("service_not_home")
+                  ? "Um dos serviços escolhidos não é feito fora do salão."
+                  : m.includes("home_needs_client")
+                    ? "Escolha uma cliente cadastrada para atendimento em domicílio."
+                    : "Não foi possível criar o agendamento.",
         );
         setBusy(false); return;
       }
@@ -146,9 +175,19 @@ export function CreateAppointment({
     }
   }
 
+  // Em domicílio, só o que sai do salão — igual à página pública.
+  const servicosVisiveis = emCasa ? servicosDeCasa : services;
   const filteredServices = svcSearch.trim()
-    ? services.filter(s => s.name.toLowerCase().includes(svcSearch.toLowerCase()))
-    : services;
+    ? servicosVisiveis.filter(s => s.name.toLowerCase().includes(svcSearch.toLowerCase()))
+    : servicosVisiveis;
+
+  function trocarModo(novo: "salon" | "home") {
+    setModo(novo);
+    if (novo === "home") {
+      const ok = new Set(servicosDeCasa.map(s => s.id));
+      setSelected(prev => prev.filter(id => ok.has(id)));
+    }
+  }
 
   const serviceButtons = filteredServices.map(s => {
     const on = selected.includes(s.id);
@@ -226,6 +265,22 @@ export function CreateAppointment({
                 {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             </div>
+
+            {/* Onde vai ser: antes dos serviços, porque muda a lista deles. */}
+            {homeConfig?.enabled && (
+              <div className="space-y-1.5">
+                <Label>Onde</Label>
+                <HomeModePicker
+                  config={homeConfig}
+                  modo={modo}
+                  onModo={trocarModo}
+                  cliente={clienteEscolhido}
+                  endereco={endereco}
+                  onEndereco={setEndereco}
+                  temServicoDeCasa={temServicoDeCasa}
+                />
+              </div>
+            )}
 
             {/* Serviços — mobile only */}
             <div className="space-y-1.5 sm:hidden">

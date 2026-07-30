@@ -3257,11 +3257,13 @@ export type Database = {
       }
       create_staff_appointment: {
         Args: {
+          p_address?: Json
           p_client: string
           p_force?: boolean
           p_member: string
           p_salon: string
           p_service_ids: string[]
+          p_service_mode?: string
           p_starts_at: string
           p_status?: Database["public"]["Enums"]["appointment_status"]
         }
