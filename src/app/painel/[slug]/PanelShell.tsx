@@ -368,8 +368,15 @@ export function PanelShell({
 
       {/* ── Área principal ──────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar mobile — marca à esquerda, alternar tema à direita */}
-        <header className="lg:hidden shrink-0 relative z-20 flex items-center justify-between border-b border-border/70 bg-card px-4 h-14 shadow-[0_2px_10px_-6px_rgba(0,0,0,0.16)]">
+        {/* Topbar mobile — marca à esquerda, alternar tema à direita.
+            Cantos de baixo arredondados no mesmo raio da barra inferior: as
+            duas passam a ser o mesmo par de superfícies, com a página entre
+            elas. Curva para dentro, borda reta encostando na tela — igual
+            embaixo, espelhado.
+            Fica opaca de propósito: a barra de baixo é translúcida porque o
+            conteúdo desliza por trás dela, e aqui nada passa. Vidro sem nada
+            atrás é só efeito. */}
+        <header className="lg:hidden shrink-0 relative z-20 flex items-center justify-between border-b border-border/60 bg-card px-4 h-14 rounded-b-2xl shadow-[0_6px_24px_-10px_rgba(0,0,0,0.28)]">
           <Link href={base} className="flex items-center gap-2.5 font-display font-bold min-w-0">
             <span className="block h-8 w-8 shrink-0 overflow-hidden rounded-[var(--radius)] bg-white ring-1 ring-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
