@@ -9,6 +9,7 @@ import { formatBRL, cn } from "@/lib/utils";
 import type { Json } from "@/lib/database.types";
 import { HomeModePicker } from "./HomeModePicker";
 import { ENDERECO_VAZIO, type Endereco } from "@/app/[slug]/HomeAddressForm";
+import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { CalendarDots, CaretDown, CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
 import { DAY_SHORT, MONTH_NAMES, parse, type Client, type HomeConfig, type Pro, type Service } from "./shared";
 
@@ -129,9 +130,13 @@ export function CreateAppointment({
       let clientId = existingClient || null;
       if (!clientId) {
         if (!clientName.trim()) { setErr("Informe o nome da cliente."); setBusy(false); return; }
+        if (clientPhone.trim() !== "" && !toStoredPhone(clientPhone)) {
+          setErr("Confira o telefone: celular com DDD, como (11) 98765-4321.");
+          setBusy(false); return;
+        }
         const { data: c, error: ce } = await supabase
           .from("clients")
-          .insert({ salon_id: salonId, full_name: clientName.trim(), phone: clientPhone || null })
+          .insert({ salon_id: salonId, full_name: clientName.trim(), phone: toStoredPhone(clientPhone) })
           .select("id").single();
         if (ce) throw ce;
         clientId = c.id;
@@ -241,7 +246,7 @@ export function CreateAppointment({
             {!existingClient && (
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
-                <Input placeholder="Celular" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+                <Input placeholder="Celular" inputMode="numeric" value={clientPhone} onChange={e => setClientPhone(maskBrPhone(e.target.value))} />
               </div>
             )}
             {lastSvcs && (

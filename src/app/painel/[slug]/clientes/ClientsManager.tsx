@@ -5,7 +5,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { waLink, formatDate, cn } from "@/lib/utils";
-import { mensagemErro, DUPLICADO } from "@/lib/erroSupabase";
+import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
+import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import type { Tables } from "@/lib/database.types";
 import {
   AddressBook,
@@ -81,6 +82,10 @@ export function ClientsManager({
 
   async function add() {
     if (!name) return;
+    if (phone.trim() !== "" && !toStoredPhone(phone)) {
+      setErr("Confira o telefone: celular com DDD, como (11) 98765-4321.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     const { data, error } = await supabase
@@ -88,7 +93,7 @@ export function ClientsManager({
       .insert({
         salon_id: salonId,
         full_name: name,
-        phone: phone || null,
+        phone: toStoredPhone(phone),
         email: email || null,
         birth_date: birth || null,
         referral_source: referral || null,
@@ -98,6 +103,7 @@ export function ClientsManager({
     setBusy(false);
     if (error || !data) {
       setErr(mensagemErro(error, "Não foi possível cadastrar a cliente. Tente novamente.", {
+        [REGRA_VIOLADA]: "Confira o telefone: precisa ser um celular com DDD, como (11) 98765-4321.",
         [DUPLICADO]: "Já existe uma cliente com esse telefone. Procure por ela na busca.",
       }));
       return;
@@ -150,7 +156,22 @@ export function ClientsManager({
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="cp">Celular</Label>
-                  <Input id="cp" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
+                  <Input
+                    id="cp"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) => setPhone(maskBrPhone(e.target.value))}
+                    placeholder="(11) 99999-9999"
+                    aria-invalid={phone.trim() !== "" && !toStoredPhone(phone)}
+                  />
+                  {/* Telefone é opcional aqui (cliente de balcão pode não
+                      deixar), mas se for preenchido tem que servir — meio
+                      telefone nunca recebe mensagem e ninguém percebe. */}
+                  {phone.trim() !== "" && !toStoredPhone(phone) && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Confira o número: celular com DDD, como (11) 98765-4321.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ce">E-mail</Label>

@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { formatBRL, formatDate, formatTime, waLink } from "@/lib/utils";
 import { compressImage } from "@/lib/image";
-import { mensagemErro, DUPLICADO } from "@/lib/erroSupabase";
+import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
+import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import type { Tables } from "@/lib/database.types";
 import { uploadClientPhoto, removeClientPhoto } from "./clientPhotoActions";
 import {
@@ -308,10 +309,14 @@ function DadosTab({
   }
 
   async function save() {
+    if (phone.trim() !== "" && !toStoredPhone(phone)) {
+      setErr("Confira o telefone: celular com DDD, como (11) 98765-4321.");
+      return;
+    }
     setSaving(true); setSaved(false); setErr(null);
     const { error } = await supabase.from("clients").update({
       full_name: name,
-      phone: phone || null,
+      phone: toStoredPhone(phone),
       email: email || null,
       birth_date: birth || null,
       referral_source: referral || null,
@@ -321,6 +326,7 @@ function DadosTab({
     if (error) {
       setErr(mensagemErro(error, "Não foi possível salvar. Tente novamente.", {
         // (salon_id, phone) é único: o telefone já está na ficha de outra pessoa.
+        [REGRA_VIOLADA]: "Confira o telefone desta ficha: precisa ser um celular com DDD, como (11) 98765-4321.",
         [DUPLICADO]: "Já existe um cliente com esse telefone. Confira o número.",
       }));
       return;
@@ -389,7 +395,19 @@ function DadosTab({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="p"><Phone className="inline h-3.5 w-3.5 mr-1" />Celular</Label>
-          <Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canManage} />
+          <Input
+            id="p"
+            inputMode="numeric"
+            value={phone}
+            onChange={(e) => setPhone(maskBrPhone(e.target.value))}
+            disabled={!canManage}
+            aria-invalid={phone.trim() !== "" && !toStoredPhone(phone)}
+          />
+          {phone.trim() !== "" && !toStoredPhone(phone) && (
+            <p className="mt-1 text-xs text-red-600">
+              Este número não recebe WhatsApp. Celular com DDD, como (11) 98765-4321.
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="e"><Envelope className="inline h-3.5 w-3.5 mr-1" />E-mail</Label>

@@ -41,6 +41,38 @@ export function normalizeBrPhone(raw: string | null | undefined): string | null 
   return `55${ddd}${numero}`;
 }
 
+/**
+ * Formato de gravação usado desde sempre pela página pública: `+5511987654321`.
+ *
+ * Devolve null pra qualquer coisa que não seja celular BR válido — é o que
+ * impede o `+55` puro de virar cadastro. O `toE164` antigo montava
+ * `"+55" + digits` sem olhar o resultado, então campo vazio, "abc" ou um
+ * número pela metade viravam telefone "válido" que nunca recebe mensagem
+ * nenhuma, sem ninguém perceber.
+ *
+ * O prefixo `+` fica de propósito: mudar o formato agora criaria cadastro
+ * duplicado pra quem já está gravado assim.
+ */
+export function toStoredPhone(raw: string | null | undefined): string | null {
+  const n = normalizeBrPhone(raw);
+  return n ? `+${n}` : null;
+}
+
+/**
+ * Máscara enquanto digita: 11987654321 → (11) 98765-4321.
+ *
+ * Formatar durante a digitação não é enfeite: sem os parênteses e o traço, um
+ * dígito faltando passa despercebido — e um dígito faltando é exatamente o
+ * defeito que enche a base de telefone que não recebe nada.
+ */
+export function maskBrPhone(raw: string): string {
+  const d = raw.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 /** Máscara de exibição: 55 11 98765-4321 → (11) 98765-4321 */
 export function formatBrPhone(e164: string | null | undefined): string | null {
   if (!e164) return null;

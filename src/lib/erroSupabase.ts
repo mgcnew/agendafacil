@@ -29,3 +29,11 @@ export function mensagemErro(
 
 /** Violação de unicidade — no nosso schema, quase sempre telefone repetido. */
 export const DUPLICADO = "23505";
+
+/**
+ * Violação de CHECK. Hoje só um pode chegar na tela do dono: o telefone
+ * inválido em `clients`. Sem traduzir, quem tentar editar uma das fichas
+ * antigas com telefone quebrado leva um "não foi possível salvar" e não tem
+ * como adivinhar que o problema é um campo que ele nem tocou.
+ */
+export const REGRA_VIOLADA = "23514";

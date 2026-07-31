@@ -9,6 +9,7 @@ import { MotionModal } from "@/components/MotionModal";
 import { SocialLinksRow } from "@/components/SocialLinksRow";
 import { HomeAddressForm, ENDERECO_VAZIO, enderecoCompleto, type Endereco } from "./HomeAddressForm";
 import { homeServiceFee, regraTarifa } from "@/lib/homeService";
+import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { Calendar } from "@/components/Calendar";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import type { Json } from "@/lib/database.types";
@@ -124,10 +125,16 @@ const STATUS_LABEL: Record<string, string> = {
   no_show: "Não compareceu",
 };
 
-function toE164(raw: string) {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("55")) return "+" + digits;
-  return "+55" + digits;
+/**
+ * Telefone no formato de gravação, ou null.
+ *
+ * A versão antiga montava `"+55" + digits` sem conferir nada: campo vazio
+ * virava "+55", "abc" virava "+55", número pela metade virava telefone com
+ * cara de válido. Cadastro assim NUNCA recebe mensagem — e ninguém percebe,
+ * porque a fila descarta antes de a mensagem existir.
+ */
+function toE164(raw: string): string {
+  return toStoredPhone(raw) ?? "";
 }
 
 // Data de hoje em YYYY-MM-DD usando componentes LOCAIS (não toISOString, que é
@@ -245,6 +252,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
   // Primeiro domicílio dessa cliente: sai como PEDIDO, não como agendamento
   // fechado. Conhecendo o km, é agendamento normal com valor e tudo.
   const pedidoAConfirmar = emCasa && kmConhecido == null;
+  // Celular BR de verdade. Sem isso não dá pra confirmar nada com essa pessoa
+  // depois — e o banco agora recusa o cadastro, então validar aqui é o que
+  // transforma um erro seco numa instrução.
+  const telefoneOk = toStoredPhone(phone) !== null;
   const totalPriceLabel = hasOnRequest
     ? "A combinar"
     : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice + taxaDomicilio);
@@ -1033,10 +1044,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
               <Input
                 id="cphone"
                 type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(maskBrPhone(e.target.value))}
                 placeholder="(11) 99999-9999"
+                aria-invalid={phone.length > 0 && !telefoneOk}
               />
+              {/* Só reclama depois de a pessoa ter digitado o bastante pra
+                  valer a pena — avisar no primeiro dígito é ruído. */}
+              {phone.replace(/\D/g, "").length >= 10 && !telefoneOk && (
+                <p className="mt-1 text-xs text-red-600">
+                  Confira o número: precisa ser um celular com DDD.
+                </p>
+              )}
             </div>
             <Button
               className="w-full"
@@ -1051,12 +1072,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 if (authIntent === "waitlist") joinWaitlist();
                 else setStep("confirm");
               }}
-              disabled={!name || !phone || joiningWaitlist}
+              disabled={!name || !telefoneOk || joiningWaitlist}
             >
               {joiningWaitlist && <CircleNotch className="h-4 w-4 animate-spin" />} Continuar
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Usamos seu número só para confirmar o agendamento.
+              É por ele que a confirmação e o lembrete chegam. Sem um número
+              válido, não conseguimos te avisar de nada.
             </p>
             <button
               type="button"
