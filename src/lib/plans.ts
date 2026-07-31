@@ -80,6 +80,24 @@ export const PRO_ONLY_HREFS = [
 export const DIVULGACAO_DISPONIVEL = false;
 
 /**
+ * Tira das telas de Acessos as permissões de recurso desligado.
+ *
+ * `permissions` é lida direto da tabela e vira interruptor em Equipe e em
+ * Configurações → Acessos. Sem este filtro, o dono continuaria vendo "Criar
+ * artes de divulgação (usa créditos)" e configurando quem pode entrar numa
+ * página que responde 404 — uma promessa por tabela, que some do menu mas
+ * sobrevive na tela de permissão.
+ *
+ * Filtra na exibição, não no banco: as linhas de `role_permissions` e
+ * `member_permissions` que alguém já tenha marcado continuam intactas e voltam
+ * sozinhas quando o recurso religar.
+ */
+export function permissoesVisiveis<T extends { key: string }>(lista: T[]): T[] {
+  if (DIVULGACAO_DISPONIVEL) return lista;
+  return lista.filter((p) => p.key !== "marketing.manage");
+}
+
+/**
  * Rotas exclusivas do Max (bloqueadas no Básico e no Pro).
  * TODO(lançamento Divulgação): mover "/marketing" para cá junto com
  * DIVULGACAO_DISPONIVEL = true.

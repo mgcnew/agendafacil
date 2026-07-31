@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   title:
     "Sistema de agendamento online com IA para salões de beleza e barbearias",
   description:
-    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda, do caixa e do marketing. Entre na demonstração e veja o sistema por dentro, sem cadastro.",
+    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda e do caixa. Entre na demonstração e veja o sistema por dentro, sem cadastro.",
   alternates: { canonical: "/" },
 };
 
@@ -289,7 +289,7 @@ function StructuredData() {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         description:
-          "Equipe virtual com inteligência artificial para salões de beleza, barbearias e clínicas de estética: agenda, recupera clientes, fecha caixa e cuida do marketing 24 horas por dia.",
+          "Equipe virtual com inteligência artificial para salões de beleza, barbearias e clínicas de estética: agenda, recupera clientes e fecha caixa 24 horas por dia.",
         sameAs: [],
       },
       {

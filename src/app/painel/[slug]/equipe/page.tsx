@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
-import { planAllowsHref } from "@/lib/plans";
+import { planAllowsHref, permissoesVisiveis } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { TeamManager } from "./TeamManager";
 
@@ -68,7 +68,7 @@ export default async function EquipePage({
       salonId={membership.salon_id}
       myRole={membership.role}
       members={members ?? []}
-      permissions={permissions ?? []}
+      permissions={permissoesVisiveis(permissions ?? [])}
       roleDefaults={roleDefaults ?? []}
       invites={invites ?? []}
       services={services ?? []}

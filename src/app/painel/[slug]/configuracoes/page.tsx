@@ -3,6 +3,7 @@ import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
+import { permissoesVisiveis } from "@/lib/plans";
 import { SettingsTabs } from "./SettingsTabs";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export default async function ConfigPage({
       pros={proList}
       initialHours={hours ?? []}
       initialTab={tab}
-      permissions={permList ?? []}
+      permissions={permissoesVisiveis(permList ?? [])}
       roleDefaults={roleDefaults ?? []}
       salonRolePerms={salonRolePerms ?? []}
       access={access}
