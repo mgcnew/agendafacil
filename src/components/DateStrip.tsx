@@ -126,37 +126,62 @@ export function DateStrip({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center gap-2">
-        <div
-          ref={fitaRef}
-          className="flex-1 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {lista.map((d, i) => {
-            const on = iso(d) === value;
-            return (
-              <button
-                key={iso(d)}
-                type="button"
-                data-on={on ? "1" : "0"}
-                onClick={() => onChange(iso(d))}
-                aria-pressed={on}
-                className={cn(
-                  "shrink-0 w-[3.25rem] rounded-[var(--radius)] border py-1.5 text-center transition",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                  on
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card hover:border-primary",
-                )}
-              >
-                <span className={cn("block text-[10px] uppercase tracking-wide", on ? "opacity-80" : "text-muted-foreground")}>
-                  {i === 0 ? "hoje" : i === 1 ? "amanhã" : DIA_CURTO[d.getDay()]}
-                </span>
-                <span className="block text-base font-semibold leading-tight">{d.getDate()}</span>
-                <span className={cn("block text-[10px]", on ? "opacity-80" : "text-muted-foreground")}>
-                  {MES_CURTO[d.getMonth()]}
-                </span>
-              </button>
-            );
-          })}
+        {/* `min-w-0` é o que permite este filho encolher e rolar: sem ele o
+            flex dimensiona pelo conteúdo e a fita empurra o botão do
+            calendário para fora da tela em vez de rolar. */}
+        <div className="relative min-w-0 flex-1">
+          {/* `no-scrollbar` vem do globals.css, e não de uma variante
+              utilitária: a regra global `*::-webkit-scrollbar` mora fora de
+              @layer, e CSS sem layer vence CSS em layer independentemente da
+              especificidade — a classe do Tailwind era gerada e perdia a
+              cascata, deixando a barra de 10px à vista embaixo dos dias.
+
+              `overscroll-x-contain` impede o swipe horizontal de vazar para a
+              página (no iOS, arrastar até o fim vira gesto de voltar). */}
+          <div
+            ref={fitaRef}
+            className="no-scrollbar flex gap-1.5 overflow-x-auto overscroll-x-contain"
+          >
+            {lista.map((d, i) => {
+              const on = iso(d) === value;
+              return (
+                <button
+                  key={iso(d)}
+                  type="button"
+                  data-on={on ? "1" : "0"}
+                  onClick={() => onChange(iso(d))}
+                  aria-pressed={on}
+                  className={cn(
+                    // Altura fixa, igual à do botão do calendário: sem isso
+                    // cada um se dimensionava pelo próprio conteúdo e a fita
+                    // ficava desalinhada do botão ao lado.
+                    "shrink-0 w-14 h-14 flex flex-col items-center justify-center gap-px",
+                    "rounded-[var(--radius)] border text-center transition",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                    on
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card hover:border-primary",
+                  )}
+                >
+                  {/* Sem tracking: "amanhã" é a palavra mais larga da fita, e
+                      o espaçamento extra a fazia encostar nas bordas. */}
+                  <span className={cn("text-[10px] uppercase leading-none", on ? "opacity-80" : "text-muted-foreground")}>
+                    {i === 0 ? "hoje" : i === 1 ? "amanhã" : DIA_CURTO[d.getDay()]}
+                  </span>
+                  <span className="text-base font-semibold leading-none">{d.getDate()}</span>
+                  <span className={cn("text-[10px] leading-none", on ? "opacity-80" : "text-muted-foreground")}>
+                    {MES_CURTO[d.getMonth()]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Esmaece a borda direita: o dia cortado passa a ler como "tem mais
+              para o lado" em vez de "o botão comeu o dia". Estático e sem JS —
+              acompanhar a rolagem para escondê-lo no fim custaria um setState
+              por quadro. */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-card to-transparent" />
         </div>
 
         <button
@@ -166,7 +191,7 @@ export function DateStrip({
           aria-expanded={open}
           aria-label="Escolher outra data no calendário"
           className={cn(
-            "shrink-0 grid h-[3.6rem] w-11 place-items-center rounded-[var(--radius)] border transition",
+            "shrink-0 grid h-14 w-11 place-items-center rounded-[var(--radius)] border transition",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
             // Data fora da fita: o botão passa a carregar a seleção, senão
             // nada na tela mostraria que dia está escolhido.
