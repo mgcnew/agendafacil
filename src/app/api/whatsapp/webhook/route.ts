@@ -6,11 +6,15 @@ import { parseEvolutionWebhook } from "@/lib/whatsapp/inbound";
 /**
  * Recebe as mensagens que os clientes mandam de volta.
  *
- * Existe primeiro por causa de uma promessa: toda mensagem que enviamos
- * termina com "Responda SAIR para não receber mais mensagens". Sem esta rota a
- * frase era mentira — e quem responde SAIR e continua recebendo Bloqueia, que
- * é justamente o sinal que mais derruba número no WhatsApp. A frase existia
- * pra evitar bloqueio e, sem canal de entrada, produzia bloqueio.
+ * Existe primeiro por causa de uma promessa: a cliente é avisada de que pode
+ * responder SAIR. Sem esta rota a frase era mentira — e quem responde SAIR e
+ * continua recebendo Bloqueia, que é justamente o sinal que mais derruba
+ * número no WhatsApp. A frase existia pra evitar bloqueio e, sem canal de
+ * entrada, produzia bloqueio.
+ *
+ * O aviso não vai mais em toda mensagem (ver `whatsapp_rodape`), mas o SAIR
+ * continua sendo atendido em qualquer uma — é o que digitam que importa, não
+ * o que anunciamos.
  *
  * Aqui só se confere quem chamou e se repassa. Quem lê o envelope é
  * `parseEvolutionWebhook`; quem interpreta e age é `whatsapp_handle_inbound`,

@@ -331,8 +331,13 @@ export default function BarbeariaPage() {
                     <br />
                     💈 Corte + Barba
                   </p>
+                  {/* A assinatura e o aviso de saída são o que sai de verdade
+                      na primeira mensagem — o print aqui tem que bater com o
+                      produto, senão a landing promete outra coisa. */}
+                  <p className="mt-3 text-foreground">— Bruno</p>
                   <p className="mt-3 text-[11px] italic text-muted-foreground">
-                    Responda SAIR para não receber mais mensagens.
+                    Se um dia não quiser mais receber mensagens, é só responder
+                    SAIR.
                   </p>
                 </div>
               </div>
