@@ -4,14 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { MotionModal } from "@/components/MotionModal";
-import { Calendar } from "@/components/Calendar";
+import { ClientCombobox } from "@/components/ClientCombobox";
+import { DateStrip } from "@/components/DateStrip";
+import { TimeSlots } from "@/components/TimeSlots";
 import { formatBRL, cn } from "@/lib/utils";
 import type { Json } from "@/lib/database.types";
 import { HomeModePicker } from "./HomeModePicker";
+import { ProAvatar } from "./ProAvatar";
 import { ENDERECO_VAZIO, type Endereco } from "@/app/[slug]/HomeAddressForm";
 import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
-import { CalendarDots, CaretDown, CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
-import { DAY_SHORT, MONTH_NAMES, parse, type Client, type HomeConfig, type Pro, type Service } from "./shared";
+import { CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
+import type { Client, HomeConfig, Pro, Service } from "./shared";
 
 /**
  * Formulário de novo agendamento.
@@ -43,7 +46,6 @@ export function CreateAppointment({
   const initialTimeUsed = useRef(false);
   const [selected, setSelected]         = useState<string[]>([]);
   const [date, setDate]                 = useState(initialDate);
-  const [showCal, setShowCal]           = useState(false);
   const [slot, setSlot]                 = useState<string>("");
   const [slots, setSlots]               = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -58,11 +60,6 @@ export function CreateAppointment({
   const emCasa = !!homeConfig?.enabled && modo === "home";
   const [svcSearch, setSvcSearch]       = useState("");
   const [lastSvcs, setLastSvcs]         = useState<{ id: string; name: string }[] | null>(null);
-
-  const dateLabel = (() => {
-    const d = parse(date);
-    return `${DAY_SHORT[d.getDay()]}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]} de ${d.getFullYear()}`;
-  })();
 
   const discOf     = (s: Service) => discounts[s.id] ?? 0;
   const effOf      = (s: Service) => {
@@ -223,25 +220,79 @@ export function CreateAppointment({
     );
   });
 
+  // Um bloco só, desenhado em dois lugares (coluna da direita no desktop, no
+  // fluxo no celular) — mesma marcação, sem cópia.
+  const blocoServicos = (
+    <>
+      <Input
+        placeholder="Buscar serviço…"
+        value={svcSearch}
+        onChange={e => setSvcSearch(e.target.value)}
+      />
+      <div className="space-y-1.5 max-h-52 overflow-auto sm:max-h-none sm:flex-1 sm:pr-0.5">
+        {serviceButtons}
+      </div>
+    </>
+  );
+
+  const blocoHorarios = (
+    totalDuration <= 0 ? (
+      <p className="rounded-[var(--radius)] border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
+        Escolha os serviços primeiro — o horário depende de quanto tempo o
+        atendimento leva.
+      </p>
+    ) : loadingSlots ? (
+      <p className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+        <CircleNotch className="h-3.5 w-3.5 animate-spin" /> Procurando horários livres…
+      </p>
+    ) : slots.length === 0 ? (
+      <p className="rounded-[var(--radius)] border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
+        Nenhum horário livre neste dia para {pros.find(p => p.id === proId)?.name ?? "esta profissional"}.
+        Tente outro dia na fita acima.
+      </p>
+    ) : (
+      <TimeSlots dense slots={slots} selected={slot || null} onSelect={setSlot} className="max-h-56 overflow-auto sm:max-h-48" />
+    )
+  );
+
+  // Botão travado sem explicação é o que faz a pessoa achar que o sistema
+  // quebrou. Diz o que falta, na ordem em que ela preencheria.
+  const faltando =
+    !existingClient && !clientName.trim() ? "Informe o nome da cliente"
+      : selected.length === 0 ? "Escolha pelo menos um serviço"
+        : !slot ? "Escolha um horário"
+          : null;
+
   return (
     <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-2xl mx-auto max-h-[90vh] overflow-auto sm:overflow-hidden p-6 rounded-b-none sm:rounded-[var(--radius)]">
+      <Card className="w-full sm:max-w-3xl mx-auto max-h-[90vh] overflow-auto sm:overflow-hidden p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
         </div>
 
+        {/* A data atravessa as duas colunas no desktop: ela é o eixo do
+            formulário (muda a lista de horários inteira) e, espremida na
+            coluna de 240px, a fita mostraria três dias — perdendo o motivo de
+            existir. No celular ela volta para o fluxo, na ordem em que se
+            preenche. */}
+        <div className="hidden sm:block mb-4">
+          <Label className="mb-1.5 block">Data</Label>
+          <DateStrip value={date} onChange={setDate} />
+        </div>
+
         {/* Desktop: two columns. Mobile: single column */}
-        <div className="sm:flex sm:gap-6 sm:min-h-[440px]">
+        <div className="sm:flex sm:gap-6 sm:min-h-[420px]">
 
           {/* Left column — fields */}
           <div className="space-y-4 sm:w-60 sm:shrink-0 sm:flex sm:flex-col sm:space-y-3">
             <div className="space-y-1.5">
               <Label>Cliente</Label>
-              <Select value={existingClient} onValueChange={v => { setExisting(v); setSelected([]); }}>
-                <option value="">+ Nova cliente</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-              </Select>
+              <ClientCombobox
+                clients={clients}
+                value={existingClient}
+                onChange={v => { setExisting(v); setSelected([]); }}
+              />
             </div>
             {!existingClient && (
               <div className="grid grid-cols-2 gap-3">
@@ -266,8 +317,21 @@ export function CreateAppointment({
 
             <div className="space-y-1.5">
               <Label>Profissional</Label>
+              {/* Foto no rótulo: em salão com equipe, quem atende se reconhece
+                  pelo rosto antes do nome — e a cor do avatar é a mesma que
+                  identifica a pessoa na grade da agenda. */}
               <Select value={proId} onValueChange={setProId}>
-                {pros.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {pros.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {/* inline-flex e não flex: o Select embrulha o rótulo num
+                        span com `truncate`, e um filho block quebraria o
+                        alinhamento tanto no botão quanto na lista. */}
+                    <span className="inline-flex items-center gap-2 align-middle">
+                      <ProAvatar pro={p} size={20} />
+                      <span>{p.name}</span>
+                    </span>
+                  </option>
+                ))}
               </Select>
             </div>
 
@@ -287,82 +351,65 @@ export function CreateAppointment({
               </div>
             )}
 
-            {/* Serviços — mobile only */}
+            {/* Serviços e horários no celular ficam aqui, no fluxo; no desktop
+                vão para a coluna da direita. */}
             <div className="space-y-1.5 sm:hidden">
               <Label>Serviços</Label>
-              <Input
-                placeholder="Buscar serviço…"
-                value={svcSearch}
-                onChange={e => setSvcSearch(e.target.value)}
-              />
-              <div className="space-y-1.5 max-h-44 overflow-auto">{serviceButtons}</div>
+              {blocoServicos}
             </div>
 
-            {/* Data — mobile: toggle; desktop: calendário fixo */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:hidden">
               <Label>Data</Label>
-              <button
-                type="button"
-                onClick={() => setShowCal(v => !v)}
-                aria-expanded={showCal}
-                className="sm:hidden h-11 w-full flex items-center justify-between rounded-[var(--radius)] border border-border bg-card px-3.5 text-sm text-foreground hover:border-foreground/25 transition"
-              >
-                <span className="flex items-center gap-2">
-                  <CalendarDots className="h-4 w-4 text-muted-foreground shrink-0" />
-                  {dateLabel}
-                </span>
-                <CaretDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showCal && "rotate-180")} />
-              </button>
-              {showCal && (
-                <Calendar value={date} onChange={(d) => { setDate(d); setShowCal(false); }} className="mt-1 sm:hidden" />
+              <DateStrip value={date} onChange={setDate} />
+            </div>
+
+            <div className="space-y-1.5 sm:hidden">
+              <Label>Horário</Label>
+              {blocoHorarios}
+            </div>
+
+            {/* Resumo antes do botão: o que vai ser criado, em uma linha.
+                O "Total" era um campo de formulário que ninguém preenche e
+                mostrava R$ 0,00 antes de haver o que somar; aqui ele só
+                aparece quando existe conta, junto da duração — que é o número
+                que faltava para escolher horário com segurança. */}
+            <div className="sm:mt-auto space-y-2 pt-1">
+              {chosen.length > 0 && (
+                <div className="flex items-baseline justify-between gap-2 rounded-[var(--radius)] bg-muted/50 px-3 py-2">
+                  <span className="min-w-0 text-xs text-muted-foreground">
+                    <span className="truncate">{chosen.map(s => s.name).join(" + ")}</span>
+                    {" · "}
+                    {totalDuration >= 60
+                      ? `${Math.floor(totalDuration / 60)}h${totalDuration % 60 ? String(totalDuration % 60).padStart(2, "0") : ""}`
+                      : `${totalDuration} min`}
+                  </span>
+                  <span className="shrink-0 font-semibold text-primary">{formatBRL(totalPrice)}</span>
+                </div>
               )}
-              <Calendar value={date} onChange={(d) => setDate(d)} className="hidden sm:block" />
+
+              {err && <p className="text-sm text-red-600">{err}</p>}
+
+              <Button className="w-full" onClick={create} disabled={busy || !!faltando}>
+                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Criar agendamento
+              </Button>
+              {faltando && (
+                <p className="text-center text-xs text-muted-foreground">{faltando}</p>
+              )}
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Horário</Label>
-                <Select
-                  value={slot}
-                  onValueChange={setSlot}
-                  disabled={loadingSlots || slots.length === 0}
-                  placeholder={
-                    totalDuration <= 0 ? "Escolha serviços"
-                      : loadingSlots ? "Carregando…"
-                        : slots.length === 0 ? "Sem horários" : "Selecione"
-                  }
-                >
-                  {slots.map(s => <option key={s} value={s}>{slotLabel(s)}</option>)}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Total</Label>
-                <div className="h-11 flex items-center font-semibold text-primary">{formatBRL(totalPrice)}</div>
-              </div>
-            </div>
-
-            {proId && totalDuration > 0 && !loadingSlots && slots.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Nenhum horário livre nesta data para esta profissional. Verifique os horários de trabalho em Configurações.
-              </p>
-            )}
-
-            {err && <p className="text-sm text-red-600">{err}</p>}
-            <Button className="w-full sm:mt-auto" onClick={create} disabled={busy || selected.length === 0 || !slot}>
-              {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Criar agendamento
-            </Button>
           </div>
 
-          {/* Right column — services (desktop only) */}
-          <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-w-0">
-            <Label className="mb-2">Serviços</Label>
-            <Input
-              placeholder="Buscar serviço…"
-              value={svcSearch}
-              onChange={e => setSvcSearch(e.target.value)}
-              className="mb-2"
-            />
-            <div className="flex-1 overflow-auto space-y-1.5 pr-0.5">{serviceButtons}</div>
+          {/* Coluna da direita (desktop) — o que e quando. Horários logo
+              abaixo dos serviços porque um depende do outro: mudar o serviço
+              muda a duração e, com ela, a lista de horários. */}
+          <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-w-0 sm:gap-3">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <Label className="mb-2">Serviços</Label>
+              <div className="flex min-h-0 flex-1 flex-col gap-2">{blocoServicos}</div>
+            </div>
+            <div className="shrink-0">
+              <Label className="mb-2 block">Horário</Label>
+              {blocoHorarios}
+            </div>
           </div>
 
         </div>

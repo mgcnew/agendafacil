@@ -11,6 +11,7 @@ import { HomeAddressForm, ENDERECO_VAZIO, enderecoCompleto, type Endereco } from
 import { homeServiceFee, regraTarifa } from "@/lib/homeService";
 import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { Calendar } from "@/components/Calendar";
+import { TimeSlots } from "@/components/TimeSlots";
 import { formatBRL, formatServicePrice, formatDuration, formatDateLong } from "@/lib/utils";
 import type { Json } from "@/lib/database.types";
 import {
@@ -1918,6 +1919,11 @@ function DateRuler({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
+/**
+ * A grade em si mora em `@/components/TimeSlots`, dividida com o painel: o
+ * mesmo salão via um layout aqui e um dropdown lá dentro. Este invólucro
+ * existe só para manter o nome usado no passo do horário.
+ */
 function SlotGrid({
   slots,
   selected,
@@ -1927,45 +1933,5 @@ function SlotGrid({
   selected: string | null;
   onSelect: (s: string) => void;
 }) {
-  const slotHour = (s: string) =>
-    parseInt(new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", timeZone: "America/Sao_Paulo" }));
-
-  const groups = [
-    { label: "Manhã", icon: "🌤", slots: slots.filter((s) => slotHour(s) < 12) },
-    { label: "Tarde", icon: "☀️", slots: slots.filter((s) => slotHour(s) >= 12 && slotHour(s) < 18) },
-    { label: "Noite", icon: "🌙", slots: slots.filter((s) => slotHour(s) >= 18) },
-  ].filter((g) => g.slots.length > 0);
-
-  return (
-    <div className="space-y-4">
-      {groups.map((g) => (
-        <div key={g.label}>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            {g.icon} {g.label}
-          </p>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {g.slots.map((s) => {
-              const t = new Date(s).toLocaleTimeString("pt-BR", {
-                hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
-              });
-              const on = selected === s;
-              return (
-                <button
-                  key={s}
-                  onClick={() => onSelect(s)}
-                  className={`h-11 rounded-[var(--radius)] border text-sm font-medium transition ${
-                    on
-                      ? "bg-primary text-primary-foreground border-primary scale-[0.97]"
-                      : "border-border bg-card hover:border-primary"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <TimeSlots slots={slots} selected={selected} onSelect={onSelect} />;
 }

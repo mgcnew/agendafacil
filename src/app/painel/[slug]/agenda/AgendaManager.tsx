@@ -15,6 +15,7 @@ import { PaymentPickerModal } from "@/components/PaymentPickerModal";
 import { chargeAppointment as chargeAppointmentRpc, addAppointmentService as addAppointmentServiceRpc } from "@/lib/checkout";
 import { AgendaSignalsBanner, waPhone, type TodaySignals, type LateClient } from "@/components/AgendaSignalsBanner";
 import { CreateAppointment } from "./CreateAppointment";
+import { PALETTE, ProAvatar } from "./ProAvatar";
 import { HomeVisitCard, type HomeVisitConfig } from "./HomeVisitCard";
 import { DAY_SHORT, MONTH_NAMES, parse, toStr, type Client, type HomeConfig, type Pro, type Service } from "./shared";
 import {
@@ -113,12 +114,6 @@ const STATUS_META: Record<Status, { label: string; dot: string }> = {
 };
 
 const STATUS_LIST = Object.entries(STATUS_META) as [Status, { label: string; dot: string }][];
-
-const PALETTE = [
-  "#6366f1","#ec4899","#8b5cf6","#3b82f6",
-  "#14b8a6","#a855f7","#0ea5e9","#d946ef",
-  "#06b6d4","#7c3aed",
-];
 
 const DAY_LONG   = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 
@@ -253,28 +248,6 @@ function laneStyle(lane: number, lanes: number): CSSProperties {
 function getColor(pros: Pro[], memberId: string) {
   const idx = pros.findIndex(p => p.id === memberId);
   return pros[idx]?.color ?? PALETTE[Math.max(0, idx) % PALETTE.length];
-}
-
-function initials(name: string) {
-  const parts = (name || "").trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
-}
-
-/** Avatar do profissional: foto, ou iniciais sobre a cor do profissional. */
-function ProAvatar({ pro, size = 24 }: { pro: Pro; size?: number }) {
-  if (pro.photo_url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={pro.photo_url} alt={pro.name} className="rounded-full object-cover shrink-0"
-        style={{ width: size, height: size }} />
-    );
-  }
-  return (
-    <span className="rounded-full grid place-items-center text-white font-semibold shrink-0"
-      style={{ width: size, height: size, background: pro.color ?? PALETTE[0], fontSize: Math.round(size * 0.4) }}>
-      {initials(pro.name)}
-    </span>
-  );
 }
 
 // Avatar do cliente: foto (registro) ou inicial. Usa o mesmo fallback neutro
