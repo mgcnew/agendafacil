@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
-import { planAllowsHref } from "@/lib/plans";
+import { planAllowsHref, DIVULGACAO_DISPONIVEL } from "@/lib/plans";
 import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
 import { InlineScript } from "@/components/InlineScript";
@@ -119,6 +119,9 @@ export default async function PanelLayout({
       label: g.label,
       items: g.items
         .filter((n) => !n.perms || n.perms.some((p) => perms.has(p)))
+        // Recurso desligado some do menu antes de qualquer regra de plano ou
+        // permissão: não é "você não pode", é "ainda não existe".
+        .filter((n) => DIVULGACAO_DISPONIVEL || n.item.href !== "/marketing")
         .map((n) => n.item)
         .filter((it) => !effectivePlan || planAllowsHref(effectivePlan, it.href)),
     }))

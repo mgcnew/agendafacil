@@ -59,9 +59,9 @@ export function Hero() {
             >
               O <strong className="font-semibold text-foreground">sistema de agendamento online com inteligência artificial</strong> para
               salões de beleza, barbearias e estética. A cliente agenda pelo seu
-              link e recebe confirmação automática; a IA organiza sua agenda,
-              recupera quem deixou de aparecer e ainda cria suas artes de
-              divulgação. Você só aparece para atender.
+              link e recebe confirmação automática; a IA organiza sua agenda e
+              chama de volta quem deixou de aparecer. Você só aparece para
+              atender.
             </p>
 
             {/* CTAs */}

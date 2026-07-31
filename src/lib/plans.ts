@@ -65,9 +65,24 @@ export const PRO_ONLY_HREFS = [
 ] as const;
 
 /**
+ * Divulgação (artes com IA) está fora do ar.
+ *
+ * A tela inteira existe — construtor de prompt, formatos, créditos —, mas a
+ * geração nunca foi ligada: `/api/marketing/generate` devolve 501 no caminho
+ * ao vivo e um SVG "prévia" no outro, e as tabelas `ai_generations` e
+ * `ai_credits` nem chegaram a ser criadas. Enquanto a API de imagem não couber
+ * no orçamento, mostrar o menu é prometer o que não entrega.
+ *
+ * Um interruptor só, usado em três lugares: o item do menu (`layout.tsx`), a
+ * própria rota e o endpoint de geração. Religar é trocar para `true` — nada
+ * foi apagado.
+ */
+export const DIVULGACAO_DISPONIVEL = false;
+
+/**
  * Rotas exclusivas do Max (bloqueadas no Básico e no Pro).
- * TODO(lançamento Divulgação): mover "/marketing" para cá quando a IA estiver
- * ligada. Por ora a página fica acessível a todos os planos para desenvolvimento.
+ * TODO(lançamento Divulgação): mover "/marketing" para cá junto com
+ * DIVULGACAO_DISPONIVEL = true.
  */
 export const MAX_ONLY_HREFS = [] as const;
 

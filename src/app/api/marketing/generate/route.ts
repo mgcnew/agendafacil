@@ -13,8 +13,14 @@ import {
 } from "@/lib/marketing/prompts";
 import type { Niche } from "@/lib/themes";
 import { ALL_COLOR_VARIANTS } from "@/lib/themes";
+import { DIVULGACAO_DISPONIVEL } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Endpoint fechado junto com a tela (ver DIVULGACAO_DISPONIVEL). A rota some
+ * da UI, mas continuaria de pé e chamável — e é ela que consome crédito.
+ */
 
 type Body = {
   slug: string;
@@ -27,6 +33,10 @@ type Body = {
 };
 
 export async function POST(req: Request) {
+  if (!DIVULGACAO_DISPONIVEL) {
+    return NextResponse.json({ error: "Recurso indisponível." }, { status: 404 });
+  }
+
   let body: Body;
   try {
     body = (await req.json()) as Body;

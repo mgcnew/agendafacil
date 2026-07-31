@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
 import { getCredits } from "@/lib/marketing/credits";
+import { DIVULGACAO_DISPONIVEL } from "@/lib/plans";
 import { MarketingManager } from "./MarketingManager";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,11 @@ export default async function MarketingPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  // Tirar do menu não fecha a porta: quem salvou o link continua entrando.
+  // 404 e não "acesso negado", porque não é questão de permissão — a página
+  // não existe enquanto a geração de imagem estiver desligada.
+  if (!DIVULGACAO_DISPONIVEL) notFound();
+
   const { slug } = await params;
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
