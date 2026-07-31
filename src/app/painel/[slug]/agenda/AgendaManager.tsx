@@ -58,6 +58,7 @@ type Appt    = {
   inspiration_gallery_ids?: string[] | null;
   service_mode?: string | null;
   travel_km?: number | null;
+  travel_minutes?: number | null;
   travel_fee?: number | null;
   home_address?: string | null;
   color?: string;
@@ -446,7 +447,7 @@ function ApptDetailModal({
   onFinalize: () => void;
   homeVisit?: HomeVisitConfig;
   canManage?: boolean;
-  onTravelSaved: (r: { km: number; taxa: number }) => void;
+  onTravelSaved: (r: { km: number; taxa: number; minutos: number | null }) => void;
 }) {
   const supabase = createClient();
   const st = STATUS_META[appt.status];
@@ -603,6 +604,7 @@ function ApptDetailModal({
               endereco={appt.home_address ?? null}
               km={appt.travel_km == null ? null : Number(appt.travel_km)}
               taxa={Number(appt.travel_fee ?? 0)}
+              minutos={appt.travel_minutes == null ? null : Number(appt.travel_minutes)}
               config={homeVisit}
               podeEditar={!!canManage && !isFinished}
               onSalvo={onTravelSaved}
@@ -1467,7 +1469,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, service_mode, travel_km, travel_fee, home_address, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, service_mode, travel_km, travel_fee, travel_minutes, home_address, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)
@@ -1977,18 +1979,22 @@ export function AgendaManager({
             onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
             homeVisit={homeVisit}
             canManage={canManageAppointments}
-            onTravelSaved={({ km, taxa }) => {
+            onTravelSaved={({ km, taxa, minutos }) => {
               // A taxa entra no total: sem atualizar aqui, a ficha mostraria o
               // valor antigo até recarregar a página.
               const patch = (a: Appt): Appt => ({
                 ...a,
                 travel_km: km,
                 travel_fee: taxa,
+                travel_minutes: minutos,
                 total_price: Number(a.total_price) - Number(a.travel_fee ?? 0) + taxa,
                 status: a.status === "pending" ? "confirmed" : a.status,
               });
               setAppts(list => list.map(x => (x.id === detailAppt.id ? patch(x) : x)));
               setDetailAppt(d => (d ? patch(d) : d));
+              // Os bloqueios de ida e volta nascem no banco; sem recarregar,
+              // a grade não os mostraria até a próxima visita à página.
+              load();
             }}
           />
         )}

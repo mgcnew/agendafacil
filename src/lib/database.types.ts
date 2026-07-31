@@ -283,6 +283,7 @@ export type Database = {
           total_price: number
           travel_fee: number
           travel_km: number | null
+          travel_minutes: number | null
           updated_at: string
         }
         Insert: {
@@ -305,6 +306,7 @@ export type Database = {
           total_price?: number
           travel_fee?: number
           travel_km?: number | null
+          travel_minutes?: number | null
           updated_at?: string
         }
         Update: {
@@ -327,6 +329,7 @@ export type Database = {
           total_price?: number
           travel_fee?: number
           travel_km?: number | null
+          travel_minutes?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2251,6 +2254,7 @@ export type Database = {
       }
       schedule_blocks: {
         Row: {
+          appointment_id: string | null
           created_at: string
           ends_at: string
           id: string
@@ -2260,6 +2264,7 @@ export type Database = {
           starts_at: string
         }
         Insert: {
+          appointment_id?: string | null
           created_at?: string
           ends_at: string
           id?: string
@@ -2269,6 +2274,7 @@ export type Database = {
           starts_at: string
         }
         Update: {
+          appointment_id?: string | null
           created_at?: string
           ends_at?: string
           id?: string
@@ -2278,6 +2284,13 @@ export type Database = {
           starts_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "schedule_blocks_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "schedule_blocks_member_id_fkey"
             columns: ["member_id"]
@@ -3106,6 +3119,7 @@ export type Database = {
           total_price: number
           travel_fee: number
           travel_km: number | null
+          travel_minutes: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3287,6 +3301,7 @@ export type Database = {
           total_price: number
           travel_fee: number
           travel_km: number | null
+          travel_minutes: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3344,6 +3359,14 @@ export type Database = {
       home_service_fee: {
         Args: { p_km: number; p_salon: string }
         Returns: number
+      }
+      home_travel_conflicts: {
+        Args: { p_appointment: string; p_minutes: number }
+        Returns: {
+          client_name: string
+          id: string
+          starts_at: string
+        }[]
       }
       instagram_handle: { Args: { p_raw: string }; Returns: string }
       is_platform_admin: { Args: never; Returns: boolean }
@@ -3434,6 +3457,7 @@ export type Database = {
           total_price: number
           travel_fee: number
           travel_km: number | null
+          travel_minutes: number | null
           updated_at: string
         }
         SetofOptions: {
@@ -3710,7 +3734,12 @@ export type Database = {
         }[]
       }
       set_appointment_travel: {
-        Args: { p_appointment: string; p_confirm?: boolean; p_km: number }
+        Args: {
+          p_appointment: string
+          p_confirm?: boolean
+          p_km: number
+          p_minutes?: number
+        }
         Returns: Json
       }
       upcoming_birthdays: {
