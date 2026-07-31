@@ -3812,6 +3812,7 @@ export type Database = {
         Args: { p_kind: Database["public"]["Enums"]["whatsapp_message_kind"] }
         Returns: boolean
       }
+      whatsapp_late_send: { Args: { p_appointment: string }; Returns: Json }
       whatsapp_mark_result: {
         Args: {
           p_error?: string
@@ -3860,6 +3861,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      whatsapp_rodape: {
+        Args: {
+          p_client: string
+          p_kind: Database["public"]["Enums"]["whatsapp_message_kind"]
+        }
+        Returns: string
+      }
       whatsapp_unstick: { Args: never; Returns: undefined }
       whatsapp_winback_send: {
         Args: {
@@ -3902,6 +3910,7 @@ export type Database = {
         | "winback_inactive"
         | "home_request"
         | "home_confirmed"
+        | "late_nudge"
       whatsapp_outbox_status:
         | "queued"
         | "sending"
@@ -4067,6 +4076,7 @@ export const Constants = {
         "winback_inactive",
         "home_request",
         "home_confirmed",
+        "late_nudge",
       ],
       whatsapp_outbox_status: [
         "queued",

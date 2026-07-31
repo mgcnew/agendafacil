@@ -1,11 +1,11 @@
 import Link from "next/link";
+import { LateNudgeButton } from "./LateNudgeButton";
 import { formatBRL } from "@/lib/utils";
 import {
   ArrowSquareOut,
   CalendarDots,
   CalendarX,
   CaretDown,
-  ChatCircle,
   ClockCountdown,
   House,
   Sparkle,
@@ -47,17 +47,6 @@ export function waPhone(raw: string | null | undefined) {
   const d = (raw ?? "").replace(/\D/g, "");
   if (!d) return "";
   return d.startsWith("55") ? d : `55${d}`;
-}
-
-/** Monta o link do WhatsApp pra cobrar gentilmente um cliente atrasado. */
-function lateReminderUrl(client: LateClient) {
-  const first = client.name.split(" ")[0];
-  const msg =
-    `Oi${first && first !== "Cliente" ? ` ${first}` : ""}! Tudo bem? ` +
-    `Você tinha um horário marcado aqui hoje às ${client.time} 💇 ` +
-    `Ainda vem ou prefere remarcar?`;
-  const phone = waPhone(client.phone);
-  return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : null;
 }
 
 /**
@@ -162,28 +151,10 @@ export function AgendaSignalsBanner({
                 : `${lateClients.length} clientes ainda não chegaram pro horário deles.`}{" "}
               Quer que eu avise?
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {lateClients.map((c) => {
-                const url = lateReminderUrl(c);
-                return url ? (
-                  <a
-                    key={c.id}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/15 transition"
-                  >
-                    <ChatCircle className="h-3.5 w-3.5" /> Lembrar {c.name.split(" ")[0]} ({c.time})
-                  </a>
-                ) : (
-                  <span
-                    key={c.id}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
-                  >
-                    {c.name.split(" ")[0]} ({c.time}) — sem WhatsApp cadastrado
-                  </span>
-                );
-              })}
+            <div className="mt-2 flex flex-wrap items-start gap-2">
+              {lateClients.map((c) => (
+                <LateNudgeButton key={c.id} client={c} />
+              ))}
             </div>
           </div>
         )}

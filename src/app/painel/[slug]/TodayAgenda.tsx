@@ -20,6 +20,7 @@ import {
   Scissors,
   ShieldCheck,
   Sparkle,
+  UserCheck,
   UserMinus,
   Warning,
   X,
@@ -232,7 +233,7 @@ function AnamnesisSummary({
 
 // ── Card de um agendamento ─────────────────────────────────────
 function ItemCard({
-  item, expanded, overdue, slug, niche, onToggle, onFinalize, onNoShow, onZoom,
+  item, expanded, overdue, slug, niche, onToggle, onFinalize, onArrived, onNoShow, onZoom,
 }: {
   item: AgendaItem;
   expanded: boolean;
@@ -241,6 +242,7 @@ function ItemCard({
   niche: Niche;
   onToggle: () => void;
   onFinalize: () => void;
+  onArrived: () => void;
   onNoShow: () => void;
   onZoom: (url: string) => void;
 }) {
@@ -376,12 +378,36 @@ function ItemCard({
             </Link>
           ) : null}
 
-          {/* Ações */}
+          {/* Ações — na ordem em que o atendimento acontece.
+              Antes de a cliente chegar, "Chegou" é a ação principal: é o único
+              momento em que o sistema pode aprender que ela está no salão. Sem
+              esse toque, um agendamento fica em "confirmado" para sempre e
+              nada consegue distinguir quem foi atendida de quem sumiu — foi
+              assim que 17 atendimentos ficaram parados no status.
+              "Finalizar" continua ali para quem prefere dar a baixa de uma
+              vez: marcar chegada não pode virar um toque obrigatório. */}
           {isActionable && (
             <div className="flex gap-2 pt-0.5">
-              <Button onClick={onFinalize} className="flex-1 h-9 text-sm gap-1.5">
-                <Scissors className="h-3.5 w-3.5" /> Finalizar atendimento
-              </Button>
+              {item.status === "in_progress" ? (
+                <Button onClick={onFinalize} className="flex-1 h-9 text-sm gap-1.5">
+                  <Scissors className="h-3.5 w-3.5" /> Finalizar atendimento
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={onArrived} className="flex-1 h-9 text-sm gap-1.5">
+                    <UserCheck className="h-3.5 w-3.5" /> Chegou
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={onFinalize}
+                    title="Finalizar atendimento"
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-[var(--radius)] border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                  >
+                    <Scissors className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Finalizar</span>
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={onNoShow}
@@ -441,6 +467,17 @@ export function TodayAgenda({
   const toggle = (id: string) =>
     setOpen(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
+  /**
+   * "Chegou" → `in_progress`. É o único momento em que o sistema aprende que a
+   * cliente está no salão, e é o que faz o sinal de atraso parar de apontá-la
+   * (o filtro de atrasados só olha `pending`/`confirmed`).
+   */
+  async function onArrived(item: AgendaItem) {
+    setItems(list => list.map(x => x.id === item.id ? { ...x, status: "in_progress" } : x));
+    await supabase.from("appointments").update({ status: "in_progress" }).eq("id", item.id);
+    router.refresh();
+  }
+
   async function onNoShow(item: AgendaItem) {
     // Optimistic update
     setItems(list => list.map(x => x.id === item.id ? { ...x, status: "no_show" } : x));
@@ -473,6 +510,7 @@ export function TodayAgenda({
               niche={niche}
               onToggle={() => toggle(a.id)}
               onFinalize={() => setFinalizing(a)}
+              onArrived={() => onArrived(a)}
               onNoShow={() => onNoShow(a)}
               onZoom={setLightbox}
             />
@@ -522,6 +560,7 @@ export function TodayAgenda({
                   niche={niche}
                   onToggle={() => toggle(a.id)}
                   onFinalize={() => setFinalizing(a)}
+                  onArrived={() => onArrived(a)}
                   onNoShow={() => onNoShow(a)}
                   onZoom={setLightbox}
                 />
