@@ -3,6 +3,16 @@
 // Autenticação: header `x-push-secret` (compartilhado com o trigger via
 // Supabase Vault) — a função roda com --no-verify-jwt porque quem chama é o
 // Postgres, não um usuário logado.
+//
+// O TEXTO NÃO MORA AQUI. Título e corpo vêm de `appointment_notice`, a mesma
+// função que alimenta o sino do painel — senão as duas versões do mesmo aviso
+// divergem com o tempo e ninguém percebe.
+//
+// A diferença entre as duas é um parâmetro: `p_health = false`. O push aparece
+// na tela bloqueada, sem login, e `clients.alert_summary` diz coisas como
+// "Gestante" ou "Tratamento oncológico" — dado sensível de saúde (LGPD art.
+// 11) de alguém que não autorizou aquilo, visível pra quem passar perto do
+// balcão. O push avisa que EXISTE algo a conferir; o que é, só dentro do app.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
 
@@ -39,14 +49,6 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
   return data.access_token as string;
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  });
-}
-
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method_not_allowed", { status: 405 });
 
@@ -65,49 +67,52 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Lembrete de véspera é só pra profissional do horário; created/cancelled
-  // avisa o salão inteiro.
+  // O mesmo texto do sino, sem a linha da ficha.
+  const { data: notice } = await supabase.rpc("appointment_notice", {
+    p_appointment: appointment_id,
+    p_event: event,
+    p_recipient: null,
+    p_health: false,
+  });
+
+  const title = (notice as { title?: string } | null)?.title;
+  const body = (notice as { body?: string } | null)?.body;
+  // Agendamento apagado entre o trigger e aqui, ou evento que não sabemos
+  // narrar: melhor não mandar nada do que mandar push vazio.
+  if (!title || !body) {
+    return new Response(JSON.stringify({ sent: 0, reason: "sem_texto" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Quem recebe. Lembrete de véspera e confirmação da cliente só interessam a
+  // quem tem o horário; agendamento novo e cancelamento, ao salão inteiro.
+  let alvo = (profile_id as string | null) ?? null;
+  if (event === "confirmed" && !alvo) {
+    const { data: appt } = await supabase
+      .from("appointments")
+      .select("member_id")
+      .eq("id", appointment_id)
+      .maybeSingle();
+    if (appt?.member_id) {
+      const { data: membro } = await supabase
+        .from("salon_members")
+        .select("profile_id")
+        .eq("id", appt.member_id)
+        .maybeSingle();
+      alvo = membro?.profile_id ?? null;
+    }
+  }
+
   let tokenQuery = supabase.from("push_subscriptions").select("id, token").eq("salon_id", salon_id);
-  if (event === "reminder" && profile_id) {
-    tokenQuery = tokenQuery.eq("profile_id", profile_id);
+  if ((event === "reminder" || event === "confirmed") && alvo) {
+    tokenQuery = tokenQuery.eq("profile_id", alvo);
   }
   const { data: tokenRows } = await tokenQuery;
 
   if (!tokenRows || tokenRows.length === 0) {
     return new Response(JSON.stringify({ sent: 0 }), { headers: { "Content-Type": "application/json" } });
   }
-
-  const { data: appt } = await supabase
-    .from("appointments")
-    .select("starts_at, member_id, clients(full_name), appointment_services(name)")
-    .eq("id", appointment_id)
-    .maybeSingle();
-
-  const clientName = (appt?.clients as { full_name?: string } | null)?.full_name ?? "Cliente";
-  const services = ((appt?.appointment_services as { name: string }[] | null) ?? []).map((s) => s.name).join(", ");
-  const time = appt ? formatTime(appt.starts_at) : "";
-
-  let waitingSuffix = "";
-  if (event === "cancelled" && appt) {
-    const preferredDate = appt.starts_at.slice(0, 10); // preferred_date é date, comparável ao prefixo YYYY-MM-DD do timestamptz em America/Sao_Paulo
-    const { count } = await supabase
-      .from("appointment_waitlist")
-      .select("id", { count: "exact", head: true })
-      .eq("salon_id", salon_id)
-      .eq("status", "waiting")
-      .eq("preferred_date", preferredDate)
-      .or(`member_id.is.null,member_id.eq.${appt.member_id}`);
-    if (count && count > 0) waitingSuffix = ` · ${count} na lista de espera`;
-  }
-
-  const title = event === "cancelled"
-    ? "Agendamento cancelado"
-    : event === "reminder"
-    ? "Amanhã você tem horário"
-    : "Novo agendamento";
-  const body = (services
-    ? `${clientName} · ${services}${time ? ` às ${time}` : ""}`
-    : `${clientName}${time ? ` às ${time}` : ""}`) + waitingSuffix;
 
   const saJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
   if (!saJson) return new Response("missing_service_account", { status: 500 });

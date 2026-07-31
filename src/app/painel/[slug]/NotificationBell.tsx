@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Bell,
+  CalendarCheck,
   CalendarPlus,
   CalendarX,
   Clock,
@@ -33,8 +34,11 @@ function relativeTime(iso: string): string {
 }
 
 /**
- * Sino de notificações do painel — mostra novos agendamentos e cancelamentos
- * (alimentado pelo trigger notify_appointment_event). Abrir marca as não-lidas
+ * Sino de notificações do painel — novos agendamentos, cancelamentos,
+ * confirmações da cliente e o lembrete de véspera. O texto vem pronto do
+ * banco (`appointment_notice`), o mesmo que alimenta o push; aqui ele chega na
+ * versão com login, que é a única que pode citar a ficha de saúde.
+ * Abrir marca as não-lidas
  * como lidas (zera o badge). Fica vivo por realtime: assina appointments (já
  * publicado) e recarrega a lista quando algo muda no salão.
  */
@@ -147,13 +151,22 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
                 // de estado: saiu ou voltou às mensagens.
                 const whatsapp =
                   n.type === "whatsapp_opt_out" || n.type === "whatsapp_opt_in";
+                const confirmed = n.type === "appointment_confirmed";
                 const Icon = cancelled
                   ? CalendarX
                   : reminder
                   ? Clock
                   : whatsapp
                   ? WhatsappLogo
+                  : confirmed
+                  ? CalendarCheck
                   : CalendarPlus;
+                // O corpo vem de `appointment_notice` em até três linhas: o
+                // recado, o endereço do domicílio e o alerta da ficha. A da
+                // ficha é o motivo de o aviso existir em vez de ser só
+                // "fulano marcou" — então ela não pode sair na mesma cor
+                // cinza do resto.
+                const linhas = (n.body ?? "").split("\n").filter(Boolean);
                 return (
                   <div
                     key={n.id}
@@ -173,8 +186,19 @@ export function NotificationBell({ salonId, initialItems }: { salonId: string; i
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
-                      {n.body && <p className="text-xs text-muted-foreground truncate">{n.body}</p>}
+                      <p className="text-sm font-medium">{n.title}</p>
+                      {linhas.map((linha, i) => (
+                        <p
+                          key={i}
+                          className={`text-xs ${
+                            linha.startsWith("⚠️")
+                              ? "mt-0.5 font-medium text-amber-700 dark:text-amber-400"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {linha}
+                        </p>
+                      ))}
                     </div>
                     <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5">{relativeTime(n.created_at)}</span>
                   </div>

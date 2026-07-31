@@ -3087,6 +3087,15 @@ export type Database = {
           sample_count: number
         }[]
       }
+      appointment_notice: {
+        Args: {
+          p_appointment: string
+          p_event: string
+          p_health?: boolean
+          p_recipient?: string
+        }
+        Returns: Json
+      }
       book_appointment: {
         Args: {
           p_address?: Json
@@ -3311,6 +3320,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      data_amigavel: { Args: { p_ts: string; p_tz?: string }; Returns: string }
       effective_price: {
         Args: {
           p_base: number
