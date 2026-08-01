@@ -301,7 +301,7 @@ export default async function DashboardPage({
             <div className="rounded-[var(--radius)] border-2 border-primary bg-primary/5 p-5">
               <div className="flex items-start gap-3">
                 <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-primary text-primary-foreground">
-                  <CalendarDots className="h-5 w-5" />
+                  <CalendarDots aria-hidden className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-display font-bold">Este é o link de agendamento do seu salão</p>
@@ -318,7 +318,7 @@ export default async function DashboardPage({
                     rel="noopener noreferrer"
                     className="mt-3 inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition"
                   >
-                    Ver como a cliente agenda <CaretRight className="h-4 w-4" />
+                    Ver como a cliente agenda <CaretRight aria-hidden className="h-4 w-4" />
                   </a>
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default async function DashboardPage({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {stats.map((s) => (
               <div key={s.label} className="rounded-[var(--radius)] border border-border bg-card p-5">
-                <s.icon className="h-5 w-5 text-primary" />
+                <s.icon aria-hidden className="h-5 w-5 text-primary" />
                 <p className="font-display text-2xl font-bold mt-3">{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
               </div>
@@ -345,7 +345,7 @@ export default async function DashboardPage({
           {/* Agenda de hoje */}
           <div>
             <h2 className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" /> Agenda de hoje
+              <Clock aria-hidden className="h-5 w-5 text-primary" /> Agenda de hoje
             </h2>
             {appts.length === 0 ? (
               <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
@@ -362,7 +362,7 @@ export default async function DashboardPage({
           {/* Últimos atendimentos */}
           <div className="rounded-[var(--radius)] border border-border bg-card p-4">
             <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <ClockCounterClockwise className="h-4 w-4 text-primary" /> Últimos atendimentos
+              <ClockCounterClockwise aria-hidden className="h-4 w-4 text-primary" /> Últimos atendimentos
             </h2>
             {recentAppts.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">Nenhum atendimento concluído ainda.</p>
@@ -384,7 +384,7 @@ export default async function DashboardPage({
           {/* Aniversariantes do mês */}
           <div className="rounded-[var(--radius)] border border-border bg-card p-4">
             <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <Cake className="h-4 w-4 text-primary" /> Aniversariantes do mês
+              <Cake aria-hidden className="h-4 w-4 text-primary" /> Aniversariantes do mês
             </h2>
             {birthdays.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">Nenhum aniversariante nos próximos 31 dias.</p>
@@ -404,7 +404,8 @@ export default async function DashboardPage({
                         href={`https://wa.me/55${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Feliz aniversário, ${b.name.split(" ")[0]}! 🎂`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="shrink-0 text-xs font-medium text-primary hover:underline"
+                        aria-label={`Parabenizar ${b.name} no WhatsApp`}
+                        className="shrink-0 rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         Parabenizar
                       </a>
@@ -422,7 +423,7 @@ export default async function DashboardPage({
               className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
-                <UserCheck className="h-4 w-4" />
+                <UserCheck aria-hidden className="h-4 w-4" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm">
@@ -432,7 +433,7 @@ export default async function DashboardPage({
                   {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno.
                 </p>
               </div>
-              <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <CaretRight aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Link>
           )}
 
@@ -440,7 +441,7 @@ export default async function DashboardPage({
           {myComm && (
             <div className="rounded-[var(--radius)] border border-primary/30 bg-primary/5 p-4">
               <p className="flex items-center gap-2 text-sm font-medium">
-                <Wallet className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
+                <Wallet aria-hidden className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
                 <span className="capitalize text-muted-foreground text-xs">{myComm.monthLabel}</span>
               </p>
               <p className="font-display text-3xl font-bold text-primary mt-2">{formatBRL(myComm.toReceive)}</p>
@@ -459,11 +460,14 @@ export default async function DashboardPage({
           <div className="rounded-[var(--radius)] border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" /> Pacotes ativos
+                <Package aria-hidden className="h-4 w-4 text-primary" /> Pacotes ativos
               </h2>
               {pkgs.length > 0 && (
-                <Link href={`/painel/${slug}/pacotes`} className="text-xs text-primary font-medium">
-                  Ver todos
+                <Link
+                  href={`/painel/${slug}/pacotes`}
+                  className="rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  Ver todos<span className="sr-only"> os pacotes</span>
                 </Link>
               )}
             </div>
