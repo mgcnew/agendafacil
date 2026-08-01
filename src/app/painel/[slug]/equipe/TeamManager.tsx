@@ -173,8 +173,8 @@ export function TeamManager({
 
       {/* Erros de ações fora do formulário (revogar, cargo, remover) */}
       {err && !adding && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <Warning className="h-4 w-4 shrink-0" /> {err}
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <Warning aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -184,7 +184,9 @@ export function TeamManager({
             <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-display text-lg font-bold">Convidar pessoa</h3>
-                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
+                <button
+                  type="button" onClick={() => setAdding(false)} aria-label="Fechar"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -218,7 +220,7 @@ export function TeamManager({
                 pode definir uma comissão diferente por serviço na aba <b>Serviços</b>. Horários e
                 comissão ficam sob seu controle.
               </p>
-              {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
+              {err && <p role="alert" className="text-sm text-red-600 mt-2">{err}</p>}
               <div className="flex gap-2 mt-5">
                 <Button onClick={createInvite} disabled={busy || !email} className="flex-1">
                   {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <LinkSimple className="h-4 w-4" />}
@@ -254,14 +256,15 @@ export function TeamManager({
               {canManage && (
                 <div className="flex items-center gap-1 ml-auto shrink-0">
                   <Button variant="outline" size="sm" onClick={() => shareWhatsApp(inv)}>
-                    <ShareNetwork className="h-4 w-4" /> WhatsApp
+                    <ShareNetwork aria-hidden className="h-4 w-4" /> WhatsApp
                   </Button>
                   <button
+                    type="button"
                     onClick={() => revokeInvite(inv)}
-                    className="p-2 text-muted-foreground hover:text-red-600"
-                    title="Cancelar convite"
+                    aria-label={`Cancelar convite de ${inv.email}`}
+                    className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   >
-                    <Trash className="h-4 w-4" />
+                    <Trash aria-hidden className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -295,7 +298,7 @@ export function TeamManager({
                   </span>
                   {canManage && (
                     <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
-                      <PencilSimple className="h-4 w-4" /> Editar
+                      <PencilSimple aria-hidden className="h-4 w-4" /> Editar
                     </Button>
                   )}
                 </>
@@ -305,6 +308,7 @@ export function TeamManager({
                     <Select
                       value={m.role}
                       onValueChange={(v) => changeRole(m, v as Role)}
+                      aria-label={`Cargo de ${m.display_name ?? m.profiles?.full_name ?? "esta pessoa"}`}
                       className="w-auto h-9 text-sm"
                     >
                       {ROLE_OPTIONS.map((r) => (
@@ -317,14 +321,16 @@ export function TeamManager({
                   {canManage && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setEditing(m)}>
-                        <PencilSimple className="h-4 w-4" /> Editar
+                        <PencilSimple aria-hidden className="h-4 w-4" /> Editar
                       </Button>
                       <button
+                        type="button"
                         onClick={() => deactivate(m)}
-                        className="p-2 text-muted-foreground hover:text-red-600"
-                        title="Remover"
+                        aria-label={`Remover ${m.display_name ?? m.profiles?.full_name ?? "esta pessoa"} da equipe`}
+                        title="Remover da equipe"
+                        className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
-                        <X className="h-4 w-4" />
+                        <X aria-hidden className="h-4 w-4" />
                       </button>
                     </>
                   )}
@@ -424,20 +430,27 @@ function MemberEditor({
           <h3 className="font-display text-lg font-bold">
             {member.display_name ?? member.profiles?.full_name ?? "Profissional"}
           </h3>
-          <button onClick={onClose} className="p-2 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+          <button
+            type="button" onClick={onClose} aria-label="Fechar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X aria-hidden className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Abas — mobile: pílulas (ícone + rótulo na ativa);
             desktop: ícone em cima, rótulo abaixo, distribuídas uniformemente */}
-        <div className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-0 sm:pb-0 sm:px-0">
+        <div role="tablist" aria-label="Seções do cadastro" className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-0 sm:pb-0 sm:px-0">
           {tabs.map((t) => {
             const on = tab === t.id;
             return (
               <button
                 key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                tabIndex={on ? 0 : -1}
                 onClick={() => setTab(t.id)}
-                aria-label={t.label}
-                aria-current={on ? "page" : undefined}
                 className={cn(
                   "transition shrink-0 font-medium whitespace-nowrap",
                   // Mobile: pílula horizontal
@@ -604,13 +617,17 @@ function DadosPanel({ member, salonId, onSaved }: { member: Member; salonId: str
         </div>
       </div>
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving || uploading}>
           {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar dados
         </Button>
-        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+        {/* Região viva: o "Salvo" aparece longe do botão em formulários
+            longos, e some sozinho — sem isto, ninguém confirma que gravou. */}
+        <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+          {ok && <span className="inline-flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo</span>}
+        </span>
       </div>
     </div>
   );
@@ -902,13 +919,17 @@ function CadastroPanel({ member, salonId }: { member: Member; salonId: string })
         <Textarea id="notes" rows={2} value={form.notes ?? ""} onChange={(e) => set("notes", e.target.value)} placeholder="Anotações internas sobre o profissional" />
       </div>
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
           {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar cadastro
         </Button>
-        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+        {/* Região viva: o "Salvo" aparece longe do botão em formulários
+            longos, e some sozinho — sem isto, ninguém confirma que gravou. */}
+        <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+          {ok && <span className="inline-flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo</span>}
+        </span>
       </div>
     </div>
   );
@@ -1083,7 +1104,7 @@ function FinancasPanel({ member, salonId, salon }: { member: Member; salonId: st
             <p className="text-xs text-muted-foreground">
               Se o caixa estiver aberto, isso lança uma saída de comissão automaticamente.
             </p>
-            {err && <p className="text-sm text-red-600">{err}</p>}
+            {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
             {msg && (
               <div className="flex flex-wrap items-center gap-3">
                 <p className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> {msg}</p>
@@ -1276,13 +1297,17 @@ function ServicesPanel({
         </div>
       )}
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
           {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar {selectedCount > 0 ? `(${selectedCount})` : ""}
         </Button>
-        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+        {/* Região viva: o "Salvo" aparece longe do botão em formulários
+            longos, e some sozinho — sem isto, ninguém confirma que gravou. */}
+        <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+          {ok && <span className="inline-flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo</span>}
+        </span>
       </div>
     </div>
   );
@@ -1388,13 +1413,17 @@ function PermissionsPanel({
         </div>
       )}
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
       <div className="flex items-center gap-3 pt-1">
         <Button onClick={save} disabled={saving}>
           {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar permissões
         </Button>
-        {ok && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check className="h-4 w-4" /> Salvo</span>}
+        {/* Região viva: o "Salvo" aparece longe do botão em formulários
+            longos, e some sozinho — sem isto, ninguém confirma que gravou. */}
+        <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+          {ok && <span className="inline-flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo</span>}
+        </span>
       </div>
     </div>
   );

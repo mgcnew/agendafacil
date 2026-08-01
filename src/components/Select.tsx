@@ -19,6 +19,12 @@ export interface SelectProps {
   className?: string;
   disabled?: boolean;
   placeholder?: string;
+  /**
+   * Para quando não há um <label htmlFor> — caso comum de select repetido por
+   * linha de lista (o cargo de cada pessoa, a etapa de cada lead), onde um
+   * rótulo visível seria ruído mas o controle precisa de nome mesmo assim.
+   */
+  "aria-label"?: string;
 }
 
 /**
@@ -34,6 +40,7 @@ export function Select({
   className,
   disabled,
   placeholder,
+  "aria-label": ariaLabel,
 }: SelectProps) {
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
@@ -113,6 +120,7 @@ export function Select({
         onClick={() => (open ? setOpen(false) : openMenu())}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-card px-3 text-sm text-foreground transition",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
