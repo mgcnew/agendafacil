@@ -98,22 +98,22 @@ function SendFeedback({ state }: { state: SendState | undefined }) {
 
   if (state.status === "error") {
     return (
-      <p className="mt-2 flex items-start gap-1.5 rounded-[var(--radius)] bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-        <Warning className="h-3.5 w-3.5 shrink-0 mt-px" /> {state.message}
+      <p role="alert" className="mt-2 flex items-start gap-1.5 rounded-[var(--radius)] bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+        <Warning aria-hidden className="h-3.5 w-3.5 shrink-0 mt-px" /> {state.message}
       </p>
     );
   }
 
   return (
-    <div className="mt-2 rounded-[var(--radius)] border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2">
+    <div role="status" className="mt-2 rounded-[var(--radius)] border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
         {state.foraJanela ? (
           <>
-            <ClockAfternoon className="h-3.5 w-3.5 shrink-0" /> Na fila — sai a partir das 8h
+            <ClockAfternoon aria-hidden className="h-3.5 w-3.5 shrink-0" /> Na fila — sai a partir das 8h
           </>
         ) : (
           <>
-            <Check className="h-3.5 w-3.5 shrink-0" /> Enviado pelo WhatsApp do salão
+            <Check aria-hidden className="h-3.5 w-3.5 shrink-0" /> Enviado pelo WhatsApp do salão
           </>
         )}
       </p>
@@ -359,18 +359,20 @@ export function RecuperarManager({
             href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent("Volta pra cá")}&desconto=15`}
             className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
           >
-            <SealPercent className="h-3.5 w-3.5" /> Criar campanha
+            <SealPercent aria-hidden className="h-3.5 w-3.5" /> Criar campanha
           </Link>
         </div>
       )}
 
       {/* Cupom de retorno (opcional) */}
       {campaigns.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="Anexar cupom à mensagem" className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Anexar cupom:</span>
           <button
+            type="button"
             onClick={() => setCouponId("")}
-            className={`rounded-full border px-3 py-1 text-xs transition ${
+            aria-pressed={couponId === ""}
+            className={`rounded-full border px-3 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
               couponId === "" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
             }`}
           >
@@ -379,8 +381,10 @@ export function RecuperarManager({
           {campaigns.map((c) => (
             <button
               key={c.id}
+              type="button"
               onClick={() => setCouponId(c.id)}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
+              aria-pressed={couponId === c.id}
+              className={`rounded-full border px-3 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                 couponId === c.id ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
               }`}
             >
@@ -407,8 +411,11 @@ export function RecuperarManager({
       {/* Busca + período */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <label htmlFor="busca-recuperar" className="sr-only">Buscar cliente por nome</label>
+          <MagnifyingGlass aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
+            id="busca-recuperar"
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nome…"
@@ -418,6 +425,7 @@ export function RecuperarManager({
         <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
           {tab === "inactive" ? "Inativo há mais de" : "Janela"}
           <select
+            aria-label={tab === "inactive" ? "Inativo há mais de quantos dias" : "Janela de quantos dias"}
             value={tab === "inactive" ? inactiveDays : windowDays}
             onChange={(e) =>
               tab === "inactive"
@@ -437,20 +445,23 @@ export function RecuperarManager({
           celular empurrava "Inativos" pra fora da tela. O ícone sai no
           celular: com o rótulo ao lado ele não informa nada, e é justamente a
           largura que estava faltando. */}
-      <div className="grid grid-cols-3 border-b border-border">
+      <div role="tablist" aria-label="Clientes para recuperar" className="grid grid-cols-3 border-b border-border">
         {TABS.map((t) => {
           const count = data[t.id].length;
           const on = tab === t.id;
           return (
             <button
               key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              tabIndex={on ? 0 : -1}
               onClick={() => setTab(t.id)}
-              aria-current={on ? "page" : undefined}
-              className={`flex items-center justify-center gap-1.5 px-1 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition sm:text-sm ${
+              className={`flex items-center justify-center gap-1.5 border-b-2 -mb-px px-1 py-2.5 text-[13px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] sm:text-sm ${
                 on ? "border-primary text-primary" : "border-transparent text-muted-foreground"
               }`}
             >
-              <t.icon className="hidden h-4 w-4 shrink-0 sm:block" />
+              <t.icon aria-hidden className="hidden h-4 w-4 shrink-0 sm:block" />
               <span className="truncate">{t.label}</span>
               {count > 0 && (
                 <span className="shrink-0 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
@@ -500,12 +511,12 @@ export function RecuperarManager({
                       <p className="font-medium truncate">{c.name}</p>
                       {destaque && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                          <Sparkle className="h-3 w-3" weight="fill" /> Comece por aqui
+                          <Sparkle aria-hidden className="h-3 w-3" weight="fill" /> Comece por aqui
                         </span>
                       )}
                       {risky && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5">
-                          <Warning className="h-3 w-3" /> {c.total_no_shows} faltas
+                          <Warning aria-hidden className="h-3 w-3" /> {c.total_no_shows} faltas
                         </span>
                       )}
                     </div>
@@ -529,14 +540,23 @@ export function RecuperarManager({
                     // aceita clique pra depois dizer não é pior que um desligado.
                     disabled={!hasPhone || !!send}
                     onClick={() => void chamar(c)}
+                    // Um "Chamar" por cliente: sem o nome, são vinte botões
+                    // idênticos. E o travado precisa dizer por que travou.
+                    aria-label={
+                      !hasPhone
+                        ? `${c.name} não tem telefone cadastrado`
+                        : send?.status === "sent"
+                          ? `${c.name} já foi chamada`
+                          : `Chamar ${c.name} no WhatsApp`
+                    }
                     className="shrink-0 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                   >
                     {send?.status === "sending" ? (
-                      <CircleNotch className="h-4 w-4 animate-spin" />
+                      <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
                     ) : send?.status === "sent" ? (
-                      <Check className="h-4 w-4" />
+                      <Check aria-hidden className="h-4 w-4" />
                     ) : (
-                      <WhatsappLogo className="h-4 w-4" />
+                      <WhatsappLogo aria-hidden className="h-4 w-4" />
                     )}
                     {send?.status === "sent" ? "Chamado" : "Chamar"}
                   </Button>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { AnimatePresence } from "framer-motion";
+import { Switch } from "@/components/Switch";
 import { MotionModal } from "@/components/MotionModal";
 import { Calendar as DatePicker } from "@/components/Calendar";
 import { formatBRL, cn } from "@/lib/utils";
@@ -123,7 +124,7 @@ export function CampaignsManager({
       </div>
 
       {err && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
           <Warning className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
@@ -162,32 +163,48 @@ export function CampaignsManager({
                       <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", st.cls)}>{st.label}</span>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Calendar className="h-3 w-3" /> {periodLabel(c)}
+                      <Calendar aria-hidden className="h-3 w-3" /> {periodLabel(c)}
                       {" · "}
                       {c.scope === "all" ? "Todos os serviços" : `${svcCount(c.id)} serviço(s)`}
                     </p>
                   </div>
+                  {/* Um botão de liga/desliga cujo único sinal era a cor do
+                      ícone — verde ou cinza. Quem não separa os dois não sabia
+                      se a campanha estava no ar. */}
                   <button
+                    type="button"
                     onClick={() => toggleActive(c)}
-                    title={c.is_active ? "Pausar" : "Ativar"}
+                    aria-pressed={c.is_active}
+                    aria-label={`${c.name}: ${c.is_active ? "ativa" : "pausada"}`}
+                    title={c.is_active ? "Pausar campanha" : "Ativar campanha"}
                     className={cn(
-                      "p-2 rounded-[var(--radius)] hover:bg-muted transition",
+                      "grid h-9 w-9 place-items-center rounded-[var(--radius)] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                       c.is_active ? "text-emerald-600" : "text-muted-foreground",
                     )}
                   >
-                    <Power className="h-4 w-4" />
+                    <Power aria-hidden className="h-4 w-4" />
                   </button>
-                  <button onClick={() => { setEditing(c); setErr(null); }} className="p-2 text-muted-foreground hover:text-foreground">
-                    <PencilSimple className="h-4 w-4" />
+                  <button
+                    type="button"
+                    onClick={() => { setEditing(c); setErr(null); }}
+                    aria-label={`Editar a campanha ${c.name}`}
+                    className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <PencilSimple aria-hidden className="h-4 w-4" />
                   </button>
-                  <button onClick={() => remove(c)} className="p-2 text-muted-foreground hover:text-red-600">
-                    <Trash className="h-4 w-4" />
+                  <button
+                    type="button"
+                    onClick={() => remove(c)}
+                    aria-label={`Excluir a campanha ${c.name}`}
+                    className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <Trash aria-hidden className="h-4 w-4" />
                   </button>
                 </div>
 
                 {hasData ? (
                   <p className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                    <ChartLineUp className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <ChartLineUp aria-hidden className="h-3.5 w-3.5 text-primary shrink-0" />
                     <span><strong className="text-foreground">{perf.bookings}</strong> agendamento{perf.bookings === 1 ? "" : "s"}</span>
                     <span>·</span>
                     <span><strong className="text-foreground">{formatBRL(perf.revenue)}</strong> em receita</span>
@@ -303,30 +320,36 @@ function CampaignEditor({
       <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">{campaign ? "Editar campanha" : "Nova campanha"}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+          <button
+            type="button" onClick={onClose} aria-label="Fechar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X aria-hidden className="h-5 w-5" />
+          </button>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Nome</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Promoção de Feriado" />
+            <Label htmlFor="camp-nome">Nome</Label>
+            <Input id="camp-nome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Promoção de Feriado" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Desconto (%)</Label>
-            <Input value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="20" inputMode="decimal" />
+            <Label htmlFor="camp-desconto">Desconto (%)</Label>
+            <Input id="camp-desconto" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="20" inputMode="decimal" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Aplica em</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <Label id="camp-escopo-rot">Aplica em</Label>
+            <div role="group" aria-labelledby="camp-escopo-rot" className="grid grid-cols-2 gap-2">
               {(["all", "services"] as const).map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setScope(s)}
+                  aria-pressed={scope === s}
                   className={cn(
-                    "rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition",
+                    "rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                     scope === s ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-foreground/25",
                   )}
                 >
@@ -338,8 +361,8 @@ function CampaignEditor({
 
           {scope === "services" && (
             <div className="space-y-1.5">
-              <Label>Serviços ({selected.length})</Label>
-              <div className="space-y-1.5 max-h-52 overflow-auto rounded-[var(--radius)] border border-border p-2">
+              <Label id="camp-svc-rot">Serviços ({selected.length})</Label>
+              <div role="group" aria-labelledby="camp-svc-rot" className="space-y-1.5 max-h-52 overflow-auto rounded-[var(--radius)] border border-border p-2">
                 {services.map((s) => {
                   const on = selected.includes(s.id);
                   const onReq = s.price_type === "on_request";
@@ -347,15 +370,17 @@ function CampaignEditor({
                     <button
                       key={s.id}
                       type="button"
+                      role="checkbox"
+                      aria-checked={on}
                       disabled={onReq}
                       onClick={() => toggleSvc(s.id)}
                       className={cn(
-                        "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition",
+                        "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                         onReq ? "opacity-50 cursor-not-allowed border-border" : on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
                       )}
                     >
                       <span className="flex items-center gap-2">
-                        <span className={cn("grid place-items-center h-5 w-5 rounded border shrink-0", on ? "bg-primary border-primary text-primary-foreground" : "border-border")}>
+                        <span aria-hidden className={cn("grid place-items-center h-5 w-5 rounded border shrink-0", on ? "bg-primary border-primary text-primary-foreground" : "border-border")}>
                           {on && <Check className="h-3.5 w-3.5" />}
                         </span>
                         {s.name}
@@ -434,18 +459,12 @@ function CampaignEditor({
             Sem datas, a campanha vale enquanto estiver ativa.
           </p>
 
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <button
-              type="button"
-              onClick={() => setActive((v) => !v)}
-              className={cn("relative h-6 w-11 rounded-full transition shrink-0", active ? "bg-primary" : "bg-muted-foreground/30")}
-            >
-              <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all", active ? "left-[22px]" : "left-0.5")} />
-            </button>
+          <div className="flex items-center gap-2.5">
+            <Switch checked={active} onChange={setActive} label="Campanha ativa" />
             <span className="text-sm">Campanha ativa</span>
-          </label>
+          </div>
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
           <div className="flex gap-2 pt-1">
             <Button onClick={save} disabled={busy} className="flex-1">
