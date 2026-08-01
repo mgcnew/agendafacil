@@ -269,6 +269,7 @@ export type Database = {
           created_by: string | null
           ends_at: string
           home_address: string | null
+          home_quote_at: string | null
           id: string
           inspiration_gallery_ids: string[]
           member_id: string
@@ -292,6 +293,7 @@ export type Database = {
           created_by?: string | null
           ends_at: string
           home_address?: string | null
+          home_quote_at?: string | null
           id?: string
           inspiration_gallery_ids?: string[]
           member_id: string
@@ -315,6 +317,7 @@ export type Database = {
           created_by?: string | null
           ends_at?: string
           home_address?: string | null
+          home_quote_at?: string | null
           id?: string
           inspiration_gallery_ids?: string[]
           member_id?: string
@@ -3911,6 +3914,7 @@ export type Database = {
         | "home_request"
         | "home_confirmed"
         | "late_nudge"
+        | "home_quote"
       whatsapp_outbox_status:
         | "queued"
         | "sending"
@@ -4076,6 +4080,7 @@ export const Constants = {
         "winback_inactive",
         "home_request",
         "home_confirmed",
+        "home_quote",
         "late_nudge",
       ],
       whatsapp_outbox_status: [

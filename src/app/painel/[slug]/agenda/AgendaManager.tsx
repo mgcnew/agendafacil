@@ -62,6 +62,7 @@ type Appt    = {
   travel_minutes?: number | null;
   travel_fee?: number | null;
   home_address?: string | null;
+  home_quote_at?: string | null;
   color?: string;
 };
 type ApptService = { id: string; name: string; price: number; duration_min: number };
@@ -330,6 +331,10 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
   const emCasa = a.service_mode === "home";
   // Pedido sem quilometragem = cliente esperando o valor do deslocamento.
   const aguardandoKm = emCasa && a.travel_km == null;
+  // Valor enviado e sem resposta ainda. Sem isto o selo diria "Em casa" para
+  // uma viagem que a cliente talvez recuse — o mesmo problema que o orçamento
+  // veio resolver, só que na varredura do dia.
+  const aguardandoResposta = emCasa && a.status === "pending" && a.home_quote_at != null;
   const timeLabel = narrow || compact
     ? fmtHM(a.starts_at)
     : `${fmtHM(a.starts_at)}${a.ends_at ? ` – ${fmtHM(a.ends_at)}` : ""}`;
@@ -346,10 +351,24 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
         `${name} às ${fmtHM(a.starts_at)} — ${st.label}` +
         (emCasa ? " — em domicílio" : "") +
         // O aria-label substitui todo o conteúdo do botão: sem repetir aqui,
-        // o ícone de restrição existia só para quem enxerga.
+        // o selo e o ícone de restrição existiriam só para quem enxerga.
+        (aguardandoKm
+          ? " — falta o valor do deslocamento"
+          : aguardandoResposta
+          ? " — aguardando a cliente responder ao valor"
+          : "") +
         (a.clients?.alert_summary ? ` — atenção: ${a.clients.alert_summary}` : "")
       }
-      title={emCasa ? `${name} — atendimento em domicílio${aguardandoKm ? " (falta definir o valor do deslocamento)" : ""}` : undefined}
+      title={
+        emCasa
+          ? `${name} — atendimento em domicílio` +
+            (aguardandoKm
+              ? " (falta definir o valor do deslocamento)"
+              : aguardandoResposta
+              ? " (aguardando a cliente responder ao valor)"
+              : "")
+          : undefined
+      }
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       style={{
         borderLeft: `3px solid ${color}`,
@@ -406,7 +425,7 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
             {emCasa && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 <House className="h-2.5 w-2.5" weight="fill" />
-                {aguardandoKm ? "Falta o valor" : "Em casa"}
+                {aguardandoKm ? "Falta o valor" : aguardandoResposta ? "Aguardando resposta" : "Em casa"}
               </span>
             )}
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground/75">
@@ -431,7 +450,7 @@ function ApptDetailModal({
   onFinalize: () => void;
   homeVisit?: HomeVisitConfig;
   canManage?: boolean;
-  onTravelSaved: (r: { km: number; taxa: number; minutos: number | null }) => void;
+  onTravelSaved: (r: { km: number; taxa: number; minutos: number | null; aguardando: boolean }) => void;
 }) {
   const supabase = createClient();
   const st = STATUS_META[appt.status];
@@ -591,7 +610,11 @@ function ApptDetailModal({
               minutos={appt.travel_minutes == null ? null : Number(appt.travel_minutes)}
               config={homeVisit}
               podeEditar={!!canManage && !isFinished}
+              // Só é espera de verdade enquanto está pendente: respondeu SIM,
+              // o status muda e o aviso some sozinho.
+              aguardandoDesde={appt.status === "pending" ? appt.home_quote_at ?? null : null}
               onSalvo={onTravelSaved}
+              onConfirmar={() => onStatusChange("confirmed")}
             />
           )}
 
@@ -1456,7 +1479,7 @@ export function AgendaManager({
     const [{ data }, { data: blockData }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, service_mode, travel_km, travel_fee, travel_minutes, home_address, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
+        .select("id, starts_at, ends_at, status, total_price, member_id, client_id, notes, inspiration_gallery_ids, service_mode, travel_km, travel_fee, travel_minutes, home_address, home_quote_at, clients(full_name, phone, alert_summary, photo_url), salon_members(display_name), appointment_services(service_id)")
         .eq("salon_id", salonId)
         .gte("starts_at", start)
         .lte("starts_at", end)
@@ -2012,16 +2035,22 @@ export function AgendaManager({
             onFinalize={() => { setDetailAppt(null); setFinalizing(detailAppt); }}
             homeVisit={homeVisit}
             canManage={canManageAppointments}
-            onTravelSaved={({ km, taxa, minutos }) => {
+            onTravelSaved={({ km, taxa, minutos, aguardando }) => {
               // A taxa entra no total: sem atualizar aqui, a ficha mostraria o
               // valor antigo até recarregar a página.
+              //
+              // `aguardando` decide o status: enviar o valor não confirma mais
+              // nada — quem confirma é a cliente, respondendo SIM. Só quando
+              // não houve como perguntar (sem WhatsApp conectado) o
+              // agendamento passa a confirmado na hora, como antes.
               const patch = (a: Appt): Appt => ({
                 ...a,
                 travel_km: km,
                 travel_fee: taxa,
                 travel_minutes: minutos,
                 total_price: Number(a.total_price) - Number(a.travel_fee ?? 0) + taxa,
-                status: a.status === "pending" ? "confirmed" : a.status,
+                home_quote_at: aguardando ? new Date().toISOString() : a.home_quote_at,
+                status: !aguardando && a.status === "pending" ? "confirmed" : a.status,
               });
               setAppts(list => list.map(x => (x.id === detailAppt.id ? patch(x) : x)));
               setDetailAppt(d => (d ? patch(d) : d));

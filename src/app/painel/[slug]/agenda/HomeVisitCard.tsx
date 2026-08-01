@@ -2,12 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { Button, Input } from "@/components/ui";
-import { ArrowSquareOut, CircleNotch, House, MapPin, PencilSimple, Warning } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, ChatCircleDots, CircleNotch, House, MapPin, PencilSimple, Warning } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/client";
 import { formatBRL } from "@/lib/utils";
 import { homeServiceFee, type Tarifa } from "@/lib/homeService";
 
 type Conflito = { id: string; client_name: string; starts_at: string };
+
+/**
+ * "há 20 minutos", "ontem". O tempo é o dado que importa aqui: dez minutos de
+ * espera é normal, dois dias é hora de ligar.
+ */
+function desde(iso: string): string {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (min < 2) return "agora";
+  if (min < 60) return `há ${min} minutos`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h} ${h === 1 ? "hora" : "horas"}`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "ontem" : `há ${d} dias`;
+}
 
 export type HomeVisitConfig = {
   tarifa: Tarifa;
@@ -27,6 +41,12 @@ export type HomeVisitConfig = {
  *
  * O km fica guardado na ficha da cliente: da próxima vez a página pública já
  * mostra o valor fechado e este card nem aparece.
+ *
+ * O botão não confirma nada: manda a pergunta. Quem confirma é a cliente,
+ * respondendo SIM ao valor (ver 20260801_domicilio_orcamento_2_fluxo.sql) — e
+ * é por isso que existe o "Confirmar mesmo assim" aqui embaixo. Metade das
+ * respostas reais chega em áudio ou por frase que nenhuma lista de palavras
+ * pega; sem a saída manual, o recurso viraria armadilha.
  */
 export function HomeVisitCard({
   appointmentId,
@@ -36,7 +56,9 @@ export function HomeVisitCard({
   minutos,
   config,
   podeEditar,
+  aguardandoDesde,
   onSalvo,
+  onConfirmar,
 }: {
   appointmentId: string;
   endereco: string | null;
@@ -46,7 +68,15 @@ export function HomeVisitCard({
   minutos: number | null;
   config: HomeVisitConfig;
   podeEditar: boolean;
-  onSalvo: (r: { km: number; taxa: number; minutos: number | null }) => void;
+  /**
+   * Quando o orçamento foi enviado, se o agendamento ainda está pendente.
+   * `null` quando não há pergunta em aberto — nunca houve, ou já foi
+   * respondida.
+   */
+  aguardandoDesde: string | null;
+  onSalvo: (r: { km: number; taxa: number; minutos: number | null; aguardando: boolean }) => void;
+  /** Confirma na mão, para quem respondeu por áudio, ligação ou pessoalmente. */
+  onConfirmar: () => void;
 }) {
   const [editando, setEditando] = useState(km == null);
   const [valor, setValor] = useState(km == null ? "" : String(km).replace(".", ","));
@@ -115,12 +145,17 @@ export function HomeVisitCard({
       );
       return;
     }
-    const r = data as unknown as { travel_km: number; travel_fee: number } | null;
+    const r = data as unknown as
+      | { travel_km: number; travel_fee: number; aguardando?: boolean }
+      | null;
     setEditando(false);
     onSalvo({
       km: Number(r?.travel_km ?? kmDigitado),
       taxa: Number(r?.travel_fee ?? previa ?? 0),
       minutos: minutosParaSalvar,
+      // O banco decide: sem WhatsApp conectado não há pergunta a fazer, e o
+      // agendamento é confirmado na hora, como sempre foi.
+      aguardando: r?.aguardando === true,
     });
   }
 
@@ -237,37 +272,62 @@ export function HomeVisitCard({
           {erro && <p className="text-xs text-red-600">{erro}</p>}
 
           <Button size="sm" onClick={salvar} disabled={!kmValido || !minValido || salvando} className="w-full">
-            {salvando && <CircleNotch className="h-4 w-4 animate-spin" />}
-            {km == null ? "Confirmar e avisar a cliente" : "Salvar novo valor"}
+            {salvando && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+            {km == null ? "Enviar o valor para a cliente" : "Salvar novo valor"}
           </Button>
           {km == null && (
             <p className="text-[11px] text-muted-foreground">
-              O agendamento passa a confirmado e a cliente recebe o valor no
-              WhatsApp.
+              A cliente recebe o valor no WhatsApp e responde SIM ou NÃO. O
+              horário fica guardado até ela responder.
             </p>
           )}
         </div>
       ) : (
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
-          <span className="text-sm">
-            {km?.toLocaleString("pt-BR")} km ·{" "}
-            <b className="text-primary">{formatBRL(taxa)}</b>
-            {minutos != null && minutos > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {" "}· {minutos} min de cada lado reservados
-              </span>
+        <>
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+            <span className="text-sm">
+              {km?.toLocaleString("pt-BR")} km ·{" "}
+              <b className="text-primary">{formatBRL(taxa)}</b>
+              {minutos != null && minutos > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {" "}· {minutos} min de cada lado reservados
+                </span>
+              )}
+            </span>
+            {podeEditar && (
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className="inline-flex items-center gap-1 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <PencilSimple aria-hidden className="h-3.5 w-3.5" /> Corrigir
+              </button>
             )}
-          </span>
-          {podeEditar && (
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <PencilSimple className="h-3.5 w-3.5" /> Corrigir
-            </button>
+          </div>
+
+          {/* Pendente porque a cliente está decidindo — estado que a agenda
+              mostrava idêntico a "pendente porque ninguém olhou ainda". */}
+          {aguardandoDesde && (
+            <div className="mt-2.5 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-2.5 dark:border-amber-500/40 dark:bg-amber-500/10">
+              <p className="flex items-start gap-1.5 text-xs text-amber-900 dark:text-amber-200">
+                <ChatCircleDots aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Valor enviado {desde(aguardandoDesde)} — esperando a resposta
+                  dela. O horário e o trajeto continuam reservados até lá.
+                </span>
+              </p>
+              {podeEditar && (
+                <button
+                  type="button"
+                  onClick={onConfirmar}
+                  className="mt-2 rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  Ela já disse sim — confirmar mesmo assim
+                </button>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
