@@ -241,21 +241,38 @@ export function ReportsView({
             type="button"
             disabled={isEmpty || loading}
             onClick={() => setMenuOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 h-9 rounded-[var(--radius)] border border-border bg-card px-3 text-sm font-medium hover:bg-muted disabled:opacity-40"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            // No celular sobra só o ícone: sem isto o botão fica sem nome.
+            aria-label={exporting ? "Exportando…" : "Exportar relatório"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius)] border border-border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
           >
-            {exporting ? <CircleNotch className="h-4 w-4 animate-spin" /> : <DownloadSimple className="h-4 w-4" />}
+            {exporting
+              ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+              : <DownloadSimple aria-hidden className="h-4 w-4" />}
             <span className="hidden sm:inline">Exportar</span>
-            <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <CaretDown aria-hidden className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
           {menuOpen && (
             <>
               <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setMenuOpen(false)} />
-              <div className="absolute left-0 mt-1 z-20 w-44 rounded-[var(--radius)] border border-border bg-card p-1 shadow-lg">
-                <button onClick={handlePdf} className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted">
-                  <FileText className="h-4 w-4 text-red-600" /> PDF
+              <div
+                role="menu"
+                aria-label="Formato do arquivo"
+                onKeyDown={(e) => { if (e.key === "Escape") setMenuOpen(false); }}
+                className="absolute left-0 mt-1 z-20 w-44 rounded-[var(--radius)] border border-border bg-card p-1 shadow-lg"
+              >
+                <button
+                  type="button" role="menuitem" onClick={handlePdf}
+                  className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
+                >
+                  <FileText aria-hidden className="h-4 w-4 text-red-600" /> PDF
                 </button>
-                <button onClick={handleCsv} className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted">
-                  <FileXls className="h-4 w-4 text-emerald-600" /> Excel (CSV)
+                <button
+                  type="button" role="menuitem" onClick={handleCsv}
+                  className="flex w-full items-center gap-2 rounded-[calc(var(--radius)-0.25rem)] px-2.5 py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
+                >
+                  <FileXls aria-hidden className="h-4 w-4 text-emerald-600" /> Excel (CSV)
                 </button>
               </div>
             </>
@@ -265,29 +282,31 @@ export function ReportsView({
         {/* Navegação de mês */}
         <div className="flex items-center gap-1 rounded-[var(--radius)] border border-border bg-card p-1">
           <button
+            type="button"
             onClick={() => load(shiftMonth(cmes, -1))}
-            className="grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground hover:bg-muted"
+            className="grid h-9 w-9 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             aria-label="Mês anterior"
           >
-            <CaretLeft className="h-4 w-4" />
+            <CaretLeft aria-hidden className="h-4 w-4" />
           </button>
-          <span className="min-w-[7.5rem] text-center text-sm font-medium capitalize">
+          <span aria-live="polite" className="min-w-[7.5rem] text-center text-sm font-medium capitalize">
             {monthLabel(cmes)}
           </span>
           <button
+            type="button"
             onClick={() => !isCurrent && load(shiftMonth(cmes, 1))}
             disabled={isCurrent}
-            className="grid h-8 w-8 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground hover:bg-muted disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-[calc(var(--radius)-0.25rem)] text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
             aria-label="Próximo mês"
           >
-            <CaretRight className="h-4 w-4" />
+            <CaretRight aria-hidden className="h-4 w-4" />
           </button>
         </div>
         </div>
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
+      <div role="tablist" aria-label="Relatórios" className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
         {([
           { id: "financeiro", label: "Financeiro", icon: Wallet },
           { id: "operacional", label: "Serviços & Profissionais", icon: Sparkle },
@@ -298,11 +317,15 @@ export function ReportsView({
           return (
             <button
               key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              tabIndex={on ? 0 : -1}
               onClick={() => selectTab(t.id)}
-              aria-current={on ? "page" : undefined}
               className={cn(
-                "flex items-center justify-center gap-2 font-medium whitespace-nowrap transition shrink-0",
+                "flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition",
                 "rounded-full px-3.5 py-2 text-sm",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                 on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
                 "sm:rounded-none sm:-mb-px sm:border-b-2 sm:px-3.5 sm:py-2.5 sm:bg-transparent",
                 on
@@ -310,8 +333,13 @@ export function ReportsView({
                   : "sm:border-transparent sm:hover:bg-transparent sm:hover:text-foreground",
               )}
             >
-              <t.icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
-              <span className={cn("leading-none", on ? "inline" : "hidden", "sm:inline")}>{t.label}</span>
+              <t.icon aria-hidden className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
+              {/* No celular a aba inativa some o rótulo e fica só o ícone —
+                  para o leitor de tela ela ficava sem nome nenhum. O texto
+                  continua existindo, só que escondido de quem enxerga. */}
+              <span className={cn("leading-none", on ? "inline" : "sr-only", "sm:not-sr-only sm:inline")}>
+                {t.label}
+              </span>
             </button>
           );
         })}
@@ -322,12 +350,13 @@ export function ReportsView({
       ) : tab === "reativacao" ? (
         <ReativacaoTab clients={react} loading={reactLoading} salonName={salonName} slug={slug} />
       ) : loading ? (
-        <div className="grid place-items-center py-20 text-muted-foreground">
-          <CircleNotch className="h-6 w-6 animate-spin" />
+        <div role="status" className="grid place-items-center py-20 text-muted-foreground">
+          <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
+          <span className="sr-only">Carregando o relatório…</span>
         </div>
       ) : isEmpty ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-          <ChartBar className="mx-auto h-8 w-8 text-muted-foreground/50" />
+          <ChartBar aria-hidden className="mx-auto h-8 w-8 text-muted-foreground/50" />
           <p className="mt-3 font-medium">Sem dados neste período</p>
           <p className="text-sm text-muted-foreground mt-1">
             Os relatórios aparecem conforme os atendimentos são concluídos.
@@ -480,8 +509,9 @@ function ReativacaoTab({
 }) {
   if (loading || clients === null) {
     return (
-      <div className="grid place-items-center py-20 text-muted-foreground">
-        <CircleNotch className="h-6 w-6 animate-spin" />
+      <div role="status" className="grid place-items-center py-20 text-muted-foreground">
+        <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
+        <span className="sr-only">Carregando…</span>
       </div>
     );
   }
@@ -574,7 +604,7 @@ function TempBadge({ t }: { t: Temp | null }) {
   const Icon = map.icon;
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", map.cls)}>
-      <Icon className="h-3.5 w-3.5" /> {map.label}
+      <Icon aria-hidden className="h-3.5 w-3.5" /> {map.label}
     </span>
   );
 }
@@ -590,8 +620,9 @@ function TemperaturaTab({
 }) {
   if (loading || data === null) {
     return (
-      <div className="grid place-items-center py-20 text-muted-foreground">
-        <CircleNotch className="h-6 w-6 animate-spin" />
+      <div role="status" className="grid place-items-center py-20 text-muted-foreground">
+        <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
+        <span className="sr-only">Carregando…</span>
       </div>
     );
   }
