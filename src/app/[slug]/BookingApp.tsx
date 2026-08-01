@@ -943,14 +943,15 @@ export function BookingApp({ salon }: { salon: Salon }) {
                       key={p.id}
                       type="button"
                       onClick={() => toggleProduct(p.id)}
-                      className={`shrink-0 w-36 text-left rounded-[var(--radius)] border p-3 transition ${
+                      aria-pressed={on}
+                      className={`shrink-0 w-36 text-left rounded-[var(--radius)] border p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                         on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
                       }`}
                     >
                       <p className="text-sm font-medium leading-tight line-clamp-2">{p.name}</p>
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs font-semibold text-primary">{formatBRL(Number(p.sale_price))}</span>
-                        <span className={`grid place-items-center h-5 w-5 rounded-full border shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                        <span aria-hidden className={`grid place-items-center h-5 w-5 rounded-full border shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
                           {on && <Check className="h-3 w-3" />}
                         </span>
                       </div>
@@ -978,8 +979,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
           {/* Opção "sem preferência" — agrega horários de todos */}
           {eligiblePros.length > 1 && (
             <button
+              type="button"
               onClick={() => { setAnyPro(true); setPro(null); setTimeout(() => setStep("time"), 280); }}
-              className={`w-full text-left rounded-[var(--radius)] border p-4 transition flex items-center gap-3 ${
+              aria-pressed={anyPro}
+              className={`flex w-full items-center gap-3 rounded-[var(--radius)] border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                 anyPro ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
               }`}
             >
@@ -990,7 +993,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 <p className="font-medium">Sem preferência</p>
                 <p className="text-xs text-muted-foreground">Ver todos os horários disponíveis</p>
               </div>
-              {anyPro && <Check className="h-5 w-5 text-primary" />}
+              {anyPro && <Check aria-hidden className="h-5 w-5 text-primary" />}
             </button>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -999,35 +1002,46 @@ export function BookingApp({ salon }: { salon: Salon }) {
               const isFavorite = favoriteProId === p.id;
               const isSuggested = !favoriteProId && suggestedProId === p.id;
               return (
-                <button
-                  key={p.id}
-                  onClick={() => { setAnyPro(false); setPro(p); setTimeout(() => setStep("time"), 280); }}
-                  className={`relative rounded-[var(--radius)] border p-4 transition flex flex-col items-center text-center gap-2 ${
-                    on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
-                  }`}
-                >
-                  {on && <Check className="absolute top-2 right-2 h-4 w-4 text-primary" />}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); toggleFavoritePro(p.id); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavoritePro(p.id); } }}
-                    aria-label={isFavorite ? "Remover profissional favorito" : "Marcar como favorito"}
-                    className="absolute top-2 left-2 grid place-items-center h-6 w-6 rounded-full text-muted-foreground hover:text-red-500 transition"
+                /* O coração era um `role="button"` DENTRO do botão do cartão —
+                   HTML inválido (controle dentro de controle) e imprevisível
+                   no teclado e no leitor de tela: às vezes favoritava, às
+                   vezes escolhia a profissional. Agora são dois botões irmãos
+                   dentro de um invólucro posicionado. */
+                <div key={p.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => { setAnyPro(false); setPro(p); setTimeout(() => setStep("time"), 280); }}
+                    aria-pressed={on}
+                    className={`flex w-full flex-col items-center gap-2 rounded-[var(--radius)] border p-4 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+                      on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
+                    }`}
                   >
-                    <Heart className="h-4 w-4" weight={isFavorite ? "fill" : "regular"} style={isFavorite ? { color: "#ef4444" } : undefined} />
-                  </span>
-                  <BookingAvatar p={p} size={72} />
-                  <div className="min-w-0 w-full">
-                    <p className="font-medium text-sm leading-tight truncate">{p.display_name}</p>
-                    {p.bio && <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{p.bio}</p>}
-                    {(isFavorite || isSuggested) && (
-                      <span className="inline-block mt-1 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                        {isFavorite ? "Seu favorito" : "Você costuma escolher"}
-                      </span>
-                    )}
-                  </div>
-                </button>
+                    {on && <Check aria-hidden className="absolute top-2 right-2 h-4 w-4 text-primary" />}
+                    <BookingAvatar p={p} size={72} />
+                    <div className="min-w-0 w-full">
+                      <p className="font-medium text-sm leading-tight truncate">{p.display_name}</p>
+                      {p.bio && <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{p.bio}</p>}
+                      {(isFavorite || isSuggested) && (
+                        <span className="inline-block mt-1 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                          {isFavorite ? "Seu favorito" : "Você costuma escolher"}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleFavoritePro(p.id)}
+                    aria-pressed={isFavorite}
+                    aria-label={
+                      isFavorite
+                        ? `Desmarcar ${p.display_name} como favorita`
+                        : `Marcar ${p.display_name} como favorita`
+                    }
+                    className="absolute top-2 left-2 grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <Heart aria-hidden className="h-4 w-4" weight={isFavorite ? "fill" : "regular"} style={isFavorite ? { color: "#ef4444" } : undefined} />
+                  </button>
+                </div>
               );
             })}
           </div>

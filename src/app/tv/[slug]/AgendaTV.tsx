@@ -56,7 +56,7 @@ export function AgendaTV({ items, salonName }: { items: TVItem[]; salonName: str
   });
 
   return (
-    <div className="min-h-screen flex flex-col p-10">
+    <main className="min-h-screen flex flex-col p-10">
       {/* Cabeçalho */}
       <div className="flex items-start justify-between">
         <h1 className="font-display text-4xl font-bold">{salonName}</h1>
@@ -87,7 +87,7 @@ export function AgendaTV({ items, salonName }: { items: TVItem[]; salonName: str
                 <div className="flex items-center gap-2 mt-2 text-xl text-muted-foreground">
                   {next.prof && (
                     <span className="flex items-center gap-1.5">
-                      <UserCircle className="h-6 w-6" /> {next.prof}
+                      <UserCircle aria-hidden className="h-6 w-6" /> {next.prof}
                     </span>
                   )}
                   {next.services.length > 0 && (
@@ -119,8 +119,8 @@ export function AgendaTV({ items, salonName }: { items: TVItem[]; salonName: str
       </div>
 
       <p className="flex items-center gap-1.5 justify-center text-xs text-muted-foreground/60 mt-8">
-        <Clock className="h-3.5 w-3.5" /> Atualiza automaticamente
+        <Clock aria-hidden className="h-3.5 w-3.5" /> Atualiza automaticamente
       </p>
-    </div>
+    </main>
   );
 }
