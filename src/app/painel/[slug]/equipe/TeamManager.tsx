@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { Switch } from "@/components/Switch";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { uploadMemberPhoto, removeMemberPhoto } from "./actions";
@@ -1271,14 +1272,11 @@ function ServicesPanel({
             const on = state[sv.id]?.on ?? false;
             return (
               <div key={sv.id} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted">
-                <button
-                  type="button"
-                  onClick={() => toggle(sv.id)}
-                  className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
-                  aria-pressed={on}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-                </button>
+                <Switch
+                  checked={on}
+                  onChange={() => toggle(sv.id)}
+                  label={`Atende ${sv.name}`}
+                />
                 <span className="flex-1 text-sm">{sv.name}</span>
                 {on && (
                   <div className="flex items-center gap-1">
@@ -1394,17 +1392,11 @@ function PermissionsPanel({
                   const on = isOn(p.key);
                   const isDefault = !(p.key in overrides);
                   return (
-                    <label key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted cursor-pointer">
-                      <button
-                        type="button"
-                        onClick={() => toggle(p.key)}
-                        className={`relative h-6 w-11 rounded-full transition shrink-0 ${on ? "bg-primary" : "bg-muted-foreground/30"}`}
-                      >
-                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-                      </button>
+                    <div key={p.key} className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 hover:bg-muted">
+                      <Switch checked={on} onChange={() => toggle(p.key)} label={p.label} />
                       <span className="flex-1 text-sm">{p.label}</span>
                       {!isDefault && <span className="text-[10px] text-accent font-medium">personalizado</span>}
-                    </label>
+                    </div>
                   );
                 })}
               </div>

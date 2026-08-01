@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { Switch } from "@/components/Switch";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { formatServicePrice, formatDuration, formatBRL } from "@/lib/utils";
@@ -532,14 +533,12 @@ export function ServicesManager({
           {/* Tempo de pausa (química / coloração) */}
           <div className="rounded-[var(--radius)] border border-border p-4">
             <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={() => setHasProcessing((v) => !v)}
-                className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${hasProcessing ? "bg-primary" : "bg-muted-foreground/30"}`}
-                aria-pressed={hasProcessing}
-              >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${hasProcessing ? "left-[22px]" : "left-0.5"}`} />
-              </button>
+              <Switch
+                checked={hasProcessing}
+                onChange={setHasProcessing}
+                label="Este serviço tem tempo de pausa"
+                className="mt-0.5"
+              />
               <div>
                 <p className="text-sm font-medium flex items-center gap-1.5">
                   <Timer className="h-4 w-4 text-primary" /> Tem tempo de pausa?
@@ -577,14 +576,12 @@ export function ServicesManager({
           {niche !== "barbearia" && (
             <div className="rounded-[var(--radius)] border border-border p-4">
               <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setBringOwnTools((v) => !v)}
-                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${bringOwnTools ? "bg-primary" : "bg-muted-foreground/30"}`}
-                  aria-pressed={bringOwnTools}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${bringOwnTools ? "left-[22px]" : "left-0.5"}`} />
-                </button>
+                <Switch
+                  checked={bringOwnTools}
+                  onChange={setBringOwnTools}
+                  label="Cliente pode trazer o próprio material"
+                  className="mt-0.5"
+                />
                 <div>
                   <p className="text-sm font-medium flex items-center gap-1.5">
                     <ShieldCheck className="h-4 w-4 text-primary" /> Cliente pode trazer o próprio material?
@@ -606,14 +603,12 @@ export function ServicesManager({
           {homeServiceEnabled && (
             <div className="rounded-[var(--radius)] border border-border p-4">
               <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAllowsHome((v) => !v)}
-                  className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${allowsHome ? "bg-primary" : "bg-muted-foreground/30"}`}
-                  aria-pressed={allowsHome}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${allowsHome ? "left-[22px]" : "left-0.5"}`} />
-                </button>
+                <Switch
+                  checked={allowsHome}
+                  onChange={setAllowsHome}
+                  label="Faz este serviço em domicílio"
+                  className="mt-0.5"
+                />
                 <div>
                   <p className="text-sm font-medium flex items-center gap-1.5">
                     <House className="h-4 w-4 text-primary" /> Você faz este serviço em domicílio?
