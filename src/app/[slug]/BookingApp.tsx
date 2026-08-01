@@ -256,7 +256,17 @@ export function BookingApp({ salon }: { salon: Salon }) {
   // Celular BR de verdade. Sem isso não dá pra confirmar nada com essa pessoa
   // depois — e o banco agora recusa o cadastro, então validar aqui é o que
   // transforma um erro seco numa instrução.
+  const [avisoModo, setAvisoModo] = useState<string | null>(null);
   const telefoneOk = toStoredPhone(phone) !== null;
+
+  /** O que ainda falta para confirmar, na ordem em que a pessoa preencheria. */
+  const faltaConfirmar = !telefoneOk
+    ? "Falta seu celular — toque em Voltar para informar."
+    : emCasa && !endereco.street.trim()
+    ? "Informe o CEP para preenchermos a rua."
+    : emCasa && !endereco.street_number.trim()
+    ? "Falta o número do endereço."
+    : null;
   const totalPriceLabel = hasOnRequest
     ? "A combinar"
     : (hasFrom ? "A partir de " : "") + formatBRL(totalPrice + taxaDomicilio);
@@ -502,8 +512,22 @@ export function BookingApp({ salon }: { salon: Salon }) {
    */
   function trocarModo(novo: "salon" | "home") {
     setModo(novo);
+    setAvisoModo(null);
     if (novo === "home") {
       const permitidos = new Set(servicosEmCasa.map((s) => s.id));
+      // Trocar para domicílio some com o que não sai do salão. Some em
+      // silêncio era o problema: a pessoa escolheu três serviços, viu dois
+      // desaparecerem e não sabia se tinha desmarcado sem querer.
+      const removidos = services.filter(
+        (sv) => selected.includes(sv.id) && !permitidos.has(sv.id),
+      );
+      if (removidos.length > 0) {
+        setAvisoModo(
+          removidos.length === 1
+            ? `${removidos[0].name} não é feito fora do salão, então saiu da sua escolha.`
+            : `${removidos.map((sv) => sv.name).join(", ")} não são feitos fora do salão, então saíram da sua escolha.`,
+        );
+      }
       setSelected((prev) => prev.filter((id) => permitidos.has(id)));
     }
   }
@@ -545,7 +569,17 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }, [emCasa, supabase, salon.id, savedPhone, phone]);
 
   async function confirmBooking() {
-    if (!pro || !slot) return;
+    // Nunca sair em silêncio: um botão que não faz nada ao ser apertado é o
+    // pior retorno possível — a pessoa aperta de novo achando que não pegou.
+    if (!pro || !slot) {
+      setBookErr("Escolha profissional e horário antes de confirmar.");
+      return;
+    }
+    if (!telefoneOk) {
+      setBookErr("Confira seu celular: precisa ser um número com DDD.");
+      setStep("auth");
+      return;
+    }
     setBooking(true);
     setBookErr(null);
     // produtos escolhidos não têm cobrança online — viram nota pra equipe
@@ -568,17 +602,30 @@ export function BookingApp({ salon }: { salon: Salon }) {
     });
     if (error) {
       const m = error.message;
+      // Todo erro que o `book_appointment` sabe levantar tem tradução. Faltavam
+      // `telefone_invalido` e `client_busy`, e eram justamente os dois que a
+      // pessoa consegue provocar sozinha — os dois caíam no texto genérico,
+      // que não diz o que fazer e faz o agendamento parecer quebrado.
       setBookErr(
         m.includes("slot_taken")
           ? "Esse horário acabou de ser reservado. Escolha outro."
+          : m.includes("telefone_invalido")
+          ? "Confira seu celular: precisa ser um número com DDD."
+          : m.includes("client_busy")
+          ? "Você já tem outro atendimento nesse mesmo horário."
           : m.includes("home_address_required")
           ? "Confira o endereço: precisamos da rua e do número."
           : m.includes("service_not_home")
           ? "Um dos serviços escolhidos não é feito fora do salão."
           : m.includes("home_service_off")
           ? "O atendimento em domicílio não está disponível no momento."
+          : m.includes("invalid_services") || m.includes("no_services")
+          ? "Escolha pelo menos um serviço para continuar."
+          : m.includes("invalid_member")
+          ? "Essa profissional não está mais disponível. Escolha outra."
           : "Não foi possível concluir. Tente novamente.",
       );
+      if (m.includes("telefone_invalido")) setStep("auth");
       setBooking(false);
       return;
     }
@@ -672,7 +719,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   function goAfterTime() {
     setAuthIntent("book");
-    if (userId || savedPhone) setStep("confirm");
+    // O telefone salvo no navegador precisa ser RECONFERIDO antes de pular a
+    // identificação. Ele veio do localStorage, pode ter sido gravado antes de
+    // existirem as regras de telefone, ou ter ficado pela metade. Quem pulava
+    // com um número quebrado chegava na confirmação, apertava o botão e levava
+    // "Não foi possível concluir" sem nenhuma pista — o `book_appointment`
+    // recusa com `telefone_invalido` logo na primeira linha.
+    const contatoOk = userId ? toStoredPhone(phone) !== null : toStoredPhone(savedPhone) !== null;
+    if (contatoOk) setStep("confirm");
     else setStep("auth");
   }
 
@@ -767,10 +821,17 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </div>
           )}
 
+          {/* Região viva: trocar a modalidade reescreve a lista de serviços
+              inteira, e quem não vê a tela não percebe a mudança. */}
           {emCasa && (
-            <p className="rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            <p
+              role="status"
+              aria-live="polite"
+              className="rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+            >
               Mostrando só os serviços que fazemos na sua casa. Deslocamento:{" "}
               <b className="text-foreground">{regraTarifa(tarifa)}</b>.
+              {avisoModo && <span className="mt-1 block text-amber-700 dark:text-amber-400">{avisoModo}</span>}
             </p>
           )}
 
@@ -1211,7 +1272,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </div>
             )}
           </Card>
-          {bookErr && <p className="text-sm text-red-600">{bookErr}</p>}
+          {/* role="alert" para o erro chegar em leitor de tela: quem não vê a
+              tela apertava o botão e ficava sem retorno nenhum. */}
+          {bookErr && (
+            <p role="alert" className="text-sm text-red-600">{bookErr}</p>
+          )}
           <div className="flex gap-3">
             <Button variant="outline" size="lg" onClick={() => setStep("time")} disabled={booking}>
               <CaretLeft className="h-4 w-4" /> Voltar
@@ -1220,12 +1285,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
               className="flex-1"
               size="lg"
               onClick={confirmBooking}
-              disabled={booking || (emCasa && !enderecoCompleto(endereco))}
+              disabled={booking || !!faltaConfirmar}
+              aria-describedby={faltaConfirmar ? "confirm-falta" : undefined}
             >
               {booking && <CircleNotch className="h-4 w-4 animate-spin" />}
               {pedidoAConfirmar ? "Enviar pedido" : "Confirmar agendamento"}
             </Button>
           </div>
+          {/* Botão travado sem motivo é o que faz a pessoa achar que o sistema
+              quebrou — e some por completo para quem usa leitor de tela. */}
+          {faltaConfirmar && (
+            <p id="confirm-falta" className="text-center text-xs text-muted-foreground">
+              {faltaConfirmar}
+            </p>
+          )}
         </section>
       )}
 

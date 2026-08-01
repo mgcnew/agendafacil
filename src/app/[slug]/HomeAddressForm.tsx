@@ -123,9 +123,14 @@ export function HomeAddressForm({
                 if (onlyDigits(v).length === 8) void buscarCep(v);
               }}
               placeholder="00000-000"
+              aria-busy={buscando}
+              aria-describedby="hs-cep-msg"
             />
             {buscando && (
-              <CircleNotch className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+              <CircleNotch
+                aria-hidden
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
+              />
             )}
           </div>
         </div>
@@ -137,6 +142,8 @@ export function HomeAddressForm({
             value={value.street}
             onChange={(e) => set("street", e.target.value)}
             placeholder="Preenchemos pelo CEP"
+            required
+            aria-invalid={value.street.trim() === ""}
           />
         </div>
       </div>
@@ -149,6 +156,9 @@ export function HomeAddressForm({
             value={value.street_number}
             onChange={(e) => set("street_number", e.target.value)}
             placeholder="26"
+            required
+            aria-invalid={value.street_number.trim() === ""}
+            autoComplete="address-line2"
           />
         </div>
         <div>
@@ -177,10 +187,15 @@ export function HomeAddressForm({
         </div>
       </div>
 
-      {cepMsg && <p className="text-xs text-muted-foreground">{cepMsg}</p>}
+      {/* Região viva: a busca do CEP é assíncrona e o resultado precisa ser
+          anunciado — quem não vê a tela não percebe os campos se preenchendo
+          sozinhos, nem o aviso de que o CEP não foi encontrado. */}
+      <p id="hs-cep-msg" role="status" aria-live="polite" className="text-xs text-muted-foreground">
+        {buscando ? "Buscando endereço pelo CEP…" : cepMsg}
+      </p>
 
       {outraCidade && (
-        <p className="flex items-start gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+        <p role="status" aria-live="polite" className="flex items-start gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
           <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Esse endereço fica em <b>{value.city}</b> e o salão atende a partir de{" "}
