@@ -201,6 +201,7 @@ export function ProspeccaoPanel() {
   const [waText, setWaText] = useState("");
   const [meuNome, setMeuNome] = useState("");
   const [waDemo, setWaDemo] = useState<"none" | "salao" | "barbearia">("none");
+  const [busyLead, setBusyLead] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -323,8 +324,10 @@ export function ProspeccaoPanel() {
 
   async function remove(l: Lead) {
     if (!confirm(`Remover "${l.name}" do pipeline?`)) return;
+    setBusyLead(l.id);
     const supabase = createClient();
     await supabase.from("growth_leads").delete().eq("id", l.id);
+    setBusyLead(null);
     await load();
   }
 
@@ -374,24 +377,24 @@ export function ProspeccaoPanel() {
   return (
     <div className="space-y-6">
       {/* Cabeçalho + ação */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-primary/12 text-primary">
-            <DoorOpen className="h-5 w-5" />
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-64 items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+            <DoorOpen aria-hidden className="h-5 w-5" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-display text-xl font-bold leading-tight">Prospecção</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Seu pipeline de divulgação. Registre cada salão, o canal de origem e a etapa — e veja qual canal converte.
             </p>
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex shrink-0 gap-2">
           <Button size="sm" variant="outline" onClick={() => { setImporting(true); setEditing(null); }}>
-            <UploadSimple className="h-4 w-4" /> Importar
+            <UploadSimple aria-hidden className="h-4 w-4" /> Importar
           </Button>
           <Button size="sm" onClick={openNew}>
-            <Plus className="h-4 w-4" /> Novo
+            <Plus aria-hidden className="h-4 w-4" /> Novo
           </Button>
         </div>
       </div>
@@ -407,26 +410,28 @@ export function ProspeccaoPanel() {
       {/* Resumo por canal */}
       {byChannel.length > 0 && (
         <Card className="p-0 overflow-hidden">
-          <div className="px-4 py-2.5 bg-muted/50 font-semibold text-sm">Desempenho por canal</div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[420px]">
-              <thead className="text-muted-foreground text-xs">
+          <h3 className="bg-muted/50 px-4 py-2.5 text-sm font-semibold">Desempenho por canal</h3>
+          {/* A tabela rola dentro do cartão — a página nunca anda de lado. */}
+          <div className="scroll-thin overflow-x-auto">
+            <table className="w-full min-w-[420px] text-sm">
+              <caption className="sr-only">Abordados, testando, pagantes e conversão por canal de origem.</caption>
+              <thead className="text-xs text-muted-foreground">
                 <tr>
-                  <th className="text-left px-4 py-2 font-semibold">Canal</th>
-                  <th className="text-left px-4 py-2 font-semibold">Abordados</th>
-                  <th className="text-left px-4 py-2 font-semibold">Testando</th>
-                  <th className="text-left px-4 py-2 font-semibold">Pagantes</th>
-                  <th className="text-left px-4 py-2 font-semibold">Conversão</th>
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">Canal</th>
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">Abordados</th>
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">Testando</th>
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">Pagantes</th>
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">Conversão</th>
                 </tr>
               </thead>
               <tbody>
                 {byChannel.map((r, i) => (
                   <tr key={r.id} className={i % 2 ? "bg-muted/20" : ""}>
-                    <td className="px-4 py-2 font-medium">{r.label}</td>
-                    <td className="px-4 py-2">{r.total}</td>
-                    <td className="px-4 py-2">{r.testando}</td>
-                    <td className="px-4 py-2 font-semibold text-emerald-600">{r.pagantes}</td>
-                    <td className="px-4 py-2 text-primary font-medium">{r.conv}%</td>
+                    <th scope="row" className="px-4 py-2 text-left font-medium">{r.label}</th>
+                    <td className="px-4 py-2 tabular-nums">{r.total}</td>
+                    <td className="px-4 py-2 tabular-nums">{r.testando}</td>
+                    <td className="px-4 py-2 font-semibold tabular-nums text-emerald-600">{r.pagantes}</td>
+                    <td className="px-4 py-2 font-medium tabular-nums text-primary">{r.conv}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -569,10 +574,11 @@ export function ProspeccaoPanel() {
                   key={t.id}
                   type="button"
                   onClick={() => pickWaTemplate(t.id)}
-                  className={`text-sm rounded-full px-3 py-1.5 border transition ${
+                  aria-pressed={waTemplate === t.id}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                     waTemplate === t.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card border-border text-muted-foreground hover:bg-muted"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {t.label}
@@ -588,10 +594,11 @@ export function ProspeccaoPanel() {
                   key={id}
                   type="button"
                   onClick={() => pickWaDemo(id)}
-                  className={`text-sm rounded-full px-3 py-1.5 border transition ${
+                  aria-pressed={waDemo === id}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                     waDemo === id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card border-border text-muted-foreground hover:bg-muted"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {label}
@@ -616,12 +623,14 @@ export function ProspeccaoPanel() {
 
       {/* Filtros */}
       {leads.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Select value={channelFilter} onValueChange={setChannelFilter} className="sm:w-52">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <label htmlFor="filtro-canal" className="sr-only">Filtrar por canal</label>
+          <Select id="filtro-canal" value={channelFilter} onValueChange={setChannelFilter} className="sm:w-52">
             <option value="">Todos os canais</option>
             {CHANNELS.map((c) => (<option key={c.id} value={c.id}>{c.label}</option>))}
           </Select>
-          <Select value={stageFilter} onValueChange={setStageFilter} className="sm:w-52">
+          <label htmlFor="filtro-etapa" className="sr-only">Filtrar por etapa</label>
+          <Select id="filtro-etapa" value={stageFilter} onValueChange={setStageFilter} className="sm:w-52">
             <option value="">Todas as etapas</option>
             {STAGES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
           </Select>
@@ -630,8 +639,8 @@ export function ProspeccaoPanel() {
 
       {/* Lista */}
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-10 justify-center">
-          <CircleNotch className="h-4 w-4 animate-spin" /> Carregando…
+        <div role="status" className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+          <CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> Carregando…
         </div>
       ) : leads.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-border rounded-[var(--radius)]">
@@ -645,47 +654,60 @@ export function ProspeccaoPanel() {
             const Icon = stage.icon;
             return (
               <div key={stage.id} className="space-y-2">
-                <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${stage.text}`}>
-                  <Icon className="h-4 w-4" />
+                <h3 className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${stage.text}`}>
+                  <Icon aria-hidden className="h-4 w-4" />
                   {stage.label} · {items.length}
-                </div>
+                </h3>
                 {items.map((l) => (
-                  <Card key={l.id} className={`p-4 border-l-4 ${stage.bar}`}>
+                  <Card
+                    key={l.id}
+                    className={`border-l-4 p-4 transition-opacity ${stage.bar} ${busyLead === l.id ? "opacity-60" : ""}`}
+                  >
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{l.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="truncate font-medium">{l.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {[l.owner_name, l.neighborhood, channelLabel(l.channel), l.contact, l.email]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
                         {/* Só quem aceitou pode entrar em disparo de oferta. */}
                         {l.accepts_marketing && (
-                          <span className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                             aceita ofertas
                           </span>
                         )}
-                        {l.notes && <p className="text-sm text-foreground/80 mt-1.5">{l.notes}</p>}
+                        {l.notes && <p className="mt-1.5 text-sm text-foreground/80">{l.notes}</p>}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => openEdit(l)} title="Editar"
-                          className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted">
-                          <PencilSimple className="h-4 w-4" />
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button" onClick={() => openEdit(l)} aria-label={`Editar ${l.name}`}
+                          className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <PencilSimple aria-hidden className="h-4 w-4" />
                         </button>
-                        <button onClick={() => remove(l)} title="Remover"
-                          className="grid place-items-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
-                          <Trash className="h-4 w-4" />
+                        <button
+                          type="button" onClick={() => remove(l)} disabled={busyLead !== null}
+                          aria-label={`Remover ${l.name} do pipeline`}
+                          className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+                        >
+                          {busyLead === l.id
+                            ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+                            : <Trash aria-hidden className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
                     {/* Avanço rápido de etapa + WhatsApp */}
-                    <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground shrink-0">Mudar etapa:</span>
-                      <Select value={l.stage} onValueChange={(v) => quickStage(l.id, v)} className="h-9 flex-1 min-w-[130px] sm:max-w-[180px]">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                      <label htmlFor={`etapa-${l.id}`} className="shrink-0 text-xs text-muted-foreground">Mudar etapa:</label>
+                      <Select id={`etapa-${l.id}`} value={l.stage} onValueChange={(v) => quickStage(l.id, v)} className="h-9 min-w-[130px] flex-1 sm:max-w-[180px]">
                         {STAGES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
                       </Select>
-                      <Button size="sm" variant="outline" onClick={() => openWa(l)} className="text-emerald-600">
-                        <WhatsappLogo className="h-4 w-4" /> WhatsApp
+                      <Button
+                        size="sm" variant="outline" onClick={() => openWa(l)}
+                        className="text-emerald-600" aria-label={`Chamar ${l.name} no WhatsApp`}
+                      >
+                        <WhatsappLogo aria-hidden className="h-4 w-4" /> WhatsApp
                       </Button>
                     </div>
                   </Card>

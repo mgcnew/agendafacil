@@ -21,6 +21,7 @@ import {
   Lightbulb,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+import { AdminTabs, AdminTabPanel } from "./AdminTabs";
 
 /**
  * Playbook de divulgação do Zulan — guia estratégico de go-to-market para a
@@ -64,37 +65,31 @@ export function PlaybookPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Sub-navegação por seção (chips com scroll horizontal no mobile) */}
-      <div className="-mx-1 overflow-x-auto pb-1">
-        <div className="flex gap-1.5 px-1 min-w-max">
-          {SECTIONS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setSection(id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium whitespace-nowrap transition ${
-                section === id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-card border border-border text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Sub-navegação por seção. Mesmo comportamento das abas de cima (setas,
+          Home/End, rola até a escolhida); pastilha em vez de trilha para
+          deixar claro que é um nível abaixo. */}
+      <AdminTabs
+        tabs={SECTIONS}
+        value={section}
+        onChange={setSection}
+        label="Seções do playbook"
+        ns="pb-"
+        variant="chips"
+      />
 
-      {section === "norte" && <Norte />}
-      {section === "publico" && <Publico />}
-      {section === "posicao" && <Posicao />}
-      {section === "oferta" && <Oferta />}
-      {section === "gatilhos" && <Gatilhos />}
-      {section === "objecoes" && <Objecoes />}
-      {section === "campo" && <Campo />}
-      {section === "redes" && <Redes />}
-      {section === "metricas" && <Metricas />}
-      {section === "projecao" && <Projecao />}
-      {section === "roteiro" && <Roteiro />}
+      <AdminTabPanel id={section} ns="pb-">
+        {section === "norte" && <Norte />}
+        {section === "publico" && <Publico />}
+        {section === "posicao" && <Posicao />}
+        {section === "oferta" && <Oferta />}
+        {section === "gatilhos" && <Gatilhos />}
+        {section === "objecoes" && <Objecoes />}
+        {section === "campo" && <Campo />}
+        {section === "redes" && <Redes />}
+        {section === "metricas" && <Metricas />}
+        {section === "projecao" && <Projecao />}
+        {section === "roteiro" && <Roteiro />}
+      </AdminTabPanel>
     </div>
   );
 }
