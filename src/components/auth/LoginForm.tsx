@@ -165,7 +165,7 @@ export function LoginForm({
             placeholder="voce@salao.com"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={resetting}>
           {resetting && <CircleNotch className="h-4 w-4 animate-spin" />}
           Enviar link de recuperação
@@ -212,10 +212,13 @@ export function LoginForm({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
+          role="checkbox"
+          aria-checked={remember}
           onClick={() => setRemember((v) => !v)}
-          className="flex items-center gap-2 text-sm text-foreground/80"
+          className="flex items-center gap-2 rounded text-sm text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <span
+            aria-hidden
             className={`grid place-items-center h-4 w-4 rounded border transition ${
               remember ? "bg-primary border-primary text-primary-foreground" : "border-border"
             }`}
@@ -227,16 +230,16 @@ export function LoginForm({
         <button
           type="button"
           onClick={() => { setMode("forgot"); setError(null); }}
-          className="text-sm text-primary font-medium hover:underline"
+          className="rounded text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           Esqueci a senha
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <Button type="submit" size="lg" className="w-full" disabled={loading || bioLoading}>
-        {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
-        Entrar
+        {loading && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+        {loading ? "Entrando…" : "Entrar"}
       </Button>
 
       {bioAvailable && (

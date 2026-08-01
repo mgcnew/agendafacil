@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input, Label, Select, Textarea } from "@/components/ui";
+import { Switch } from "@/components/Switch";
 import { CHOOSABLE_NICHES, COLOR_GROUPS, patternClass, type Niche, type ColorTheme } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import type { TablesUpdate } from "@/lib/database.types";
@@ -531,14 +532,11 @@ export default function NovoSalaoPage() {
                   {hours.map((d) => (
                     <div key={d.weekday} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 rounded-[var(--radius)] border border-border p-2.5">
                       <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setDay(d.weekday, { enabled: !d.enabled })}
-                          className={`relative h-6 w-11 rounded-full transition shrink-0 ${d.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-                          aria-label={`Alternar ${WEEKDAYS[d.weekday]}`}
-                        >
-                          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${d.enabled ? "left-[22px]" : "left-0.5"}`} />
-                        </button>
+                        <Switch
+                          checked={d.enabled}
+                          onChange={(v) => setDay(d.weekday, { enabled: v })}
+                          label={`${WEEKDAYS[d.weekday]}: salão aberto`}
+                        />
                         <span className="w-10 text-sm font-medium">{WEEKDAYS[d.weekday]}</span>
                         {!d.enabled && (
                           <span className="ml-auto text-sm text-muted-foreground sm:hidden">Fechado</span>
@@ -546,9 +544,19 @@ export default function NovoSalaoPage() {
                       </div>
                       {d.enabled ? (
                         <div className="flex items-center gap-2 sm:ml-auto">
-                          <input type="time" value={d.start} onChange={(e) => setDay(d.weekday, { start: e.target.value })} className="h-10 sm:h-9 flex-1 sm:flex-none sm:w-28 min-w-0 rounded-[var(--radius)] border border-border bg-card px-2 text-sm" />
-                          <span className="text-muted-foreground text-sm shrink-0">às</span>
-                          <input type="time" value={d.end} onChange={(e) => setDay(d.weekday, { end: e.target.value })} className="h-10 sm:h-9 flex-1 sm:flex-none sm:w-28 min-w-0 rounded-[var(--radius)] border border-border bg-card px-2 text-sm" />
+                          <input
+                            type="time" value={d.start}
+                            aria-label={`${WEEKDAYS[d.weekday]}: abre às`}
+                            onChange={(e) => setDay(d.weekday, { start: e.target.value })}
+                            className="h-10 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:h-9 sm:w-28 sm:flex-none"
+                          />
+                          <span aria-hidden className="text-muted-foreground text-sm shrink-0">às</span>
+                          <input
+                            type="time" value={d.end}
+                            aria-label={`${WEEKDAYS[d.weekday]}: fecha às`}
+                            onChange={(e) => setDay(d.weekday, { end: e.target.value })}
+                            className="h-10 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:h-9 sm:w-28 sm:flex-none"
+                          />
                         </div>
                       ) : (
                         <span className="ml-auto hidden text-sm text-muted-foreground sm:block">Fechado</span>
@@ -621,7 +629,7 @@ export default function NovoSalaoPage() {
               </div>
             )}
 
-            {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
+            {error && <p role="alert" className="mt-4 text-sm text-red-600">{error}</p>}
 
             {/* Navegação */}
             <div className="flex items-center gap-3 mt-7">
@@ -636,7 +644,7 @@ export default function NovoSalaoPage() {
                 </Button>
               ) : (
                 <Button className="ml-auto" size="lg" onClick={finish} disabled={loading}>
-                  {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
+                  {loading && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
                   {hasTeam && empEmail.trim() ? "Criar salão e convidar" : "Criar salão"}
                 </Button>
               )}

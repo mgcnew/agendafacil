@@ -134,7 +134,7 @@ export default function CriarSalaoPage() {
           <Label htmlFor="password">Senha</Label>
           <Input id="password" type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
           Criar conta

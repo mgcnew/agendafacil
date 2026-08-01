@@ -102,7 +102,7 @@ export default function RedefinirSenhaPage() {
             placeholder="repita a senha"
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading && <CircleNotch className="h-4 w-4 animate-spin" />}
           Salvar nova senha
