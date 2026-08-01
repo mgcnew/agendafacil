@@ -1545,7 +1545,9 @@ export function AgendaManager({
     const end   = new Date(todayStr + "T23:59:59").toISOString();
     const weekday = parse(todayStr).getDay(); // 0=domingo..6=sábado, mesma convenção do extract(dow) no Postgres
 
-    const [{ data: todayAppts }, { data: revenueRows }, { data: homeRows }, ...availability] = await Promise.all([
+    const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [{ data: todayAppts }, { data: revenueRows }, { data: homeRows }, { data: quoteRows }, ...availability] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, starts_at, status, clients(full_name, phone)")
@@ -1565,6 +1567,20 @@ export function AgendaManager({
         .eq("service_mode", "home")
         .is("travel_km", null)
         .eq("status", "pending")
+        .gte("starts_at", start)
+        .order("starts_at")
+        .limit(5),
+      // Orçamentos enviados e sem resposta há mais de um dia. O corte de 24h é o
+      // que separa "ela ainda vai ver" de "ela não vai responder" — abaixo disso
+      // o aviso apareceria em todo domicílio recém-orçado e viraria mobília.
+      supabase
+        .from("appointments")
+        .select("id, starts_at, clients(full_name, phone)")
+        .eq("salon_id", salonId)
+        .eq("service_mode", "home")
+        .eq("status", "pending")
+        .not("home_quote_at", "is", null)
+        .lt("home_quote_at", ontem)
         .gte("starts_at", start)
         .order("starts_at")
         .limit(5),
@@ -1624,9 +1640,21 @@ export function AgendaManager({
       date: a.starts_at,
     }));
 
+    type QuoteRow = {
+      id: string; starts_at: string;
+      clients: { full_name: string; phone: string | null } | null;
+    };
+    const homeQuotes = ((quoteRows as QuoteRow[] | null) ?? []).map((a) => ({
+      id: a.id,
+      name: a.clients?.full_name ?? "Cliente",
+      phone: a.clients?.phone ?? null,
+      time: fmtHM(a.starts_at),
+      date: a.starts_at,
+    }));
+
     setTodaySignals({
       cancelled, lateClients, emptySlots: slots.size,
-      homeRequests,
+      homeRequests, homeQuotes,
       estimatedRevenue: hasEstimate ? estimatedRevenue : null,
     });
   }, [supabase, salonId, pros]);

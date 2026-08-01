@@ -6,6 +6,7 @@ import {
   CalendarDots,
   CalendarX,
   CaretDown,
+  ChatCircleDots,
   ClockCountdown,
   House,
   Sparkle,
@@ -31,12 +32,16 @@ function diaCurto(iso: string): string {
 export type LateClient = { id: string; name: string; phone: string | null; time: string };
 /** Pedido de domicílio ainda sem quilometragem — cliente esperando o valor. */
 export type HomeRequest = { id: string; name: string; time: string; date: string };
+/** Orçamento de deslocamento enviado e sem resposta — o lado espelhado. */
+export type HomeQuote = { id: string; name: string; phone: string | null; time: string; date: string };
 export type TodaySignals = {
   cancelled: number;
   /** Lista (não só contagem) — cada atraso vira uma sugestão acionável de lembrete. */
   lateClients: LateClient[];
   /** Pedidos de domicílio aguardando o valor do deslocamento. */
   homeRequests?: HomeRequest[];
+  /** Orçamentos enviados há mais de um dia que a cliente não respondeu. */
+  homeQuotes?: HomeQuote[];
   emptySlots: number;
   /** Estimativa de faturamento dos horários vazios, com base no histórico (v2). null = sem amostra suficiente/não calculado. */
   estimatedRevenue: number | null;
@@ -93,12 +98,16 @@ export function AgendaSignalsBanner({
   if (!signals) return null;
   const { cancelled, lateClients, emptySlots, estimatedRevenue } = signals;
   const homeRequests = signals.homeRequests ?? [];
+  const homeQuotes = signals.homeQuotes ?? [];
 
   // Horário livre sozinho NÃO é aviso: é o estado normal de quase todo dia, e
   // um alerta que aparece sempre vira mobília — a pessoa para de ler. Só vira
   // notícia quando existe alguém esperando vaga, porque aí há o que fazer.
   const mostrarVazios = emptySlots > 0 && waiting > 0;
-  if (cancelled === 0 && lateClients.length === 0 && !mostrarVazios && homeRequests.length === 0)
+  if (
+    cancelled === 0 && lateClients.length === 0 && !mostrarVazios &&
+    homeRequests.length === 0 && homeQuotes.length === 0
+  )
     return null;
 
   return (
@@ -139,6 +148,50 @@ export function AgendaSignalsBanner({
             >
               Definir o valor na Agenda <ArrowSquareOut className="h-3 w-3" />
             </Link>
+          </div>
+        )}
+
+        {/* O espelho do aviso de cima: lá a cliente espera por você, aqui você
+            espera por ela. Sem isto o silêncio dela é invisível — o horário
+            fica reservado, o trajeto bloqueado, e ninguém repara até o dia.
+            Não cancelamos sozinho de propósito: sumir com o horário de alguém
+            por causa de silêncio no WhatsApp é pior que a vaga presa. */}
+        {homeQuotes.length > 0 && (
+          <div className="rounded-[var(--radius)] border border-amber-300 bg-background p-3 dark:border-amber-500/40">
+            <p className="flex items-center gap-1.5 text-sm">
+              <ChatCircleDots aria-hidden className="h-4 w-4 shrink-0 text-amber-600" />
+              {homeQuotes.length === 1 ? (
+                <span>
+                  <b>{homeQuotes[0].name.split(" ")[0]}</b> recebeu o valor do
+                  deslocamento e ainda não respondeu.
+                </span>
+              ) : (
+                <span>
+                  <b>{homeQuotes.length} clientes</b> receberam o valor do
+                  deslocamento e ainda não responderam.
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              O horário e o trajeto seguem reservados:{" "}
+              {homeQuotes.map((h) => `${h.name.split(" ")[0]} · ${diaCurto(h.date)} ${h.time}`).join(" · ")}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {homeQuotes.map((h) =>
+                waPhone(h.phone) ? (
+                  <a
+                    key={h.id}
+                    href={`https://wa.me/${waPhone(h.phone)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    Perguntar pra {h.name.split(" ")[0]}
+                    <ArrowSquareOut aria-hidden className="h-3 w-3" />
+                  </a>
+                ) : null,
+              )}
+            </div>
           </div>
         )}
 
