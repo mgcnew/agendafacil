@@ -58,6 +58,7 @@ export function ClientsManager({
   const [inactiveDays, setInactiveDays] = useState(0); // 0 = sem filtro; 30/60/90
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [removendo, setRemovendo] = useState<string | null>(null);
 
   const PAGE_SIZE = 30;
 
@@ -113,15 +114,21 @@ export function ClientsManager({
     setAdding(false);
   }
 
-  async function remove(id: string) {
-    if (!confirm("Remover esta cliente?")) return;
+  /**
+   * O confirm dizia só "Remover esta cliente?" — numa lista de 30 nomes
+   * iguais em altura, não dava para saber qual estava prestes a sumir.
+   */
+  async function remove(c: Client) {
+    if (!confirm(`Remover ${c.full_name} da sua lista de clientes?`)) return;
     setErr(null);
+    setRemovendo(c.id);
     const prev = clients;
-    setClients((c) => c.filter((x) => x.id !== id));
-    const { error } = await supabase.from("clients").delete().eq("id", id);
+    setClients((list) => list.filter((x) => x.id !== c.id));
+    const { error } = await supabase.from("clients").delete().eq("id", c.id);
+    setRemovendo(null);
     if (error) {
       setClients(prev); // restaura: o banco recusou (provável vínculo com agendamentos)
-      setErr("Não foi possível remover esta cliente — ela pode ter agendamentos vinculados.");
+      setErr(`Não foi possível remover ${c.full_name} — ela pode ter agendamentos vinculados.`);
     }
   }
 
@@ -134,7 +141,7 @@ export function ClientsManager({
         </div>
         {canManage && (
           <Button onClick={() => setAdding((v) => !v)}>
-            <Plus className="h-4 w-4" /> Nova cliente
+            <Plus aria-hidden className="h-4 w-4" /> Nova cliente
           </Button>
         )}
       </div>
@@ -145,8 +152,11 @@ export function ClientsManager({
             <Card className="w-full sm:max-w-lg mx-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-display text-lg font-bold">Nova cliente</h3>
-                <button onClick={() => setAdding(false)} className="p-1 rounded hover:bg-muted">
-                  <X className="h-5 w-5" />
+                <button
+                  type="button" onClick={() => setAdding(false)} aria-label="Fechar"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  <X aria-hidden className="h-5 w-5" />
                 </button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -191,7 +201,8 @@ export function ClientsManager({
               </p>
               <div className="flex gap-2 mt-5">
                 <Button onClick={add} disabled={busy || !name} className="flex-1">
-                  {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Adicionar
+                  {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+                  {busy ? "Cadastrando…" : "Adicionar"}
                 </Button>
                 <Button variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>
               </div>
@@ -201,18 +212,23 @@ export function ClientsManager({
       </AnimatePresence>
 
       {err && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <Warning className="h-4 w-4 shrink-0" /> {err}
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <Warning aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
       <div className="relative">
-        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={q} onChange={(e) => { setQ(e.target.value); resetPage(); }} placeholder="Buscar por nome ou telefone" className="pl-9" />
+        <label htmlFor="busca-cliente" className="sr-only">Buscar cliente por nome ou telefone</label>
+        <MagnifyingGlass aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          id="busca-cliente" type="search" value={q}
+          onChange={(e) => { setQ(e.target.value); resetPage(); }}
+          placeholder="Buscar por nome ou telefone" className="pl-9"
+        />
       </div>
 
       {/* Reativação: filtrar quem não volta há X dias */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div role="group" aria-label="Filtrar por tempo sem visita" className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-muted-foreground shrink-0">Sem visita há:</span>
         {[
           { d: 0, label: "Todas" },
@@ -222,9 +238,11 @@ export function ClientsManager({
         ].map((opt) => (
           <button
             key={opt.d}
+            type="button"
             onClick={() => { setInactiveDays(opt.d); resetPage(); }}
+            aria-pressed={inactiveDays === opt.d}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full border transition font-medium",
+              "text-xs px-2.5 py-1 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               inactiveDays === opt.d
                 ? "bg-primary text-primary-foreground border-primary"
                 : "border-border hover:border-foreground/30 text-foreground",
@@ -233,16 +251,20 @@ export function ClientsManager({
             {opt.label}
           </button>
         ))}
-        {inactiveDays > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {filtered.length} cliente{filtered.length === 1 ? "" : "s"} para reativar
-          </span>
-        )}
+        {/* O resultado do filtro/busca muda sem sair do lugar: sem região viva,
+            quem usa leitor de tela não sabe que a lista encolheu. */}
+        <span aria-live="polite" className="text-xs text-muted-foreground">
+          {inactiveDays > 0
+            ? `${filtered.length} cliente${filtered.length === 1 ? "" : "s"} para reativar`
+            : q
+              ? `${filtered.length} cliente${filtered.length === 1 ? "" : "s"} encontrada${filtered.length === 1 ? "" : "s"}`
+              : ""}
+        </span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center">
-          <AddressBook className="h-8 w-8 mx-auto text-muted-foreground" />
+          <AddressBook aria-hidden className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-3">Nenhuma cliente encontrada.</p>
         </div>
       ) : (
@@ -260,17 +282,23 @@ export function ClientsManager({
                     {c.full_name}
                     {vipSet.has(c.id) && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase">
-                        <Star className="h-3 w-3" /> VIP
+                        <Star aria-hidden className="h-3 w-3" /> VIP
                       </span>
                     )}
                     {c.alert_summary && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium">
-                        <Warning className="h-3 w-3" /> alerta
+                      <span
+                        title={c.alert_summary}
+                        className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium"
+                      >
+                        <Warning aria-hidden className="h-3 w-3" /> alerta
+                        {/* "alerta" sozinho não diz de quê — e o texto já está
+                            carregado aqui, não custa nada dizer. */}
+                        <span className="sr-only">: {c.alert_summary}</span>
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                    {c.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {c.phone}</span>}
+                    {c.phone && <span className="flex items-center gap-1"><Phone aria-hidden className="h-3 w-3" /> {c.phone}</span>}
                     <span>
                       {days === null
                         ? "Nunca veio"
@@ -280,7 +308,7 @@ export function ClientsManager({
                     </span>
                   </p>
                 </div>
-                <CaretRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                <CaretRight aria-hidden className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
               {c.phone && (
                 <a
@@ -288,15 +316,23 @@ export function ClientsManager({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="p-2 text-emerald-600 hover:text-emerald-700 shrink-0"
-                  title="Chamar no WhatsApp"
+                  aria-label={`Chamar ${c.full_name} no WhatsApp`}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-emerald-600 transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
-                  <ChatCircle className="h-4 w-4" />
+                  <ChatCircle aria-hidden className="h-4 w-4" />
                 </a>
               )}
               {canManage && (
-                <button onClick={() => remove(c.id)} className="p-2 text-muted-foreground hover:text-red-600 shrink-0">
-                  <Trash className="h-4 w-4" />
+                <button
+                  type="button"
+                  onClick={() => remove(c)}
+                  disabled={removendo !== null}
+                  aria-label={`Remover ${c.full_name}`}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+                >
+                  {removendo === c.id
+                    ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+                    : <Trash aria-hidden className="h-4 w-4" />}
                 </button>
               )}
             </div>
@@ -308,21 +344,23 @@ export function ClientsManager({
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <button
+            type="button"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-1 rounded-[var(--radius)] border border-border px-3 py-1.5 text-sm transition hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <CaretLeft className="h-4 w-4" /> Anterior
+            <CaretLeft aria-hidden className="h-4 w-4" /> Anterior
           </button>
-          <span className="text-xs text-muted-foreground">
+          <span aria-live="polite" className="text-xs text-muted-foreground">
             {page + 1} de {totalPages} &middot; {filtered.length} clientes
           </span>
           <button
+            type="button"
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-[var(--radius)] border border-border hover:border-foreground/30 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-1 rounded-[var(--radius)] border border-border px-3 py-1.5 text-sm transition hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Próxima <CaretRight className="h-4 w-4" />
+            Próxima <CaretRight aria-hidden className="h-4 w-4" />
           </button>
         </div>
       )}

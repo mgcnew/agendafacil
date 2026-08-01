@@ -121,7 +121,7 @@ export function ClientDetail({
             )}
             {birthday && birthday.daysUntil <= 7 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-pink-400/15 px-2 py-0.5 text-[11px] font-medium text-pink-700">
-                <Cake className="h-3 w-3" />
+                <Cake aria-hidden className="h-3 w-3" />
                 {birthday.daysUntil === 0 ? "Aniversário hoje 🎉" : birthday.daysUntil === 1 ? "Aniversário amanhã" : `Aniversário em ${birthday.daysUntil} dias`}
               </span>
             )}
@@ -132,12 +132,12 @@ export function ClientDetail({
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
               <Button variant="outline" className="w-full text-emerald-600 border-emerald-200 hover:bg-emerald-50">
-                <ChatCircle className="h-4 w-4" /> WhatsApp
+                <ChatCircle aria-hidden className="h-4 w-4" /> WhatsApp
               </Button>
             </a>
           )}
           <Link href={agendarHref} className="flex-1 sm:flex-none">
-            <Button className="w-full"><CalendarPlus className="h-4 w-4" /> Agendar</Button>
+            <Button className="w-full"><CalendarPlus aria-hidden className="h-4 w-4" /> Agendar</Button>
           </Link>
         </div>
       </div>
@@ -157,7 +157,7 @@ export function ClientDetail({
       {reactivation && (
         <div className="flex items-start gap-3 rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-            <Sparkle className="h-4 w-4" />
+            <Sparkle aria-hidden className="h-4 w-4" />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm">
@@ -170,7 +170,7 @@ export function ClientDetail({
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/15 transition"
               >
-                <ChatCircle className="h-3.5 w-3.5" /> Lembrar retorno
+                <ChatCircle aria-hidden className="h-3.5 w-3.5" /> Lembrar retorno
               </a>
             )}
           </div>
@@ -179,8 +179,8 @@ export function ClientDetail({
 
       {/* Alerta de segurança */}
       {alert && (
-        <div className="flex items-start gap-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-800 p-4">
-          <Warning className="h-5 w-5 shrink-0 mt-0.5" />
+        <div role="alert" className="flex items-start gap-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-800 p-4">
+          <Warning aria-hidden className="h-5 w-5 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-sm">Atenção — anamnese</p>
             <p className="text-sm">{alert}</p>
@@ -189,7 +189,7 @@ export function ClientDetail({
       )}
 
       {/* Abas */}
-      <div className="flex gap-1 border-b border-border">
+      <div role="tablist" aria-label="Seções da ficha" className="flex gap-1 border-b border-border">
         {([
           ["dados", "Dados", User],
           ["anamnese", "Anamnese", Heartbeat],
@@ -197,38 +197,54 @@ export function ClientDetail({
         ] as const).map(([key, label, Icon]) => (
           <button
             key={key}
+            type="button"
+            role="tab"
+            id={`aba-${key}`}
+            aria-controls={`painel-${key}`}
+            aria-selected={tab === key}
+            tabIndex={tab === key ? 0 : -1}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-              tab === key ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+            className={`flex items-center gap-1.5 border-b-2 -mb-px px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] ${
+              tab === key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Icon className="h-4 w-4" /> {label}
+            <Icon aria-hidden className="h-4 w-4" /> {label}
           </button>
         ))}
       </div>
 
       {tab === "dados" && (
-        <DadosTab
-          supabase={supabase}
-          client={client}
-          canManage={canManage}
-          photoUrl={photoUrl}
-          onPhotoChange={setPhotoUrl}
-          onSaved={() => router.refresh()}
-        />
+        <div id="painel-dados" role="tabpanel" aria-labelledby="aba-dados">
+          <DadosTab
+            supabase={supabase}
+            client={client}
+            canManage={canManage}
+            photoUrl={photoUrl}
+            onPhotoChange={setPhotoUrl}
+            onSaved={() => router.refresh()}
+          />
+        </div>
       )}
       {tab === "anamnese" && (
-        <AnamneseTab
-          supabase={supabase}
-          client={client}
-          anamnesis={anamnesis}
-          canManage={canManage}
-          niche={niche}
-          onAlertChange={setAlert}
-          onSaved={() => router.refresh()}
-        />
+        <div id="painel-anamnese" role="tabpanel" aria-labelledby="aba-anamnese">
+          <AnamneseTab
+            supabase={supabase}
+            client={client}
+            anamnesis={anamnesis}
+            canManage={canManage}
+            niche={niche}
+            onAlertChange={setAlert}
+            onSaved={() => router.refresh()}
+          />
+        </div>
       )}
-      {tab === "historico" && <HistoricoTab history={history} />}
+      {tab === "historico" && (
+        <div id="painel-historico" role="tabpanel" aria-labelledby="aba-historico">
+          <HistoricoTab history={history} />
+        </div>
+      )}
     </div>
   );
 }
@@ -350,14 +366,24 @@ function DadosTab({
         )}
         {canManage && (
           <div className="flex flex-col gap-1.5">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm hover:bg-muted">
-              {uploading ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-              {photoUrl ? "Trocar foto" : "Enviar foto"}
-              <input type="file" accept="image/*" className="hidden" onChange={onPickPhoto} disabled={uploading} />
+            <label
+              aria-busy={uploading}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-border px-3 py-2 text-sm transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-[var(--ring)]"
+            >
+              {uploading
+                ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+                : <Camera aria-hidden className="h-4 w-4" />}
+              {uploading ? "Enviando…" : photoUrl ? "Trocar foto" : "Enviar foto"}
+              <input type="file" accept="image/*" className="sr-only" onChange={onPickPhoto} disabled={uploading} />
             </label>
             {photoUrl && (
-              <button onClick={removePhoto} disabled={uploading} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-600 disabled:opacity-50">
-                <Trash className="h-3.5 w-3.5" /> Remover foto
+              <button
+                type="button"
+                onClick={() => { if (window.confirm("Remover a foto deste cliente?")) removePhoto(); }}
+                disabled={uploading}
+                className="inline-flex items-center gap-1 rounded text-xs text-muted-foreground transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+              >
+                <Trash aria-hidden className="h-3.5 w-3.5" /> Remover foto
               </button>
             )}
           </div>
@@ -368,7 +394,7 @@ function DadosTab({
           mensagens e o salão não tinha como descobrir por quê. */}
       {optOut && (
         <div className="flex flex-wrap items-start gap-3 rounded-[var(--radius)] border border-amber-300 bg-amber-50 p-3.5 dark:border-amber-500/40 dark:bg-amber-500/10">
-          <WhatsappLogo className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" weight="fill" />
+          <WhatsappLogo aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" weight="fill" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
               Não recebe mensagens automáticas
@@ -382,7 +408,7 @@ function DadosTab({
           </div>
           {canManage && (
             <Button variant="outline" onClick={religarWhatsApp} disabled={religando}>
-              {religando && <CircleNotch className="h-4 w-4 animate-spin" />} Religar mensagens
+              {religando && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />} Religar mensagens
             </Button>
           )}
         </div>
@@ -394,7 +420,7 @@ function DadosTab({
           <Input id="n" value={name} onChange={(e) => setName(e.target.value)} disabled={!canManage} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="p"><Phone className="inline h-3.5 w-3.5 mr-1" />Celular</Label>
+          <Label htmlFor="p"><Phone aria-hidden className="inline h-3.5 w-3.5 mr-1" />Celular</Label>
           <Input
             id="p"
             inputMode="numeric"
@@ -410,11 +436,11 @@ function DadosTab({
           )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="e"><Envelope className="inline h-3.5 w-3.5 mr-1" />E-mail</Label>
+          <Label htmlFor="e"><Envelope aria-hidden className="inline h-3.5 w-3.5 mr-1" />E-mail</Label>
           <Input id="e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!canManage} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="b"><Cake className="inline h-3.5 w-3.5 mr-1" />Nascimento</Label>
+          <Label htmlFor="b"><Cake aria-hidden className="inline h-3.5 w-3.5 mr-1" />Nascimento</Label>
           <Input id="b" type="date" value={birth} onChange={(e) => setBirth(e.target.value)} disabled={!canManage} />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
@@ -429,10 +455,15 @@ function DadosTab({
       {canManage && (
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={saving}>
-            {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar
+            {saving && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+            {saving ? "Salvando…" : "Salvar"}
           </Button>
-          {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
-          {err && <span className="text-sm text-red-600">{err}</span>}
+          {/* O "Salvo!" some sozinho em 2,5s: sem região viva, quem não está
+              olhando para este canto da tela nunca soube que gravou. */}
+          <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+            {saved && <span className="flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo!</span>}
+          </span>
+          {err && <span role="alert" className="text-sm text-red-600">{err}</span>}
         </div>
       )}
     </Card>
@@ -505,7 +536,7 @@ function AnamneseTab({
     <div className="space-y-5 max-w-2xl">
       {/* Condições de saúde */}
       <Card className="p-6">
-        <h3 className="font-display font-semibold flex items-center gap-2"><Heartbeat className="h-5 w-5 text-primary" /> Condições de saúde</h3>
+        <h3 className="font-display font-semibold flex items-center gap-2"><Heartbeat aria-hidden className="h-5 w-5 text-primary" /> Condições de saúde</h3>
         <p className="text-xs text-muted-foreground mt-1">Marque o que se aplica. Itens críticos geram alerta automático.</p>
         <div className="grid sm:grid-cols-2 gap-2 mt-4">
           {cfg.conditions.map((c) => {
@@ -514,13 +545,15 @@ function AnamneseTab({
               <button
                 key={c.key}
                 type="button"
+                role="checkbox"
+                aria-checked={on}
                 disabled={!canManage}
                 onClick={() => setField(c.key as ConditionKey, !on)}
-                className={`flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm transition disabled:opacity-70 ${
+                className={`flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-70 ${
                   on ? "border-amber-300 bg-amber-50 text-amber-900" : "border-border hover:border-foreground/20"
                 }`}
               >
-                <span className={`grid place-items-center h-5 w-5 rounded border shrink-0 ${on ? "bg-amber-500 border-amber-500 text-white" : "border-border"}`}>
+                <span aria-hidden className={`grid place-items-center h-5 w-5 rounded border shrink-0 ${on ? "bg-amber-500 border-amber-500 text-white" : "border-border"}`}>
                   {on && <Check className="h-3.5 w-3.5" />}
                 </span>
                 {c.label}
@@ -549,7 +582,7 @@ function AnamneseTab({
 
       {/* Consentimento */}
       <Card className="p-6">
-        <h3 className="font-display font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Termo de consentimento</h3>
+        <h3 className="font-display font-semibold flex items-center gap-2"><ShieldCheck aria-hidden className="h-5 w-5 text-primary" /> Termo de consentimento</h3>
         <label className="flex items-start gap-3 mt-4 cursor-pointer">
           <input
             type="checkbox"
@@ -571,7 +604,7 @@ function AnamneseTab({
         )}
         {anamnesis?.consent_at && (
           <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-            <Calendar className="h-3 w-3" /> Consentimento registrado em {formatDate(anamnesis.consent_at)}
+            <Calendar aria-hidden className="h-3 w-3" /> Consentimento registrado em {formatDate(anamnesis.consent_at)}
           </p>
         )}
       </Card>
@@ -579,10 +612,13 @@ function AnamneseTab({
       {canManage && (
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={saving}>
-            {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar anamnese
+            {saving && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+            {saving ? "Salvando…" : "Salvar anamnese"}
           </Button>
-          {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
-          {err && <span className="text-sm text-red-600">{err}</span>}
+          <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+            {saved && <span className="flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo!</span>}
+          </span>
+          {err && <span role="alert" className="text-sm text-red-600">{err}</span>}
         </div>
       )}
     </div>
