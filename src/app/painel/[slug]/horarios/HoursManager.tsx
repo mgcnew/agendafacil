@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Label, Select } from "@/components/ui";
+import { Switch } from "@/components/Switch";
 import type { Tables } from "@/lib/database.types";
 import {
   Check,
@@ -164,27 +165,40 @@ export function HoursManager({
       <Card className="p-4 sm:p-6 space-y-2">
         {days.map((d) => (
           <div key={d.weekday} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[var(--radius)] border border-border p-2.5">
-            <button
-              type="button"
-              onClick={() => setDay(d.weekday, { enabled: !d.enabled })}
-              className={`relative h-6 w-11 rounded-full transition shrink-0 ${d.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-              aria-label={`Alternar ${WEEKDAYS[d.weekday]}`}
-            >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${d.enabled ? "left-[22px]" : "left-0.5"}`} />
-            </button>
+            {/* Era um botão comum com "Alternar Segunda": nem aberto nem
+                fechado chegava ao leitor de tela — e "aberto ou fechado" é a
+                informação inteira desta linha. */}
+            <Switch
+              checked={d.enabled}
+              onChange={(v) => setDay(d.weekday, { enabled: v })}
+              label={`${WEEKDAYS[d.weekday]}: salão aberto`}
+            />
             <span className="w-20 shrink-0 text-sm font-medium">{WEEKDAYS[d.weekday]}</span>
             {d.enabled ? (
               <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
-                <input type="time" value={d.start} onChange={(e) => setDay(d.weekday, { start: e.target.value })} className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm sm:flex-none" />
-                <span className="text-muted-foreground text-sm shrink-0">às</span>
-                <input type="time" value={d.end} onChange={(e) => setDay(d.weekday, { end: e.target.value })} className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm sm:flex-none" />
+                {/* Dois campos de hora idênticos por linha, sete linhas: sem
+                    rótulo, o leitor de tela anunciava catorze vezes "hora". */}
+                <input
+                  type="time" value={d.start}
+                  aria-label={`${WEEKDAYS[d.weekday]}: abre às`}
+                  onChange={(e) => setDay(d.weekday, { start: e.target.value })}
+                  className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:flex-none"
+                />
+                <span aria-hidden className="text-muted-foreground text-sm shrink-0">às</span>
+                <input
+                  type="time" value={d.end}
+                  aria-label={`${WEEKDAYS[d.weekday]}: fecha às`}
+                  onChange={(e) => setDay(d.weekday, { end: e.target.value })}
+                  className="h-9 min-w-0 flex-1 rounded-[var(--radius)] border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:flex-none"
+                />
                 <button
                   type="button"
                   title="Copiar este horário para os outros dias ativos"
+                  aria-label={`Copiar o horário de ${WEEKDAYS[d.weekday]} para os outros dias abertos`}
                   onClick={() => copyToAll(d)}
-                  className="p-1.5 shrink-0 text-muted-foreground hover:text-primary"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
-                  <Copy className="h-4 w-4" />
+                  <Copy aria-hidden className="h-4 w-4" />
                 </button>
               </div>
             ) : (
@@ -195,17 +209,19 @@ export function HoursManager({
       </Card>
 
       {err && (
-        <p className="text-sm text-red-600 flex items-center gap-1.5">
-          <Warning className="h-4 w-4 shrink-0" /> {err}
+        <p role="alert" className="text-sm text-red-600 flex items-center gap-1.5">
+          <Warning aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </p>
       )}
 
       <div className="flex items-center gap-3">
         <Button onClick={save} disabled={saving}>
-          {saving ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
-          Salvar horários
+          {saving ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> : <Clock aria-hidden className="h-4 w-4" />}
+          {saving ? "Salvando…" : "Salvar horários"}
         </Button>
-        {saved && <span className="text-sm text-emerald-600 flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
+        <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+          {saved && <span className="flex items-center gap-1"><Check aria-hidden className="h-4 w-4" /> Salvo!</span>}
+        </span>
       </div>
     </div>
   );
