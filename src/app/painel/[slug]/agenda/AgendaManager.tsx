@@ -294,16 +294,21 @@ function BlockCard({ b, canManage, onDelete }: {
     <button
       type="button"
       onClick={canManage ? (e) => { e.stopPropagation(); onDelete(b); } : undefined}
+      aria-label={
+        canManage
+          ? `Remover bloqueio${b.reason ? ` — ${b.reason}` : ""}`
+          : `Horário bloqueado${b.reason ? ` — ${b.reason}` : ""}`
+      }
       title={canManage ? "Clique para remover o bloqueio" : (b.reason ?? "Horário bloqueado")}
       className={cn(
-        "absolute inset-0 rounded-[6px] overflow-hidden text-left border border-slate-300/60",
+        "absolute inset-0 rounded-[6px] overflow-hidden text-left border border-slate-300/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         canManage ? "cursor-pointer" : "cursor-default",
       )}
       style={{ background: BLOCK_STRIPES }}
     >
       <div className="px-2 py-1 h-full flex flex-col gap-0.5">
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600">
-          <Lock className="h-2.5 w-2.5 shrink-0" /> Bloqueado
+          <Lock aria-hidden className="h-2.5 w-2.5 shrink-0" /> Bloqueado
         </span>
         {b.reason && <span className="text-[11px] text-slate-600/90 truncate leading-tight">{b.reason}</span>}
       </div>
@@ -337,7 +342,13 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${name} às ${fmtHM(a.starts_at)} — ${st.label}${emCasa ? " — em domicílio" : ""}`}
+      aria-label={
+        `${name} às ${fmtHM(a.starts_at)} — ${st.label}` +
+        (emCasa ? " — em domicílio" : "") +
+        // O aria-label substitui todo o conteúdo do botão: sem repetir aqui,
+        // o ícone de restrição existia só para quem enxerga.
+        (a.clients?.alert_summary ? ` — atenção: ${a.clients.alert_summary}` : "")
+      }
       title={emCasa ? `${name} — atendimento em domicílio${aguardandoKm ? " (falta definir o valor do deslocamento)" : ""}` : undefined}
       className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       style={{
@@ -359,14 +370,14 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
               narrow ? "text-[9px]" : "text-[11px]",
             )}>
               {a.clients?.alert_summary && (
-                <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
+                <Warning aria-hidden className="h-2.5 w-2.5 text-red-500 shrink-0" />
               )}
               {/* Sai do salão: precisa saltar aos olhos na varredura do dia,
                   senão a profissional só descobre o deslocamento na hora. */}
               {emCasa && (
                 <House
+                  aria-hidden
                   className={cn("shrink-0 text-primary", narrow ? "h-2.5 w-2.5" : "h-3 w-3")}
-                  aria-label="Em domicílio"
                   weight="fill"
                 />
               )}
@@ -380,10 +391,10 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
           /* Card baixo, sem sobreposição: cabe 1 linha combinando hora + nome. */
           <p className="font-medium truncate leading-tight text-[11px] text-foreground/90 flex items-center gap-1">
             {a.clients?.alert_summary && (
-              <Warning className="h-2.5 w-2.5 text-red-500 shrink-0" aria-label="Restrição" />
+              <Warning aria-hidden className="h-2.5 w-2.5 text-red-500 shrink-0" />
             )}
             {emCasa && (
-              <House className="h-3 w-3 shrink-0 text-primary" aria-label="Em domicílio" weight="fill" />
+              <House aria-hidden className="h-3 w-3 shrink-0 text-primary" weight="fill" />
             )}
             <span className="truncate min-w-0">
               <span className="font-semibold">{fmtHM(a.starts_at)}</span>{" · "}{name}
@@ -943,7 +954,7 @@ function AgendaList({ date, appts, blocks, pros, activePros, canManageSchedule, 
             <p className="mt-3 text-sm font-medium text-muted-foreground">Nenhum agendamento</p>
             {canCreate && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => onNewAppt(date)}>
-                <Plus className="h-4 w-4" /> Novo agendamento
+                <Plus aria-hidden className="h-4 w-4" /> Novo agendamento
               </Button>
             )}
           </div>
@@ -1365,6 +1376,9 @@ export function AgendaManager({
   const [waitlist, setWaitlist]     = useState<WaitlistEntry[]>([]);
   const esperaRef = useRef<HTMLDivElement>(null);
   const [removingWaitlistId, setRemovingWaitlistId] = useState<string | null>(null);
+  // Falhas de gravação. A tela é otimista em tudo (status, bloqueio, espera):
+  // sem isto, o desfazer acontecia sozinho e ninguém entendia por quê.
+  const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [convertingWaitlistId, setConvertingWaitlistId] = useState<string | null>(null);
 
   /** Abre o modal de criação, opcionalmente já com profissional, horário e cliente. */
@@ -1484,8 +1498,13 @@ export function AgendaManager({
   async function removeWaitlistEntry(id: string) {
     if (!window.confirm("Remover essa pessoa da lista de espera?")) return;
     setRemovingWaitlistId(id);
-    await supabase.from("appointment_waitlist").delete().eq("id", id);
+    setErroAcao(null);
+    const { error } = await supabase.from("appointment_waitlist").delete().eq("id", id);
     setRemovingWaitlistId(null);
+    if (error) {
+      setErroAcao("Não deu para remover da lista de espera. Tente de novo.");
+      return;
+    }
     loadWaitlist();
   }
 
@@ -1619,6 +1638,7 @@ export function AgendaManager({
       return;
     }
     const prev = a.status;
+    setErroAcao(null);
     // Optimistic update
     setAppts(list => list.map(x => x.id === a.id ? { ...x, status } : x));
     if (detailAppt?.id === a.id) setDetailAppt(d => d ? { ...d, status } : d);
@@ -1626,15 +1646,24 @@ export function AgendaManager({
     if (error) {
       setAppts(list => list.map(x => x.id === a.id ? { ...x, status: prev } : x));
       if (detailAppt?.id === a.id) setDetailAppt(d => d ? { ...d, status: prev } : d);
+      // O card voltava ao estado anterior sem explicação — parecia que o
+      // clique não tinha pegado, e a pessoa clicava de novo.
+      setErroAcao(
+        `Não deu para mudar o status de ${a.clients?.full_name ?? "cliente"}. Verifique a conexão e tente de novo.`,
+      );
     }
   }
 
   async function deleteBlock(b: Block) {
     if (!confirm("Remover este bloqueio? O horário volta a ficar disponível.")) return;
     const prev = blocks;
+    setErroAcao(null);
     setBlocks(list => list.filter(x => x.id !== b.id));
     const { error } = await supabase.from("schedule_blocks").delete().eq("id", b.id);
-    if (error) setBlocks(prev);
+    if (error) {
+      setBlocks(prev);
+      setErroAcao("Não deu para remover o bloqueio. Tente de novo.");
+    }
   }
 
   function navigate(n: number) {
@@ -1692,7 +1721,7 @@ export function AgendaManager({
             title="Abre uma tela de próximos atendimentos, pra espelhar num monitor"
             className="hidden lg:inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
           >
-            <Monitor className="h-4 w-4" /> Modo TV
+            <Monitor aria-hidden className="h-4 w-4" /> Modo TV
           </a>
 
           {canBlock && (
@@ -1703,17 +1732,17 @@ export function AgendaManager({
                 title="Bloquear horário"
                 className="lg:hidden grid h-9 w-9 place-items-center rounded-[var(--radius)] border border-border transition active:bg-muted"
               >
-                <Lock className="h-4 w-4" />
+                <Lock aria-hidden className="h-4 w-4" />
               </button>
               <Button variant="outline" className="hidden lg:inline-flex" onClick={() => setBlocking(true)}>
-                <Lock className="h-4 w-4" /> Bloquear
+                <Lock aria-hidden className="h-4 w-4" /> Bloquear
               </Button>
             </>
           )}
 
           {canManageAppointments && (
             <Button className="hidden lg:inline-flex" onClick={() => openCreate(date)}>
-              <Plus className="h-4 w-4" /> Novo agendamento
+              <Plus aria-hidden className="h-4 w-4" /> Novo agendamento
             </Button>
           )}
         </div>
@@ -1723,13 +1752,19 @@ export function AgendaManager({
           a largura livre e "Hoje" só aparece quando há pra onde voltar —
           botão que não faz nada é ruído. */}
       <div className="flex items-center gap-2">
-        <div className="flex flex-1 lg:flex-none rounded-[var(--radius)] border border-border overflow-hidden text-sm">
+        <div
+          role="group"
+          aria-label="Modo de visualização"
+          className="flex flex-1 lg:flex-none rounded-[var(--radius)] border border-border overflow-hidden text-sm"
+        >
           {(["dia","semana","mes"] as View[]).map(v => (
             <button
               key={v}
+              type="button"
               onClick={() => setView(v)}
+              aria-pressed={v === view}
               className={cn(
-                "flex-1 lg:flex-none px-3 py-1.5 font-medium transition",
+                "flex-1 lg:flex-none px-3 py-1.5 font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]",
                 v === view
                   ? "bg-primary text-primary-foreground"
                   : "text-foreground/70 hover:bg-muted",
@@ -1742,36 +1777,54 @@ export function AgendaManager({
 
         <div className="flex shrink-0 items-center gap-1">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            aria-label="Anterior"
-            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+            aria-label={view === "mes" ? "Mês anterior" : view === "semana" ? "Semana anterior" : "Dia anterior"}
+            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <CaretLeft className="h-4 w-4" />
+            <CaretLeft aria-hidden className="h-4 w-4" />
           </button>
           {date !== toStr(new Date()) && (
             <button
+              type="button"
               onClick={() => setDate(toStr(new Date()))}
-              className="h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border hover:bg-muted transition"
+              className="h-9 px-3 text-sm font-medium rounded-[var(--radius)] border border-border transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               Hoje
             </button>
           )}
           <button
+            type="button"
             onClick={() => navigate(1)}
-            aria-label="Próximo"
-            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border hover:bg-muted transition"
+            aria-label={view === "mes" ? "Próximo mês" : view === "semana" ? "Próxima semana" : "Próximo dia"}
+            className="h-9 w-9 flex items-center justify-center rounded-[var(--radius)] border border-border transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <CaretRight className="h-4 w-4" />
+            <CaretRight aria-hidden className="h-4 w-4" />
           </button>
         </div>
       </div>
+
+      {/* Gravação que não colou. Fica antes da agenda porque é onde o olho
+          volta depois de clicar num card. */}
+      {erroAcao && (
+        <div role="alert" className="flex items-start gap-2 rounded-[var(--radius)] border border-red-300/60 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-700">
+          <Warning aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+          <span className="flex-1">{erroAcao}</span>
+          <button
+            type="button" onClick={() => setErroAcao(null)} aria-label="Dispensar aviso"
+            className="shrink-0 rounded p-0.5 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+          >
+            <X aria-hidden className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Sem appointments.view_all o RLS já entrega só os próprios horários.
           A tela ficava parecendo vazia sem explicar por quê — a pessoa
           concluía que os agendamentos tinham sumido. */}
       {!canViewAllAppointments && (
         <p className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground">
-          <Eye className="h-4 w-4 shrink-0" />
+          <Eye aria-hidden className="h-4 w-4 shrink-0" />
           Você está vendo apenas os seus atendimentos. Para ver a agenda toda,
           peça a permissão &quot;Ver todos os agendamentos&quot;.
         </p>
@@ -1793,7 +1846,7 @@ export function AgendaManager({
       {waitlist.length > 0 && (
         <Card ref={esperaRef} className="p-4 space-y-3 border-amber-300/60 bg-amber-500/5">
           <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-700">
-            <Clock className="h-4 w-4" />
+            <Clock aria-hidden className="h-4 w-4" />
             {waitlist.length === 1 ? "1 pessoa esperando vaga" : `${waitlist.length} pessoas esperando vaga`}
           </p>
           <div className="space-y-2">
@@ -1823,9 +1876,9 @@ export function AgendaManager({
                       onClick={() => removeWaitlistEntry(w.id)}
                       disabled={removingWaitlistId === w.id}
                       aria-label="Remover da lista de espera"
-                      className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-500/10 disabled:opacity-50 transition"
+                      className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground transition hover:text-red-600 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
                     >
-                      <X className="h-4 w-4" />
+                      <X aria-hidden className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -1837,12 +1890,14 @@ export function AgendaManager({
 
       {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div role="group" aria-label="Filtrar por profissional" className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground shrink-0">Profissional:</span>
           <button
+            type="button"
             onClick={() => setSelected([])}
+            aria-pressed={selectedPros.length === 0}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full border transition font-medium",
+              "text-xs px-2.5 py-1 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               selectedPros.length === 0
                 ? "bg-primary text-primary-foreground border-primary"
                 : "border-border hover:border-foreground/30 text-foreground",
@@ -1856,9 +1911,13 @@ export function AgendaManager({
             return (
               <button
                 key={p.id}
+                type="button"
                 onClick={() => togglePro(p.id)}
+                // A cor da pastilha é a da profissional — só ela não diz se o
+                // filtro está ligado, e algumas paletas quase não mudam o fundo.
+                aria-pressed={active}
                 className={cn(
-                  "flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border transition font-medium text-foreground",
+                  "flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                   active ? "" : "border-border hover:border-foreground/30",
                 )}
                 style={active ? { background: color + "22", borderColor: color } : {}}
@@ -1874,8 +1933,9 @@ export function AgendaManager({
       {/* ── Calendar body ────────────────────────────────── */}
       <div className="flex-1 min-h-0">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <CircleNotch className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div role="status" className="flex h-full items-center justify-center">
+            <CircleNotch aria-hidden className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="sr-only">Carregando a agenda…</span>
           </div>
         ) : view === "mes" ? (
           <MonthView

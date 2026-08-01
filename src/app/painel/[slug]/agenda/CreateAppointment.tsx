@@ -242,8 +242,8 @@ export function CreateAppointment({
         atendimento leva.
       </p>
     ) : loadingSlots ? (
-      <p className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
-        <CircleNotch className="h-3.5 w-3.5 animate-spin" /> Procurando horários livres…
+      <p role="status" className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+        <CircleNotch aria-hidden className="h-3.5 w-3.5 animate-spin" /> Procurando horários livres…
       </p>
     ) : slots.length === 0 ? (
       <p className="rounded-[var(--radius)] border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
@@ -268,7 +268,12 @@ export function CreateAppointment({
       <Card className="w-full sm:max-w-3xl mx-auto max-h-[90vh] overflow-auto sm:overflow-hidden p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+          <button
+            type="button" onClick={onClose} aria-label="Fechar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X aria-hidden className="h-5 w-5" />
+          </button>
         </div>
 
         {/* A data atravessa as duas colunas no desktop: ela é o eixo do
@@ -296,8 +301,12 @@ export function CreateAppointment({
             </div>
             {!existingClient && (
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
-                <Input placeholder="Celular" inputMode="numeric" value={clientPhone} onChange={e => setClientPhone(maskBrPhone(e.target.value))} />
+                {/* Placeholder não é rótulo: some ao digitar e não é lido como
+                    nome do campo. */}
+                <label htmlFor="novo-cli-nome" className="sr-only">Nome da cliente</label>
+                <Input id="novo-cli-nome" placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
+                <label htmlFor="novo-cli-fone" className="sr-only">Celular da cliente</label>
+                <Input id="novo-cli-fone" placeholder="Celular" inputMode="numeric" value={clientPhone} onChange={e => setClientPhone(maskBrPhone(e.target.value))} />
               </div>
             )}
             {lastSvcs && (
@@ -316,11 +325,11 @@ export function CreateAppointment({
             )}
 
             <div className="space-y-1.5">
-              <Label>Profissional</Label>
+              <Label htmlFor="novo-profissional">Profissional</Label>
               {/* Foto no rótulo: em salão com equipe, quem atende se reconhece
                   pelo rosto antes do nome — e a cor do avatar é a mesma que
                   identifica a pessoa na grade da agenda. */}
-              <Select value={proId} onValueChange={setProId}>
+              <Select id="novo-profissional" value={proId} onValueChange={setProId}>
                 {pros.map(p => (
                   <option key={p.id} value={p.id}>
                     {/* inline-flex e não flex: o Select embrulha o rótulo num
@@ -387,13 +396,19 @@ export function CreateAppointment({
                 </div>
               )}
 
-              {err && <p className="text-sm text-red-600">{err}</p>}
+              {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
-              <Button className="w-full" onClick={create} disabled={busy || !!faltando}>
-                {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Criar agendamento
+              <Button
+                className="w-full" onClick={create} disabled={busy || !!faltando}
+                // Sem isto o botão travado ficava mudo para leitor de tela:
+                // o motivo estava escrito abaixo, mas solto na página.
+                aria-describedby={faltando ? "novo-falta" : undefined}
+              >
+                {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+                {busy ? "Criando…" : "Criar agendamento"}
               </Button>
               {faltando && (
-                <p className="text-center text-xs text-muted-foreground">{faltando}</p>
+                <p id="novo-falta" className="text-center text-xs text-muted-foreground">{faltando}</p>
               )}
             </div>
           </div>
