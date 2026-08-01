@@ -37,3 +37,33 @@ export const DUPLICADO = "23505";
  * como adivinhar que o problema é um campo que ele nem tocou.
  */
 export const REGRA_VIOLADA = "23514";
+
+/**
+ * Exceções que as funções do caixa levantam por nome (`raise exception
+ * 'session_closed'`). O PostgREST devolve isso como `message`, e as telas
+ * mostravam o texto cru: a dona do salão lia "session_closed" na cara dela.
+ */
+const CAIXA: Record<string, string> = {
+  tx_not_found: "Essa movimentação não existe mais — atualize a página.",
+  session_closed: "Esse caixa já foi fechado. Reabra antes de estornar.",
+  forbidden: "Você não tem permissão para isso.",
+  "not authorized": "Você não tem permissão para isso.",
+  session_open: "Já existe um caixa aberto.",
+  not_found: "Não encontramos esse registro — atualize a página.",
+};
+
+/**
+ * Traduz o erro que veio de um `throw` de RPC. Aceita tanto as exceções por
+ * nome quanto as que já vêm escritas em português (o banco tem das duas).
+ */
+export function mensagemRpc(e: unknown, padrao: string): string {
+  const msg = (e as { message?: string } | null)?.message?.trim();
+  if (!msg) return padrao;
+  const conhecida = CAIXA[msg];
+  if (conhecida) return conhecida;
+  // Já em português (termina com ponto e tem espaço) — o banco escreve várias
+  // assim, e reescrevê-las aqui só faria a mensagem envelhecer em dois lugares.
+  if (/\s/.test(msg) && /[.!?]$/.test(msg) && !/^[a-z_]+$/.test(msg)) return msg;
+  console.error("[rpc]", msg);
+  return padrao;
+}

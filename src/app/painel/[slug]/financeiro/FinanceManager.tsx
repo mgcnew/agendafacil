@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL, formatTime, formatDate } from "@/lib/utils";
+import { mensagemRpc } from "@/lib/erroSupabase";
 import type { Tables } from "@/lib/database.types";
 import {
   ArrowCounterClockwise,
@@ -354,18 +355,25 @@ export function FinanceManager({
       </div>
 
       {err && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <X className="h-4 w-4 shrink-0" /> {err}
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <X aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
-      <div className="flex gap-1 border-b border-border">
+      <div role="tablist" aria-label="Seções do financeiro" className="flex gap-1 overflow-x-auto no-scrollbar border-b border-border">
         {allowedTabs.map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            id={`aba-fin-${t}`}
+            aria-selected={tab === t}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-              tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+            className={`shrink-0 whitespace-nowrap border-b-2 -mb-px px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] ${
+              tab === t
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {t === "caixa" ? "Caixa" : t === "historico" ? "Caixas anteriores" : t === "comissoes" ? "Comissões" : "Fixos"}
@@ -956,7 +964,7 @@ function CaixaBar({
         <button
           onClick={onFechar}
           title="Fechar caixa"
-          className="group relative flex-1 flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card py-2.5 transition hover:border-red-300 hover:bg-red-500/5"
+          className="group relative flex-1 flex flex-col items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card py-2.5 transition hover:border-red-300 hover:bg-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <Lock className="h-4 w-4 text-muted-foreground group-hover:text-red-500" />
           <span className="text-[10px] font-medium leading-none mt-0.5 text-muted-foreground group-hover:text-red-500">Fechar</span>
@@ -974,7 +982,7 @@ function CaixaBar({
           key={a.label}
           onClick={a.onClick}
           title={`${a.label} (${a.key})`}
-          className={`group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border py-2 transition ${
+          className={`group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
             a.highlight ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40 hover:bg-muted/50"
           }`}
         >
@@ -991,7 +999,7 @@ function CaixaBar({
       <button
         onClick={onFechar}
         title="Fechar caixa (F8)"
-        className="group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border border-border bg-card py-2 transition hover:border-red-300 hover:bg-red-500/5"
+        className="group relative flex w-14 flex-col items-center justify-center gap-1 rounded-md border border-border bg-card py-2 transition hover:border-red-300 hover:bg-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         <span className={`${keycap} border-border bg-muted text-foreground/75 group-hover:border-red-300 group-hover:text-red-500`}>F8</span>
         <span className="text-[10px] font-semibold leading-none text-muted-foreground group-hover:text-red-500">Fechar</span>
@@ -1407,9 +1415,11 @@ function TxRow({ t, onReceipt, onReverse }: { t: Tx; onReceipt?: () => void; onR
   const subtitle = isCashMove
     ? `${t.category === "sangria" ? "Sangria" : "Suprimento"} · ${formatTime(t.created_at)}`
     : `${PAY_META[t.payment_method ?? "dinheiro"]?.label ?? (t.payment_method ?? "—")} · ${formatTime(t.created_at)}`;
+  // Numa lista de dez movimentações, "Estornar" sem complemento não diz qual.
+  const rotulo = `${t.description || (t.type === "income" ? "entrada" : "saída")} de ${formatBRL(Number(t.amount))}`;
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5">
-      <span className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
+      <span aria-hidden className={`grid place-items-center h-9 w-9 rounded-full ${t.type === "income" ? "bg-emerald-500/12 text-emerald-600" : "bg-red-500/12 text-red-600"}`}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="flex-1 min-w-0">
@@ -1420,15 +1430,21 @@ function TxRow({ t, onReceipt, onReverse }: { t: Tx; onReceipt?: () => void; onR
         {t.type === "income" ? "+" : "-"}{formatBRL(Number(t.amount))}
       </span>
       {t.type === "income" && !isCashMove && onReceipt && (
-        <button onClick={onReceipt} title="Emitir cupom"
-          className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground">
-          <Receipt className="h-4 w-4" />
+        <button
+          type="button" onClick={onReceipt}
+          aria-label={`Emitir cupom de ${rotulo}`}
+          className="shrink-0 grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          <Receipt aria-hidden className="h-4 w-4" />
         </button>
       )}
       {onReverse && (
-        <button onClick={onReverse} title="Estornar"
-          className="shrink-0 grid place-items-center h-8 w-8 rounded-[var(--radius)] text-muted-foreground hover:bg-red-500/10 hover:text-red-600">
-          <ArrowCounterClockwise className="h-4 w-4" />
+        <button
+          type="button" onClick={onReverse}
+          aria-label={`Estornar ${rotulo}`}
+          className="shrink-0 grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          <ArrowCounterClockwise aria-hidden className="h-4 w-4" />
         </button>
       )}
     </div>
@@ -1595,7 +1611,7 @@ function ManualModal({
                 : "O suprimento aumenta o dinheiro esperado na gaveta, sem afetar o resultado do dia."}
             </p>
           )}
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
           <Button onClick={submit} disabled={busy || !amount} className="w-full">
             {busy && <CircleNotch className="h-4 w-4 animate-spin" />} <current.icon className="h-4 w-4" /> Confirmar {current.label.toLowerCase()}
           </Button>
@@ -1640,7 +1656,7 @@ function ReverseModal({
     try {
       await onConfirm();
     } catch (e) {
-      setErr((e as { message?: string })?.message ?? "Não foi possível estornar.");
+      setErr(mensagemRpc(e, "Não foi possível estornar. Tente novamente."));
       setBusy(false);
     }
   }
@@ -1674,7 +1690,7 @@ function ReverseModal({
           </span>
         </div>
 
-        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+        {err && <p role="alert" className="text-sm text-red-600 mt-3">{err}</p>}
 
         <div className="flex gap-2 mt-4">
           <Button variant="ghost" onClick={onClose} className="flex-1">Cancelar</Button>
@@ -2319,7 +2335,7 @@ function CloseModal({
               )}
             </div>
 
-            {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+            {err && <p role="alert" className="text-sm text-red-600 mt-3">{err}</p>}
 
             <div className="flex gap-2 mt-5">
               <Button onClick={confirm} disabled={busy || counted === ""} className="flex-1">
@@ -2427,7 +2443,7 @@ function SessionDetailModal({
     try {
       await onReopen();
     } catch (e) {
-      setErr((e as { message?: string })?.message ?? "Não foi possível reabrir o caixa.");
+      setErr(mensagemRpc(e, "Não foi possível reabrir o caixa. Tente novamente."));
       setReopening(false);
     }
   }
@@ -2560,7 +2576,7 @@ function SessionDetailModal({
             {/* Reabrir caixa (só o último fechado, sem caixa aberto) */}
             {canReopen && (
               <div className="pt-2 border-t border-border">
-                {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+                {err && <p role="alert" className="text-sm text-red-600 mb-2">{err}</p>}
                 <Button onClick={reopen} disabled={reopening} variant="outline" className="w-full">
                   {reopening ? <CircleNotch className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />} Reabrir este caixa
                 </Button>

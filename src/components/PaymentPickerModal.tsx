@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { mensagemRpc } from "@/lib/erroSupabase";
 import { MotionModal } from "@/components/MotionModal";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { formatBRL } from "@/lib/utils";
@@ -88,7 +89,7 @@ export function PaymentPickerModal({
     try {
       await onConfirm(m, discount);
     } catch (e) {
-      setErr((e as { message?: string })?.message ?? "Não foi possível concluir.");
+      setErr(mensagemRpc(e, "Não foi possível concluir. Tente novamente."));
       setBusy(null);
     }
   }
@@ -103,7 +104,7 @@ export function PaymentPickerModal({
     try {
       await onConfirm("split", discount, parsed);
     } catch (e) {
-      setErr((e as { message?: string })?.message ?? "Não foi possível concluir.");
+      setErr(mensagemRpc(e, "Não foi possível concluir. Tente novamente."));
       setBusy(null);
     }
   }
@@ -161,7 +162,7 @@ export function PaymentPickerModal({
             {formatBRL(net)}
           </span>
         </div>
-        {err && <p className="text-sm text-red-600 mt-3">{err}</p>}
+        {err && <p role="alert" className="text-sm text-red-600 mt-3">{err}</p>}
 
         {/* ── modo split ── */}
         {splitMode ? (
