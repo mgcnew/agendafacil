@@ -212,14 +212,18 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
     });
     if (!res.ok) {
       setSettings(settings); // desfaz
-      setError("Não foi possível salvar. Tente de novo.");
+      // Nomeia a mensagem: o aviso aparece no cartão de cima e, no celular,
+      // fora da tela — sem dizer qual caixinha voltou sozinha, o retorno é
+      // inútil.
+      const nome = MESSAGES.find((m) => m.key === key)?.label ?? "a mensagem";
+      setError(`Não foi possível mudar "${nome}". Tente de novo.`);
     }
   }
 
   if (state === null && !error) {
     return (
-      <Card className="p-6 flex items-center gap-3 text-sm text-muted-foreground">
-        <CircleNotch className="h-4 w-4 animate-spin" /> Carregando…
+      <Card role="status" className="p-6 flex items-center gap-3 text-sm text-muted-foreground">
+        <CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> Carregando…
       </Card>
     );
   }
@@ -230,7 +234,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-              <WhatsappLogo className="h-6 w-6" weight="fill" />
+              <WhatsappLogo aria-hidden className="h-6 w-6" weight="fill" />
             </span>
             <div>
               <h3 className="font-display text-lg font-bold">WhatsApp do salão</h3>
@@ -244,8 +248,8 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
         </div>
 
         {error && (
-          <p className="mt-4 flex items-start gap-2 text-sm text-red-600">
-            <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+          <p role="alert" className="mt-4 flex items-start gap-2 text-sm text-red-600">
+            <WarningCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> {error}
           </p>
         )}
 
@@ -329,7 +333,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
                       onClick={() => void connect(phoneInput)}
                       disabled={busy || phoneInput.trim().length < 10}
                     >
-                      {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Gerar código
+                      {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />} Gerar código
                     </Button>
                   </div>
                   <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -366,7 +370,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
               {/* Sem argumento: o React passaria o evento de clique como se
                   fosse o telefone. */}
               <Button onClick={() => void connect()} disabled={busy}>
-                {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <WhatsappLogo className="h-4 w-4" weight="fill" />}
+                {busy ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> : <WhatsappLogo aria-hidden className="h-4 w-4" weight="fill" />}
                 {pareando ? "Gerar outro código" : state === "paused" ? "Reconectar" : "Conectar WhatsApp"}
               </Button>
               {/* Saída pra instância que ficou presa em "conectando": o código

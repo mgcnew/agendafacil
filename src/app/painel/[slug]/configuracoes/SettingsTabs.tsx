@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { Select } from "@/components/Select";
+import { Switch } from "@/components/Switch";
 import { cn } from "@/lib/utils";
 import { COLOR_GROUPS, CHOOSABLE_NICHES, NICHE_DEFAULT_COLOR, BARBEARIA_DEFAULT_PREVIEW, type ColorTheme, type Niche } from "@/lib/themes";
 import type { Tables } from "@/lib/database.types";
@@ -207,10 +208,11 @@ export function SettingsTabs({
       {active && (
         <div className="lg:hidden">
           <button
+            type="button"
             onClick={voltar}
-            className="-ml-1 mb-3 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+            className="-ml-1 mb-3 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <ArrowLeft className="h-4 w-4" /> Configurações
+            <ArrowLeft aria-hidden className="h-4 w-4" /> Voltar para Configurações
           </button>
           <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
           {meta?.hint && <p className="text-sm text-muted-foreground">{meta.hint}</p>}
@@ -228,16 +230,18 @@ export function SettingsTabs({
               return (
                 <li key={t.id}>
                   <button
+                    type="button"
                     onClick={() => selectTab(t.id)}
                     aria-current={on ? "page" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition",
+                      "flex w-full items-center gap-2.5 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                       on
                         ? "bg-secondary text-primary"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
                     <t.icon
+                      aria-hidden
                       className="h-[18px] w-[18px] shrink-0"
                       weight={on ? "fill" : "regular"}
                     />
@@ -259,17 +263,18 @@ export function SettingsTabs({
           {tabs.map((t) => (
             <li key={t.id}>
               <button
+                type="button"
                 onClick={() => selectTab(t.id)}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted"
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-                  <t.icon className="h-[18px] w-[18px]" />
+                  <t.icon aria-hidden className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{t.label}</span>
                   <span className="block truncate text-xs text-muted-foreground">{t.hint}</span>
                 </span>
-                <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <CaretRight aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
             </li>
           ))}
@@ -581,14 +586,19 @@ function SaveBar({
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <Button onClick={onSave} disabled={saving || disabled}>
-        {saving && <CircleNotch className="h-4 w-4 animate-spin" />} Salvar alterações
+        {saving && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+        {saving ? "Salvando…" : "Salvar alterações"}
       </Button>
-      {saved && (
-        <span className="text-sm text-emerald-600 flex items-center gap-1">
-          <Check className="h-4 w-4" /> Salvo!
-        </span>
-      )}
-      {error && <span className="text-sm text-red-600">{error}</span>}
+      {/* Esta barra é a de todos os painéis das Configurações: sem região
+          viva, nenhum deles confirmava a gravação para quem não vê a tela. */}
+      <span role="status" aria-live="polite" className="text-sm text-emerald-600">
+        {saved && (
+          <span className="flex items-center gap-1">
+            <Check aria-hidden className="h-4 w-4" /> Salvo!
+          </span>
+        )}
+      </span>
+      {error && <span role="alert" className="text-sm text-red-600">{error}</span>}
     </div>
   );
 }
@@ -1341,15 +1351,13 @@ function CashSettingsPanel({
         </p>
 
         <div className="flex items-start gap-3 mt-4">
-          <button
-            type="button"
-            onClick={() => canEdit && setEnabled((v) => !v)}
+          <Switch
+            checked={enabled}
+            onChange={setEnabled}
             disabled={!canEdit}
-            aria-pressed={enabled}
-            className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 disabled:opacity-60 ${enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-          >
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${enabled ? "left-[22px]" : "left-0.5"}`} />
-          </button>
+            label="Habilitar descontos no caixa"
+            className="mt-0.5"
+          />
           <div>
             <p className="text-sm font-medium">Habilitar descontos</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -1464,21 +1472,13 @@ function BookingPanel({
       <Card className="p-6">
         <h2 className="font-display font-semibold">Regras da agenda</h2>
         <div className="flex items-start gap-3 mt-4">
-          <button
-            type="button"
-            onClick={() => canEdit && setSimultaneous((v) => !v)}
+          <Switch
+            checked={simultaneous}
+            onChange={setSimultaneous}
             disabled={!canEdit}
-            aria-pressed={simultaneous}
-            className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 disabled:opacity-60 ${
-              simultaneous ? "bg-primary" : "bg-muted-foreground/30"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-                simultaneous ? "left-[22px]" : "left-0.5"
-              }`}
-            />
-          </button>
+            label="Permitir atendimentos simultâneos da mesma cliente"
+            className="mt-0.5"
+          />
           <div>
             <p className="text-sm font-medium">
               Permitir atendimentos simultâneos da mesma cliente
