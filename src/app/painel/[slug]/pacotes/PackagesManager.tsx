@@ -99,12 +99,16 @@ export function PackagesManager({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div role="tablist" aria-label="Pacotes" className="flex gap-1 border-b border-border">
         {(["vendidos", "modelos"] as const).map((t) => (
           <button
             key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
+            className={`border-b-2 -mb-px px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] ${
               tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -357,10 +361,14 @@ function TemplatesList({
           <span className="font-semibold text-primary text-sm">{formatBRL(Number(t.price))}</span>
           {canManage && (
             <>
-              <button onClick={() => onEdit(t)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
+              <button
+                type="button" onClick={() => onEdit(t)} aria-label={`Editar o modelo ${t.name}`}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
                 <PencilSimple className="h-4 w-4" />
               </button>
-              <button onClick={() => remove(t)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
+              <button
+                type="button" onClick={() => remove(t)} aria-label={`Excluir o modelo ${t.name}`}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
                 <Trash className="h-4 w-4" />
               </button>
             </>
@@ -490,8 +498,8 @@ function TemplateEditor({
     <Modal title={template ? "Editar modelo" : "Novo modelo de pacote"} onClose={onClose}>
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <Label>Nome do pacote</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Pacote 4 Manicures" />
+          <Label htmlFor="pkg-nome">Nome do pacote</Label>
+          <Input id="pkg-nome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Pacote 4 Manicures" />
         </div>
 
         <div>
@@ -499,7 +507,14 @@ function TemplateEditor({
           <div className="space-y-2 mt-1.5">
             {items.map((it, idx) => (
               <div key={idx} className="flex gap-2">
-                <Select value={it.service_id} onValueChange={(v) => setItem(idx, { service_id: v })} className="flex-1">
+                {/* Três linhas iguais: sem nome, o leitor de tela lê
+                    "Selecione" e "Qtd" repetidos, sem dizer qual serviço. */}
+                <Select
+                  value={it.service_id}
+                  onValueChange={(v) => setItem(idx, { service_id: v })}
+                  aria-label={`Serviço ${idx + 1} do pacote`}
+                  className="flex-1"
+                >
                   {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
                 <Input
@@ -507,12 +522,18 @@ function TemplateEditor({
                   min={1}
                   value={it.quantity}
                   onChange={(e) => setItem(idx, { quantity: e.target.value })}
+                  aria-label={`Quantidade do serviço ${idx + 1}`}
                   className="w-20"
                   placeholder="Qtd"
                 />
                 {items.length > 1 && (
-                  <button onClick={() => setItems((a) => a.filter((_, i) => i !== idx))} className="p-2 text-muted-foreground hover:text-red-600">
-                    <X className="h-4 w-4" />
+                  <button
+                    type="button"
+                    onClick={() => setItems((a) => a.filter((_, i) => i !== idx))}
+                    aria-label={`Remover o serviço ${idx + 1} do pacote`}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <X aria-hidden className="h-4 w-4" />
                   </button>
                 )}
               </div>
@@ -520,28 +541,28 @@ function TemplateEditor({
             <button
               type="button"
               onClick={() => setItems((a) => [...a, { service_id: services[0]?.id ?? "", quantity: "1" }])}
-              className="text-sm text-primary font-medium flex items-center gap-1"
+              className="flex items-center gap-1 rounded text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
-              <Plus className="h-3.5 w-3.5" /> Adicionar serviço
+              <Plus aria-hidden className="h-3.5 w-3.5" /> Adicionar serviço
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Validade (dias)</Label>
-            <Input type="number" min={1} value={validity} onChange={(e) => setValidity(e.target.value)} />
+            <Label htmlFor="pkg-validade">Validade (dias)</Label>
+            <Input id="pkg-validade" type="number" min={1} value={validity} onChange={(e) => setValidity(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Preço do pacote (R$)</Label>
-            <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
+            <Label htmlFor="pkg-preco">Preço do pacote (R$)</Label>
+            <Input id="pkg-preco" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" />
           </div>
         </div>
 
         {validDraftItems.length > 0 && (
           <div className="rounded-[var(--radius)] border border-border p-4 bg-secondary/40">
             <p className="text-sm font-medium flex items-center gap-1.5">
-              <Sparkle className="h-4 w-4 text-primary" /> Pra te ajudar a decidir o preço
+              <Sparkle aria-hidden className="h-4 w-4 text-primary" /> Pra te ajudar a decidir o preço
             </p>
             <div className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between">
@@ -573,7 +594,7 @@ function TemplateEditor({
           </div>
         )}
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
         <div className="flex gap-2 pt-1">
           <Button onClick={save} disabled={busy || !name.trim()}>
@@ -626,14 +647,14 @@ function SellModal({
     <Modal title="Vender pacote" onClose={onClose}>
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <Label>Cliente</Label>
-          <Select value={clientId} onValueChange={setClientId}>
+          <Label htmlFor="venda-cliente">Cliente</Label>
+          <Select id="venda-cliente" value={clientId} onValueChange={setClientId}>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Pacote</Label>
-          <Select value={templateId} onValueChange={setTemplateId}>
+          <Label htmlFor="venda-pacote">Pacote</Label>
+          <Select id="venda-pacote" value={templateId} onValueChange={setTemplateId}>
             {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </Select>
         </div>
@@ -655,18 +676,19 @@ function SellModal({
         )}
 
         <div className="space-y-1.5">
-          <Label>Forma de pagamento</Label>
-          <Select value={method} onValueChange={setMethod}>
+          <Label htmlFor="venda-pgto">Forma de pagamento</Label>
+          <Select id="venda-pgto" value={method} onValueChange={setMethod}>
             <option value="dinheiro">Dinheiro</option>
             <option value="pix">Pix</option>
             <option value="cartao">Cartão</option>
           </Select>
         </div>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
         <div className="flex gap-2">
           <Button onClick={sell} disabled={busy || !clientId || !templateId}>
-            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Confirmar venda
+            {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+            {busy ? "Registrando…" : "Confirmar venda"}
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
@@ -725,16 +747,17 @@ function RedeemModal({
           {pkg.clients?.full_name} · <b className="text-foreground">{item.name}</b> ({item.used}/{item.total} usados)
         </p>
         <div className="space-y-1.5">
-          <Label>Profissional que atendeu (comissão)</Label>
-          <Select value={member} onValueChange={setMember}>
+          <Label htmlFor="uso-profissional">Profissional que atendeu (comissão)</Label>
+          <Select id="uso-profissional" value={member} onValueChange={setMember}>
             <option value="">Não atribuir / sem comissão</option>
             {pros.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </div>
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
         <div className="flex gap-2">
           <Button onClick={use} disabled={busy}>
-            {busy && <CircleNotch className="h-4 w-4 animate-spin" />} Registrar uso
+            {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+            {busy ? "Registrando…" : "Registrar uso"}
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         </div>
@@ -750,7 +773,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <Card className="w-full sm:max-w-lg mx-auto max-h-[90vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-lg font-bold">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
+          <button
+            type="button" onClick={onClose} aria-label="Fechar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X aria-hidden className="h-5 w-5" />
+          </button>
         </div>
         {children}
       </Card>
