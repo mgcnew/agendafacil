@@ -126,9 +126,9 @@ export function SubscribePanel({
               type="button"
               onClick={() => doChange(plan)}
               disabled={pending}
-              className="ml-1 underline hover:no-underline disabled:opacity-50"
+              className="ml-1 rounded underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
             >
-              Cancelar mudança
+              Cancelar mudança de plano
             </button>
           </div>
         )}
@@ -189,13 +189,13 @@ export function SubscribePanel({
         </div>
 
         {info && (
-          <div className="mt-4 rounded-[var(--radius)] border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          <div role="status" className="mt-4 rounded-[var(--radius)] border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             {info}
           </div>
         )}
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div role="alert" className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <WarningCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -233,6 +233,7 @@ export function SubscribePanel({
               type="button"
               disabled={disabled}
               onClick={() => setSelected(p.id)}
+              aria-pressed={active}
               className={[
                 "w-full rounded-[var(--radius)] border p-3 text-left transition-colors",
                 disabled
@@ -303,18 +304,20 @@ export function SubscribePanel({
       </div>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div role="alert" className="mt-4 flex items-start gap-2 rounded-[var(--radius)] border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <WarningCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <Button onClick={subscribe} disabled={pending} className="mt-5 w-full" size="lg">
         {pending ? (
-          <CircleNotch className="h-5 w-5 animate-spin" />
+          <>
+            <CircleNotch aria-hidden className="h-5 w-5 animate-spin" /> Gerando a cobrança…
+          </>
         ) : (
           <>
-            <CreditCard className="h-5 w-5" />
+            <CreditCard aria-hidden className="h-5 w-5" />
             Assinar {PLANS[selected].name} · {priceLabel(PLANS[selected].value)}/mês
           </>
         )}

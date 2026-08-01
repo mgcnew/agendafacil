@@ -167,6 +167,9 @@ function LightboxModal({
     // contra a div da galeria, não contra a janela: com poucas fotos essa div
     // é baixa, e a foto "ampliada" saía menor que a miniatura.
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Foto ${idx + 1} de ${photos.length}`}
       className="fixed inset-0 z-50 flex flex-col bg-black/95"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
@@ -177,8 +180,10 @@ function LightboxModal({
         </span>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={alternarZoom}
             aria-pressed={zoom > 1}
+            aria-label={zoom > 1 ? "Reduzir a foto" : "Ampliar a foto"}
             title={zoom > 1 ? "Reduzir" : "Ampliar"}
             className={cn(
               "rounded-full p-2 transition",
@@ -186,15 +191,16 @@ function LightboxModal({
             )}
           >
             {zoom > 1
-              ? <MagnifyingGlassMinus className="h-5 w-5" />
-              : <MagnifyingGlassPlus className="h-5 w-5" />}
+              ? <MagnifyingGlassMinus aria-hidden className="h-5 w-5" />
+              : <MagnifyingGlassPlus aria-hidden className="h-5 w-5" />}
           </button>
           <button
+            type="button"
             onClick={onClose}
-            title="Fechar"
-            className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+            aria-label="Fechar"
+            className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
-            <X className="h-5 w-5" />
+            <X aria-hidden className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -319,7 +325,12 @@ export function GaleriaManager({
   }
 
   async function remove(photoId: string) {
-    if (!confirm("Remover esta foto da galeria?")) return;
+    // A foto não tem nome próprio: quando existe legenda, ela é a única coisa
+    // que distingue uma miniatura da outra num grid de vinte.
+    const legenda = photos.find((p) => p.id === photoId)?.caption;
+    if (!confirm(
+      legenda ? `Remover "${legenda}" da galeria?` : "Remover esta foto da galeria?",
+    )) return;
     setErr(null);
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     const res = await deleteGalleryPhoto(slug, photoId);
@@ -363,8 +374,8 @@ export function GaleriaManager({
       </div>
 
       {err && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <Warning className="h-4 w-4 shrink-0" /> {err}
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <Warning aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
