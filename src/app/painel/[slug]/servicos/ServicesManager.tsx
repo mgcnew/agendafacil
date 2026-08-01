@@ -27,6 +27,7 @@ import {
   Stack,
   Tag,
   Timer,
+  Warning,
   Trash,
   TrendUp,
   X,
@@ -268,17 +269,31 @@ export function ServicesManager({
       finish_time_min: 0,
     }));
     const { data, error } = await supabase.from("services").insert(rows).select();
-    if (!error && data) {
+    if (error || !data) {
+      setErr("Não foi possível adicionar os serviços escolhidos. Tente novamente.");
+    } else {
       setServices((s) => [...(data as Service[]), ...s]);
     }
     setPresetOpen(false);
   }
 
-  async function remove(id: string) {
+  /**
+   * A lixeira apagava no primeiro clique, sem perguntar — e ela fica colada
+   * no lápis de editar. Serviço apagado leva junto preço, comissão e receita
+   * de insumos; não há desfazer.
+   */
+  async function remove(svc: Service) {
+    if (!window.confirm(
+      `Excluir o serviço "${svc.name}"? Ele sai da sua lista e do link de agendamento.`,
+    )) return;
     const prev = services;
-    setServices((s) => s.filter((x) => x.id !== id));
-    const { error } = await supabase.from("services").delete().eq("id", id);
-    if (error) setServices(prev);
+    setErr(null);
+    setServices((s) => s.filter((x) => x.id !== svc.id));
+    const { error } = await supabase.from("services").delete().eq("id", svc.id);
+    if (error) {
+      setServices(prev);
+      setErr(`Não foi possível excluir "${svc.name}" — ele pode estar em agendamentos já registrados.`);
+    }
   }
 
   async function addCategory() {
@@ -290,26 +305,41 @@ export function ServicesManager({
       .insert({ salon_id: salonId, name: trimmed, sort_order: categories.length })
       .select("id, name, sort_order")
       .single();
-    if (!error && data) {
+    if (error || !data) {
+      setErr("Não foi possível criar a categoria. Tente novamente.");
+    } else {
       setCategories((c) => [...c, data as Category]);
       setNewCatName("");
     }
     setCatBusy(false);
   }
 
-  async function deleteCategory(id: string) {
-    const { error } = await supabase.from("service_categories").delete().eq("id", id);
-    if (!error) {
-      setCategories((c) => c.filter((x) => x.id !== id));
-      setServices((s) => s.map((x) => x.category_id === id ? { ...x, category_id: null } : x));
+  async function deleteCategory(cat: Category) {
+    const usados = services.filter((x) => x.category_id === cat.id).length;
+    if (!window.confirm(
+      usados > 0
+        ? `Excluir a categoria "${cat.name}"? Os ${usados} serviço(s) dela ficam sem categoria (não são apagados).`
+        : `Excluir a categoria "${cat.name}"?`,
+    )) return;
+    setErr(null);
+    const { error } = await supabase.from("service_categories").delete().eq("id", cat.id);
+    if (error) {
+      setErr(`Não foi possível excluir a categoria "${cat.name}".`);
+      return;
     }
+    setCategories((c) => c.filter((x) => x.id !== cat.id));
+    setServices((s) => s.map((x) => x.category_id === cat.id ? { ...x, category_id: null } : x));
   }
 
   async function toggleActive(svc: Service) {
     const prev = services;
+    setErr(null);
     setServices((s) => s.map((x) => (x.id === svc.id ? { ...x, is_active: !x.is_active } : x)));
     const { error } = await supabase.from("services").update({ is_active: !svc.is_active }).eq("id", svc.id);
-    if (error) setServices(prev); // desfaz se o banco recusar
+    if (error) {
+      setServices(prev); // desfaz se o banco recusar
+      setErr(`Não foi possível ${svc.is_active ? "desativar" : "ativar"} "${svc.name}".`);
+    }
   }
 
   // Margem ao vivo no editor (a partir do formulário aberto).
@@ -330,28 +360,44 @@ export function ServicesManager({
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setPresetOpen(true)}>
-            <MagicWand className="h-4 w-4" /> Serviços comuns
+            <MagicWand aria-hidden className="h-4 w-4" /> Serviços comuns
           </Button>
           <Button onClick={openNew}>
-            <Plus className="h-4 w-4" /> Novo serviço
+            <Plus aria-hidden className="h-4 w-4" /> Novo serviço
           </Button>
         </div>
       </div>
+
+      {/* Falhas fora do editor — excluir, ativar, categoria — precisavam de um
+          lugar na página: o aviso do formulário só existe com o modal aberto. */}
+      {err && !adding && (
+        <div role="alert" className="flex items-start gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <Warning aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+          <span className="flex-1">{err}</span>
+          <button
+            type="button" onClick={() => setErr(null)} aria-label="Dispensar aviso"
+            className="shrink-0 rounded p-0.5 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+          >
+            <X aria-hidden className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Gerenciar categorias */}
       <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden">
         <button
           type="button"
           onClick={() => setCatOpen((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition"
+          aria-expanded={catOpen}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
         >
           <span className="flex items-center gap-2 text-sm font-medium">
-            <Tag className="h-4 w-4 text-primary" /> Categorias de serviço
+            <Tag aria-hidden className="h-4 w-4 text-primary" /> Categorias de serviço
             {categories.length > 0 && (
               <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">{categories.length}</span>
             )}
           </span>
-          <CaretDown className={`h-4 w-4 text-muted-foreground transition-transform ${catOpen ? "rotate-180" : ""}`} />
+          <CaretDown aria-hidden className={`h-4 w-4 text-muted-foreground transition-transform ${catOpen ? "rotate-180" : ""}`} />
         </button>
         {catOpen && (
           <div className="border-t border-border p-4 space-y-3">
@@ -365,9 +411,9 @@ export function ServicesManager({
                     {c.name}
                     <button
                       type="button"
-                      onClick={() => deleteCategory(c.id)}
-                      className="text-muted-foreground hover:text-red-600 transition"
-                      title="Excluir categoria"
+                      onClick={() => deleteCategory(c)}
+                      aria-label={`Excluir categoria ${c.name}`}
+                      className="rounded-full text-muted-foreground transition hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -412,7 +458,9 @@ export function ServicesManager({
             <h2 className="font-display font-semibold">
               {editingId ? "Editar serviço" : "Novo serviço"}
             </h2>
-            <button onClick={closeForm} className="p-1 rounded hover:bg-muted">
+            <button
+              type="button" onClick={closeForm} aria-label="Fechar"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -468,6 +516,7 @@ export function ServicesManager({
                   <button
                     key={c}
                     type="button"
+                    aria-pressed={color === c}
                     onClick={() => setColor(c)}
                     aria-label={`Cor ${c}`}
                     className={`h-7 w-7 rounded-full transition ${color === c ? "ring-2 ring-offset-2 ring-foreground/60" : "hover:scale-110"}`}
@@ -645,7 +694,7 @@ export function ServicesManager({
             </div>
           )}
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
 
           <div className="flex gap-2 mt-2">
             <Button onClick={save} disabled={busy || !name} className="flex-1">
@@ -710,7 +759,7 @@ function ServiceList({
 }: {
   services: Tables<"services">[];
   onEdit: (s: Tables<"services">) => void;
-  onRemove: (id: string) => void;
+  onRemove: (s: Tables<"services">) => void;
   onToggle: (s: Tables<"services">) => void;
   margin?: (s: Tables<"services">) => number | null;
   realMargin?: (s: Tables<"services">) => number | null;
@@ -733,7 +782,7 @@ function ServiceList({
         >
           {/* Bloco de informações — ocupa a linha toda no mobile */}
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
+            <span aria-hidden className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
                 {s.name}
@@ -758,7 +807,7 @@ function ServiceList({
                 )}
                 {m != null && (
                   <span className={`flex items-center gap-1 ${m < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                    <Percent className="h-3 w-3" /> lucro{real != null ? " real" : " est."} {formatBRL(m)}
+                    <Percent aria-hidden className="h-3 w-3" /> lucro{real != null ? " real" : " est."} {formatBRL(m)}
                   </span>
                 )}
               </div>
@@ -771,17 +820,28 @@ function ServiceList({
               {formatServicePrice(Number(s.price), s.price_type)}
             </span>
             <div className="flex items-center gap-1">
+              {/* O rótulo mostra o estado ATUAL, mas o clique inverte — sem
+                  aria-pressed dava para entender "Ativo" como "ativar". */}
               <button
+                type="button"
                 onClick={() => onToggle(s)}
-                className="text-xs rounded-full px-2.5 py-1 border border-border hover:bg-muted"
+                aria-pressed={s.is_active}
+                aria-label={`${s.name}: ${s.is_active ? "ativo" : "inativo"}`}
+                className="rounded-full border border-border px-2.5 py-1 text-xs transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 {s.is_active ? "Ativo" : "Inativo"}
               </button>
-              <button onClick={() => onEdit(s)} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-                <PencilSimple className="h-4 w-4" />
+              <button
+                type="button" onClick={() => onEdit(s)} aria-label={`Editar ${s.name}`}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <PencilSimple aria-hidden className="h-4 w-4" />
               </button>
-              <button onClick={() => onRemove(s.id)} className="p-2 text-muted-foreground hover:text-red-600" title="Excluir">
-                <Trash className="h-4 w-4" />
+              <button
+                type="button" onClick={() => onRemove(s)} aria-label={`Excluir ${s.name}`}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <Trash aria-hidden className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -838,7 +898,12 @@ function PresetPicker({
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
             <MagicWand className="h-5 w-5 text-primary" /> Serviços comuns
           </h3>
-          <button onClick={onClose} className="p-2"><X className="h-5 w-5" /></button>
+          <button
+            type="button" onClick={onClose} aria-label="Fechar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X aria-hidden className="h-5 w-5" />
+          </button>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           Marque os serviços que o seu salão oferece. Depois você ajusta preço e duração.
