@@ -25,6 +25,7 @@ import {
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { AnimatePresence } from "framer-motion";
+import { Switch } from "@/components/Switch";
 import { MotionModal } from "@/components/MotionModal";
 import { daysUntilStockout, PRODUCT_INSIGHTS_WINDOW_DAYS, type ProductInsight } from "@/lib/productInsights";
 import { loadMoreMovements } from "./inventoryActions";
@@ -187,15 +188,15 @@ export function InventoryManager({
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Remover este produto?")) return;
+  async function remove(prod: Product) {
+    if (!confirm(`Remover "${prod.name}" do estoque?`)) return;
     setErr(null);
     const prev = products;
-    setProducts((p) => p.filter((x) => x.id !== id));
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    setProducts((p) => p.filter((x) => x.id !== prod.id));
+    const { error } = await supabase.from("products").delete().eq("id", prod.id);
     if (error) {
       setProducts(prev); // restaura: provável vínculo com movimentações/atendimentos
-      setErr("Não foi possível remover este produto — ele pode ter movimentações vinculadas.");
+      setErr(`Não foi possível remover "${prod.name}" — ele pode ter movimentações vinculadas.`);
     }
   }
 
@@ -247,14 +248,14 @@ export function InventoryManager({
 
       {lowStock.length > 0 && (
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-amber-300 bg-amber-50 text-amber-800 p-3 text-sm">
-          <Warning className="h-4 w-4 shrink-0" />
+          <Warning aria-hidden className="h-4 w-4 shrink-0" />
           {lowStock.length} produto(s) no estoque mínimo: {lowStock.map((p) => p.name).join(", ")}
         </div>
       )}
 
       {err && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          <Warning className="h-4 w-4 shrink-0" /> {err}
+        <div role="alert" className="flex items-center gap-2 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <Warning aria-hidden className="h-4 w-4 shrink-0" /> {err}
         </div>
       )}
 
@@ -344,14 +345,12 @@ export function InventoryManager({
               {/* Revenda só faz sentido pra produto por unidade */}
               {!isWeight && (
                 <div className="flex items-start gap-3 rounded-[var(--radius)] border border-border p-4 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsResale((v) => !v)}
-                    aria-pressed={isResale}
-                    className={`relative h-6 w-11 rounded-full transition shrink-0 mt-0.5 ${isResale ? "bg-primary" : "bg-muted-foreground/30"}`}
-                  >
-                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${isResale ? "left-[22px]" : "left-0.5"}`} />
-                  </button>
+                  <Switch
+                    checked={isResale}
+                    onChange={setIsResale}
+                    label="Produto para revenda"
+                    className="mt-0.5"
+                  />
                   <div>
                     <p className="text-sm font-medium">Produto para revenda?</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -375,15 +374,18 @@ export function InventoryManager({
       {products.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[180px]">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <label htmlFor="busca-produto" className="sr-only">Buscar produto</label>
+            <MagnifyingGlass aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              id="busca-produto"
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar produto..."
               className="pl-9"
             />
           </div>
-          <div className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+          <div role="group" aria-label="Filtrar por tipo" className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
             {([
               ["all", "Todos"],
               ["supply", "Insumos"],
@@ -391,8 +393,10 @@ export function InventoryManager({
             ] as const).map(([val, label]) => (
               <button
                 key={val}
+                type="button"
                 onClick={() => setTypeFilter(val)}
-                className={`px-2.5 py-1.5 rounded-[calc(var(--radius)-2px)] transition ${
+                aria-pressed={typeFilter === val}
+                className={`rounded-[calc(var(--radius)-2px)] px-2.5 py-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                   typeFilter === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
               >
@@ -400,7 +404,7 @@ export function InventoryManager({
               </button>
             ))}
           </div>
-          <div className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+          <div role="group" aria-label="Filtrar por situação" className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
             {([
               ["all", "Todo status"],
               ["low", "Estoque baixo"],
@@ -408,8 +412,10 @@ export function InventoryManager({
             ] as const).map(([val, label]) => (
               <button
                 key={val}
+                type="button"
                 onClick={() => setStatusFilter(val)}
-                className={`px-2.5 py-1.5 rounded-[calc(var(--radius)-2px)] transition whitespace-nowrap ${
+                aria-pressed={statusFilter === val}
+                className={`whitespace-nowrap rounded-[calc(var(--radius)-2px)] px-2.5 py-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                   statusFilter === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
               >
@@ -486,24 +492,33 @@ export function InventoryManager({
                       {canManage ? (
                         <div className="inline-flex items-center rounded-full border border-border">
                           <button
+                            type="button"
                             onClick={() => adjust(p, -step)}
+                            aria-label={`${weight ? "Remover 1 embalagem" : "Remover 1"} de ${p.name}`}
                             title={weight ? "Remover 1 embalagem" : "Remover 1"}
-                            className="grid place-items-center h-8 w-8 rounded-l-full hover:bg-muted transition"
+                            className="grid h-9 w-9 place-items-center rounded-l-full transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
                           >
-                            <Minus className="h-4 w-4" />
+                            <Minus aria-hidden className="h-4 w-4" />
                           </button>
+                          {/* A quantidade muda sem sair do lugar: sem região
+                              viva, o clique no + não produz retorno nenhum
+                              para quem não enxerga o número. */}
                           <span
+                            aria-live="polite"
+                            aria-label={`${p.name}: ${qtyText} em estoque`}
                             title={weight ? fmtQty(p) : undefined}
                             className={`font-display font-bold text-center px-1 ${weight ? "min-w-[56px] text-sm" : "min-w-[2.5rem]"} ${low ? "text-amber-600" : ""}`}
                           >
                             {qtyText}
                           </span>
                           <button
+                            type="button"
                             onClick={() => adjust(p, step)}
+                            aria-label={`${weight ? "Adicionar 1 embalagem" : "Adicionar 1"} de ${p.name}`}
                             title={weight ? "Adicionar 1 embalagem" : "Adicionar 1"}
-                            className="grid place-items-center h-8 w-8 rounded-r-full hover:bg-muted transition"
+                            className="grid h-9 w-9 place-items-center rounded-r-full transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
                           >
-                            <Plus className="h-4 w-4" />
+                            <Plus aria-hidden className="h-4 w-4" />
                           </button>
                         </div>
                       ) : (
@@ -515,13 +530,19 @@ export function InventoryManager({
                         </span>
                       )}
                       {canManage && (
-                        <button onClick={() => openEdit(p)} title="Editar" className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition">
-                          <PencilSimple className="h-4 w-4" />
+                        <button
+                          type="button" onClick={() => openEdit(p)} aria-label={`Editar ${p.name}`}
+                          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <PencilSimple aria-hidden className="h-4 w-4" />
                         </button>
                       )}
                       {canManage && (
-                        <button onClick={() => remove(p.id)} title="Remover" className="grid place-items-center h-8 w-8 rounded-full text-muted-foreground hover:text-red-600 hover:bg-muted transition">
-                          <Trash className="h-4 w-4" />
+                        <button
+                          type="button" onClick={() => remove(p)} aria-label={`Remover ${p.name} do estoque`}
+                          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <Trash aria-hidden className="h-4 w-4" />
                         </button>
                       )}
                     </div>
