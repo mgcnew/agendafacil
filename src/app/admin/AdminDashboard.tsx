@@ -47,6 +47,7 @@ import {
 import { getSalonBilling } from "./actions";
 import { PlaybookPanel } from "./PlaybookPanel";
 import { ProspeccaoPanel } from "./ProspeccaoPanel";
+import { UpdatesAdminPanel } from "./UpdatesAdminPanel";
 import { AdminTabs, AdminTabPanel, type AdminTabDef } from "./AdminTabs";
 
 type BillingPayment = {
@@ -201,7 +202,7 @@ function exportSalonsCsv(rows: AdminSalon[]) {
 
 type TabId =
   | "atencao" | "geral" | "saloes" | "admin"
-  | "avisos" | "blog" | "prospeccao" | "playbook";
+  | "avisos" | "blog" | "prospeccao" | "playbook" | "atualizacoes";
 
 const TABS: readonly AdminTabDef<TabId>[] = [
   { id: "atencao", label: "Atenção", icon: Warning },
@@ -212,6 +213,7 @@ const TABS: readonly AdminTabDef<TabId>[] = [
   { id: "blog", label: "Blog", icon: Newspaper },
   { id: "prospeccao", label: "Prospecção", icon: DoorOpen },
   { id: "playbook", label: "Playbook", icon: BookOpenText },
+  { id: "atualizacoes", label: "Atualizações", icon: Sparkle },
 ];
 
 export function AdminDashboard({
@@ -465,6 +467,10 @@ export function AdminDashboard({
         {tab === "prospeccao" && <AdminTabPanel id="prospeccao"><ProspeccaoPanel /></AdminTabPanel>}
 
         {tab === "playbook" && <AdminTabPanel id="playbook"><PlaybookPanel /></AdminTabPanel>}
+
+        {tab === "atualizacoes" && (
+          <AdminTabPanel id="atualizacoes"><UpdatesAdminPanel /></AdminTabPanel>
+        )}
       </div>
 
       <AnimatePresence>
