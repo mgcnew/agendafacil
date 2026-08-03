@@ -50,6 +50,11 @@ const CAIXA: Record<string, string> = {
   "not authorized": "Você não tem permissão para isso.",
   session_open: "Já existe um caixa aberto.",
   not_found: "Não encontramos esse registro — atualize a página.",
+  muitas_sugestoes:
+    "Você já mandou várias sugestões hoje. Continue amanhã — vamos ler todas.",
+  titulo_vazio: "Escreva um título.",
+  texto_vazio: "Escreva o texto.",
+  nao_encontrado: "Esse item não existe mais — atualize a página.",
 };
 
 /**

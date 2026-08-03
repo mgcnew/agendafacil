@@ -1,0 +1,303 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Button, Card } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { mensagemRpc } from "@/lib/erroSupabase";
+import {
+  CircleNotch,
+  Hammer,
+  Lightbulb,
+  PaperPlaneTilt,
+  Sparkle,
+} from "@phosphor-icons/react/dist/ssr";
+
+type Update = {
+  id: string;
+  title: string;
+  body: string;
+  kind: string;
+  status: string;
+  shipped_at: string | null;
+};
+
+type Suggestion = {
+  id: string;
+  body: string;
+  status: string;
+  reply: string | null;
+  created_at: string;
+  update_id: string | null;
+};
+
+/** O tipo diz como ler a linha: o que é novo, o que melhorou, o que estava errado. */
+const KIND: Record<string, { label: string; classe: string }> = {
+  novidade: { label: "Novidade", classe: "bg-primary text-primary-foreground" },
+  melhoria: { label: "Melhoria", classe: "bg-secondary text-primary" },
+  correcao: { label: "Correção", classe: "bg-muted text-foreground/70" },
+};
+
+/**
+ * O estado de cada sugestão, com o texto que a dona lê.
+ *
+ * "Não vamos fazer" existe e é dito assim mesmo. A alternativa — deixar a
+ * sugestão parada em "recebida" para sempre — é a que faz alguém desistir de
+ * escrever de novo.
+ */
+const STATUS: Record<string, { label: string; classe: string }> = {
+  recebida:      { label: "Recebida",       classe: "bg-muted text-foreground/70" },
+  em_analise:    { label: "Em análise",     classe: "bg-muted text-foreground/70" },
+  planejada:     { label: "Planejada",      classe: "bg-secondary text-primary" },
+  em_construcao: { label: "Em construção",  classe: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200" },
+  entregue:      { label: "Entregue",       classe: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200" },
+  nao_planejada: { label: "Não vamos fazer", classe: "bg-muted text-foreground/60" },
+};
+
+/** "3 de agosto" — e o ano só quando não for este, que é quando ele informa algo. */
+function quando(iso: string): string {
+  const d = new Date(iso);
+  const mesmoAno = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    ...(mesmoAno ? {} : { year: "numeric" }),
+  });
+}
+
+function Selo({ label, classe }: { label: string; classe: string }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold", classe)}>
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Atualizações — o que mudou, o que está sendo feito, e o que ela pediu.
+ *
+ * A pergunta que esta tela responde não é "que recurso tem?", é "isso aqui
+ * está vivo?". Por isso o histórico vem completo e datado: a prova é a
+ * quantidade e a frequência, não o texto de nenhum item.
+ *
+ * Não há esteira com prazo de propósito. Só existe "em construção agora", sem
+ * data — prometer setembro e entregar novembro estraga mais confiança do que
+ * a promessa comprava.
+ */
+export function UpdatesPanel({ salonId }: { salonId: string }) {
+  const supabase = createClient();
+
+  const [updates, setUpdates] = useState<Update[] | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviada, setEnviada] = useState(false);
+
+  // Busca e devolve, em vez de gravar direto no estado: quem chama decide se
+  // ainda vale gravar. Sem isso, sair da aba antes da resposta chegar grava
+  // num componente que já saiu da tela.
+  const buscar = useCallback(async () => {
+    const [{ data: u }, { data: s }] = await Promise.all([
+      supabase
+        .from("product_updates")
+        .select("id, title, body, kind, status, shipped_at")
+        .order("shipped_at", { ascending: false, nullsFirst: true }),
+      supabase
+        .from("product_suggestions")
+        .select("id, body, status, reply, created_at, update_id")
+        .eq("salon_id", salonId)
+        .order("created_at", { ascending: false }),
+    ]);
+    return {
+      updates: (u as Update[] | null) ?? [],
+      suggestions: (s as Suggestion[] | null) ?? [],
+    };
+  }, [supabase, salonId]);
+
+  useEffect(() => {
+    let vivo = true;
+    buscar().then((r) => {
+      if (!vivo) return;
+      setUpdates(r.updates);
+      setSuggestions(r.suggestions);
+    });
+    // Abrir esta aba É ter lido. Zera o pontinho do Dashboard sem pedir mais
+    // um clique de "ok, entendi".
+    supabase.rpc("mark_product_updates_seen" as never);
+    return () => { vivo = false; };
+  }, [buscar, supabase]);
+
+  async function enviar(e: React.FormEvent) {
+    e.preventDefault();
+    const corpo = texto.trim();
+    if (!corpo) return;
+
+    setEnviando(true);
+    setErro(null);
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from("product_suggestions").insert({
+      salon_id: salonId,
+      author_id: auth.user?.id ?? null,
+      body: corpo,
+    });
+    setEnviando(false);
+
+    if (error) {
+      setErro(mensagemRpc(error, "Não deu para enviar sua sugestão. Tente de novo."));
+      return;
+    }
+    setTexto("");
+    setEnviada(true);
+    const r = await buscar();
+    setUpdates(r.updates);
+    setSuggestions(r.suggestions);
+  }
+
+  const emConstrucao = (updates ?? []).filter((u) => u.status === "building");
+  const entregues = (updates ?? []).filter((u) => u.status === "shipped");
+
+  return (
+    <div className="space-y-5">
+      {/* ── Em construção agora ──────────────────────────────────────── */}
+      {emConstrucao.length > 0 && (
+        <Card className="p-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Hammer aria-hidden className="h-4 w-4 text-amber-600" />
+            Em construção agora
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            O que está sendo feito neste momento. Sem data — a gente prefere
+            avisar quando estiver no ar.
+          </p>
+          <ul className="mt-3 space-y-3">
+            {emConstrucao.map((u) => (
+              <li key={u.id} className="border-l-2 border-amber-400 pl-3">
+                <p className="text-sm font-semibold">{u.title}</p>
+                <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">{u.body}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* ── O que já entregamos ──────────────────────────────────────── */}
+      <Card className="p-5">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Sparkle aria-hidden className="h-4 w-4 text-primary" weight="fill" />
+          O que já entregamos
+        </h2>
+
+        {updates === null ? (
+          <p role="status" className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+            Carregando…
+          </p>
+        ) : entregues.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Ainda não há nada publicado aqui. Assim que a primeira entrega sair,
+            ela aparece nesta lista.
+          </p>
+        ) : (
+          <ol className="mt-3 space-y-4">
+            {entregues.map((u) => (
+              <li key={u.id} className="border-l-2 border-border pl-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Selo {...(KIND[u.kind] ?? KIND.novidade)} />
+                  <time
+                    dateTime={u.shipped_at ?? undefined}
+                    className="text-xs text-muted-foreground"
+                  >
+                    {u.shipped_at ? quando(u.shipped_at) : ""}
+                  </time>
+                </div>
+                <p className="mt-1 text-sm font-semibold">{u.title}</p>
+                <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">{u.body}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+
+      {/* ── A sugestão dela ──────────────────────────────────────────── */}
+      <Card className="p-5">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Lightbulb aria-hidden className="h-4 w-4 text-primary" />
+          Sugira uma melhoria
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Você usa o sistema todo dia — se falta alguma coisa, ou se algo é mais
+          trabalhoso do que precisava ser, escreve aqui. Toda sugestão é lida e
+          respondida, inclusive quando a resposta é não.
+        </p>
+
+        <form onSubmit={enviar} className="mt-3">
+          <label htmlFor="sugestao" className="sr-only">
+            Sua sugestão
+          </label>
+          <textarea
+            id="sugestao"
+            value={texto}
+            onChange={(e) => { setTexto(e.target.value); setEnviada(false); }}
+            rows={4}
+            maxLength={1000}
+            placeholder="Ex.: queria poder ver quanto cada profissional fez no mês sem precisar abrir o relatório inteiro."
+            className="w-full rounded-[var(--radius)] border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span aria-live="polite" className="text-xs">
+              {erro ? (
+                <span className="text-red-600">{erro}</span>
+              ) : enviada ? (
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  Recebemos! Você acompanha o andamento aqui embaixo.
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{texto.trim().length}/1000</span>
+              )}
+            </span>
+            <Button type="submit" size="sm" disabled={!texto.trim() || enviando}>
+              {enviando ? (
+                <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+              ) : (
+                <PaperPlaneTilt aria-hidden className="h-4 w-4" />
+              )}
+              Enviar
+            </Button>
+          </div>
+        </form>
+
+        {suggestions.length > 0 && (
+          <>
+            <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Suas sugestões
+            </h3>
+            <ul className="mt-2 divide-y divide-border">
+              {suggestions.map((s) => {
+                const st = STATUS[s.status] ?? STATUS.recebida;
+                return (
+                  <li key={s.id} className="py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 whitespace-pre-line text-sm">{s.body}</p>
+                      <Selo {...st} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Enviada em {quando(s.created_at)}
+                    </p>
+                    {/* A resposta é o que fecha o ciclo. Sem ela o status
+                        sozinho ainda é uma etiqueta sem explicação. */}
+                    {s.reply && (
+                      <p className="mt-1.5 rounded-[var(--radius)] bg-muted px-3 py-2 text-sm">
+                        {s.reply}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}

@@ -18,6 +18,7 @@ import { BiometricCard } from "@/components/auth/BiometricCard";
 import { SubscribePanel } from "../assinatura/SubscribePanel";
 import { WhatsAppPanel } from "./WhatsAppPanel";
 import { HomeServiceCard, type HomeServiceState } from "./HomeServiceCard";
+import { UpdatesPanel } from "./UpdatesPanel";
 import type { AccessStatus } from "@/lib/subscription";
 import {
   ArrowClockwise,
@@ -38,6 +39,7 @@ import {
   MapPin,
   Palette,
   ShieldCheck,
+  Sparkle,
   Storefront,
   Trash,
   UploadSimple,
@@ -52,7 +54,7 @@ import { instagramUrl, facebookUrl, googleUrl } from "@/lib/social";
 
 type Pro = { id: string; name: string };
 type OwnerInfo = { id: string; display_name: string | null; full_name: string | null };
-type TabId = "estabelecimento" | "horarios" | "agendamento" | "caixa" | "aparencia" | "acessos" | "whatsapp" | "assinatura";
+type TabId = "estabelecimento" | "horarios" | "agendamento" | "caixa" | "aparencia" | "acessos" | "whatsapp" | "assinatura" | "atualizacoes";
 type Role = "manager" | "professional" | "receptionist";
 type Perm = { key: string; label: string; category: string };
 type RolePerm = { role: string; permission_key: string; allowed: boolean };
@@ -75,6 +77,9 @@ const TAB_META: {
   { id: "aparencia", label: "Aparência", hint: "Cores e tema da sua página", icon: Palette, need: "salon" },
   { id: "whatsapp", label: "WhatsApp", hint: "Conexão e mensagens automáticas", icon: WhatsappLogo, need: "whatsapp" },
   { id: "assinatura", label: "Assinatura", hint: "Plano, cobrança e faturas", icon: CreditCard, need: "billing" },
+  // Por último de propósito: é a única seção que não configura nada. Quem vem
+  // mexer no horário não pode tropeçar nela antes de achar o que procurava.
+  { id: "atualizacoes", label: "Atualizações", hint: "O que mudou e o que você sugeriu", icon: Sparkle, need: "salon" },
 ];
 
 export function SettingsTabs({
@@ -175,6 +180,8 @@ export function SettingsTabs({
         );
       case "whatsapp":
         return <WhatsAppPanel slug={salon.slug} />;
+      case "atualizacoes":
+        return <UpdatesPanel salonId={salon.id} />;
       case "assinatura":
         return access ? (
           <SubscribePanel
