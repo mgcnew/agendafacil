@@ -18,6 +18,7 @@ import { GestorPanel } from "./GestorPanel";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 import { BiometricCard } from "@/components/auth/BiometricCard";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
+import { UpdatesCard, type UnseenUpdate } from "./UpdatesCard";
 import { SITE_URL } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
@@ -245,6 +246,12 @@ export default async function DashboardPage({
     .limit(20);
   const notifItems = (notifRaw ?? []) as NotifItem[];
 
+  // Entregas que esta pessoa ainda não viu. A RPC parte da data de criação do
+  // perfil, então quem cadastrou hoje não recebe o histórico inteiro como
+  // "novidade" (ver 20260803_atualizacoes_2_funcoes.sql).
+  const { data: unseenRaw } = await supabase.rpc("unseen_product_updates" as never);
+  const unseenUpdates = (Array.isArray(unseenRaw) ? unseenRaw : []) as UnseenUpdate[];
+
   const stats = [
     { icon: CalendarDots, label: "Agendamentos hoje", value: String(appts.length) },
     { icon: Wallet, label: "Previsão de hoje", value: formatBRL(revenue) },
@@ -290,6 +297,11 @@ export default async function DashboardPage({
           <NotificationBell salonId={salonId} initialItems={notifItems} />
         </div>
       </div>
+
+      {/* Prova de vida do produto. Aparece uma vez e some quando dispensada —
+          o valor está na frequência com que algo novo aparece aqui, não no
+          texto de nenhum item. */}
+      <UpdatesCard updates={unseenUpdates} slug={slug} />
 
       {/* Desktop: 2 colunas. Mobile: coluna única */}
       <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start">
