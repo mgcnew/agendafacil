@@ -292,6 +292,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
     return [...eligiblePros].sort((a, b) => (a.id === favId ? -1 : b.id === favId ? 1 : 0));
   }, [eligiblePros, favoriteProId, suggestedProId]);
 
+  // Quem vai atender de fato. Com "Sem preferência" isso só se sabe depois do
+  // horário: é quem tem aquele horário livre. É DERIVADO de propósito, nunca
+  // gravado em `pro` — `pro` é a escolha da cliente e alimenta a busca de
+  // horários. Guardar o resultado de volta na entrada refazia a busca, e a
+  // busca começa limpando o horário: a cliente escolhia e perdia a escolha,
+  // caindo numa tela em branco na confirmação.
+  const proAtendente = anyPro ? (slot ? slotProMap[slot] ?? null : null) : pro;
+
   // se o profissional escolhido deixou de ser elegível, limpa a seleção
   useEffect(() => {
     if (pro && !eligiblePros.some((p) => p.id === pro.id)) {
@@ -571,7 +579,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   async function confirmBooking() {
     // Nunca sair em silêncio: um botão que não faz nada ao ser apertado é o
     // pior retorno possível — a pessoa aperta de novo achando que não pegou.
-    if (!pro || !slot) {
+    if (!proAtendente || !slot) {
       setBookErr("Escolha profissional e horário antes de confirmar.");
       return;
     }
@@ -590,7 +598,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         : undefined;
     const { data, error } = await supabase.rpc("book_appointment", {
       p_salon: salon.id,
-      p_member: pro.id,
+      p_member: proAtendente.id,
       p_service_ids: selected,
       p_starts_at: slot,
       p_client_name: name || "Cliente",
@@ -1096,7 +1104,6 @@ export function BookingApp({ salon }: { salon: Salon }) {
               selected={slot}
               onSelect={(s) => {
                 setSlot(s);
-                if (anyPro) setPro(slotProMap[s]);
                 setTimeout(() => goAfterTime(), 300);
               }}
             />
@@ -1168,7 +1175,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       )}
 
       {/* STEP: confirmação */}
-      {step === "confirm" && pro && slot && (
+      {step === "confirm" && proAtendente && slot && (
         <section className="space-y-4 af-rise">
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" /> Revise e confirme
@@ -1200,10 +1207,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </div>
             </div>
             <div className="flex items-center gap-3 pb-1">
-              <BookingAvatar p={pro} size={48} />
+              <BookingAvatar p={proAtendente} size={48} />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Profissional</p>
-                <p className="font-medium truncate">{pro.display_name}</p>
+                <p className="font-medium truncate">{proAtendente.display_name}</p>
               </div>
             </div>
             <Row label="Data" value={<span className="capitalize">{formatDateLong(slot)}</span>} />
@@ -1352,7 +1359,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 {salon.name} agradece o seu agendamento! <span aria-hidden>💈</span>
               </p>
               <p className="text-muted-foreground mt-1">
-                {pro?.display_name} te espera{" "}
+                {proAtendente?.display_name} te espera{" "}
                 {slot && (
                   <b className="capitalize">
                     {formatDateLong(slot)} às{" "}
