@@ -175,6 +175,12 @@ export function ClientCombobox({
             placeholder="Digite o nome ou o telefone…"
             className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             autoComplete="off"
+            // A lista sai num portal, fora daqui. Sem estes atributos ninguém
+            // de fora sabe que há um popover aberto — e o modal que abriga
+            // este campo precisa saber, senão o Escape fecha os dois de uma vez.
+            role="combobox"
+            aria-expanded={open}
+            aria-haspopup="listbox"
           />
           <button
             type="button"
