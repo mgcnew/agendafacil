@@ -387,7 +387,10 @@ export function PanelShell({
           <ThemeToggle className="-mr-2" />
         </header>
 
-        <main className="flex-1 overflow-y-auto flex flex-col max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">
+        {/* overscroll-contain: o scroll desta área não encadeia no documento
+            quando chega ao fim. Sem isso, terminar de rolar a página puxava
+            junto o que estivesse rolável atrás. */}
+        <main className="flex-1 overflow-y-auto overscroll-contain flex flex-col max-lg:pb-[calc(4rem+env(safe-area-inset-bottom))]">
           <AnnouncementBanner announcements={announcements} />
           <div
             className={cn(

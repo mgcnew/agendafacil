@@ -390,25 +390,6 @@
   --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 16px 34px -20px rgba(0,0,0,.8);
 }
 
-/* ------------------------------------------------------------------
-   A faixa clara no rodapé do celular.
-
-   As variáveis do modo noturno moram em `[data-theme="dark"] [data-color]`
-   — no wrapper do painel, não na raiz. O `body` continua resolvendo
-   `--background` do `:root`, que é claro. Enquanto o wrapper cobre a tela
-   inteira ninguém vê; no celular, quando a barra de endereço recolhe, o
-   documento fica um fio mais alto que o wrapper e a sobra aparece.
-
-   No modo claro o defeito sempre existiu e era invisível: a sobra tinha
-   exatamente a cor da página. O escuro só revelou.
-
-   Pinta o body com a base neutra da mesma mistura do wrapper. A segunda
-   regra cobre o tema Preto, que fica de fora do bloco escuro por já ser
-   preto e usar outro tom.
-   ------------------------------------------------------------------ */
-[data-theme="dark"] body { background: #0d0d0f; }
-[data-theme="dark"] body:has(.panel-root[data-color="i"]) { background: #141414; }
-
 /* Marcas escuras que sumiriam no fundo escuro — versão clareada
    (o -foreground vira escuro porque a marca ficou clara). */
 [data-theme="dark"] [data-color="a"] { /* Rosa Gold */
@@ -448,6 +429,35 @@
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /* ----------------------------------------------------------------
+     O painel é app shell: quem rola é o `main`, e só ele.
+
+     A raiz é `html.h-full` + `body.min-h-full`, que existem para a
+     landing — lá a página rola inteira e o rodapé precisa ser empurrado.
+     No painel isso vira um SEGUNDO container rolável por cima do shell
+     (`h-dvh` + `overflow-hidden`), e os dois se encadeiam: termina o
+     scroll de dentro, o de fora continua. O que aparece nessa sobra é o
+     `body`, que resolve `--background` do `:root` e por isso vem claro
+     mesmo no modo noturno.
+
+     `100%` na raiz também não é o mesmo que `100dvh` no shell: no
+     celular a porcentagem resolve contra o viewport GRANDE (barra de
+     endereço recolhida) enquanto o shell usa o dinâmico. A diferença é
+     exatamente a altura da barra — a faixa que sobra.
+
+     Travar só nas rotas do painel, pelo wrapper que o layout já põe.
+     A landing e a página pública do salão continuam rolando normal.
+     ---------------------------------------------------------------- */
+  html:has(.panel-root),
+  html:has(.panel-root) body {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    /* Sem isto o "puxão" no fim do scroll interno ainda arrasta a
+       viewport no iOS, mesmo com o documento já travado. */
+    overscroll-behavior: none;
   }
 
   h1, h2, h3, h4, .font-display {
