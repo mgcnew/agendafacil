@@ -1636,6 +1636,105 @@ export type Database = {
           },
         ]
       }
+      product_suggestions: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          reply: string | null
+          salon_id: string
+          status: string
+          update_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          reply?: string | null
+          salon_id: string
+          status?: string
+          update_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          reply?: string | null
+          salon_id?: string
+          status?: string
+          update_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_suggestions_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_suggestions_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_suggestions_update_id_fkey"
+            columns: ["update_id"]
+            isOneToOne: false
+            referencedRelation: "product_updates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_updates: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          shipped_at: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          shipped_at?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          shipped_at?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_updates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_services: {
         Row: {
           commission_percent: number | null
@@ -1697,6 +1796,7 @@ export type Database = {
           id: string
           phone: string | null
           updated_at: string
+          updates_seen_at: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1706,6 +1806,7 @@ export type Database = {
           id: string
           phone?: string | null
           updated_at?: string
+          updates_seen_at?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1715,6 +1816,7 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
+          updates_seen_at?: string | null
         }
         Relationships: []
       }
