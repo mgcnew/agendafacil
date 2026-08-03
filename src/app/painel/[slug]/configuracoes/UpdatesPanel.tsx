@@ -13,6 +13,9 @@ import {
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 
+/** Quantos itens por vez. Dez cobre a tela sem obrigar a rolar pra achar o botão. */
+const PAGINA = 10;
+
 type Update = {
   id: string;
   title: string;
@@ -87,46 +90,93 @@ function Selo({ label, classe }: { label: string; classe: string }) {
 export function UpdatesPanel({ salonId }: { salonId: string }) {
   const supabase = createClient();
 
-  const [updates, setUpdates] = useState<Update[] | null>(null);
+  // "Em construção" não pagina: é sempre curto por natureza — o que está sendo
+  // feito AGORA. Quem cresce sem parar é o histórico, e é só ele que ganha o
+  // botão de mostrar mais.
+  const [building, setBuilding] = useState<Update[]>([]);
+  const [shipped, setShipped] = useState<Update[] | null>(null);
+  const [temMaisEntregas, setTemMaisEntregas] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [temMaisSugestoes, setTemMaisSugestoes] = useState(false);
+  const [carregandoMais, setCarregandoMais] = useState<"entregas" | "sugestoes" | null>(null);
+
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [enviada, setEnviada] = useState(false);
 
-  // Busca e devolve, em vez de gravar direto no estado: quem chama decide se
-  // ainda vale gravar. Sem isso, sair da aba antes da resposta chegar grava
-  // num componente que já saiu da tela.
-  const buscar = useCallback(async () => {
-    const [{ data: u }, { data: s }] = await Promise.all([
+  /**
+   * Pede sempre um item a mais do que vai mostrar. Se o extra vier, existe
+   * próxima página — e isso evita uma segunda consulta de contagem só pra
+   * decidir se um botão aparece.
+   */
+  const paginaEntregas = useCallback(async (offset: number) => {
+    const { data } = await supabase
+      .from("product_updates")
+      .select("id, title, body, kind, status, shipped_at")
+      .eq("status", "shipped")
+      .order("shipped_at", { ascending: false })
+      .range(offset, offset + PAGINA);
+    const linhas = (data as Update[] | null) ?? [];
+    return { linhas: linhas.slice(0, PAGINA), temMais: linhas.length > PAGINA };
+  }, [supabase]);
+
+  const paginaSugestoes = useCallback(async (offset: number) => {
+    const { data } = await supabase
+      .from("product_suggestions")
+      .select("id, body, status, reply, created_at, update_id")
+      .eq("salon_id", salonId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGINA);
+    const linhas = (data as Suggestion[] | null) ?? [];
+    return { linhas: linhas.slice(0, PAGINA), temMais: linhas.length > PAGINA };
+  }, [supabase, salonId]);
+
+  const buscarInicio = useCallback(async () => {
+    const [{ data: b }, entregas, sugestoes] = await Promise.all([
       supabase
         .from("product_updates")
         .select("id, title, body, kind, status, shipped_at")
-        .order("shipped_at", { ascending: false, nullsFirst: true }),
-      supabase
-        .from("product_suggestions")
-        .select("id, body, status, reply, created_at, update_id")
-        .eq("salon_id", salonId)
+        .eq("status", "building")
         .order("created_at", { ascending: false }),
+      paginaEntregas(0),
+      paginaSugestoes(0),
     ]);
-    return {
-      updates: (u as Update[] | null) ?? [],
-      suggestions: (s as Suggestion[] | null) ?? [],
-    };
-  }, [supabase, salonId]);
+    return { building: (b as Update[] | null) ?? [], entregas, sugestoes };
+  }, [supabase, paginaEntregas, paginaSugestoes]);
+
+  const aplicarInicio = useCallback((r: Awaited<ReturnType<typeof buscarInicio>>) => {
+    setBuilding(r.building);
+    setShipped(r.entregas.linhas);
+    setTemMaisEntregas(r.entregas.temMais);
+    setSuggestions(r.sugestoes.linhas);
+    setTemMaisSugestoes(r.sugestoes.temMais);
+  }, []);
 
   useEffect(() => {
     let vivo = true;
-    buscar().then((r) => {
-      if (!vivo) return;
-      setUpdates(r.updates);
-      setSuggestions(r.suggestions);
-    });
+    buscarInicio().then((r) => { if (vivo) aplicarInicio(r); });
     // Abrir esta aba É ter lido. Zera o pontinho do Dashboard sem pedir mais
     // um clique de "ok, entendi".
     supabase.rpc("mark_product_updates_seen" as never);
     return () => { vivo = false; };
-  }, [buscar, supabase]);
+  }, [buscarInicio, aplicarInicio, supabase]);
+
+  async function maisEntregas() {
+    setCarregandoMais("entregas");
+    const r = await paginaEntregas(shipped?.length ?? 0);
+    setShipped((atual) => [...(atual ?? []), ...r.linhas]);
+    setTemMaisEntregas(r.temMais);
+    setCarregandoMais(null);
+  }
+
+  async function maisSugestoes() {
+    setCarregandoMais("sugestoes");
+    const r = await paginaSugestoes(suggestions.length);
+    setSuggestions((atual) => [...atual, ...r.linhas]);
+    setTemMaisSugestoes(r.temMais);
+    setCarregandoMais(null);
+  }
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -149,18 +199,15 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
     }
     setTexto("");
     setEnviada(true);
-    const r = await buscar();
-    setUpdates(r.updates);
-    setSuggestions(r.suggestions);
+    // Volta pra primeira página: a sugestão nova é a mais recente, então é lá
+    // que ela está — e recarregar o que já foi paginado seria trabalho à toa.
+    aplicarInicio(await buscarInicio());
   }
-
-  const emConstrucao = (updates ?? []).filter((u) => u.status === "building");
-  const entregues = (updates ?? []).filter((u) => u.status === "shipped");
 
   return (
     <div className="space-y-5">
       {/* ── Em construção agora ──────────────────────────────────────── */}
-      {emConstrucao.length > 0 && (
+      {building.length > 0 && (
         <Card className="p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <Hammer aria-hidden className="h-4 w-4 text-amber-600" />
@@ -171,7 +218,7 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
             avisar quando estiver no ar.
           </p>
           <ul className="mt-3 space-y-3">
-            {emConstrucao.map((u) => (
+            {building.map((u) => (
               <li key={u.id} className="border-l-2 border-amber-400 pl-3">
                 <p className="text-sm font-semibold">{u.title}</p>
                 <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">{u.body}</p>
@@ -188,19 +235,19 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
           O que já entregamos
         </h2>
 
-        {updates === null ? (
+        {shipped === null ? (
           <p role="status" className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
             Carregando…
           </p>
-        ) : entregues.length === 0 ? (
+        ) : shipped.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
             Ainda não há nada publicado aqui. Assim que a primeira entrega sair,
             ela aparece nesta lista.
           </p>
         ) : (
           <ol className="mt-3 space-y-4">
-            {entregues.map((u) => (
+            {shipped.map((u) => (
               <li key={u.id} className="border-l-2 border-border pl-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Selo {...(KIND[u.kind] ?? KIND.novidade)} />
@@ -216,6 +263,21 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
               </li>
             ))}
           </ol>
+        )}
+
+        {temMaisEntregas && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={maisEntregas}
+            disabled={carregandoMais === "entregas"}
+            className="mt-4 w-full"
+          >
+            {carregandoMais === "entregas" && (
+              <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+            )}
+            Mostrar mais
+          </Button>
         )}
       </Card>
 
@@ -295,6 +357,20 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
                 );
               })}
             </ul>
+            {temMaisSugestoes && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={maisSugestoes}
+                disabled={carregandoMais === "sugestoes"}
+                className="mt-3 w-full"
+              >
+                {carregandoMais === "sugestoes" && (
+                  <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+                )}
+                Mostrar mais
+              </Button>
+            )}
           </>
         )}
       </Card>

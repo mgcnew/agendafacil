@@ -14,6 +14,9 @@ import {
   Trash,
 } from "@phosphor-icons/react/dist/ssr";
 
+/** Igual à aba da dona: dez por vez, com página seguinte sob demanda. */
+const PAGINA = 10;
+
 type Update = {
   id: string;
   title: string;
@@ -71,7 +74,10 @@ export function UpdatesAdminPanel() {
   const supabase = createClient();
 
   const [updates, setUpdates] = useState<Update[] | null>(null);
+  const [temMaisUpdates, setTemMaisUpdates] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [temMaisSugestoes, setTemMaisSugestoes] = useState(false);
+  const [carregandoMais, setCarregandoMais] = useState<"updates" | "sugestoes" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -81,32 +87,57 @@ export function UpdatesAdminPanel() {
   const [body, setBody] = useState("");
   const [kind, setKind] = useState("novidade");
 
-  const buscar = useCallback(async () => {
-    const [{ data: u }, { data: s }] = await Promise.all([
-      supabase.rpc("admin_list_updates" as never),
-      supabase.rpc("admin_list_suggestions" as never),
-    ]);
-    return {
-      updates: (Array.isArray(u) ? u : []) as Update[],
-      suggestions: (Array.isArray(s) ? s : []) as Suggestion[],
-    };
+  // Pede um a mais do que mostra: se o extra vier, existe próxima página —
+  // sem precisar de uma consulta de contagem só pra decidir se o botão aparece.
+  const pagina = useCallback(async (rpc: string, offset: number) => {
+    const { data } = await supabase.rpc(rpc as never, {
+      p_limit: PAGINA + 1, p_offset: offset,
+    } as never);
+    const linhas = (Array.isArray(data) ? data : []) as unknown[];
+    return { linhas: linhas.slice(0, PAGINA), temMais: linhas.length > PAGINA };
   }, [supabase]);
 
   const recarregar = useCallback(async () => {
-    const r = await buscar();
-    setUpdates(r.updates);
-    setSuggestions(r.suggestions);
-  }, [buscar]);
+    const [u, s] = await Promise.all([
+      pagina("admin_list_updates", 0),
+      pagina("admin_list_suggestions", 0),
+    ]);
+    setUpdates(u.linhas as Update[]);
+    setTemMaisUpdates(u.temMais);
+    setSuggestions(s.linhas as Suggestion[]);
+    setTemMaisSugestoes(s.temMais);
+  }, [pagina]);
 
   useEffect(() => {
     let vivo = true;
-    buscar().then((r) => {
+    Promise.all([
+      pagina("admin_list_updates", 0),
+      pagina("admin_list_suggestions", 0),
+    ]).then(([u, s]) => {
       if (!vivo) return;
-      setUpdates(r.updates);
-      setSuggestions(r.suggestions);
+      setUpdates(u.linhas as Update[]);
+      setTemMaisUpdates(u.temMais);
+      setSuggestions(s.linhas as Suggestion[]);
+      setTemMaisSugestoes(s.temMais);
     });
     return () => { vivo = false; };
-  }, [buscar]);
+  }, [pagina]);
+
+  async function maisUpdates() {
+    setCarregandoMais("updates");
+    const r = await pagina("admin_list_updates", updates?.length ?? 0);
+    setUpdates((a) => [...(a ?? []), ...(r.linhas as Update[])]);
+    setTemMaisUpdates(r.temMais);
+    setCarregandoMais(null);
+  }
+
+  async function maisSugestoes() {
+    setCarregandoMais("sugestoes");
+    const r = await pagina("admin_list_suggestions", suggestions.length);
+    setSuggestions((a) => [...a, ...(r.linhas as Suggestion[])]);
+    setTemMaisSugestoes(r.temMais);
+    setCarregandoMais(null);
+  }
 
   function limpar() {
     setId(null); setTitle(""); setBody(""); setKind("novidade");
@@ -145,7 +176,13 @@ export function UpdatesAdminPanel() {
   }
 
   const emConstrucao = (updates ?? []).filter((u) => u.status === "building");
+
+  // Conta só o que está carregado. Como 'recebida' vem primeiro na ordenação,
+  // a primeira página tem todas — a menos que passem de uma página inteira, e
+  // aí o número vira "10+" em vez de mentir para menos.
   const naoRespondidas = suggestions.filter((s) => s.status === "recebida").length;
+  const contagemPendente =
+    temMaisSugestoes && naoRespondidas === PAGINA ? `${PAGINA}+` : String(naoRespondidas);
 
   return (
     <div className="space-y-5">
@@ -283,6 +320,16 @@ export function UpdatesAdminPanel() {
             ))}
           </ul>
         )}
+
+        {temMaisUpdates && (
+          <Button variant="outline" size="sm" onClick={maisUpdates}
+                  disabled={carregandoMais === "updates"} className="mt-3 w-full">
+            {carregandoMais === "updates" && (
+              <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+            )}
+            Mostrar mais
+          </Button>
+        )}
       </Card>
 
       {/* ── A fila de sugestões ──────────────────────────────────────── */}
@@ -291,7 +338,7 @@ export function UpdatesAdminPanel() {
           Sugestões
           {naoRespondidas > 0 && (
             <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
-              {naoRespondidas} sem resposta
+              {contagemPendente} sem resposta
             </span>
           )}
         </h2>
@@ -314,6 +361,16 @@ export function UpdatesAdminPanel() {
               />
             ))}
           </ul>
+        )}
+
+        {temMaisSugestoes && (
+          <Button variant="outline" size="sm" onClick={maisSugestoes}
+                  disabled={carregandoMais === "sugestoes"} className="mt-3 w-full">
+            {carregandoMais === "sugestoes" && (
+              <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+            )}
+            Mostrar mais
+          </Button>
         )}
       </Card>
     </div>
