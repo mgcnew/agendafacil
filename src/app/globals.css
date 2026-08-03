@@ -390,6 +390,25 @@
   --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 16px 34px -20px rgba(0,0,0,.8);
 }
 
+/* ------------------------------------------------------------------
+   A faixa clara no rodapé do celular.
+
+   As variáveis do modo noturno moram em `[data-theme="dark"] [data-color]`
+   — no wrapper do painel, não na raiz. O `body` continua resolvendo
+   `--background` do `:root`, que é claro. Enquanto o wrapper cobre a tela
+   inteira ninguém vê; no celular, quando a barra de endereço recolhe, o
+   documento fica um fio mais alto que o wrapper e a sobra aparece.
+
+   No modo claro o defeito sempre existiu e era invisível: a sobra tinha
+   exatamente a cor da página. O escuro só revelou.
+
+   Pinta o body com a base neutra da mesma mistura do wrapper. A segunda
+   regra cobre o tema Preto, que fica de fora do bloco escuro por já ser
+   preto e usar outro tom.
+   ------------------------------------------------------------------ */
+[data-theme="dark"] body { background: #0d0d0f; }
+[data-theme="dark"] body:has(.panel-root[data-color="i"]) { background: #141414; }
+
 /* Marcas escuras que sumiriam no fundo escuro — versão clareada
    (o -foreground vira escuro porque a marca ficou clara). */
 [data-theme="dark"] [data-color="a"] { /* Rosa Gold */
