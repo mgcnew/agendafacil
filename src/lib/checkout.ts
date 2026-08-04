@@ -6,13 +6,31 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * comportamento, pra não haver discrepância entre os dois fluxos de
  * fechamento.
  */
+export type ResultadoCobranca = {
+  stock_warnings?: string[];
+  cash_recorded?: boolean;
+  amount?: number;
+};
+
+/**
+ * Finalizou o atendimento mas a receita NÃO entrou no caixa, porque não havia
+ * caixa aberto na hora. O `finalize_appointment` sempre avisou isso no retorno
+ * (`cash_recorded`), e ninguém lia: o atendimento saía como concluído, o
+ * dinheiro não aparecia em lugar nenhum e a tela dizia que deu tudo certo.
+ *
+ * O valor zero não conta — aí não havia nada a lançar, e avisar seria ruído.
+ */
+export function receitaNaoEntrouNoCaixa(r: ResultadoCobranca | null): boolean {
+  return r?.cash_recorded === false && Number(r?.amount ?? 0) > 0;
+}
+
 export async function chargeAppointment(
   supabase: SupabaseClient,
   appointmentId: string,
   payment: string,
   discount: number,
   splits?: { method: string; amount: number }[],
-): Promise<{ stock_warnings?: string[] } | null> {
+): Promise<ResultadoCobranca | null> {
   const params: Record<string, unknown> = {
     p_appointment: appointmentId,
     p_discount: discount || 0,
@@ -24,7 +42,7 @@ export async function chargeAppointment(
   }
   const { data, error } = await supabase.rpc("finalize_appointment" as never, params as never);
   if (error) throw error;
-  return data as { stock_warnings?: string[] } | null;
+  return data as ResultadoCobranca | null;
 }
 
 /** Adiciona um serviço extra ao atendimento (soma no total_price; comissão é calculada normalmente ao finalizar). */

@@ -9,6 +9,7 @@ import { MotionModal } from "@/components/MotionModal";
 import Link from "next/link";
 import { formatBRL, formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { receitaNaoEntrouNoCaixa, type ResultadoCobranca } from "@/lib/checkout";
 import type { Tables } from "@/lib/database.types";
 import { getAnamnesisConfig, anamnesisToForm, HEALTH_CONDITIONS, type Niche } from "@/lib/anamnesis";
 import {
@@ -71,6 +72,7 @@ function FinalizeModal({
   const [busy, setBusy]     = useState(false);
   const [err, setErr]       = useState<string | null>(null);
   const [warn, setWarn]     = useState<string[] | null>(null);
+  const [semCaixa, setSemCaixa] = useState(false);
 
   async function finalize() {
     setBusy(true); setErr(null);
@@ -83,8 +85,15 @@ function FinalizeModal({
       setBusy(false);
       return;
     }
-    const warnings = (data as { stock_warnings?: string[] } | null)?.stock_warnings ?? [];
-    if (warnings.length > 0) { setWarn(warnings); setBusy(false); return; }
+    const resultado = data as ResultadoCobranca | null;
+    const warnings = resultado?.stock_warnings ?? [];
+    const foraDoCaixa = receitaNaoEntrouNoCaixa(resultado);
+    if (warnings.length > 0 || foraDoCaixa) {
+      setWarn(warnings);
+      setSemCaixa(foraDoCaixa);
+      setBusy(false);
+      return;
+    }
     onDone([]);
   }
 
@@ -102,16 +111,28 @@ function FinalizeModal({
         </div>
         <p className="text-sm text-muted-foreground">{item.client} · {item.time}</p>
 
-        {warn ? (
+        {(warn && warn.length > 0) || semCaixa ? (
           <div className="mt-4 space-y-4">
-            <div role="status" className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
-              <Warning aria-hidden className="h-4 w-4 shrink-0 mt-0.5" />
-              <div>
-                Atendimento finalizado. Estoque negativo:{" "}
-                <b>{warn.join(", ")}</b>. Reponha quando puder.
+            {semCaixa && (
+              <div role="alert" className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
+                <Warning aria-hidden className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  Atendimento concluído, mas o <b>caixa está fechado</b> — o valor
+                  não entrou no faturamento do dia. Abra o caixa e lance o
+                  recebimento pelo Financeiro.
+                </div>
               </div>
-            </div>
-            <Button className="w-full" onClick={() => onDone(warn)}>Entendi</Button>
+            )}
+            {warn && warn.length > 0 && (
+              <div role="status" className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
+                <Warning aria-hidden className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  Atendimento finalizado. Estoque negativo:{" "}
+                  <b>{warn.join(", ")}</b>. Reponha quando puder.
+                </div>
+              </div>
+            )}
+            <Button className="w-full" onClick={() => onDone(warn ?? [])}>Entendi</Button>
           </div>
         ) : (
           <>

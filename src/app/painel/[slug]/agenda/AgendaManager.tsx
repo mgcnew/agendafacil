@@ -12,7 +12,12 @@ import { cn } from "@/lib/utils";
 import type { Enums } from "@/lib/database.types";
 import { HEALTH_CONDITIONS } from "@/lib/anamnesis";
 import { PaymentPickerModal } from "@/components/PaymentPickerModal";
-import { chargeAppointment as chargeAppointmentRpc, addAppointmentService as addAppointmentServiceRpc } from "@/lib/checkout";
+import {
+  chargeAppointment as chargeAppointmentRpc,
+  addAppointmentService as addAppointmentServiceRpc,
+  receitaNaoEntrouNoCaixa,
+  type ResultadoCobranca,
+} from "@/lib/checkout";
 import { AgendaSignalsBanner, waPhone, type TodaySignals, type LateClient } from "@/components/AgendaSignalsBanner";
 import { CreateAppointment } from "./CreateAppointment";
 import { PALETTE, ProAvatar } from "./ProAvatar";
@@ -2160,6 +2165,7 @@ function FinalizeModal({
 }) {
   const supabase = createClient();
   const [warn, setWarn]     = useState<string[] | null>(null);
+  const [semCaixa, setSemCaixa] = useState(false);
   const [items, setItems]   = useState<ApptService[] | null>(null);
   // Serviço extra pedido em cima da hora (ex.: "veio pro corte, pediu barba
   // também") — fica só no estado local; vira linha em appointment_services só
@@ -2197,7 +2203,7 @@ function FinalizeModal({
         await addAppointmentServiceRpc(supabase, appt.id, item.service.id);
       }
     }
-    let data: { stock_warnings?: string[] } | null;
+    let data: ResultadoCobranca | null;
     try {
       data = await chargeAppointmentRpc(supabase, appt.id, pay, discount, splits);
     } catch (e) {
@@ -2208,9 +2214,11 @@ function FinalizeModal({
       throw e;
     }
     const warnings = data?.stock_warnings ?? [];
-    if (warnings.length > 0) {
+    const foraDoCaixa = receitaNaoEntrouNoCaixa(data);
+    if (warnings.length > 0 || foraDoCaixa) {
       setPayModalOpen(false);
-      setWarn(warnings);
+      setWarn(warnings.length > 0 ? warnings : null);
+      setSemCaixa(foraDoCaixa);
       return;
     }
     onDone();
@@ -2232,15 +2240,27 @@ function FinalizeModal({
           {appt.clients?.full_name ?? "Cliente"} · {fmtHM(appt.starts_at)}
         </p>
 
-        {warn ? (
+        {warn || semCaixa ? (
           <div className="mt-4 space-y-4">
-            <div className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
-              <Warning className="h-4 w-4 shrink-0 mt-0.5" />
-              <div>
-                Atendimento finalizado. O estoque ficou negativo de:{" "}
-                <b>{warn.join(", ")}</b>. Reponha quando puder.
+            {semCaixa && (
+              <div role="alert" className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
+                <Warning className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  Atendimento concluído, mas o <b>caixa está fechado</b> — o valor
+                  não entrou no faturamento do dia. Abra o caixa e lance o
+                  recebimento pelo Financeiro.
+                </div>
               </div>
-            </div>
+            )}
+            {warn && (
+              <div className="rounded-[var(--radius)] bg-amber-500/12 text-amber-700 p-3 text-sm flex gap-2">
+                <Warning className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  Atendimento finalizado. O estoque ficou negativo de:{" "}
+                  <b>{warn.join(", ")}</b>. Reponha quando puder.
+                </div>
+              </div>
+            )}
             <Button className="w-full" onClick={onDone}>Entendi</Button>
           </div>
         ) : (
