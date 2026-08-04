@@ -304,7 +304,16 @@ export function UpdatesPanel({ salonId }: { salonId: string }) {
             rows={4}
             maxLength={1000}
             placeholder="Ex.: queria poder ver quanto cada profissional fez no mês sem precisar abrir o relatório inteiro."
-            className="w-full rounded-[var(--radius)] border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className={cn(
+              "w-full rounded-[var(--radius)] border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              // No celular, ao focar um campo o navegador rola só até a borda da
+              // área rolável — e a barra inferior é fixa POR CIMA dela. O campo
+              // ficava 65px escondido atrás da barra (a altura dela), e o botão
+              // Enviar, mais abaixo, sumia de vez. Esta margem é o espaço que o
+              // navegador precisa reservar ao rolar: a barra mais a linha do
+              // contador e do botão, que vêm logo depois do campo.
+              "max-lg:[scroll-margin-bottom:calc(8rem+env(safe-area-inset-bottom))]",
+            )}
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <span aria-live="polite" className="text-xs">
