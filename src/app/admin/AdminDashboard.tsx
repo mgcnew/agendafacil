@@ -14,6 +14,7 @@ import { parsePastedSeo, stripSeoTail } from "@/lib/blog/sanitize";
 import {
   ArrowSquareOut,
   BookOpenText,
+  Robot,
   Buildings,
   CalendarBlank,
   CaretDown,
@@ -46,6 +47,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { getSalonBilling } from "./actions";
 import { PlaybookPanel } from "./PlaybookPanel";
+import { AgentesPanel } from "./AgentesPanel";
 import { ProspeccaoPanel } from "./ProspeccaoPanel";
 import { UpdatesAdminPanel } from "./UpdatesAdminPanel";
 import { AdminTabs, AdminTabPanel, type AdminTabDef } from "./AdminTabs";
@@ -202,7 +204,7 @@ function exportSalonsCsv(rows: AdminSalon[]) {
 
 type TabId =
   | "atencao" | "geral" | "saloes" | "admin"
-  | "avisos" | "blog" | "prospeccao" | "playbook" | "atualizacoes";
+  | "avisos" | "blog" | "prospeccao" | "playbook" | "agentes" | "atualizacoes";
 
 const TABS: readonly AdminTabDef<TabId>[] = [
   { id: "atencao", label: "Atenção", icon: Warning },
@@ -213,6 +215,9 @@ const TABS: readonly AdminTabDef<TabId>[] = [
   { id: "blog", label: "Blog", icon: Newspaper },
   { id: "prospeccao", label: "Prospecção", icon: DoorOpen },
   { id: "playbook", label: "Playbook", icon: BookOpenText },
+  // Ao lado do Playbook de propósito: os dois leem a mesma fonte de conteúdo.
+  // O Playbook é para você ler; este é para alimentar agentes de IA.
+  { id: "agentes", label: "Agentes de IA", icon: Robot },
   { id: "atualizacoes", label: "Atualizações", icon: Sparkle },
 ];
 
@@ -467,6 +472,10 @@ export function AdminDashboard({
         {tab === "prospeccao" && <AdminTabPanel id="prospeccao"><ProspeccaoPanel /></AdminTabPanel>}
 
         {tab === "playbook" && <AdminTabPanel id="playbook"><PlaybookPanel /></AdminTabPanel>}
+
+        {tab === "agentes" && (
+          <AdminTabPanel id="agentes"><AgentesPanel metrics={metrics} /></AdminTabPanel>
+        )}
 
         {tab === "atualizacoes" && (
           <AdminTabPanel id="atualizacoes"><UpdatesAdminPanel /></AdminTabPanel>
