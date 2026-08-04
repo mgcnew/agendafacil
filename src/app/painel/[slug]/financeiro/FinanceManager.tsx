@@ -7,6 +7,7 @@ import { MotionModal } from "@/components/MotionModal";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { formatBRL, formatTime, formatDate } from "@/lib/utils";
 import { mensagemRpc } from "@/lib/erroSupabase";
 import type { Tables } from "@/lib/database.types";
@@ -125,6 +126,11 @@ export function FinanceManager({
   );
   const safeInitialTab = (allowedTabs as readonly string[]).includes(initialTab) ? initialTab as typeof allowedTabs[number] : "caixa";
   const [tab, setTab] = useState<"caixa" | "historico" | "comissoes" | "fixos">(safeInitialTab);
+  // A faixa de abas rola quando não cabe (em 360px "Fixos" fica fora da tela),
+  // e nada avisava. A sombra só aparece enquanto ainda há aba escondida —
+  // senão ela continuaria apagando a última depois de rolar até o fim.
+  const trilhoRef = useRef<HTMLDivElement>(null);
+  const [temMaisAbas, setTemMaisAbas] = useState(false);
   const [commModal, setCommModal] = useState<Comm | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -176,6 +182,22 @@ export function FinanceManager({
       return [...prev, { service: s, qty: 1 }];
     });
   }
+
+  // Mede se ainda há aba escondida à direita — a sombra depende disso.
+  useEffect(() => {
+    const trilho = trilhoRef.current;
+    if (!trilho) return;
+    const medir = () =>
+      setTemMaisAbas(trilho.scrollLeft + trilho.clientWidth < trilho.scrollWidth - 4);
+    medir();
+    trilho.addEventListener("scroll", medir, { passive: true });
+    const ro = new ResizeObserver(medir);
+    ro.observe(trilho);
+    return () => {
+      trilho.removeEventListener("scroll", medir);
+      ro.disconnect();
+    };
+  }, []);
 
   // ── Atalhos de teclado estilo PDV (apenas na aba Caixa com caixa aberto) ──
   useEffect(() => {
@@ -360,7 +382,20 @@ export function FinanceManager({
         </div>
       )}
 
-      <div role="tablist" aria-label="Seções do financeiro" className="flex gap-1 overflow-x-auto no-scrollbar border-b border-border">
+      <div className="relative border-b border-border">
+        {temMaisAbas && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+          />
+        )}
+        <div
+          ref={trilhoRef}
+          role="tablist"
+          aria-label="Seções do financeiro"
+          onKeyDown={tablistKeys(allowedTabs, tab, setTab)}
+          className="flex gap-1 overflow-x-auto no-scrollbar"
+        >
         {allowedTabs.map((t) => (
           <button
             key={t}
@@ -379,6 +414,7 @@ export function FinanceManager({
             {t === "caixa" ? "Caixa" : t === "historico" ? "Caixas anteriores" : t === "comissoes" ? "Comissões" : "Fixos"}
           </button>
         ))}
+        </div>
       </div>
 
       {tab === "caixa" && (
@@ -1099,6 +1135,8 @@ function SearchBar({
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => { if (q) setOpen(true); }}
+          // O placeholder some assim que a pessoa digita — não serve de nome.
+          aria-label="Buscar cliente ou produto"
           placeholder="Buscar cliente ou produto… (/)"
           className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
         />

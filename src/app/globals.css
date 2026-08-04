@@ -377,6 +377,24 @@
    nunca setam esse atributo), então na prática vale só no painel. As
    superfícies levam um leve tom da marca (color-mix com --primary).
    ============================================================ */
+/* Os neutros do escuro, sem a mistura da marca. As regras abaixo só valem
+   DENTRO de um [data-color], e o <body> está fora dele — ficava resolvendo o
+   tema claro do :root. Hoje não aparece porque o documento está travado em
+   100dvh, mas qualquer folga futura no layout vira faixa branca de novo. O
+   wrapper com [data-color] sobrescreve tudo isto logo em seguida. */
+[data-theme="dark"] {
+  --background: #0d0d0f;
+  --card: #17171a;
+  --card-foreground: #f2f0ee;
+  --foreground: #f2f0ee;
+  --secondary: #1c1c20;
+  --secondary-foreground: #ece9e6;
+  --muted: #1a1a1d;
+  --muted-foreground: #a6a3a0;
+  --border: #2b2b2f;
+  --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 16px 34px -20px rgba(0,0,0,.8);
+}
+
 [data-theme="dark"] [data-color]:not([data-color="i"]) {
   --background: color-mix(in srgb, var(--primary) 6%, #0d0d0f);
   --card: color-mix(in srgb, var(--primary) 8%, #17171a);

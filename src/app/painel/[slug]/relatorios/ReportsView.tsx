@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { cn, formatBRL, monthRangeBR } from "@/lib/utils";
 import {
   CaretDown,
@@ -306,7 +307,16 @@ export function ReportsView({
       </div>
 
       {/* Abas */}
-      <div role="tablist" aria-label="Relatórios" className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0">
+      <div
+        role="tablist"
+        aria-label="Relatórios"
+        onKeyDown={tablistKeys(
+          ["financeiro", "operacional", "temperatura", "reativacao"] as const,
+          tab,
+          selectTab,
+        )}
+        className="flex gap-1.5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-1 sm:pb-0"
+      >
         {([
           { id: "financeiro", label: "Financeiro", icon: Wallet },
           { id: "operacional", label: "Serviços & Profissionais", icon: Sparkle },

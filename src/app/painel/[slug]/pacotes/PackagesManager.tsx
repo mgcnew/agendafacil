@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 import { formatBRL, waLink } from "@/lib/utils";
@@ -99,7 +100,12 @@ export function PackagesManager({
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Pacotes" className="flex gap-1 border-b border-border">
+      <div
+        role="tablist"
+        aria-label="Pacotes"
+        onKeyDown={tablistKeys(["vendidos", "modelos"] as const, tab, setTab)}
+        className="flex gap-1 border-b border-border"
+      >
         {(["vendidos", "modelos"] as const).map((t) => (
           <button
             key={t}

@@ -6,6 +6,7 @@ import { JsonLd } from "@/components/InlineScript";
 import {
   seoTitle,
   seoDescription,
+  seoHeading,
   salonJsonLd,
   type PublicSalonSeo,
 } from "@/lib/salonSeo";
@@ -95,7 +96,10 @@ export default async function SalonBookingPage({
     >
       {jsonLd && <JsonLd data={jsonLd} />}
       {salon.is_demo && <DemoBanner niche={salon.niche as string} />}
-      <BookingApp salon={salon} />
+      <main>
+        <h1 className="sr-only">{seoHeading(salon as unknown as PublicSalonSeo)}</h1>
+        <BookingApp salon={salon} />
+      </main>
     </div>
   );
 }

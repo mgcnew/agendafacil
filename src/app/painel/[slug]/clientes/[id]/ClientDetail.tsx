@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { formatBRL, formatDate, formatTime, waLink } from "@/lib/utils";
 import { compressImage } from "@/lib/image";
 import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
@@ -189,7 +190,12 @@ export function ClientDetail({
       )}
 
       {/* Abas */}
-      <div role="tablist" aria-label="Seções da ficha" className="flex gap-1 border-b border-border">
+      <div
+        role="tablist"
+        aria-label="Seções da ficha"
+        onKeyDown={tablistKeys(["dados", "anamnese", "historico"] as const, tab, setTab)}
+        className="flex gap-1 border-b border-border"
+      >
         {([
           ["dados", "Dados", User],
           ["anamnese", "Anamnese", Heartbeat],

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { Switch } from "@/components/Switch";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
@@ -441,7 +442,12 @@ function MemberEditor({
 
         {/* Abas — mobile: pílulas (ícone + rótulo na ativa);
             desktop: ícone em cima, rótulo abaixo, distribuídas uniformemente */}
-        <div role="tablist" aria-label="Seções do cadastro" className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-0 sm:pb-0 sm:px-0">
+        <div
+          role="tablist"
+          aria-label="Seções do cadastro"
+          onKeyDown={tablistKeys(tabs.map((t) => t.id), tab, setTab)}
+          className="flex gap-1.5 px-5 border-b border-border overflow-x-auto no-scrollbar pb-2 sm:gap-0 sm:pb-0 sm:px-0"
+        >
           {tabs.map((t) => {
             const on = tab === t.id;
             return (

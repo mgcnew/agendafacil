@@ -66,6 +66,20 @@ export function seoDescription(s: PublicSalonSeo): string {
     : `Agende seu horário online no ${s.name} em poucos toques.`;
 }
 
+/**
+ * Título da página (o `h1`). Fica só para leitor de tela e buscador: o
+ * cabeçalho é leve de propósito, e a identidade completa do salão aparece na
+ * confirmação. Mas a página precisava de um título de verdade — sem `h1`, o
+ * Google não tem o que casar com o `<title>`, e quem usa leitor de tela abre
+ * a página e a primeira coisa que ouve é "Escolha os serviços", sem saber de
+ * quem é o salão.
+ */
+export function seoHeading(s: PublicSalonSeo): string {
+  const tipo = NICHE_LABEL[s.niche ?? "neutro"] ?? "Salão";
+  const onde = localeSuffix(s);
+  return `${s.name} — ${tipo}${onde}. Agende seu horário online.`;
+}
+
 /** Mapeia o nicho pro tipo mais específico de negócio no schema.org. */
 function schemaType(niche: string | null): string {
   if (niche === "barbearia") return "HairSalon";

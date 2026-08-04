@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { tablistKeys } from "@/lib/tablistKeys";
 import { createClient } from "@/lib/supabase/client";
 import { formatBRL, formatDate } from "@/lib/utils";
 import {
@@ -445,7 +446,12 @@ export function RecuperarManager({
           celular empurrava "Inativos" pra fora da tela. O ícone sai no
           celular: com o rótulo ao lado ele não informa nada, e é justamente a
           largura que estava faltando. */}
-      <div role="tablist" aria-label="Clientes para recuperar" className="grid grid-cols-3 border-b border-border">
+      <div
+        role="tablist"
+        aria-label="Clientes para recuperar"
+        onKeyDown={tablistKeys(TABS.map((t) => t.id), tab, setTab)}
+        className="grid grid-cols-3 border-b border-border"
+      >
         {TABS.map((t) => {
           const count = data[t.id].length;
           const on = tab === t.id;

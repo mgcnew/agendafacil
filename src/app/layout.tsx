@@ -107,7 +107,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={`${jakarta.variable} ${oswald.variable} ${playfair.variable} h-full`}>
+    // O modo noturno é aplicado por um script inline (painel/[slug]/layout.tsx)
+    // que escreve `data-theme` aqui antes do primeiro paint — é o que evita o
+    // flash de tela clara. O servidor não tem como saber a escolha, então o
+    // atributo sempre difere na hidratação. Sem isto, todas as páginas do
+    // painel no escuro despejam um erro de hidratação no console, que acaba
+    // escondendo erro de verdade.
+    <html
+      lang="pt-BR"
+      className={`${jakarta.variable} ${oswald.variable} ${playfair.variable} h-full`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col bg-background text-foreground font-body">
         <MotionProvider>{children}</MotionProvider>
         <PWARegister />

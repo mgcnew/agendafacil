@@ -43,3 +43,6 @@ next-env.d.ts
 # Supabase CLI temp
 supabase/.temp/
 APLICAR-whatsapp.sql
+
+# Artefatos de sessão do Playwright MCP (snapshots e logs do navegador)
+.playwright-mcp/
