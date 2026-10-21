@@ -347,6 +347,12 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
   // longa "hh:mm · Nome" em ~60-80px de largura); baixo-mas-largo continua
   // preferindo 1 linha combinada, que economiza altura sem sacrificar nome.
   const stacked = narrow || !compact;
+  const settled = a.status === "completed" || a.status === "cancelled" || a.status === "no_show";
+  const crossed = a.status === "cancelled" || a.status === "no_show";
+  // Passou do horário e ninguém deu baixa: o mesmo âmbar do "dar baixa" da
+  // Visão geral, pra a pendência saltar na varredura da grade.
+  const overdue = (a.status === "pending" || a.status === "confirmed") &&
+    new Date(a.starts_at).getTime() < new Date().getTime();
 
   return (
     <button
@@ -374,10 +380,14 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
               : "")
           : undefined
       }
-      className="absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className={cn(
+        "absolute inset-0 rounded-[6px] cursor-pointer overflow-hidden text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        settled && "opacity-55",
+        overdue && "ring-2 ring-inset ring-amber-500/70",
+      )}
       style={{
         borderLeft: `3px solid ${color}`,
-        background: color + "1a",
+        background: color + (settled ? "14" : "26"),
         // Hachura diagonal só em domicílio. O bloco já usa a cor da
         // profissional, então cor não estava disponível como sinal — a
         // textura sobrevive ao card de 40px, onde não cabe texto nenhum.
@@ -407,7 +417,7 @@ function ApptCard({ a, color, compact = false, narrow = false, onOpen }: {
               )}
               <span className="truncate text-foreground/80 min-w-0">{timeLabel}</span>
             </p>
-            <p className={cn("font-medium text-foreground truncate leading-tight", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5")}>
+            <p className={cn("font-semibold text-foreground truncate leading-tight", narrow ? "text-[9px] mt-0.5" : "text-[12px] mt-0.5", crossed && "line-through")}>
               {name}
             </p>
           </>
@@ -834,6 +844,18 @@ function ApptDetailModal({
   );
 }
 
+// Abre a grade já no ponto que interessa: hoje, na linha de agora; em outro
+// dia, no primeiro atendimento. Antes abria sempre no topo e o dia "começava"
+// em horas vazias, com o que importava fora da tela.
+function useScrollToY(ref: React.RefObject<HTMLDivElement | null>, y: number | null, key: string) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || y === null) return;
+    el.scrollTo({ top: Math.max(0, y - 96) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
 // ── Day View ───────────────────────────────────────────────────
 const COL_W_DAY = 160;
 
@@ -856,10 +878,15 @@ function DayView({ date, appts, blocks, pros, activePros, canManageSchedule, can
   const nCols   = Math.max(1, cols.length);
   const minW    = 56 + nCols * COL_W_DAY;
   const isEmpty = appts.length === 0;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const focusY = todayLine !== null
+    ? todayLine
+    : appts.length > 0 ? Math.min(...appts.map((a) => apptTop(a, bounds.start))) : null;
+  useScrollToY(scrollRef, focusY, date);
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto scroll-thin relative">
         {/* Sticky column headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
           <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
@@ -1156,10 +1183,18 @@ function WeekView({ date, appts, blocks, pros, activePros, canManageSchedule, ca
   const hours    = hoursOf(bounds);
   const totalH   = totalHeight(bounds);
   const isEmpty  = visible.length === 0;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const weekNowY = days.includes(todayStr)
+    ? (now.getHours() + now.getMinutes() / 60 - bounds.start) * CELL_H
+    : null;
+  const focusY = weekNowY !== null
+    ? weekNowY
+    : visible.length > 0 ? Math.min(...visible.map((a) => apptTop(a, bounds.start))) : null;
+  useScrollToY(scrollRef, focusY, days[0] ?? date);
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card h-full flex flex-col overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-auto scroll-thin relative">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto scroll-thin relative">
         {/* Sticky day headers */}
         <div className="flex sticky top-0 z-20 bg-card border-b border-border" style={{ minWidth: minW }}>
           <div className="w-14 shrink-0 sticky left-0 z-30 bg-card" />
@@ -1331,7 +1366,18 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, canCr
                   )}
                 </div>
 
-                <div className="space-y-0.5">
+                {/* Celular: a célula tem ~50px — o texto virava "16:…". Bolinhas
+                    na cor de cada atendimento dizem quanto o dia está cheio;
+                    tocar abre o dia. */}
+                {dayAppts.length > 0 && (
+                  <div className="sm:hidden flex flex-wrap gap-1 px-0.5" aria-label={`${dayAppts.length} agendamento${dayAppts.length === 1 ? "" : "s"}`}>
+                    {dayAppts.slice(0, 6).map(a => (
+                      <span key={a.id} className="h-1.5 w-1.5 rounded-full" style={{ background: a.color ?? getColor(pros, a.member_id) }} />
+                    ))}
+                    {dayAppts.length > 6 && <span className="text-[9px] leading-none text-muted-foreground">+{dayAppts.length - 6}</span>}
+                  </div>
+                )}
+                <div className="hidden sm:block space-y-0.5">
                   {dayAppts.slice(0, MAX).map(a => {
                     const color = a.color ?? getColor(pros, a.member_id);
                     return (
@@ -1456,11 +1502,13 @@ export function AgendaManager({
     return m;
   }, [services]);
 
-  // Cor do evento = cor do 1º serviço do atendimento (cinza neutro se sem cor).
+  // Cor do evento = cor do 1º serviço do atendimento; sem cor de serviço, a da
+  // profissional. Antes caía no cinza — e como quase nenhum salão colore os
+  // serviços, a grade inteira ficava cinza e nada se distinguia.
   const apptColor = useCallback((a: Appt): string => {
     const sid = a.appointment_services?.find((x) => x.service_id && serviceColor[x.service_id])?.service_id;
-    return (sid && serviceColor[sid]) || NO_SERVICE_COLOR;
-  }, [serviceColor]);
+    return (sid && serviceColor[sid]) || getColor(pros, a.member_id);
+  }, [serviceColor, pros]);
 
   // Sou um profissional com coluna na agenda? (posso bloquear meu próprio horário)
   const iAmPro = !!myMemberId && pros.some(p => p.id === myMemberId);
@@ -1784,11 +1832,11 @@ export function AgendaManager({
             <>
               <button
                 onClick={() => setBlocking(true)}
-                aria-label="Bloquear horário"
-                title="Bloquear horário"
-                className="lg:hidden grid h-9 w-9 place-items-center rounded-[var(--radius)] border border-border transition active:bg-muted"
+                // Cadeado sozinho não dizia o que faz; com o nome cabe no
+                // cabeçalho e ninguém precisa adivinhar.
+                className="lg:hidden inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-sm font-medium transition active:bg-muted"
               >
-                <Lock aria-hidden className="h-4 w-4" />
+                <Lock aria-hidden className="h-4 w-4" /> Bloquear
               </button>
               <Button variant="outline" className="hidden lg:inline-flex" onClick={() => setBlocking(true)}>
                 <Lock aria-hidden className="h-4 w-4" /> Bloquear
@@ -1946,7 +1994,7 @@ export function AgendaManager({
 
       {/* ── Professional filter ─────────────────────────── */}
       {pros.length > 1 && (
-        <div role="group" aria-label="Filtrar por profissional" className="flex items-center gap-2 flex-wrap">
+        <div role="group" aria-label="Filtrar por profissional" className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
           <span className="text-xs text-muted-foreground shrink-0">Profissional:</span>
           <button
             type="button"
@@ -1954,8 +2002,9 @@ export function AgendaManager({
             aria-pressed={selectedPros.length === 0}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              "shrink-0",
               selectedPros.length === 0
-                ? "bg-primary text-primary-foreground border-primary"
+                ? "bg-foreground text-background border-foreground"
                 : "border-border hover:border-foreground/30 text-foreground",
             )}
           >
@@ -1973,7 +2022,7 @@ export function AgendaManager({
                 // filtro está ligado, e algumas paletas quase não mudam o fundo.
                 aria-pressed={active}
                 className={cn(
-                  "flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  "flex shrink-0 items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                   active ? "" : "border-border hover:border-foreground/30",
                 )}
                 style={active ? { background: color + "22", borderColor: color } : {}}

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Calendar } from "@/components/Calendar";
 import { cn } from "@/lib/utils";
 import { CalendarDots } from "@phosphor-icons/react/dist/ssr";
+import { portalThemeOf, type PortalTheme } from "@/lib/portalTheme";
 
 const DIA_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -43,7 +44,7 @@ export function DateStrip({
 }) {
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
-  const [theme, setTheme] = React.useState<{ niche?: string; color?: string }>({});
+  const [theme, setTheme] = React.useState<PortalTheme>({});
   const btnRef = React.useRef<HTMLButtonElement>(null);
   const popRef = React.useRef<HTMLDivElement>(null);
   const fitaRef = React.useRef<HTMLDivElement>(null);
@@ -105,8 +106,7 @@ export function DateStrip({
 
   function abrir() {
     posicionar();
-    const host = btnRef.current?.closest("[data-niche]") as HTMLElement | null;
-    setTheme({ niche: host?.dataset.niche, color: host?.dataset.color });
+    setTheme(portalThemeOf(btnRef.current?.closest("[data-niche]")));
     setOpen(true);
   }
 
@@ -217,7 +217,7 @@ export function DateStrip({
           data-niche={theme.niche}
           data-color={theme.color}
           style={popStyle(rect)}
-          className="z-[70] rounded-[var(--radius)] border border-border bg-card p-2 shadow-xl text-foreground"
+          className={`${theme.className ?? ""} z-[70] rounded-[var(--radius)] border border-border bg-card p-2 shadow-xl text-foreground`}
         >
           <Calendar
             value={value}

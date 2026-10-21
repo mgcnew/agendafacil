@@ -16,6 +16,20 @@ import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
 import type { Client, HomeConfig, Pro, Service } from "./shared";
 
+// Cada etapa com número: o formulário tem uma ordem (quem → o quê → com quem →
+// quando), e o número diz isso sem precisar de texto explicando.
+function Etapa({ n, titulo, htmlFor, children }: { n: number; titulo: string; htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <Label htmlFor={htmlFor} className="flex items-center gap-2 text-sm font-semibold">
+        <span aria-hidden className="grid h-5 w-5 place-items-center rounded-full bg-foreground text-[11px] font-bold text-background tabular-nums">{n}</span>
+        {titulo}
+      </Label>
+      {children}
+    </section>
+  );
+}
+
 /**
  * Formulário de novo agendamento.
  *
@@ -199,7 +213,7 @@ export function CreateAppointment({
         onClick={() => setSelected(p => on ? p.filter(x => x !== s.id) : [...p, s.id])}
         className={cn(
           "w-full flex items-center justify-between rounded-[var(--radius)] border p-2.5 text-sm transition",
-          on ? "border-primary bg-secondary/40" : "border-border hover:border-foreground/20",
+          on ? "border-primary bg-secondary ring-1 ring-primary" : "border-border hover:border-foreground/25",
         )}
       >
         <span className="flex items-center gap-1.5">
@@ -220,19 +234,19 @@ export function CreateAppointment({
     );
   });
 
-  // Um bloco só, desenhado em dois lugares (coluna da direita no desktop, no
-  // fluxo no celular) — mesma marcação, sem cópia.
   const blocoServicos = (
-    <>
+    <div className="space-y-2">
+      <label htmlFor="novo-busca-servico" className="sr-only">Buscar serviço</label>
       <Input
+        id="novo-busca-servico"
         placeholder="Buscar serviço…"
         value={svcSearch}
         onChange={e => setSvcSearch(e.target.value)}
       />
-      <div className="space-y-1.5 max-h-52 overflow-auto sm:max-h-none sm:flex-1 sm:pr-0.5">
+      <div className="space-y-1.5 sm:max-h-64 sm:overflow-auto sm:pr-0.5">
         {serviceButtons}
       </div>
-    </>
+    </div>
   );
 
   const blocoHorarios = (
@@ -248,10 +262,10 @@ export function CreateAppointment({
     ) : slots.length === 0 ? (
       <p className="rounded-[var(--radius)] border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
         Nenhum horário livre neste dia para {pros.find(p => p.id === proId)?.name ?? "esta profissional"}.
-        Tente outro dia na fita acima.
+        Tente outro dia acima.
       </p>
     ) : (
-      <TimeSlots dense slots={slots} selected={slot || null} onSelect={setSlot} className="max-h-56 overflow-auto sm:max-h-48" />
+      <TimeSlots dense slots={slots} selected={slot || null} onSelect={setSlot} className="max-h-56 overflow-auto" />
     )
   );
 
@@ -263,170 +277,132 @@ export function CreateAppointment({
         : !slot ? "Escolha um horário"
           : null;
 
+  const duracao = totalDuration >= 60
+    ? `${Math.floor(totalDuration / 60)}h${totalDuration % 60 ? String(totalDuration % 60).padStart(2, "0") : ""}`
+    : `${totalDuration} min`;
+
   return (
     <MotionModal onClose={onClose}>
-      <Card className="w-full sm:max-w-3xl mx-auto max-h-[90vh] overflow-auto sm:overflow-hidden p-6 rounded-b-none sm:rounded-[var(--radius)]">
-        <div className="flex items-center justify-between mb-5">
+      <Card className="w-full sm:max-w-4xl mx-auto max-h-[92dvh] flex flex-col overflow-hidden p-0 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4 sm:px-6">
           <h3 className="font-display text-lg font-bold">Novo agendamento</h3>
           <button
             type="button" onClick={onClose} aria-label="Fechar"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <X aria-hidden className="h-5 w-5" />
           </button>
         </div>
 
-        {/* A data atravessa as duas colunas no desktop: ela é o eixo do
-            formulário (muda a lista de horários inteira) e, espremida na
-            coluna de 240px, a fita mostraria três dias — perdendo o motivo de
-            existir. No celular ela volta para o fluxo, na ordem em que se
-            preenche. */}
-        <div className="hidden sm:block mb-4">
-          <Label className="mb-1.5 block">Data</Label>
-          <DateStrip value={date} onChange={setDate} />
+        {/* Corpo rolável. Desktop: à esquerda quem e o quê; à direita com quem
+            e quando. Celular: a mesma ordem numa coluna. */}
+        <div className="flex-1 min-h-0 overflow-auto px-5 py-5 sm:px-6">
+          <div className="grid gap-6 sm:grid-cols-2 sm:gap-8">
+            <div className="space-y-6 min-w-0">
+              <Etapa n={1} titulo="Cliente">
+                <ClientCombobox
+                  clients={clients}
+                  value={existingClient}
+                  onChange={v => { setExisting(v); setSelected([]); }}
+                />
+                {!existingClient && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Placeholder não é rótulo: some ao digitar e não é lido
+                        como nome do campo. */}
+                    <label htmlFor="novo-cli-nome" className="sr-only">Nome da cliente</label>
+                    <Input id="novo-cli-nome" placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
+                    <label htmlFor="novo-cli-fone" className="sr-only">Celular da cliente</label>
+                    <Input id="novo-cli-fone" placeholder="Celular" inputMode="numeric" value={clientPhone} onChange={e => setClientPhone(maskBrPhone(e.target.value))} />
+                  </div>
+                )}
+                {lastSvcs && (
+                  <div className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-muted/50 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground truncate">
+                      Último: <span className="text-foreground font-medium">{lastSvcs.map(s => s.name).join(", ")}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(lastSvcs.map(s => s.id).filter(id => services.some(sv => sv.id === id)))}
+                      className="shrink-0 text-xs font-semibold hover:underline"
+                    >
+                      Repetir
+                    </button>
+                  </div>
+                )}
+              </Etapa>
+
+              <Etapa n={2} titulo="Serviços">
+                {blocoServicos}
+              </Etapa>
+            </div>
+
+            <div className="space-y-6 min-w-0">
+              <Etapa n={3} titulo="Profissional" htmlFor="novo-profissional">
+                {/* Foto no rótulo: a cor do avatar é a mesma que identifica a
+                    pessoa na grade da agenda. */}
+                <Select id="novo-profissional" value={proId} onValueChange={setProId}>
+                  {pros.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {/* inline-flex e não flex: o Select embrulha o rótulo num
+                          span com `truncate`, e um filho block quebraria o
+                          alinhamento tanto no botão quanto na lista. */}
+                      <span className="inline-flex items-center gap-2 align-middle">
+                        <ProAvatar pro={p} size={20} />
+                        <span>{p.name}</span>
+                      </span>
+                    </option>
+                  ))}
+                </Select>
+                {/* Onde vai ser: muda a lista de serviços, então fica junto. */}
+                {homeConfig?.enabled && (
+                  <div className="pt-1">
+                    <HomeModePicker
+                      config={homeConfig}
+                      modo={modo}
+                      onModo={trocarModo}
+                      cliente={clienteEscolhido}
+                      endereco={endereco}
+                      onEndereco={setEndereco}
+                      temServicoDeCasa={temServicoDeCasa}
+                    />
+                  </div>
+                )}
+              </Etapa>
+
+              <Etapa n={4} titulo="Dia e horário">
+                <DateStrip value={date} onChange={setDate} />
+                {blocoHorarios}
+              </Etapa>
+            </div>
+          </div>
         </div>
 
-        {/* Desktop: two columns. Mobile: single column */}
-        <div className="sm:flex sm:gap-6 sm:min-h-[420px]">
-
-          {/* Left column — fields */}
-          <div className="space-y-4 sm:w-60 sm:shrink-0 sm:flex sm:flex-col sm:space-y-3">
-            <div className="space-y-1.5">
-              <Label>Cliente</Label>
-              <ClientCombobox
-                clients={clients}
-                value={existingClient}
-                onChange={v => { setExisting(v); setSelected([]); }}
-              />
-            </div>
-            {!existingClient && (
-              <div className="grid grid-cols-2 gap-3">
-                {/* Placeholder não é rótulo: some ao digitar e não é lido como
-                    nome do campo. */}
-                <label htmlFor="novo-cli-nome" className="sr-only">Nome da cliente</label>
-                <Input id="novo-cli-nome" placeholder="Nome" value={clientName} onChange={e => setClientName(e.target.value)} />
-                <label htmlFor="novo-cli-fone" className="sr-only">Celular da cliente</label>
-                <Input id="novo-cli-fone" placeholder="Celular" inputMode="numeric" value={clientPhone} onChange={e => setClientPhone(maskBrPhone(e.target.value))} />
-              </div>
-            )}
-            {lastSvcs && (
-              <div className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-muted/40 px-3 py-2 text-sm">
-                <span className="text-muted-foreground truncate">
-                  Último: <span className="text-foreground font-medium">{lastSvcs.map(s => s.name).join(", ")}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelected(lastSvcs.map(s => s.id).filter(id => services.some(sv => sv.id === id)))}
-                  className="shrink-0 text-xs font-semibold text-primary hover:underline"
-                >
-                  Usar
-                </button>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="novo-profissional">Profissional</Label>
-              {/* Foto no rótulo: em salão com equipe, quem atende se reconhece
-                  pelo rosto antes do nome — e a cor do avatar é a mesma que
-                  identifica a pessoa na grade da agenda. */}
-              <Select id="novo-profissional" value={proId} onValueChange={setProId}>
-                {pros.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {/* inline-flex e não flex: o Select embrulha o rótulo num
-                        span com `truncate`, e um filho block quebraria o
-                        alinhamento tanto no botão quanto na lista. */}
-                    <span className="inline-flex items-center gap-2 align-middle">
-                      <ProAvatar pro={p} size={20} />
-                      <span>{p.name}</span>
-                    </span>
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            {/* Onde vai ser: antes dos serviços, porque muda a lista deles. */}
-            {homeConfig?.enabled && (
-              <div className="space-y-1.5">
-                <Label>Onde</Label>
-                <HomeModePicker
-                  config={homeConfig}
-                  modo={modo}
-                  onModo={trocarModo}
-                  cliente={clienteEscolhido}
-                  endereco={endereco}
-                  onEndereco={setEndereco}
-                  temServicoDeCasa={temServicoDeCasa}
-                />
-              </div>
-            )}
-
-            {/* Serviços e horários no celular ficam aqui, no fluxo; no desktop
-                vão para a coluna da direita. */}
-            <div className="space-y-1.5 sm:hidden">
-              <Label>Serviços</Label>
-              {blocoServicos}
-            </div>
-
-            <div className="space-y-1.5 sm:hidden">
-              <Label>Data</Label>
-              <DateStrip value={date} onChange={setDate} />
-            </div>
-
-            <div className="space-y-1.5 sm:hidden">
-              <Label>Horário</Label>
-              {blocoHorarios}
-            </div>
-
-            {/* Resumo antes do botão: o que vai ser criado, em uma linha.
-                O "Total" era um campo de formulário que ninguém preenche e
-                mostrava R$ 0,00 antes de haver o que somar; aqui ele só
-                aparece quando existe conta, junto da duração — que é o número
-                que faltava para escolher horário com segurança. */}
-            <div className="sm:mt-auto space-y-2 pt-1">
-              {chosen.length > 0 && (
-                <div className="flex items-baseline justify-between gap-2 rounded-[var(--radius)] bg-muted/50 px-3 py-2">
-                  <span className="min-w-0 text-xs text-muted-foreground">
-                    <span className="truncate">{chosen.map(s => s.name).join(" + ")}</span>
-                    {" · "}
-                    {totalDuration >= 60
-                      ? `${Math.floor(totalDuration / 60)}h${totalDuration % 60 ? String(totalDuration % 60).padStart(2, "0") : ""}`
-                      : `${totalDuration} min`}
-                  </span>
-                  <span className="shrink-0 font-semibold text-primary">{formatBRL(totalPrice)}</span>
-                </div>
+        {/* Rodapé fixo: o que vai ser criado + a ação, sempre à vista. */}
+        <div className="shrink-0 border-t border-border bg-card px-5 py-3 sm:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {err && <p role="alert" className="mb-2 text-sm text-red-600">{err}</p>}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0 flex-1 text-sm">
+              {chosen.length > 0 ? (
+                <p className="truncate">
+                  <span className="font-semibold tabular-nums">{formatBRL(totalPrice)}</span>
+                  <span className="text-muted-foreground"> · {duracao} · {chosen.map(s => s.name).join(" + ")}</span>
+                </p>
+              ) : (
+                <p className="text-muted-foreground">Nenhum serviço escolhido ainda.</p>
               )}
-
-              {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
-
-              <Button
-                className="w-full" onClick={create} disabled={busy || !!faltando}
-                // Sem isto o botão travado ficava mudo para leitor de tela:
-                // o motivo estava escrito abaixo, mas solto na página.
-                aria-describedby={faltando ? "novo-falta" : undefined}
-              >
-                {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
-                {busy ? "Criando…" : "Criar agendamento"}
-              </Button>
               {faltando && (
-                <p id="novo-falta" className="text-center text-xs text-muted-foreground">{faltando}</p>
+                <p id="novo-falta" className="text-xs text-muted-foreground">{faltando}</p>
               )}
             </div>
+            <Button
+              className="w-full sm:w-auto sm:min-w-52 rounded-full" onClick={create} disabled={busy || !!faltando}
+              // Sem isto o botão travado ficava mudo para leitor de tela.
+              aria-describedby={faltando ? "novo-falta" : undefined}
+            >
+              {busy && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+              {busy ? "Criando…" : "Criar agendamento"}
+            </Button>
           </div>
-
-          {/* Coluna da direita (desktop) — o que e quando. Horários logo
-              abaixo dos serviços porque um depende do outro: mudar o serviço
-              muda a duração e, com ela, a lista de horários. */}
-          <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-w-0 sm:gap-3">
-            <div className="flex min-h-0 flex-1 flex-col">
-              <Label className="mb-2">Serviços</Label>
-              <div className="flex min-h-0 flex-1 flex-col gap-2">{blocoServicos}</div>
-            </div>
-            <div className="shrink-0">
-              <Label className="mb-2 block">Horário</Label>
-              {blocoHorarios}
-            </div>
-          </div>
-
         </div>
       </Card>
     </MotionModal>

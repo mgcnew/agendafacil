@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { m } from "framer-motion";
+import { portalThemeOf, type PortalTheme } from "@/lib/portalTheme";
 
 /** O que o Tab alcança dentro do modal. */
 const FOCALIZAVEL =
@@ -17,18 +18,14 @@ export function MotionModal({
   label?: string;
   children: React.ReactNode;
 }) {
-  const [attrs, setAttrs] = useState<{ niche?: string; color?: string }>({});
+  const [attrs, setAttrs] = useState<PortalTheme>({});
   const [mounted, setMounted] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
   const idTitulo = useId();
 
   useEffect(() => {
     setMounted(true);
-    const el = document.querySelector("[data-niche]");
-    setAttrs({
-      niche: el?.getAttribute("data-niche") ?? undefined,
-      color: el?.getAttribute("data-color") ?? undefined,
-    });
+    setAttrs(portalThemeOf(document.querySelector("[data-niche]")));
   }, []);
 
   // Nome do diálogo e ida/volta do foco.
@@ -115,7 +112,7 @@ export function MotionModal({
     <div
       data-niche={attrs.niche}
       data-color={attrs.color}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center text-foreground bg-transparent"
+      className={`${attrs.className ?? ""} fixed inset-0 z-50 flex items-end sm:items-center justify-center text-foreground bg-transparent`}
     >
       <m.div
         className="absolute inset-0 bg-black/50"

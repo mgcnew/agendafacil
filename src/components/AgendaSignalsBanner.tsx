@@ -111,13 +111,11 @@ export function AgendaSignalsBanner({
     return null;
 
   return (
-    <div className="rounded-[var(--radius)] border border-primary/20 bg-primary/5 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-          <Sparkle className="h-3.5 w-3.5" />
-        </span>
-        <p className="text-sm font-semibold">De olho na agenda de hoje</p>
-      </div>
+    <div className="rounded-[var(--radius)] border border-border bg-card p-3 space-y-2">
+      <p className="flex items-center gap-2 px-1 text-sm font-semibold">
+        <Sparkle aria-hidden className="h-4 w-4 text-primary" weight="fill" />
+        De olho na agenda de hoje
+      </p>
 
       <div className="space-y-2">
         {/* Primeiro de todos de propósito: nos outros avisos o dia continua

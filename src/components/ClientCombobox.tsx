@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CaretDown, MagnifyingGlass, Plus, UserPlus, X } from "@phosphor-icons/react/dist/ssr";
+import { portalThemeOf, type PortalTheme } from "@/lib/portalTheme";
 
 export type ComboClient = { id: string; full_name: string; phone: string | null };
 
@@ -47,7 +48,7 @@ export function ClientCombobox({
   const [open, setOpen] = React.useState(false);
   const [busca, setBusca] = React.useState("");
   const [rect, setRect] = React.useState<DOMRect | null>(null);
-  const [theme, setTheme] = React.useState<{ niche?: string; color?: string }>({});
+  const [theme, setTheme] = React.useState<PortalTheme>({});
   const [ativo, setAtivo] = React.useState(0);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -89,8 +90,7 @@ export function ClientCombobox({
 
   function abrir() {
     posicionar();
-    const host = wrapRef.current?.closest("[data-niche]") as HTMLElement | null;
-    setTheme({ niche: host?.dataset.niche, color: host?.dataset.color });
+    setTheme(portalThemeOf(wrapRef.current?.closest("[data-niche]")));
     setOpen(true);
     setAtivo(0);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -221,7 +221,7 @@ export function ClientCombobox({
           data-niche={theme.niche}
           data-color={theme.color}
           style={menuStyle(rect)}
-          className="z-[70] overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 text-foreground shadow-xl"
+          className={`${theme.className ?? ""} z-[70] overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 text-foreground shadow-xl`}
         >
           {/* Nunca filtrado: é a saída para quando a busca não achou nada. */}
           <button

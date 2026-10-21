@@ -7,6 +7,7 @@ import {
   CaretDown,
   Check,
 } from "@phosphor-icons/react/dist/ssr";
+import { portalThemeOf, type PortalTheme } from "@/lib/portalTheme";
 
 type Opt = { value: string; label: React.ReactNode; disabled?: boolean };
 
@@ -45,7 +46,7 @@ export function Select({
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
   // tema do ancestral (o portal fica fora do wrapper [data-niche]/[data-color])
-  const [theme, setTheme] = React.useState<{ niche?: string; color?: string }>({});
+  const [theme, setTheme] = React.useState<PortalTheme>({});
   const btnRef = React.useRef<HTMLButtonElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -69,8 +70,7 @@ export function Select({
   function openMenu() {
     if (disabled) return;
     updateRect();
-    const host = btnRef.current?.closest("[data-niche]") as HTMLElement | null;
-    setTheme({ niche: host?.dataset.niche, color: host?.dataset.color });
+    setTheme(portalThemeOf(btnRef.current?.closest("[data-niche]")));
     setOpen(true);
   }
 
@@ -144,7 +144,7 @@ export function Select({
           data-niche={theme.niche}
           data-color={theme.color}
           style={menuStyle(rect)}
-          className="z-[60] overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground"
+          className={`${theme.className ?? ""} z-[60] overflow-auto rounded-[var(--radius)] border border-border bg-card p-1 shadow-xl text-foreground`}
         >
           {options.map((o) => {
             const on = o.value === value;
