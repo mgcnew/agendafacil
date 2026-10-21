@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/Switch";
 
 /**
  * Alterna o modo noturno do painel. A preferência é por dispositivo
  * (localStorage "af-theme") e o atributo data-theme fica no <html> — o
  * script inline do layout do painel já aplica antes de pintar (sem flash).
  */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  variant = "icon",
+}: {
+  className?: string;
+  /** "row": linha de lista com rótulo e interruptor (menu "Mais" do celular). */
+  variant?: "icon" | "row";
+}) {
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -35,6 +43,16 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   const label = dark ? "Tema claro" : "Tema escuro";
+
+  if (variant === "row") {
+    return (
+      <div className={cn("flex items-center gap-3.5", className)}>
+        <Moon className="h-5 w-5 shrink-0 text-foreground/70" />
+        <span className="flex-1 text-[0.95rem] font-medium">Modo noturno</span>
+        <Switch checked={mounted && dark} onChange={toggle} label="Modo noturno" />
+      </div>
+    );
+  }
 
   return (
     <button

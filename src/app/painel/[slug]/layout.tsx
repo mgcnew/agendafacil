@@ -6,6 +6,7 @@ import { planAllowsHref, DIVULGACAO_DISPONIVEL } from "@/lib/plans";
 import { SubscriptionGate } from "./assinatura/SubscriptionGate";
 import { PanelShell, type NavItem, type NavGroup } from "./PanelShell";
 import { InlineScript } from "@/components/InlineScript";
+import { figtree } from "@/components/landing/fonts";
 import { SessionKeepAlive } from "@/components/auth/SessionKeepAlive";
 import { SessionPersistence } from "@/components/auth/SessionPersistence";
 
@@ -95,6 +96,7 @@ export default async function PanelLayout({
   if (access && !access.has_access) {
     return (
       <div
+        className={`panel-root ${figtree.variable} min-h-full bg-background text-foreground`}
         data-niche={membership.salons.niche}
         data-color={
           (membership.salons.color_theme && membership.salons.color_theme !== "")
@@ -139,7 +141,7 @@ export default async function PanelLayout({
     <div
       data-niche={niche}
       data-color={colorAttr}
-      className="panel-root min-h-full bg-background text-foreground"
+      className={`panel-root ${figtree.variable} min-h-full bg-background text-foreground`}
     >
       {/* Aplica o modo noturno antes de pintar (evita flash claro). Só roda
           nas rotas do painel — landing/página pública do cliente nunca ficam

@@ -31,6 +31,8 @@ import {
   SignOut,
   ShareNetwork,
   ShieldCheck,
+  CaretLeft,
+  CaretRight,
 } from "@phosphor-icons/react/dist/ssr";
 
 /** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
@@ -221,6 +223,14 @@ export function PanelShell({
   const naAgenda = pathname === `${base}/agenda`;
   const fullBleed = naAgenda;
 
+  // A tela "Mais" fecha no Esc e ao trocar de rota (link tocado lá dentro).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const allItems = groups.flatMap((g) => g.items);
 
   const isActive = (href: string) =>
@@ -276,6 +286,12 @@ export function PanelShell({
     router.refresh();
   }
 
+  // Item da sidebar desktop: só ícone + tooltip no lg (barra estreita), ícone +
+  // rótulo a partir do xl. O ativo usa o tom da cor do salão, sem pílula cheia.
+  const itemBase =
+    "group relative flex items-center justify-center xl:justify-start gap-3 rounded-[0.7rem] h-10 w-10 xl:w-full xl:px-3 text-[0.9rem] font-medium transition-colors";
+  const itemIdle = "text-foreground/65 hover:bg-muted hover:text-foreground";
+
   function NavLink({ it }: { it: NavItem }) {
     const href = base + it.href;
     const active = isActive(it.href);
@@ -283,25 +299,33 @@ export function PanelShell({
     return (
       <Link
         href={href}
+        aria-current={active ? "page" : undefined}
         className={cn(
-          "group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 transition",
-          active
-            ? "bg-primary text-primary-foreground"
-            : "text-foreground/60 hover:bg-muted hover:text-foreground",
+          itemBase,
+          active ? "bg-secondary text-foreground font-semibold" : itemIdle,
         )}
       >
-        <Icon className="h-[18px] w-[18px] shrink-0" />
-        <Tip label={it.label} />
+        <Icon
+          className={cn("h-[18px] w-[18px] shrink-0", active && "text-primary")}
+          weight={active ? "fill" : "regular"}
+        />
+        <span className="hidden xl:inline truncate">{it.label}</span>
+        <span className="xl:hidden"><Tip label={it.label} /></span>
       </Link>
     );
   }
 
-  /** Nav usado na sidebar desktop — grupos com divisores */
+  /** Nav usado na sidebar desktop — grupos com rótulo (xl) ou divisor (lg) */
   const desktopNav = (
-    <nav className="pointer-events-auto flex flex-col items-center gap-1 w-full">
+    <nav aria-label="Painel" className="pointer-events-auto flex flex-col items-center xl:items-stretch gap-0.5 w-full">
       {mainGroups.map((group, gi) => (
-        <div key={group.label} className="flex flex-col items-center gap-1 w-full">
-          {gi > 0 && <div className="w-6 h-px bg-border/60 my-1.5" />}
+        <div key={group.label} className="flex flex-col items-center xl:items-stretch gap-0.5 w-full">
+          {gi > 0 && <div className="w-6 h-px bg-border my-2 xl:hidden" />}
+          {mainGroups.length > 1 && (
+            <p className={cn("hidden xl:block px-3 pb-1 text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground", gi > 0 ? "pt-5" : "pt-1")}>
+              {group.label}
+            </p>
+          )}
           {group.items.map((it) => <NavLink key={it.href} it={it} />)}
         </div>
       ))}
@@ -310,59 +334,59 @@ export function PanelShell({
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      {/* ── Sidebar desktop — recolhida, ícones + tooltip ───────── */}
-      <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-4 overflow-visible">
-        {/* Logo — nunca comprime (shrink-0) */}
+      {/* ── Sidebar desktop — ícones no lg, ícone + rótulo no xl ───────── */}
+      <aside className="hidden lg:flex w-16 xl:w-60 shrink-0 flex-col items-center xl:items-stretch border-r border-border bg-card py-4 xl:px-3 gap-4 overflow-visible">
+        {/* Marca + salão — nunca comprime (shrink-0) */}
         <Link
           href={base}
-          className="group relative flex shrink-0 items-center justify-center h-10 w-10 rounded-[var(--radius)] overflow-hidden bg-white ring-1 ring-border mb-2"
+          className="group relative flex shrink-0 items-center gap-3 rounded-[0.7rem] xl:px-1.5 xl:py-1 mb-2 hover:bg-muted transition-colors"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
-          <Tip label={salon.name} />
+          <span className="block h-10 w-10 shrink-0 overflow-hidden rounded-[0.7rem] bg-white ring-1 ring-border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
+          </span>
+          <span className="hidden xl:block min-w-0 leading-tight">
+            <span className="block truncate font-display font-bold text-[0.95rem]">{salon.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</span>
+          </span>
+          <span className="xl:hidden"><Tip label={salon.name} /></span>
         </Link>
 
         {/* Itens de navegação — rolagem interna invisível quando não cabem.
             box-content + pr/-mr estende a área de recorte só à direita (sem
-            deslocar layout) para as tooltips não serem cortadas; a barra some
-            via .no-scrollbar e pointer-events-none deixa cliques passarem pro
-            conteúdo (os links reativam com pointer-events-auto). */}
-        <div className="flex-1 min-h-0 w-full box-content overflow-y-auto overscroll-contain no-scrollbar pointer-events-none pr-28 -mr-28">
+            deslocar layout) para as tooltips do lg não serem cortadas; a barra
+            some via .no-scrollbar e pointer-events-none deixa cliques passarem
+            pro conteúdo (os links reativam com pointer-events-auto). */}
+        <div className="flex-1 min-h-0 w-full box-content xl:box-border overflow-y-auto overscroll-contain no-scrollbar pointer-events-none pr-28 -mr-28 xl:pr-0 xl:mr-0">
           {desktopNav}
         </div>
 
         {/* Rodapé: Sistema (ex: Configurações) + ações utilitárias */}
-        <div className="shrink-0 flex flex-col items-center gap-1">
-          {systemGroup && (
-            <>
-              {systemGroup.items.map((it) => <NavLink key={it.href} it={it} />)}
-              <div className="w-6 h-px bg-border/60 my-1.5" />
-            </>
-          )}
+        <div className="shrink-0 flex flex-col items-center xl:items-stretch gap-0.5 border-t border-border pt-3">
+          {systemGroup && systemGroup.items.map((it) => <NavLink key={it.href} it={it} />)}
           {isPlatformAdmin && (
-            <Link
-              href="/admin"
-              className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-foreground/60 hover:bg-muted hover:text-foreground transition"
-            >
-              <ShieldCheck className="h-[18px] w-[18px]" />
-              <Tip label="Plataforma" />
+            <Link href="/admin" className={cn(itemBase, itemIdle)}>
+              <ShieldCheck className="h-[18px] w-[18px] shrink-0" />
+              <span className="hidden xl:inline">Plataforma</span>
+              <span className="xl:hidden"><Tip label="Plataforma" /></span>
             </Link>
           )}
-          <ThemeToggle />
-          <button
-            onClick={sharePublic}
-            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-primary hover:bg-primary/10 transition"
-          >
-            <ShareNetwork className="h-[18px] w-[18px]" />
-            <Tip label="Compartilhar link" />
+          <button onClick={sharePublic} className={cn(itemBase, itemIdle)}>
+            <ShareNetwork className="h-[18px] w-[18px] shrink-0" />
+            <span className="hidden xl:inline">Compartilhar link</span>
+            <span className="xl:hidden"><Tip label="Compartilhar link" /></span>
           </button>
-          <button
-            onClick={logout}
-            className="group relative flex items-center justify-center rounded-[var(--radius)] w-10 h-10 text-red-600 hover:bg-red-500/10 hover:text-red-700 transition"
-          >
-            <SignOut className="h-[18px] w-[18px]" />
-            <Tip label="Sair" />
-          </button>
+          <div className="flex items-center justify-center xl:justify-between gap-1 xl:pl-1 flex-col xl:flex-row">
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className={cn(itemBase, "xl:w-auto text-foreground/65 hover:bg-red-500/10 hover:text-red-600")}
+            >
+              <SignOut className="h-[18px] w-[18px] shrink-0" />
+              <span className="hidden xl:inline">Sair</span>
+              <span className="xl:hidden"><Tip label="Sair" /></span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -484,151 +508,126 @@ export function PanelShell({
         </nav>
       </div>
 
-      {/* ── Bottom sheet "Mais" (mobile) ─────────────────────────── */}
+      {/* ── Tela "Mais" (mobile) — página cheia em lista, entra pela direita ── */}
       {open && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-0 inset-x-0 bg-card rounded-t-2xl max-h-[85vh] flex flex-col shadow-2xl border-t border-border/50">
-            {/* Topo fixo: puxador + cabeçalho */}
-            <div className="shrink-0 px-4 pt-3">
-              <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30 mb-4" />
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="block h-9 w-9 shrink-0 overflow-hidden rounded-[var(--radius)] bg-white ring-1 ring-border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
-                    <p className="text-xs text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
-                  </div>
-                </div>
-                <button onClick={() => setOpen(false)} className="shrink-0 grid place-items-center h-9 w-9 rounded-[var(--radius)] text-muted-foreground hover:bg-muted hover:text-foreground transition">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Meio rolável: grade de páginas */}
-            <div className="flex-1 overflow-auto px-4 pb-2">
-              {moreGroups.length > 0 && (
-                <div className="space-y-3">
-                  {moreGroups.map((group) => (
-                    <div key={group.label}>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-0.5">
-                        {group.label}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {group.items.map((it) => {
-                          const active = isActive(it.href);
-                          const Icon = ICONS[it.icon];
-                          return (
-                            <Link
-                              key={it.href}
-                              href={base + it.href}
-                              onClick={() => setOpen(false)}
-                              className={cn(
-                                "flex flex-col items-center gap-2 rounded-[var(--radius)] p-3 text-center transition active:scale-[0.97]",
-                                active ? "bg-primary/10 ring-1 ring-primary/25" : "bg-muted/50 hover:bg-muted",
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  "grid place-items-center h-10 w-10 rounded-[var(--radius)] transition",
-                                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
-                                )}
-                              >
-                                <Icon className="h-5 w-5" weight={active ? "fill" : "regular"} />
-                              </span>
-                              <span className={cn("text-[11px] font-medium leading-tight", active ? "text-primary" : "text-foreground/75")}>
-                                {it.label}
-                              </span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Rodapé fixo: sempre à mostra. Em linha, não empilhado — as quatro
-                ações ocupavam ~180px de altura para dizer o que quatro ícones
-                com legenda dizem em 80px, e o que sobra vira grade de páginas
-                visível sem rolar.
-
-                Sem fundo nos itens (diferente das páginas acima): a grade são
-                lugares, esta linha são ações. O contraste de tratamento é o que
-                evita ler a barra como "mais cinco telas". */}
-            <div
-              className={cn(
-                "shrink-0 grid gap-1 border-t border-border/60 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
-                isPlatformAdmin ? "grid-cols-4" : "grid-cols-3",
-              )}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mais opções"
+          className="lg:hidden fixed inset-0 z-50 flex flex-col bg-background zl-push"
+        >
+          <header className="shrink-0 flex items-center gap-2 h-14 px-2 border-b border-border bg-card">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Voltar"
+              className="grid place-items-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition"
             >
-              {isPlatformAdmin && (
-                <Link
-                  href="/admin"
-                  onClick={() => setOpen(false)}
-                  className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-muted"
-                >
-                  <span className="grid place-items-center h-9 w-9 rounded-full bg-muted text-foreground/70">
-                    <ShieldCheck className="h-[18px] w-[18px]" />
-                  </span>
-                  <span className="text-[10px] font-medium leading-tight text-center text-foreground/75">
-                    Plataforma
-                  </span>
-                </Link>
-              )}
-              {settingsItem && (
-                <Link
-                  href={base + settingsItem.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97]",
-                    isActive(settingsItem.href) ? "bg-primary/10" : "hover:bg-muted",
-                  )}
-                >
-                  <span className={cn(
-                    "grid place-items-center h-9 w-9 rounded-full",
-                    isActive(settingsItem.href) ? "bg-primary text-primary-foreground shadow-sm" : "bg-primary/10 text-primary",
-                  )}>
-                    <Gear className="h-[18px] w-[18px]" weight={isActive(settingsItem.href) ? "fill" : "regular"} />
-                  </span>
-                  <span className={cn(
-                    "text-[10px] font-medium leading-tight text-center",
-                    isActive(settingsItem.href) ? "text-primary" : "text-foreground/75",
-                  )}>
-                    {settingsItem.label}
-                  </span>
-                </Link>
-              )}
+              <CaretLeft className="h-5 w-5" weight="bold" />
+            </button>
+            <h2 className="font-display font-bold text-lg">Mais</h2>
+          </header>
+
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-6">
+            {/* Salão */}
+            <div className="flex items-center gap-3 rounded-[var(--radius)] bg-card border border-border p-3.5">
+              <span className="block h-11 w-11 shrink-0 overflow-hidden rounded-[0.7rem] bg-white ring-1 ring-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icon-192.png" alt="Zulan" className="h-full w-full object-cover" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-display font-bold leading-tight truncate">{salon.name}</p>
+                <p className="text-sm text-muted-foreground">{ROLE_LABEL[role] ?? role}</p>
+              </div>
               <button
                 onClick={() => { setOpen(false); sharePublic(); }}
-                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-primary/10"
+                aria-label="Compartilhar link de agendamento"
+                className="grid place-items-center h-10 w-10 shrink-0 rounded-full bg-secondary text-primary transition active:scale-95"
               >
-                <span className="grid place-items-center h-9 w-9 rounded-full bg-primary/10 text-primary">
-                  <ShareNetwork className="h-[18px] w-[18px]" />
-                </span>
-                <span className="text-[10px] font-medium leading-tight text-center text-primary">
-                  Compartilhar
-                </span>
-              </button>
-              {/* Sair fica em vermelho e no canto: é a única ação da linha que
-                  não dá pra desfazer com um toque de volta. */}
-              <button
-                onClick={logout}
-                className="flex flex-col items-center gap-1.5 rounded-[var(--radius)] px-1 py-2 transition active:scale-[0.97] hover:bg-red-500/10"
-              >
-                <span className="grid place-items-center h-9 w-9 rounded-full bg-red-500/10 text-red-600">
-                  <SignOut className="h-[18px] w-[18px]" />
-                </span>
-                <span className="text-[10px] font-medium leading-tight text-center text-red-600">
-                  Sair
-                </span>
+                <ShareNetwork className="h-5 w-5" />
               </button>
             </div>
+
+            {moreGroups.map((group) => (
+              <section key={group.label} aria-label={group.label}>
+                <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {group.label}
+                </p>
+                <ul className="overflow-hidden rounded-[var(--radius)] bg-card border border-border divide-y divide-border">
+                  {group.items.map((it) => {
+                    const active = isActive(it.href);
+                    const Icon = ICONS[it.icon];
+                    return (
+                      <li key={it.href}>
+                        <Link
+                          href={base + it.href}
+                          onClick={() => setOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={cn(
+                            "flex items-center gap-3.5 px-4 h-14 transition-colors active:bg-muted",
+                            active && "bg-secondary",
+                          )}
+                        >
+                          <Icon
+                            className={cn("h-5 w-5 shrink-0", active ? "text-primary" : "text-foreground/70")}
+                            weight={active ? "fill" : "regular"}
+                          />
+                          <span className={cn("flex-1 text-[0.95rem]", active ? "font-semibold" : "font-medium")}>
+                            {it.label}
+                          </span>
+                          <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+
+            {/* Sistema: ajustes, preferências e saída */}
+            <ul className="overflow-hidden rounded-[var(--radius)] bg-card border border-border divide-y divide-border">
+              {settingsItem && (
+                <li>
+                  <Link
+                    href={base + settingsItem.href}
+                    onClick={() => setOpen(false)}
+                    aria-current={isActive(settingsItem.href) ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3.5 px-4 h-14 transition-colors active:bg-muted",
+                      isActive(settingsItem.href) && "bg-secondary",
+                    )}
+                  >
+                    <Gear className="h-5 w-5 shrink-0 text-foreground/70" />
+                    <span className="flex-1 text-[0.95rem] font-medium">{settingsItem.label}</span>
+                    <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                </li>
+              )}
+              {isPlatformAdmin && (
+                <li>
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3.5 px-4 h-14 transition-colors active:bg-muted"
+                  >
+                    <ShieldCheck className="h-5 w-5 shrink-0 text-foreground/70" />
+                    <span className="flex-1 text-[0.95rem] font-medium">Plataforma</span>
+                    <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                </li>
+              )}
+              <li className="px-4 h-14 flex items-center">
+                <ThemeToggle variant="row" className="w-full" />
+              </li>
+              <li>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-3.5 px-4 h-14 text-left text-red-600 transition-colors active:bg-red-500/10"
+                >
+                  <SignOut className="h-5 w-5 shrink-0" />
+                  <span className="flex-1 text-[0.95rem] font-medium">Sair</span>
+                </button>
+              </li>
+            </ul>
           </div>
         </div>
       )}

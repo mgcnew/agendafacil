@@ -428,6 +428,66 @@
 
 
 /* ============================================================
+   PAINEL — base Zulan + cor do salão como acento.
+   Superfícies, tinta, bordas e tipografia são as mesmas da landing
+   para todo salão; da paleta escolhida só sobrevivem --primary,
+   --accent e o tom claro derivado deles. A página pública (/{slug})
+   não usa .panel-root e segue com o tema completo do salão.
+   Seletores com [data-niche]/[data-color] para empatar ou vencer a
+   especificidade das paletas acima; a ordem no arquivo desempata.
+   ============================================================ */
+.panel-root[data-niche],
+.panel-root {
+  --background: #f7f7f6;
+  --foreground: #0d1014;
+  --card: #ffffff;
+  --card-foreground: #0d1014;
+  --secondary: color-mix(in srgb, var(--primary) 10%, #ffffff);
+  --secondary-foreground: color-mix(in srgb, var(--primary) 70%, #0d1014);
+  --muted: #f1f1ef;
+  --muted-foreground: #5c6166;
+  --border: #e7e7e4;
+  --shadow-card: 0 1px 2px rgba(13,16,20,.05), 0 8px 24px -14px rgba(13,16,20,.16);
+  --radius: 0.875rem;
+  --display-tracking: -0.02em;
+  --display-transform: none;
+  --display-weight: 700;
+  --font-display: var(--font-figtree), system-ui, sans-serif;
+  --font-body: var(--font-figtree), system-ui, sans-serif;
+  font-family: var(--font-body);
+}
+/* Preto e o padrão da barbearia nasceram para fundo escuro: no claro, o
+   acento vira tinta (Preto) ou o cobre ganha contraste no branco. */
+.panel-root[data-color="i"] {
+  --primary: #0d1014; --primary-foreground: #ffffff; --ring: #0d1014;
+}
+.panel-root[data-niche="barbearia"]:not([data-color]) {
+  --primary: #b06f1f; --primary-foreground: #ffffff; --ring: #b06f1f;
+}
+.panel-root ::selection { background: var(--primary); color: var(--primary-foreground); }
+
+/* Noturno do painel: neutro, sem a mistura da marca nas superfícies. */
+[data-theme="dark"] .panel-root[data-niche],
+[data-theme="dark"] .panel-root {
+  --background: #0d0e10;
+  --foreground: #f2f2f0;
+  --card: #16171a;
+  --card-foreground: #f2f2f0;
+  --secondary: color-mix(in srgb, var(--primary) 18%, #16171a);
+  --secondary-foreground: #f2f2f0;
+  --muted: #1c1d20;
+  --muted-foreground: #a3a5a8;
+  --border: #2a2b2f;
+  --shadow-card: 0 0 0 1px rgba(255,255,255,.04), 0 16px 34px -20px rgba(0,0,0,.8);
+}
+[data-theme="dark"] .panel-root[data-color="i"] {
+  --primary: #f2f2f0; --primary-foreground: #0d0e10; --ring: #a3a5a8;
+}
+[data-theme="dark"] .panel-root[data-niche="barbearia"]:not([data-color]) {
+  --primary: #d4954a; --primary-foreground: #0d0e10; --ring: #d4954a;
+}
+
+/* ============================================================
    BASE STYLES
    ============================================================ */
 @layer base {
@@ -565,6 +625,13 @@
 }
 .zl-swap { animation: zl-swap .35s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* Tela cheia do celular entrando pela direita (menu "Mais") */
+@keyframes zl-push {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+.zl-push { animation: zl-push .32s cubic-bezier(0.16, 1, 0.3, 1); }
+
 @keyframes af-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
@@ -586,7 +653,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .af-rise, .af-float, .zl-swap { animation: none; }
+  .af-rise, .af-float, .zl-swap, .zl-push { animation: none; }
   .reveal { opacity: 1; transform: none; transition: none; }
   * { scroll-behavior: auto !important; }
 }
