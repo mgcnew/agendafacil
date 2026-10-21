@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "hero-eyebrow-chip",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-21T19:12:14.512Z",
+        "reason": "claude: faixa de cabeçalho do rótulo (Uso profissional / Fórmula Nº 1) é a gramática do objeto-rótulo no esboço de decisão, não um eyebrow de SaaS"
+      }
+    ]
+  }
+}

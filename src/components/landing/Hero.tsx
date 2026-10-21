@@ -1,186 +1,73 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui";
-import { ArrowRight, Check, Scissors, Star } from "@phosphor-icons/react/dist/ssr";
-import { LiveCard, PhoneMockup } from "./AppMockup";
+import { ArrowRight, Check } from "@phosphor-icons/react/dist/ssr";
 
 /**
- * Hero da landing.
- *  - Mobile (< lg): o mockup do app (HTML/CSS, sempre nítido e na marca) é o
- *    visual principal, centralizado, com o card "ao vivo" sobreposto no topo —
- *    sem a foto, que ficava apertada e cobria a composição no celular.
- *  - Desktop (lg+): composição completa — foto na marca + mockup sobreposto +
- *    card flutuante.
+ * Hero da landing — manchete + ações à esquerda, o produto real à direita:
+ * a captura da agenda num quadro grande e a página de agendamento da cliente
+ * num celular sobreposto. Sem mockup desenhado: o que aparece é o painel.
  */
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-background">
-      {/* Brilho quente no topo */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(100% 60% at 70% 0%, rgba(14,111,120,0.08), transparent 60%)",
-        }}
-      />
-      {/* Blob decorativo */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -right-24 h-[460px] w-[460px] rounded-full opacity-[0.10]"
-        style={{ background: "radial-gradient(circle, #c9a24a, transparent 70%)" }}
-      />
-
-      <div className="relative mx-auto max-w-6xl px-5 py-14 sm:py-20 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
-          {/* ── Coluna de texto ──────────────────────────────────── */}
-          <div className="text-center lg:text-left">
-            {/* Badge */}
-            <div className="flex justify-center lg:justify-start mb-5 af-rise" style={{ animationDelay: "0.05s" }}>
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
-                <Star className="h-3.5 w-3.5 fill-current text-amber-400" />
-                Feito para salões de beleza e barbearias
-              </span>
-            </div>
-
-            {/* Headline */}
-            <h1
-              className="font-display text-4xl sm:text-5xl lg:text-[3.75rem] font-bold leading-[1.04] tracking-tight af-rise"
-              style={{ animationDelay: "0.12s" }}
-            >
-              Sua recepcionista virtual,{" "}
-              <span className="text-primary">24 horas por dia.</span>
+    <section className="relative bg-background">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 pt-10 pb-16 sm:pt-16 lg:pt-20 lg:pb-24">
+        <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-12 lg:gap-16 items-center">
+          {/* ── Texto ─────────────────────────────────────────── */}
+          <div className="af-rise">
+            <h1 className="font-display font-extrabold text-[2.6rem] leading-[1.02] sm:text-6xl lg:text-[4.4rem] tracking-[-0.035em] text-balance">
+              O salão inteiro num lugar só.
             </h1>
-
-            {/* Subtítulo */}
-            <p
-              className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed af-rise"
-              style={{ animationDelay: "0.2s" }}
-            >
-              O <strong className="font-semibold text-foreground">sistema de agendamento online com inteligência artificial</strong> para
-              salões de beleza, barbearias e estética. A cliente agenda pelo seu
-              link e recebe confirmação automática; a IA organiza sua agenda e
-              chama de volta quem deixou de aparecer. Você só aparece para
-              atender.
+            <p className="mt-6 text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-[34rem]">
+              Agenda online, caixa, comissões, estoque e clientes para{" "}
+              <strong className="font-semibold text-foreground">salão de beleza e barbearia</strong>{" "}
+              — com uma IA que confirma horário e chama de volta quem sumiu.
             </p>
 
-            {/* CTAs */}
-            <div
-              className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3 af-rise"
-              style={{ animationDelay: "0.28s" }}
-            >
-              <a href="#demo">
-                <Button size="lg" className="font-semibold">
-                  Ver o sistema por dentro <ArrowRight className="h-4 w-4" />
-                </Button>
-              </a>
-              <a href="#como-funciona">
-                <Button size="lg" variant="outline">
-                  Ver como funciona
-                </Button>
+            <div className="mt-9 flex flex-col sm:flex-row gap-3">
+              <Link href="/criar-salao" className="zl-btn zl-btn-dark">
+                Criar meu salão <ArrowRight className="h-4 w-4" weight="bold" />
+              </Link>
+              <a href="#demo" className="zl-btn zl-btn-line">
+                Ver por dentro, sem cadastro
               </a>
             </div>
 
-            {/* Selos de confiança */}
-            <ul
-              className="mt-6 flex flex-wrap justify-center lg:justify-start gap-x-6 gap-y-1.5 af-rise"
-              style={{ animationDelay: "0.36s" }}
-            >
-              {[
-                "Sem cadastro para testar",
-                "Configurado em 2 minutos",
-                "Cancele quando quiser",
-              ].map((t) => (
-                <li
-                  key={t}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                >
-                  <Check className="h-3 w-3 text-primary shrink-0" /> {t}
+            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              {["Sem cartão para testar", "Configurado em 2 minutos", "Cancele quando quiser"].map((t) => (
+                <li key={t} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-[var(--brand)]" weight="bold" />
+                  {t}
                 </li>
               ))}
             </ul>
-
-            {/* Desvio pra barbearia, acima da dobra de propósito: esta home
-                fala a língua de salão ("a cliente"), e o barbeiro que cai aqui
-                precisa da porta antes de decidir sair — não no meio do scroll. */}
-            <div
-              className="mt-6 flex justify-center lg:justify-start af-rise"
-              style={{ animationDelay: "0.44s" }}
-            >
-              <Link
-                href="/barbearia"
-                className="group inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary"
-              >
-                <Scissors className="h-3.5 w-3.5 shrink-0 text-primary" />
-                <span>
-                  Tem barbearia?{" "}
-                  <span className="font-semibold text-foreground">
-                    Veja a página feita pra você
-                  </span>
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            </div>
           </div>
 
-          {/* ── Coluna do visual ─────────────────────────────────── */}
-          <div className="relative af-rise" style={{ animationDelay: "0.18s" }}>
-            {/* Halo quente atrás do visual */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 -z-10"
-              style={{
-                background:
-                  "radial-gradient(55% 55% at 55% 45%, rgba(201,162,74,0.20), transparent 70%)",
-              }}
-            />
-
-            {/* ── MOBILE / TABLET (< lg): mockup centralizado ─────── */}
-            <div className="lg:hidden">
-              <div className="relative mx-auto w-[248px] max-w-full pt-6">
-                <PhoneMockup />
-                {/* Card "ao vivo" sobreposto no topo, sem estourar a borda */}
-                <div
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-[260px] max-w-[86vw] af-rise"
-                  style={{ animationDelay: "0.5s" }}
-                >
-                  <LiveCard />
-                </div>
-              </div>
+          {/* ── Produto ───────────────────────────────────────── */}
+          <div className="relative af-rise pb-10 sm:pb-0 sm:pr-10 lg:pr-12" style={{ animationDelay: "0.12s" }}>
+            <div className="overflow-hidden rounded-[var(--radius-media)] border border-border bg-secondary shadow-[var(--shadow-media)]">
+              <Image
+                src="/showcase-agenda.png"
+                alt="Agenda do Zulan: atendimentos do dia por profissional e o assistente avisando quem ainda não chegou"
+                width={2880}
+                height={1800}
+                priority
+                sizes="(max-width: 1024px) 92vw, 700px"
+                className="w-full h-auto"
+              />
             </div>
 
-            {/* ── DESKTOP (lg+): composição foto + mockup + card ──── */}
-            <div className="hidden lg:block relative">
-              {/* Foto na marca (dona + salão) */}
-              <div className="relative mx-auto max-w-[520px] overflow-hidden rounded-[2rem] ring-1 ring-border shadow-card">
-                <Image
-                  src="/hero-zulan.jpg"
-                  alt="Dona de salão de beleza usando o Zulan no dia a dia"
-                  width={886}
-                  height={1182}
-                  quality={92}
-                  sizes="520px"
-                  className="w-full h-auto"
-                  priority
-                  draggable={false}
-                />
-              </div>
-
-              {/* Mockup do app (HTML/CSS) sobreposto no canto inferior esquerdo */}
-              <div
-                className="absolute -left-6 bottom-8 w-[212px] af-rise"
-                style={{ animationDelay: "0.5s" }}
-                aria-hidden
-              >
-                <PhoneMockup />
-              </div>
-
-              {/* Card flutuante — agendamento chegando "ao vivo" */}
-              <div
-                className="absolute -right-3 top-10 af-rise"
-                style={{ animationDelay: "0.66s" }}
-              >
-                <LiveCard />
+            {/* Celular — página de agendamento da cliente */}
+            <div className="absolute -bottom-2 right-0 sm:-bottom-10 w-[30%] max-w-[190px] min-w-[112px]">
+              <div className="rounded-[1.9rem] bg-[#0d1014] p-[6px] shadow-[var(--shadow-media)]">
+                <div className="relative overflow-hidden rounded-[1.5rem] bg-white" style={{ aspectRatio: "390 / 760" }}>
+                  <Image
+                    src="/showcase-booking.png"
+                    alt="Página de agendamento do salão no celular da cliente, com a lista de serviços"
+                    fill
+                    sizes="190px"
+                    className="object-cover object-top"
+                  />
+                </div>
               </div>
             </div>
           </div>

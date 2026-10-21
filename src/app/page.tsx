@@ -1,31 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui";
 import { JsonLd } from "@/components/InlineScript";
 import { PLANS, priceLabel, SUBSCRIBABLE_PLANS } from "@/lib/plans";
 import { Hero } from "@/components/landing/Hero";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import { SiteFooter } from "@/components/landing/SiteFooter";
-import { ScrollReveal } from "@/components/landing/ScrollReveal";
-import { DevicesShowcase } from "@/components/landing/DevicesShowcase";
 import { BenefitsQA } from "@/components/landing/BenefitsQA";
-import {
-  ArrowRight,
-  CalendarCheck,
-  Check,
-  Clock,
-  DeviceMobile,
-  Handshake,
-  Lightning,
-  Lock,
-  Prohibit,
-  SealCheck,
-  ShieldCheck,
-  Sparkle,
-  Star,
-  Wallet,
-} from "@phosphor-icons/react/dist/ssr";
+import { figtree } from "@/components/landing/fonts";
+import { ArrowRight, Check, Plus, Star } from "@phosphor-icons/react/dist/ssr";
 import { SITE_URL } from "@/lib/siteUrl";
 
 // SEO específico da home — sobrescreve o default do layout com foco nas
@@ -34,7 +17,7 @@ export const metadata: Metadata = {
   title:
     "Sistema de agendamento online com IA para salões de beleza e barbearias",
   description:
-    "Zulan é a recepcionista virtual do seu salão: agenda que atende sozinha, confirma horário e recupera cliente que sumiu — 24 horas por dia. Você cuida da beleza, a equipe virtual cuida da agenda e do caixa. Entre na demonstração e veja o sistema por dentro, sem cadastro.",
+    "Zulan é a gestão completa do salão e da barbearia: agenda online com link para clientes, confirmação automática, caixa, comissões, estoque e clientes — com IA que recupera quem sumiu. Entre na demonstração e veja o sistema por dentro, sem cadastro.",
   alternates: { canonical: "/" },
 };
 
@@ -42,15 +25,14 @@ export const metadata: Metadata = {
 
 const PLAN_CARDS: {
   id: "basic" | "pro" | "max";
-  highlight?: boolean;
   role: string;
   pitch: string;
   features: string[];
 }[] = [
   {
     id: "basic",
-    role: "Recepcionista virtual",
-    pitch: "Ela atende, agenda e confirma horário — 24 horas por dia.",
+    role: "Agenda",
+    pitch: "Para parar de marcar horário pelo WhatsApp.",
     features: [
       "Agenda online ilimitada",
       "Link de agendamento para clientes",
@@ -60,11 +42,10 @@ const PLAN_CARDS: {
   },
   {
     id: "pro",
-    highlight: true,
-    role: "+ Marketing e Financeiro",
-    pitch: "Sua equipe cresce: alguém cuidando do caixa e procurando clientes para você.",
+    role: "Gestão completa",
+    pitch: "Agenda, dinheiro e clientes do salão num lugar só.",
     features: [
-      "Tudo da Recepcionista",
+      "Tudo do Básico",
       "Caixa e comissões automatizados",
       "Controle de estoque",
       "Campanhas e recuperação de clientes",
@@ -73,10 +54,10 @@ const PLAN_CARDS: {
   },
   {
     id: "max",
-    role: "+ Automação no WhatsApp",
-    pitch: "Toda a equipe, agora respondendo e agindo sozinha no WhatsApp.",
+    role: "+ WhatsApp automático",
+    pitch: "A gestão completa respondendo e agindo sozinha no WhatsApp.",
     features: [
-      "Tudo da Equipe",
+      "Tudo do Pro",
       "Integração com WhatsApp",
       "Mensagens automáticas",
     ],
@@ -84,56 +65,48 @@ const PLAN_CARDS: {
 ];
 
 const OBJECTIONS: {
-  icon: React.ComponentType<{ className?: string }>;
   title: string;
   answer: string;
   /** Destino opcional depois da resposta — só onde a dúvida tem página própria. */
   link?: { label: string; href: string };
 }[] = [
   {
-    icon: Sparkle,
     title: "Isso é só agenda com nome bonito de IA?",
     answer:
-      "Não. Já identificamos sozinhos quem faltou, cancelou ou sumiu e entregamos pronto pra chamar de volta no WhatsApp. É o primeiro passo da equipe virtual.",
+      "Não. Além da agenda, o Zulan cuida do caixa, das comissões, do estoque e das clientes — e já identifica sozinho quem faltou, cancelou ou sumiu, entregando pronto pra chamar de volta no WhatsApp.",
   },
   {
-    icon: DeviceMobile,
     title: "Minha cliente vai conseguir usar?",
     answer:
       "Funciona no navegador do celular, sem instalar nada. A cliente clica no link e agenda em menos de 1 minuto — sem cadastro complicado.",
   },
   {
-    icon: Lightning,
     title: "É complicado de configurar?",
     answer:
       "Em 2 minutos você cadastra o salão, adiciona serviços e já tem seu link compartilhável. Nenhuma integração técnica, nenhum arquivo para instalar.",
   },
   {
-    icon: Lock,
-    title: "Meus dados ficam seguros?",
-    answer:
-      "Servidor com criptografia SSL, backups automáticos diários e conformidade com a LGPD. Seus dados e os das clientes protegidos por padrão.",
-  },
-  {
-    icon: Handshake,
-    title: "E se eu precisar de ajuda?",
-    answer:
-      "Suporte por WhatsApp e central de ajuda com tutoriais em vídeo. Você não fica sozinha em nenhum momento do processo.",
-  },
-  {
-    icon: Wallet,
-    title: "Tem contrato de fidelidade?",
-    answer:
-      "Não. Plano mensal, cancele quando quiser sem multa. Você continua porque quer — não porque é obrigada.",
-  },
-  {
-    icon: SealCheck,
     title: "Funciona para barbearia também?",
     answer:
       "Sim. O sistema tem temas e lógica específica para salão feminino, barbearia, estética e negócios mistos. Para barbearia existe até uma página só sobre isso.",
     // Quem faz esta pergunta é exatamente quem a /barbearia atende: é o
     // momento de maior intenção da página inteira pra esse público.
     link: { label: "Ver o Zulan para barbearia", href: "/barbearia" },
+  },
+  {
+    title: "Meus dados ficam seguros?",
+    answer:
+      "Servidor com criptografia SSL, backups automáticos diários e conformidade com a LGPD. Seus dados e os das clientes protegidos por padrão.",
+  },
+  {
+    title: "E se eu precisar de ajuda?",
+    answer:
+      "Suporte por WhatsApp e central de ajuda com tutoriais em vídeo. Você não fica sozinha em nenhum momento do processo.",
+  },
+  {
+    title: "Tem contrato de fidelidade?",
+    answer:
+      "Não. Plano mensal, cancele quando quiser sem multa. Você continua porque quer — não porque é obrigada.",
   },
 ];
 
@@ -148,124 +121,6 @@ const TESTIMONIALS: {
   text: string;
   stars: number;
 }[] = [];
-
-// ── Formas geométricas laranja ──────────────────────────────────────────────
-
-/** Anel de círculo — borda laranja fina, apenas decorativo */
-function OrangeRing({
-  size = 320,
-  opacity = 0.18,
-  style,
-}: {
-  size?: number;
-  opacity?: number;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <span
-      aria-hidden
-      className="absolute pointer-events-none rounded-full"
-      style={{
-        width: size,
-        height: size,
-        border: "2.5px solid #0e6f78",
-        opacity,
-        ...style,
-      }}
-    />
-  );
-}
-
-/** Blob preenchido — círculo laranja suave */
-function OrangeBlob({
-  size = 200,
-  opacity = 0.08,
-  style,
-}: {
-  size?: number;
-  opacity?: number;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <span
-      aria-hidden
-      className="absolute pointer-events-none rounded-full"
-      style={{
-        width: size,
-        height: size,
-        background: "radial-gradient(circle, #0e6f78, transparent 70%)",
-        opacity,
-        ...style,
-      }}
-    />
-  );
-}
-
-/** Triângulo decorativo em SVG */
-function OrangeTriangle({
-  size = 80,
-  opacity = 0.15,
-  rotate = 0,
-  style,
-}: {
-  size?: number;
-  opacity?: number;
-  rotate?: number;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <svg
-      aria-hidden
-      width={size}
-      height={size}
-      viewBox="0 0 80 80"
-      fill="none"
-      className="absolute pointer-events-none"
-      style={{ opacity, transform: `rotate(${rotate}deg)`, ...style }}
-    >
-      <polygon points="40,4 76,72 4,72" stroke="#0e6f78" strokeWidth="3" fill="none" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Grade de pontos laranja */
-function OrangeDots({
-  cols = 5,
-  rows = 4,
-  gap = 18,
-  opacity = 0.18,
-  style,
-}: {
-  cols?: number;
-  rows?: number;
-  gap?: number;
-  opacity?: number;
-  style?: React.CSSProperties;
-}) {
-  const w = (cols - 1) * gap;
-  const h = (rows - 1) * gap;
-  return (
-    <svg
-      aria-hidden
-      width={w + 12}
-      height={h + 12}
-      className="absolute pointer-events-none"
-      style={{ opacity, ...style }}
-    >
-      {Array.from({ length: rows }).map((_, r) =>
-        Array.from({ length: cols }).map((_, c) => (
-          <circle
-            key={`${r}-${c}`}
-            cx={6 + c * gap}
-            cy={6 + r * gap}
-            r={2.5}
-            fill="#0e6f78"
-          />
-        )),
-      )}
-    </svg>
-  );
-}
 
 // ── Dados estruturados (JSON-LD) p/ rich results do Google ──────────────────
 
@@ -333,59 +188,13 @@ function StructuredData() {
   return <JsonLd data={graph} />;
 }
 
-// ── Barra de confiança (stats acima da dobra) ──────────────────────────────
-
-const TRUST_STATS = [
-  { icon: Clock, value: "2 min", label: "para configurar o salão" },
-  { icon: CalendarCheck, value: "24/7", label: "clientes agendam sozinhas" },
-  { icon: ShieldCheck, value: "LGPD", label: "dados protegidos" },
-  { icon: Prohibit, value: "0%", label: "fidelidade ou multa" },
-];
-
-function TrustBar() {
-  return (
-    <section
-      aria-label="Por que confiar no Zulan"
-      className="border-y border-border bg-card"
-    >
-      <div className="mx-auto max-w-6xl px-5">
-        <ul className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
-          {TRUST_STATS.map((s, i) => (
-            <li
-              key={s.label}
-              className="group reveal"
-              style={{ transitionDelay: `${i * 70}ms` }}
-            >
-              <div className="flex items-center gap-3.5 px-4 py-6 sm:px-6">
-                <span className="grid place-items-center h-11 w-11 shrink-0 rounded-xl bg-secondary text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
-                  <s.icon className="h-5 w-5" />
-                </span>
-                <span className="leading-tight">
-                  <span className="block font-display text-xl font-bold tracking-tight">
-                    {s.value}
-                  </span>
-                  <span className="block text-xs text-muted-foreground mt-0.5">
-                    {s.label}
-                  </span>
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-// ── CTA fixo no rodapé (mobile) — alto impacto em conversão ─────────────────
+// ── CTA fixo no rodapé (mobile) ─────────────────────────────────────────────
 
 function StickyMobileCTA() {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 lg:hidden">
-      <Link href="/criar-salao" className="block">
-        <Button size="lg" className="w-full font-bold">
-          Criar meu salão <ArrowRight className="h-4 w-4" />
-        </Button>
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 sm:hidden">
+      <Link href="/criar-salao" className="zl-btn zl-btn-dark w-full">
+        Criar meu salão <ArrowRight className="h-4 w-4" weight="bold" />
       </Link>
     </div>
   );
@@ -393,640 +202,354 @@ function StickyMobileCTA() {
 
 // ── Página ─────────────────────────────────────────────────────────────────
 
+const NICHES = [
+  {
+    img: "/nicho-salao.jpg",
+    alt: "Cabeleireira escovando o cabelo de uma cliente sorridente num salão de beleza claro",
+    title: "Para salão de beleza",
+    services: "Cabelo, unhas, estética e sobrancelha",
+    demo: "/demo/salao",
+    page: null,
+  },
+  {
+    img: "/nicho-barbearia.jpg",
+    alt: "Barbeiro aparando a barba de um cliente numa cadeira de couro, numa barbearia de tijolinho",
+    title: "Para barbearia",
+    services: "Corte, barba e o clima da sua cadeira",
+    demo: "/demo/barbearia",
+    // Quem se reconhece aqui ganha também a página que fala a língua dele.
+    page: { label: "Página para barbearias", href: "/barbearia" },
+  },
+] as const;
+
+const STEPS = [
+  {
+    title: "Cadastre o salão",
+    text: "Serviços, preços, duração e equipe. Em 2 minutos o salão está no ar.",
+  },
+  {
+    title: "Compartilhe seu link",
+    text: "No WhatsApp, no Instagram, na bio. A cliente escolhe serviço, profissional e horário livre.",
+  },
+  {
+    title: "Atenda. O resto anda.",
+    text: "Confirmação, lembrete, caixa e comissão acontecem enquanto você está na cadeira.",
+  },
+];
+
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-full bg-background text-foreground overflow-x-clip pb-20 lg:pb-0">
+    <div className={`zl ${figtree.variable} flex flex-col min-h-full overflow-x-clip pb-20 sm:pb-0`}>
       <StructuredData />
-      <ScrollReveal />
-      {/* Fallback sem JS: garante que o conteúdo apareça mesmo sem o observador */}
-      <noscript>
-        <style>{`.reveal{opacity:1 !important;transform:none !important}`}</style>
-      </noscript>
 
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
       <SiteHeader />
 
-      {/* ── HERO ───────────────────────────────────────────────────────── */}
-      <Hero />
+      <main>
+        {/* ── HERO ─────────────────────────────────────────────────────── */}
+        <Hero />
 
-      {/* ── BARRA DE CONFIANÇA ────────────────────────────────────────── */}
-      <TrustBar />
-
-      {/* ── COMO FUNCIONA — multi-device ──────────────────────────────── */}
-      <section id="como-funciona" className="relative bg-background py-20 sm:py-28 overflow-hidden">
-        {/* Atmosfera única e intencional (sem ruído de formas) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -z-0 inset-0"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 85% 30%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)",
-          }}
-        />
-
-        <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-
-            {/* Texto */}
-            <div className="reveal">
-              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
-                <span className="h-px w-8 bg-primary" />
-                Sua equipe, trabalhando enquanto você atende
-              </p>
-              <h2 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.08] tracking-tight">
-                Não é mais uma agenda.<br className="hidden sm:block" />{" "}
-                <span className="text-primary">É uma equipe que nunca para.</span>
-              </h2>
-              <p className="mt-4 text-muted-foreground leading-relaxed max-w-md">
-                Enquanto você atende quem está na cadeira, o resto do salão
-                continua andando — confirmação, cobrança, recuperação de
-                cliente e fechamento de caixa, sem você precisar parar.
-              </p>
-
-              {/* Capacidades — tabela editorial com etiqueta de contexto */}
-              <ul className="mt-8 border-t border-border">
-                {[
-                  {
-                    tag: "Recepção",
-                    label: "Agenda que atende sozinha",
-                    desc: "A cliente agenda pelo link, recebe confirmação automática e pode remarcar sem te chamar.",
-                  },
-                  {
-                    tag: "Marketing",
-                    label: "Clientes que voltam sozinhos",
-                    desc: "Quem faltou, cancelou ou sumiu aparece pronto pra chamar no WhatsApp, com mensagem e cupom prontos.",
-                  },
-                  {
-                    tag: "Financeiro",
-                    label: "Caixa que se fecha em minutos",
-                    desc: "Comissão, vendas e relatório do dia prontos pra baixar — sem planilha.",
-                  },
-                  {
-                    tag: "Equipe",
-                    label: "Acesso por cargo",
-                    desc: "Cada pessoa enxerga só o que precisa para o trabalho dela.",
-                  },
-                ].map((c) => (
-                  <li
-                    key={c.label}
-                    className="grid grid-cols-[92px_1fr] sm:grid-cols-[120px_1fr] gap-4 sm:gap-6 py-5 border-b border-border"
-                  >
-                    <span className="pt-0.5">
-                      <span
-                        className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-                        style={{
-                          background: "var(--secondary)",
-                          color: "var(--primary)",
-                        }}
-                      >
-                        {c.tag}
-                      </span>
-                    </span>
-                    <span>
-                      <span className="block font-display font-semibold leading-snug">
-                        {c.label}
-                      </span>
-                      <span className="block text-sm text-muted-foreground mt-1 leading-relaxed">
-                        {c.desc}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Device showcase emoldurado */}
-            <div className="relative reveal" style={{ transitionDelay: "120ms" }}>
-              <div
-                aria-hidden
-                className="absolute -inset-4 sm:-inset-8 -z-10 rounded-[2.5rem] af-grain"
-                style={{
-                  background:
-                    "linear-gradient(155deg, var(--secondary), transparent 65%)",
-                  boxShadow:
-                    "inset 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent)",
-                }}
-              />
-              <DevicesShowcase />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── DOIS MUNDOS (salão + barbearia) ───────────────────────────── */}
-      <section className="px-5 py-16 sm:py-24 bg-background">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center max-w-xl mx-auto mb-12 reveal">
-            <p className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
-              <span className="h-px w-8 bg-primary" />
-              Um sistema, dois mundos
-              <span className="h-px w-8 bg-primary" />
-            </p>
-            <h2 className="font-display text-3xl sm:text-5xl tracking-tight">
-              Feito pro salão <span className="text-primary">e</span> pra barbearia.
+        {/* ── SALÃO E BARBEARIA ────────────────────────────────────────── */}
+        {/* Links da demo com prefetch={false} de propósito: /demo/[vertical] é
+            uma rota que faz login; o prefetch dispararia o login sem clique. */}
+        <section aria-labelledby="nichos-titulo" className="py-16 sm:py-24">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <h2 id="nichos-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em] max-w-2xl text-balance">
+              Feito para o salão. Feito para a barbearia.
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Tema, serviços e linguagem se ajustam ao seu negócio — não é um sistema
-              genérico com cara de qualquer coisa.
+            <p className="mt-4 text-lg text-muted-foreground max-w-xl">
+              Tema, serviços e linguagem se ajustam ao seu negócio. Escolha o seu
+              e entre num painel de demonstração já funcionando.
             </p>
-          </div>
 
-          <div className="grid sm:grid-cols-2 gap-5">
-            {[
-              {
-                img: "/ambiente-salao.jpg",
-                alt: "Ambiente de um salão de beleza acolhedor com cadeira, espelho redondo e plantas",
-                tag: "Para salões de beleza",
-                title: "Cabelo, unhas, estética e sobrancelha",
-                href: null,
-              },
-              {
-                img: "/ambiente-barbearia.jpg",
-                alt: "Ambiente de uma barbearia com cadeira clássica de couro e tijolinho",
-                tag: "Para barbearias",
-                title: "Corte, barba e o clima da sua cadeira",
-                // Quem se reconhece aqui vai para a página que fala a língua
-                // dele, em vez de seguir numa home que atende os dois.
-                href: "/barbearia",
-              },
-            ].map((c) => {
-              // O conteúdo é o mesmo nos dois casos; só o container muda —
-              // Link quando há destino, div quando é apenas ilustrativo.
-              const conteudo = (
-                <div className="relative aspect-[4/3]">
-                  <Image
-                    src={c.img}
-                    alt={c.alt}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 90vw, 560px"
-                  />
-                  {/* Gradiente pra o texto ficar legível sobre a foto */}
-                  <div
-                    aria-hidden
-                    className="absolute inset-0"
-                    style={{ background: "linear-gradient(to top, rgba(11,33,39,0.82) 0%, rgba(11,33,39,0.15) 45%, transparent 70%)" }}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-white/75">
-                      {c.tag}
-                    </p>
-                    <p className="mt-0.5 font-display text-lg sm:text-xl font-semibold text-white">
-                      {c.title}
-                    </p>
-                  </div>
-                  {c.href && (
-                    <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-[#0b2127] shadow-sm">
-                      Ver página <ArrowRight className="h-3 w-3" />
-                    </span>
+            <div className="mt-10 grid md:grid-cols-2 gap-5">
+              {NICHES.map((n) => (
+                <div key={n.title}>
+                  <Link
+                    href={n.demo}
+                    prefetch={false}
+                    className="group relative block overflow-hidden rounded-[var(--radius-media)] aspect-[4/5] sm:aspect-[4/3] bg-secondary"
+                  >
+                    <Image
+                      src={n.img}
+                      alt={n.alt}
+                      fill
+                      sizes="(max-width: 768px) 92vw, 620px"
+                      className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                    />
+                    <div
+                      aria-hidden
+                      className="absolute inset-0"
+                      style={{ background: "linear-gradient(to top, rgba(13,16,20,.78), rgba(13,16,20,.05) 55%)" }}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between text-white">
+                      <div>
+                        <p className="font-display font-extrabold text-2xl sm:text-3xl tracking-[-0.02em]">{n.title}</p>
+                        <p className="mt-1 text-white/80">{n.services}</p>
+                      </div>
+                      <span className="zl-btn zl-btn-light zl-btn-sm shrink-0">
+                        Ver demonstração <ArrowRight className="h-4 w-4" weight="bold" />
+                      </span>
+                    </div>
+                  </Link>
+                  {n.page && (
+                    <Link
+                      href={n.page.href}
+                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand)] hover:underline"
+                    >
+                      {n.page.label} <ArrowRight className="h-3.5 w-3.5" weight="bold" />
+                    </Link>
                   )}
                 </div>
-              );
-
-              const base =
-                "group relative block overflow-hidden rounded-[var(--radius)] border border-border reveal";
-
-              return c.href ? (
-                <Link key={c.tag} href={c.href} className={`${base} transition-colors hover:border-primary`}>
-                  {conteudo}
-                </Link>
-              ) : (
-                <div key={c.tag} className={base}>
-                  {conteudo}
-                </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── DEMO AO VIVO ──────────────────────────────────────────────── */}
-      {/* Links usam <a> puro (não Link) de propósito: /demo/[vertical] é uma
-          rota que faz login; o prefetch do Link dispararia o login sem clique. */}
-      <section
-        id="demo"
-        className="px-5 py-16 sm:py-20 border-y border-border"
-        style={{ background: "var(--card)" }}
-      >
-        <div className="mx-auto max-w-3xl text-center reveal">
-          <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
-            <span className="h-px w-8 bg-primary" />
-            Sem criar conta
-            <span className="h-px w-8 bg-primary" />
-          </p>
-          <h2 className="font-display text-3xl sm:text-4xl tracking-tight">
-            Dê uma volta num salão de verdade
-          </h2>
-          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-            Entre num painel de demonstração já com agenda, caixa e comissões —
-            explore como se fosse seu, sem cadastro. Escolha o tipo do seu negócio:
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-            <a href="/demo/salao" className="block">
-              <Button size="lg" className="w-full sm:w-auto font-semibold">
-                Entrar como salão <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
-            <a href="/demo/barbearia" className="block">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto font-semibold">
-                Entrar como barbearia <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Q&A BENEFÍCIOS — INTERATIVO ───────────────────────────────── */}
-      <section
-        id="funcionalidades"
-        className="relative border-y border-border py-20 sm:py-28 overflow-hidden"
-        style={{ background: "var(--card)" }}
-      >
-        {/* Formas geométricas */}
-        <OrangeRing size={500} opacity={0.09} style={{ top: -180, right: -160 }} />
-        <OrangeBlob size={320} opacity={0.05} style={{ top: -100, right: -100 }} />
-        <OrangeDots cols={5} rows={6} opacity={0.13} style={{ bottom: 60, left: 0 }} />
-        <OrangeTriangle size={72} opacity={0.12} rotate={30} style={{ top: 40, left: "38%" }} />
-
-        <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="max-w-2xl mb-12 sm:mb-16 reveal">
-            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] mb-4" style={{ color: "#0e6f78" }}>
-              <span className="h-px w-8" style={{ background: "#0e6f78" }} />
-              Problemas reais, resolvidos
-            </p>
-            <h2 className="font-display text-3xl sm:text-5xl leading-[1.05] tracking-tight">
-              O que tomava seu tempo,<br className="hidden sm:block" />{" "}
-              <span className="text-primary">agora roda sozinho.</span>
-            </h2>
-            <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl">
-              Seis dores do dia a dia de um salão — e exatamente como sua
-              equipe virtual resolve cada uma.
-            </p>
-          </div>
-
-          <div className="reveal" style={{ transitionDelay: "100ms" }}>
+        {/* ── GESTÃO COMPLETA (explorador de módulos) ──────────────────── */}
+        <section id="funcionalidades" aria-labelledby="modulos-titulo" className="py-16 sm:py-24 bg-secondary scroll-mt-16">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <div className="grid lg:grid-cols-2 gap-6 items-end mb-10 sm:mb-14">
+              <h2 id="modulos-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em] text-balance">
+                Tudo o que o salão precisa. Num sistema só.
+              </h2>
+              <p className="text-lg text-muted-foreground lg:max-w-md lg:justify-self-end">
+                Da marcação ao fechamento do caixa: cada parte do dia a dia tem
+                seu lugar, e todas conversam entre si.
+              </p>
+            </div>
             <BenefitsQA />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── QUEBRA DE OBJEÇÕES / FAQ ──────────────────────────────────── */}
-      <section id="duvidas" aria-labelledby="duvidas-titulo" className="relative bg-background py-20 sm:py-28 overflow-hidden">
-        {/* Atmosfera única (sem ruído de formas) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2"
-          style={{
-            background:
-              "radial-gradient(50% 70% at 50% 100%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%)",
-          }}
-        />
+        {/* ── COMO FUNCIONA ────────────────────────────────────────────── */}
+        <section id="como-funciona" aria-labelledby="passos-titulo" className="py-16 sm:py-24 scroll-mt-16">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-12 lg:gap-20 items-center">
+            <div>
+              <h2 id="passos-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em] text-balance">
+                Do cadastro à agenda cheia em três passos.
+              </h2>
+              <ol className="mt-10 space-y-8">
+                {STEPS.map((s, i) => (
+                  <li key={s.title} className="grid grid-cols-[2.75rem_1fr] gap-5">
+                    <span className="grid place-items-center h-11 w-11 rounded-full bg-foreground text-background font-display font-bold tabular-nums">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <h3 className="font-display font-bold text-xl tracking-[-0.01em]">{s.title}</h3>
+                      <p className="mt-1.5 text-muted-foreground leading-relaxed max-w-md">{s.text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
 
-        <div className="mx-auto max-w-5xl px-5 relative">
-          <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16 reveal">
-            <p className="inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
-              <span className="h-px w-8 bg-primary" />
-              Sem letra miúda
-              <span className="h-px w-8 bg-primary" />
-            </p>
-            <h2 id="duvidas-titulo" className="font-display text-3xl sm:text-5xl tracking-tight">
-              Perguntas frequentes
-            </h2>
-            <p className="mt-4 text-muted-foreground text-base sm:text-lg">
-              Toda dúvida que costuma aparecer antes de começar — respondida sem
-              rodeios.
-            </p>
-          </div>
-
-          {/* Receio → resposta (editorial, sem caixas) */}
-          <div className="grid sm:grid-cols-2 gap-x-10 lg:gap-x-14 gap-y-10">
-            {OBJECTIONS.map((o, i) => (
-              <div
-                key={o.title}
-                className="group relative pl-5 sm:pl-6 reveal"
-                style={{ transitionDelay: `${(i % 2) * 80 + Math.floor(i / 2) * 60}ms` }}
-              >
-                {/* Trilho de acento */}
-                <span
-                  aria-hidden
-                  className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-border transition-colors duration-300 group-hover:bg-primary"
-                />
-
-                {/* O receio (a pergunta) */}
-                <div className="flex items-start gap-3">
-                  <span
-                    className="grid place-items-center h-9 w-9 rounded-xl shrink-0 transition-colors duration-300"
-                    style={{ background: "var(--secondary)", color: "var(--primary)" }}
-                  >
-                    <o.icon className="h-[18px] w-[18px]" />
-                  </span>
-                  <h3 className="font-display text-lg font-semibold leading-snug tracking-tight pt-1">
-                    {o.title}
-                  </h3>
+            <div className="relative mx-auto w-full max-w-[340px]">
+              <div className="rounded-[2.6rem] bg-[#0d1014] p-2.5 shadow-[var(--shadow-media)]">
+                <div className="relative overflow-hidden rounded-[2.1rem] bg-white" style={{ aspectRatio: "390 / 800" }}>
+                  <Image
+                    src="/showcase-booking.png"
+                    alt="Link de agendamento do salão aberto no celular da cliente"
+                    fill
+                    sizes="340px"
+                    className="object-cover object-top"
+                  />
                 </div>
+              </div>
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                O que a sua cliente vê ao abrir o seu link.
+              </p>
+            </div>
+          </div>
+        </section>
 
-                {/* A resposta */}
-                <div className="mt-3 flex items-start gap-2.5">
-                  <span
-                    className="grid place-items-center h-5 w-5 rounded-full shrink-0 mt-0.5"
-                    style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+        {/* ── DEMONSTRAÇÃO ─────────────────────────────────────────────── */}
+        <section id="demo" aria-labelledby="demo-titulo" className="scroll-mt-16 px-3 sm:px-5">
+          <div className="mx-auto max-w-7xl rounded-[2rem] bg-[var(--ink-band)] text-white px-6 py-16 sm:px-14 sm:py-20 grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-10 items-center">
+            <div>
+              <h2 id="demo-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em] text-balance">
+                Entre num salão de verdade. Sem cadastro.
+              </h2>
+              <p className="mt-4 text-lg text-white/75 max-w-xl leading-relaxed">
+                Um painel de demonstração com agenda, caixa e comissões já
+                rodando, com dados de exemplo. Explore como se fosse seu.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3 lg:items-start xl:justify-end">
+              <Link href="/demo/salao" prefetch={false} className="zl-btn zl-btn-light">
+                Entrar como salão <ArrowRight className="h-4 w-4" weight="bold" />
+              </Link>
+              <Link href="/demo/barbearia" prefetch={false} className="zl-btn zl-btn-ghost-light">
+                Entrar como barbearia <ArrowRight className="h-4 w-4" weight="bold" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ── PLANOS ───────────────────────────────────────────────────── */}
+        <section id="planos" aria-labelledby="planos-titulo" className="py-16 sm:py-24 scroll-mt-16">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <div className="max-w-2xl">
+              <h2 id="planos-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em]">
+                Planos simples. Sem fidelidade.
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Mensal, sem cartão para testar, cancele quando quiser.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-5 md:grid-cols-3">
+              {PLAN_CARDS.map((card) => {
+                const plan = PLANS[card.id];
+                const soon = !!plan.comingSoon;
+                return (
+                  <div
+                    key={plan.id}
+                    className="flex flex-col rounded-[var(--radius-media)] border border-border bg-card p-7"
                   >
-                    <Check className="h-3 w-3" strokeWidth={3} />
-                  </span>
-                  <div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {o.answer}
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-display text-2xl font-extrabold tracking-[-0.02em]">{plan.name}</h3>
+                      {soon && (
+                        <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
+                          Em breve
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-[var(--brand)]">{card.role}</p>
+                    <p className="mt-3 text-muted-foreground min-h-[3rem]">{card.pitch}</p>
+
+                    <p className="mt-6 flex items-baseline gap-1.5">
+                      <span className="font-display text-4xl font-extrabold tracking-[-0.03em] tabular-nums">
+                        {priceLabel(plan.value)}
+                      </span>
+                      <span className="text-muted-foreground">/mês</span>
                     </p>
+
+                    <ul className="mt-6 space-y-3 flex-1 border-t border-border pt-6">
+                      {card.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2.5">
+                          <Check className="mt-1 h-4 w-4 shrink-0 text-[var(--brand)]" weight="bold" />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-8">
+                      {soon ? (
+                        <span aria-disabled className="zl-btn w-full bg-secondary text-muted-foreground cursor-not-allowed">
+                          Em breve
+                        </span>
+                      ) : (
+                        // Leva o plano escolhido pelo funil inteiro: quem clicou
+                        // aqui já decidiu, e cai no checkout com ele marcado.
+                        <Link
+                          href={`/criar-salao?plano=${plan.id}`}
+                          className={`zl-btn w-full ${card.id === "pro" ? "zl-btn-dark" : "zl-btn-line"}`}
+                        >
+                          Criar meu salão
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ── DEPOIMENTOS ──────────────────────────────────────────────── */}
+        {/* Só renderiza com depoimentos reais cadastrados (ver TESTIMONIALS). */}
+        {TESTIMONIALS.length > 0 && (
+          <section aria-labelledby="depoimentos-titulo" className="py-16 sm:py-24 bg-secondary/60">
+            <div className="mx-auto max-w-7xl px-5 sm:px-8">
+              <h2 id="depoimentos-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em]">
+                Quem usa, conta.
+              </h2>
+              <div className="mt-10 grid md:grid-cols-3 gap-5">
+                {TESTIMONIALS.map((t) => (
+                  <figure key={t.name} className="rounded-[var(--radius-media)] bg-card p-7 flex flex-col gap-5">
+                    <div className="flex gap-0.5" aria-label={`${t.stars} de 5 estrelas`}>
+                      {Array.from({ length: t.stars }).map((_, i) => (
+                        <Star key={i} weight="fill" className="h-4 w-4 text-[#f5a524]" />
+                      ))}
+                    </div>
+                    <blockquote className="flex-1 text-lg leading-relaxed">{t.text}</blockquote>
+                    <figcaption className="flex items-center gap-3">
+                      <span className="grid place-items-center h-10 w-10 rounded-full bg-foreground text-background font-bold text-sm">
+                        {t.initials}
+                      </span>
+                      <span>
+                        <span className="block font-semibold">{t.name}</span>
+                        <span className="block text-sm text-muted-foreground">{t.role}</span>
+                      </span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── DÚVIDAS ──────────────────────────────────────────────────── */}
+        <section id="duvidas" aria-labelledby="duvidas-titulo" className="py-16 sm:py-24 border-t border-border">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8 grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-10 lg:gap-20">
+            <div>
+              <h2 id="duvidas-titulo" className="font-display font-extrabold text-3xl sm:text-5xl tracking-[-0.03em]">
+                Perguntas frequentes
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground max-w-sm">
+                Não achou a sua? Fale com a gente pelo WhatsApp de suporte.
+              </p>
+            </div>
+            <div className="border-t border-border">
+              {OBJECTIONS.map((o) => (
+                <details key={o.title} className="group border-b border-border">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 font-display text-lg font-bold tracking-[-0.01em] [&::-webkit-details-marker]:hidden">
+                    {o.title}
+                    <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 group-open:rotate-45" weight="bold" />
+                  </summary>
+                  <div className="pb-6 -mt-1 max-w-[62ch]">
+                    <p className="text-muted-foreground leading-relaxed">{o.answer}</p>
                     {o.link && (
                       <Link
                         href={o.link.href}
-                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                        className="mt-3 inline-flex items-center gap-1.5 font-semibold text-[var(--brand)] hover:underline"
                       >
-                        {o.link.label}
-                        <ArrowRight className="h-3.5 w-3.5" />
+                        {o.link.label} <ArrowRight className="h-3.5 w-3.5" weight="bold" />
                       </Link>
                     )}
                   </div>
-                </div>
-
-                {/* Índice discreto */}
-                <span
-                  aria-hidden
-                  className="absolute -top-1 right-0 font-display text-xs font-bold tabular-nums"
-                  style={{ color: "color-mix(in srgb, var(--foreground) 14%, transparent)" }}
-                >
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-              </div>
-            ))}
+                </details>
+              ))}
+            </div>
           </div>
+        </section>
 
-          {/* Linha de tranquilização — fecha a objeção sem competir com o CTA
-              final (o banner "Veja funcionando" é o único empurrão pra demo). */}
-          <div className="mt-14 sm:mt-16 flex items-center justify-center gap-3 text-center reveal">
-            <ShieldCheck className="h-5 w-5 shrink-0 text-primary" weight="fill" />
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">O risco é zero:</span>{" "}
-              sem cadastro, sem cartão, sem ligação de retenção — cancele quando quiser.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── PLANOS / PREÇOS ──────────────────────────────────────────── */}
-      <section id="planos" className="px-5 py-16 sm:py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center reveal">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold">
-              Monte a equipe virtual do seu salão
-            </h2>
-            <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-              Sem cartão, sem fidelidade — cancele quando quiser.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {PLAN_CARDS.map((card, i) => {
-              const plan = PLANS[card.id];
-              const highlight = card.highlight;
-              const soon = !!plan.comingSoon;
-              return (
-                <div
-                  key={plan.id}
-                  style={{ transitionDelay: `${i * 80}ms` }}
-                  className={[
-                    "relative flex flex-col rounded-[var(--radius)] border bg-card p-6 shadow-card reveal",
-                    highlight ? "border-primary ring-2 ring-primary/30" : "border-border",
-                    soon ? "opacity-80" : "",
-                  ].join(" ")}
-                >
-                  {highlight && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-primary-foreground">
-                      Mais popular
-                    </span>
-                  )}
-                  {soon && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-accent-foreground">
-                      Em breve
-                    </span>
-                  )}
-
-                  <span className="inline-flex w-fit items-center rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
-                    {card.role}
-                  </span>
-                  <h3 className="mt-3 font-display text-xl font-bold">{plan.name}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground min-h-[2.5rem]">
-                    {card.pitch}
-                  </p>
-
-                  <div className="mt-4 flex items-end gap-1">
-                    <span className="font-display text-3xl font-bold">
-                      {priceLabel(plan.value)}
-                    </span>
-                    <span className="mb-1 text-sm text-muted-foreground">/mês</span>
-                  </div>
-
-                  <ul className="mt-5 space-y-2.5 flex-1">
-                    {card.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-6">
-                    {soon ? (
-                      <Button variant="outline" className="w-full" disabled>
-                        Em breve
-                      </Button>
-                    ) : (
-                      // Leva o plano escolhido pelo funil inteiro: quem clicou
-                      // aqui já decidiu, e cai no checkout com ele marcado em
-                      // vez de ter que escolher de novo no fim.
-                      <Link href={`/criar-salao?plano=${plan.id}`} className="block">
-                        <Button
-                          variant={highlight ? "primary" : "outline"}
-                          className="w-full"
-                        >
-                          Criar meu salão
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── BANNER TRIAL ─────────────────────────────────────────────── */}
-      <section className="px-5 py-6">
-        <div
-          className="relative overflow-hidden mx-auto max-w-6xl rounded-[2rem] px-8 py-16 sm:px-16 sm:py-20 reveal"
-          style={{
-            background: "linear-gradient(120deg, #0a565d 0%, #0e6f78 48%, #138a93 100%)",
-            boxShadow:
-              "inset 0 0 0 1px rgba(255,255,255,0.08), 0 30px 60px -30px rgba(10,86,93,0.55)",
-          }}
-        >
-          {/* Brilho branco (luz) no topo-direita */}
-          <span
-            aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 460, height: 460, top: -180, right: -140, background: "radial-gradient(closest-side, rgba(255,255,255,0.22), transparent)" }}
-          />
-          {/* Brilho teal-claro (frio, coeso com a marca) no rodapé-esquerda */}
-          <span
-            aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 340, height: 340, bottom: -160, left: -100, background: "radial-gradient(closest-side, rgba(120,222,222,0.24), transparent)" }}
-          />
-          {/* Anéis concêntricos sutis */}
-          <span
-            aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 300, height: 300, bottom: -100, right: 40, border: "1px solid rgba(255,255,255,0.16)" }}
-          />
-          <span
-            aria-hidden
-            className="absolute pointer-events-none rounded-full"
-            style={{ width: 190, height: 190, bottom: 5, right: 95, border: "1px solid rgba(255,255,255,0.12)" }}
-          />
-          {/* Grão fino — tira o "achatado" do gradiente, dá acabamento fosco */}
-          <span
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-              backgroundSize: "140px 140px",
-              opacity: 0.06,
-              mixBlendMode: "overlay",
-            }}
-          />
-
-          <div className="relative flex flex-col lg:flex-row items-center justify-between gap-10">
-            {/* Texto */}
-            <div className="text-center lg:text-left">
-              <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-white/80">
-                Sem cartão de crédito · Sem compromisso
-              </p>
-              <h2 className="font-display text-3xl sm:text-5xl font-bold text-white leading-tight">
-                Veja funcionando.{" "}
-                <br className="hidden sm:block" />
-                Depois você decide.
+        {/* ── FECHAMENTO ───────────────────────────────────────────────── */}
+        <section aria-labelledby="fim-titulo" className="pb-20 sm:pb-28">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <div className="rounded-[2rem] bg-secondary px-6 py-14 sm:px-14 sm:py-20 text-center">
+              <h2 id="fim-titulo" className="mx-auto max-w-3xl font-display font-extrabold text-3xl sm:text-6xl tracking-[-0.035em] text-balance">
+                Seu salão inteiro, num lugar só. A partir de hoje.
               </h2>
-              <p className="mt-4 text-white/90 max-w-lg leading-relaxed">
-                Entre num salão de demonstração já com agenda, caixa e comissões
-                rodando. Sem cadastro, sem cartão — dê uma volta e veja se é pra você.
+              <p className="mt-5 text-lg text-muted-foreground">
+                Sem cartão para testar · Cancele quando quiser
               </p>
-            </div>
-
-            {/* CTA */}
-            <div className="flex flex-col items-center gap-3 shrink-0">
-              <a href="#demo">
-                <Button
-                  size="lg"
-                  className="bg-white text-[#0a565d] hover:bg-white/90 border-transparent font-bold min-w-[220px] text-base shadow-lg"
-                >
-                  Entrar na demonstração <ArrowRight className="h-4 w-4" />
-                </Button>
-              </a>
-              <ul className="flex flex-col sm:flex-row gap-x-4 gap-y-1">
-                {["Sem cadastro", "Sem cartão"].map((t) => (
-                  <li key={t} className="flex items-center gap-1.5 text-xs text-white/80">
-                    <Check className="h-3 w-3 text-white shrink-0" /> {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── DEPOIMENTOS ──────────────────────────────────────────────── */}
-      {/* Só renderiza com depoimentos reais cadastrados (ver TESTIMONIALS). */}
-      {TESTIMONIALS.length > 0 && (
-      <section
-        className="relative border-t border-border py-20 sm:py-28 overflow-hidden"
-        style={{ background: "var(--card)" }}
-      >
-        {/* Atmosfera única (sem ruído de formas) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
-          style={{
-            background:
-              "radial-gradient(50% 60% at 50% 0%, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%)",
-          }}
-        />
-
-        <div className="mx-auto max-w-6xl px-5 relative">
-          <div className="text-center max-w-xl mx-auto mb-14 reveal">
-            <p className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
-              <span className="h-px w-8 bg-primary" />
-              Depoimentos
-              <span className="h-px w-8 bg-primary" />
-            </p>
-            <h2 className="font-display text-3xl sm:text-5xl tracking-tight">
-              Quem usa, não quer mais largar.
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <div
-                key={t.name}
-                style={{ transitionDelay: `${i * 80}ms` }}
-                className="rounded-[var(--radius)] border border-border bg-background p-6 flex flex-col gap-4 reveal"
-              >
-                {/* Aspas laranja */}
-                <p
-                  className="font-display text-5xl leading-none select-none"
-                  style={{ color: "#0e6f78", opacity: 0.35 }}
-                >
-                  &ldquo;
-                </p>
-
-                <p className="text-sm leading-relaxed text-foreground/80 flex-1 -mt-4">
-                  {t.text}
-                </p>
-
-                {/* Estrelas — weight="fill" pra render sólido (o padrão é contorno) */}
-                <div className="flex gap-0.5">
-                  {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} weight="fill" className="h-3.5 w-3.5 text-amber-400" />
-                  ))}
-                </div>
-
-                {/* Autor */}
-                <div className="flex items-center gap-3 border-t border-border pt-4">
-                  <div
-                    className="grid place-items-center h-10 w-10 rounded-full font-display font-bold text-sm shrink-0"
-                    style={{ background: "#0e6f78", color: "#fff" }}
-                  >
-                    {t.initials}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">{t.role}</p>
-                  </div>
-                </div>
+              <div className="mt-9 flex flex-col sm:flex-row justify-center gap-3">
+                <Link href="/criar-salao" className="zl-btn zl-btn-dark">
+                  Criar meu salão <ArrowRight className="h-4 w-4" weight="bold" />
+                </Link>
+                <a href="#demo" className="zl-btn zl-btn-line">
+                  Ver a demonstração
+                </a>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </section>
-      )}
+        </section>
+      </main>
 
-      {/* ── FOOTER ───────────────────────────────────────────────────── */}
       <SiteFooter />
 
-      {/* ── CTA FIXO (mobile) ─────────────────────────────────────────── */}
       <StickyMobileCTA />
-
     </div>
   );
 }
