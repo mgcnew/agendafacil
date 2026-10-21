@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { Fragment, useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card } from "@/components/ui";
@@ -15,7 +15,6 @@ import { getAnamnesisConfig, anamnesisToForm, HEALTH_CONDITIONS, type Niche } fr
 import {
   CaretDown,
   CircleNotch,
-  Clock,
   Heart,
   Heartbeat,
   Scissors,
@@ -279,10 +278,13 @@ function ItemCard({
   const isActionable = ["pending", "confirmed", "in_progress"].includes(item.status);
   const hasAnamnesis = !!item.anamnesis;
 
+  const settled = ["completed", "cancelled", "no_show"].includes(item.status);
+
   return (
     <div className={cn(
-      "rounded-[var(--radius)] border bg-card overflow-hidden",
-      overdue ? "border-amber-500/40" : "border-border",
+      "rounded-[var(--radius)] border overflow-hidden",
+      overdue ? "border-amber-500/50 bg-card" : "border-border",
+      settled ? "bg-transparent opacity-70" : "bg-card",
     )}>
       <button
         type="button"
@@ -293,7 +295,7 @@ function ItemCard({
         {/* Hora */}
         <div className="text-center shrink-0 w-12">
           <p className="font-display font-bold text-sm">{item.time}</p>
-          {overdue && <p className="text-[10px] text-amber-600 font-medium leading-tight">atrasado</p>}
+          {overdue && <p className="text-[10px] text-amber-700 font-semibold leading-tight">dar baixa</p>}
         </div>
 
         {/* Avatar do cliente */}
@@ -329,10 +331,12 @@ function ItemCard({
           <p className="text-xs text-muted-foreground truncate">
             {item.prof}
             {item.services.length > 0 && (
-              <>{item.prof ? " · " : ""}{item.services.length} serviço{item.services.length === 1 ? "" : "s"}</>
+              // No celular a contagem de serviços sai para o preço caber inteiro
+              // (ela aparece ao abrir o atendimento).
+              <span className="hidden sm:inline">{item.prof ? " · " : ""}{item.services.length} serviço{item.services.length === 1 ? "" : "s"}</span>
             )}
             {/* Preço na 2ª linha só no mobile (libera espaço pro nome no topo) */}
-            <span className="sm:hidden"> · <span className="font-semibold text-primary">{formatBRL(item.price)}</span></span>
+            <span className="sm:hidden"> · <span className="font-semibold text-foreground tabular-nums">{formatBRL(item.price)}</span></span>
           </p>
         </div>
 
@@ -346,7 +350,7 @@ function ItemCard({
         </span>
 
         {/* Preço à direita só no desktop */}
-        <span className="hidden sm:inline font-semibold text-primary text-sm shrink-0">{formatBRL(item.price)}</span>
+        <span className="hidden sm:inline font-semibold text-sm tabular-nums shrink-0">{formatBRL(item.price)}</span>
         <CaretDown aria-hidden className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")} />
       </button>
 
@@ -486,7 +490,6 @@ export function TodayAgenda({
   const [items, setItems]       = useState(initialItems);
   const [open, setOpen]         = useState<Set<string>>(new Set());
 
-  const [showPast, setShowPast] = useState(false);
   const [finalizing, setFinalizing] = useState<AgendaItem | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -504,21 +507,23 @@ export function TodayAgenda({
     return () => document.removeEventListener("keydown", fechar);
   }, [lightbox]);
 
-  const { upcoming, pastPending } = useMemo(() => {
+  // Linha do tempo do dia inteiro, na ordem do relógio: o que já foi feito
+  // continua visível (é o que fecha a conta com "x de y atendidos"), e o
+  // marcador de agora separa o passado do que vem pela frente.
+  const { timeline, nowIndex, overdueIds } = useMemo(() => {
     const now = Date.now();
-    // Futuros: hora ainda não passou OU em andamento
-    const upcoming = items.filter(
-      a =>
-        (new Date(a.starts_at).getTime() >= now || a.status === "in_progress") &&
-        !["completed", "cancelled", "no_show"].includes(a.status),
+    const timeline = [...items].sort(
+      (x, y) => new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime(),
     );
-    // Passados sem baixa: hora já passou E ainda abertos
-    const pastPending = items.filter(
-      a =>
-        new Date(a.starts_at).getTime() < now &&
-        ["pending", "confirmed"].includes(a.status),
+    const nowIndex = timeline.findIndex(
+      (a) => new Date(a.starts_at).getTime() >= now && a.status !== "in_progress",
     );
-    return { upcoming, pastPending };
+    const overdueIds = new Set(
+      timeline
+        .filter((a) => ["pending", "confirmed"].includes(a.status) && new Date(a.starts_at).getTime() < now)
+        .map((a) => a.id),
+    );
+    return { timeline, nowIndex, overdueIds };
   }, [items]);
 
   const toggle = (id: string) =>
@@ -580,8 +585,6 @@ export function TodayAgenda({
     router.refresh();
   }
 
-  const noPastMessage = upcoming.length === 0 && pastPending.length === 0;
-
   return (
     <div className="space-y-3">
       {/* A marcação voltou atrás — quem tocou precisa saber, senão sai daqui
@@ -599,81 +602,43 @@ export function TodayAgenda({
         </div>
       )}
 
-      {/* ── Seção: próximos ───────────────────────────────── */}
-      {upcoming.length > 0 && (
-        <div className="space-y-2">
-          {upcoming.map(a => (
-            <ItemCard
-              key={a.id}
-              item={a}
-              expanded={open.has(a.id)}
-              overdue={false}
-              slug={slug}
-              niche={niche}
-              busy={busyId === a.id}
-              onToggle={() => toggle(a.id)}
-              onFinalize={() => setFinalizing(a)}
-              onArrived={() => onArrived(a)}
-              onNoShow={() => onNoShow(a)}
-              onZoom={setLightbox}
-            />
-          ))}
-        </div>
-      )}
-
-      {upcoming.length === 0 && pastPending.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          Nenhum agendamento pendente para hoje.
-        </p>
-      )}
-
-      {upcoming.length === 0 && pastPending.length > 0 && (
-        <p className="text-sm text-muted-foreground text-center py-2">
-          Sem próximos agendamentos no dia.
-        </p>
-      )}
-
-      {/* ── Seção: aguardando baixa ───────────────────────── */}
-      {pastPending.length > 0 && (
-        <div className="rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/5 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowPast(v => !v)}
-            aria-expanded={showPast}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left transition hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-600"
-          >
-            <Clock aria-hidden className="h-4 w-4 text-amber-600 shrink-0" />
-            <span className="flex-1 text-sm font-medium text-amber-700">
-              {pastPending.length} agendamento{pastPending.length === 1 ? "" : "s"} aguardando baixa
-            </span>
-            <span className="text-[11px] text-amber-600 font-medium bg-amber-500/15 px-2 py-0.5 rounded-full shrink-0">
-              {pastPending.length}
-            </span>
-            <CaretDown aria-hidden className={cn("h-4 w-4 text-amber-600 shrink-0 transition-transform", showPast && "rotate-180")} />
-          </button>
-
-          {showPast && (
-            <div className="border-t border-amber-500/20 p-3 space-y-2">
-              {pastPending.map(a => (
-                <ItemCard
-                  key={a.id}
-                  item={a}
-                  expanded={open.has(a.id)}
-                  overdue={true}
-                  slug={slug}
-                  niche={niche}
-                  busy={busyId === a.id}
-                  onToggle={() => toggle(a.id)}
-                  onFinalize={() => setFinalizing(a)}
-                  onArrived={() => onArrived(a)}
-                  onNoShow={() => onNoShow(a)}
-                  onZoom={setLightbox}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <ol className="space-y-2">
+        {timeline.map((a, i) => (
+          <Fragment key={a.id}>
+            {i === nowIndex && i > 0 && (
+              <li aria-hidden className="flex items-center gap-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">
+                <span className="h-px flex-1 bg-primary/40" />
+                agora
+                <span className="h-px flex-1 bg-primary/40" />
+              </li>
+            )}
+            <li>
+              <ItemCard
+                item={a}
+                expanded={open.has(a.id)}
+                overdue={overdueIds.has(a.id)}
+                slug={slug}
+                niche={niche}
+                busy={busyId === a.id}
+                onToggle={() => toggle(a.id)}
+                onFinalize={() => setFinalizing(a)}
+                onArrived={() => onArrived(a)}
+                onNoShow={() => onNoShow(a)}
+                onZoom={setLightbox}
+              />
+            </li>
+          </Fragment>
+        ))}
+        {/* Tudo já passou: o "agora" fecha a lista, deixando claro que não
+            há mais nada pela frente hoje. */}
+        {nowIndex === -1 && timeline.length > 0 && !timeline.some((a) => a.status === "in_progress") && (
+          <li className="flex items-center gap-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">
+            <span className="h-px flex-1 bg-primary/40" />
+            agora · nada mais pela frente
+            <span className="h-px flex-1 bg-primary/40" />
+          </li>
+        )}
+      </ol>
 
       {/* ── Modal de finalização ──────────────────────────── */}
       <AnimatePresence>

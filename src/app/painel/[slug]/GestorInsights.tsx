@@ -64,8 +64,8 @@ const PRIORITY_STYLE: Record<Insight["priority"], string> = {
 // baixa fica neutra.
 const CARD_STYLE: Record<Insight["priority"], string> = {
   alta: "border-amber-500/25 bg-amber-500/[0.055] hover:border-amber-500/40",
-  media: "border-primary/15 bg-primary/[0.035] hover:border-primary/40",
-  baixa: "border-border bg-background hover:border-primary/40",
+  media: "border-border bg-background hover:border-foreground/25",
+  baixa: "border-border bg-background hover:border-foreground/25",
 };
 
 // Cor do ícone acompanha a prioridade, mantendo tudo coeso.
@@ -181,13 +181,11 @@ function GestorInsightsCard({
   birthdayClients: BirthdayContact[];
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[var(--radius)] border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card to-card p-5 shadow-sm">
-      {/* brilho decorativo no canto — dá o toque "assistente" sem pesar */}
-      <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+    <section aria-label="Gestor Zulan" className="relative overflow-hidden rounded-[var(--radius)] border border-border bg-card p-4">
 
       <div className="relative flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm ring-1 ring-primary/20">
+          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-primary">
             <Sparkle className="h-[18px] w-[18px]" weight="fill" />
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
           </span>
@@ -202,7 +200,7 @@ function GestorInsightsCard({
       </div>
 
       {insights.length === 0 ? (
-        <p className="relative mt-3 text-sm text-muted-foreground">
+        <p className="mt-3 text-sm text-muted-foreground">
           <TypewriterText text="Tudo tranquilo por aqui — sem pendência ou oportunidade pra te mostrar agora." />
         </p>
       ) : (
@@ -229,8 +227,8 @@ function GestorInsightsCard({
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{insight.title}</p>
+                      <div className="flex items-start gap-2">
+                        <p className="text-sm font-medium leading-snug line-clamp-2">{insight.title}</p>
                         <span
                           className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${PRIORITY_STYLE[insight.priority]}`}
                         >
@@ -274,8 +272,8 @@ function GestorInsightsCard({
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">{insight.title}</p>
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm font-medium leading-snug line-clamp-2">{insight.title}</p>
                     <span
                       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${PRIORITY_STYLE[insight.priority]}`}
                     >
@@ -311,6 +309,6 @@ function GestorInsightsCard({
           })}
         />
       )}
-    </div>
+    </section>
   );
 }

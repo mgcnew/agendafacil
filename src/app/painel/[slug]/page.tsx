@@ -1,20 +1,18 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getMembershipBySlug } from "@/lib/salon";
+import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { getAccessStatus } from "@/lib/subscription";
 import { planAllowsHref } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatTime, formatDate, startOfTodayBR, startOfTomorrowBR, currentMonthBR, monthRangeBR } from "@/lib/utils";
 import { daysUntil } from "@/lib/signals/rules";
-import { CalendarDots, Wallet, Clock, Users, Package, UserCheck, CaretRight, ClockCounterClockwise, Cake, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { CalendarDots, Wallet, Package, UserCheck, CaretRight, Cake, Plus, CheckCircle, Clock, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { DemoTrialModal } from "./DemoTrialModal";
 import { TodayAgenda, type AgendaItem, type AgendaAnamnesis, type AgendaPhoto } from "./TodayAgenda";
 import { type BirthdayClient } from "./BirthdayCard";
 import { TomorrowReminders } from "./TomorrowReminders";
 import { GestorInsightsAsync, GestorInsightsSkeleton } from "./GestorInsights";
-import { AgendaTodaySignalsAsync, AgendaTodaySignalsSkeleton } from "./AgendaTodaySignals";
-import { GestorPanel } from "./GestorPanel";
 import { PrimeirosPassos, type OnboardingStep } from "./PrimeirosPassos";
 import { BiometricCard } from "@/components/auth/BiometricCard";
 import { NotificationBell, type NotifItem } from "./NotificationBell";
@@ -44,7 +42,7 @@ export default async function DashboardPage({
     return d.toISOString();
   })();
 
-  const [{ data: todayAppts }, { count: servicesCount }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }, { data: recentRaw }] =
+  const [{ data: todayAppts }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -53,7 +51,6 @@ export default async function DashboardPage({
         .gte("starts_at", startDay)
         .lt("starts_at", endDay)
         .order("starts_at"),
-      supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true),
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
       supabase.from("profiles").select("full_name").eq("id", membership.profile_id).maybeSingle(),
       // Pacotes ativos — para o card lateral "Pacotes ativos"
@@ -76,29 +73,11 @@ export default async function DashboardPage({
         .gte("starts_at", endDay)
         .lt("starts_at", tomorrowEnd)
         .in("status", ["pending", "confirmed"])
-        .order("starts_at"),
-      // Últimos atendimentos concluídos (excluindo hoje)
-      supabase
-        .from("appointments")
-        .select("id, starts_at, clients(full_name), salon_members(display_name), appointment_services(name)")
-        .eq("salon_id", salonId)
-        .eq("status", "completed")
-        .lt("starts_at", startDay)
-        .order("starts_at", { ascending: false })
-        .limit(6),
+        .order("starts_at")
     ]);
 
   const reactCount = Array.isArray(reactRaw) ? (reactRaw as unknown[]).length : 0;
   const birthdays = (Array.isArray(bdayRaw) ? bdayRaw : []) as BirthdayClient[];
-
-  type RecentAppt = { id: string; date: string; client: string; prof: string; services: string[] };
-  const recentAppts: RecentAppt[] = (recentRaw ?? []).map((a) => ({
-    id: a.id,
-    date: formatDate(a.starts_at),
-    client: (a.clients as { full_name?: string } | null)?.full_name ?? "Cliente",
-    prof: (a.salon_members as { display_name?: string } | null)?.display_name ?? "",
-    services: ((a.appointment_services as { name: string }[] | null) ?? []).map((s) => s.name),
-  }));
 
   const reminderItems = (tomorrowAppts ?? []).map((a) => ({
     id: a.id,
@@ -252,11 +231,83 @@ export default async function DashboardPage({
   const { data: unseenRaw } = await supabase.rpc("unseen_product_updates" as never);
   const unseenUpdates = (Array.isArray(unseenRaw) ? unseenRaw : []) as UnseenUpdate[];
 
+  // ── Números do dia ───────────────────────────────────────────
+  // "Agora" do servidor: a página é dinâmica, então é a hora da visita.
+  const nowMs = new Date().getTime();
+  const validAppts = appts.filter((a) => a.status !== "cancelled");
+  const doneAppts = appts.filter((a) => a.status === "completed");
+  const noShows = appts.filter((a) => a.status === "no_show").length;
+  const realized = doneAppts.reduce((sum, a) => sum + Number(a.total_price), 0);
+  const overdueCount = appts.filter(
+    (a) => ["pending", "confirmed"].includes(a.status) && new Date(a.starts_at).getTime() < nowMs,
+  ).length;
+  const aheadCount = appts.filter(
+    (a) => a.status === "in_progress" ||
+      (["pending", "confirmed"].includes(a.status) && new Date(a.starts_at).getTime() >= nowMs),
+  ).length;
+
   const stats = [
-    { icon: CalendarDots, label: "Agendamentos hoje", value: String(appts.length) },
-    { icon: Wallet, label: "Previsão de hoje", value: formatBRL(revenue) },
-    { icon: Sparkle, label: "Serviços ativos", value: String(servicesCount ?? 0) },
-    { icon: Users, label: "Clientes", value: String(clientsCount ?? 0) },
+    { label: "Atendidos", value: `${doneAppts.length} de ${validAppts.length - noShows}` },
+    { label: "Previsto hoje", value: formatBRL(revenue) },
+    { label: "Já realizado", value: formatBRL(realized) },
+    { label: "Faltas", value: String(noShows) },
+  ];
+
+  const todayLabel = (() => {
+    const t = new Date().toLocaleDateString("pt-BR", {
+      weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo",
+    });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  })();
+  const summary =
+    aheadCount > 0
+      ? `${aheadCount} atendimento${aheadCount === 1 ? "" : "s"} pela frente hoje`
+      : validAppts.length > 0
+        ? "Nenhum atendimento pela frente hoje"
+        : "Agenda livre hoje";
+
+  const perms = await getEffectivePermissions(salonId, membership);
+  const canSchedule = perms.has("appointments.manage");
+
+  // ── Precisa de você: o que pede uma ação, em ordem de urgência ─────────
+  const birthdaysToday = birthdays.filter((b) => b.days_until === 0);
+  const birthdaysSoon = birthdays.filter((b) => b.days_until > 0);
+  const pkgsSoon = pkgs.filter((p) => p.dleft <= 3);
+  const waBirthday = (b: BirthdayClient) =>
+    b.phone
+      ? `https://wa.me/55${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Feliz aniversário, ${b.name.split(" ")[0]}! 🎂`)}`
+      : null;
+
+  type Todo = { key: string; icon: typeof Clock; text: string; hint?: string; href: string; cta: string; external?: boolean; urgent?: boolean };
+  const todos: Todo[] = [
+    ...(overdueCount > 0
+      ? [{
+          key: "baixa", icon: Clock, urgent: true,
+          text: `${overdueCount} atendimento${overdueCount === 1 ? "" : "s"} sem baixa`,
+          hint: "Já passou do horário: finalize ou marque a falta.",
+          href: "#agenda-hoje", cta: "Ver",
+        }]
+      : []),
+    ...birthdaysToday.flatMap((b) => {
+      const href = waBirthday(b);
+      return href
+        ? [{ key: `aniv-${b.id}`, icon: Cake, text: `${b.name.split(" ")[0]} faz aniversário hoje`, hint: b.turning_age ? `${b.turning_age} anos` : undefined, href, cta: "Parabenizar", external: true }]
+        : [];
+    }),
+    ...(reactCount > 0
+      ? [{
+          key: "reativar", icon: UserCheck,
+          text: `${reactCount} cliente${reactCount === 1 ? "" : "s"} para reativar`,
+          hint: `${reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno.`,
+          href: `/painel/${slug}/relatorios?tab=reativacao`, cta: "Ver",
+        }]
+      : []),
+    ...pkgsSoon.map((p) => ({
+      key: `pkg-${p.id}`, icon: Package,
+      text: `Pacote de ${p.client.split(" ")[0]} ${p.dleft < 0 ? "venceu" : p.dleft === 0 ? "vence hoje" : `vence em ${p.dleft}d`}`,
+      hint: `${p.name} · ${p.remaining} restante${p.remaining === 1 ? "" : "s"}`,
+      href: `/painel/${slug}/pacotes`, cta: "Ver",
+    })),
   ];
 
   // Salão demo: destaca o link público de agendamento pra o visitante testar
@@ -265,198 +316,173 @@ export default async function DashboardPage({
   const siteUrl = SITE_URL;
   const demoVertical = membership.salons.niche === "barbearia" ? "barbearia" : "salao";
 
+  const card = "rounded-[var(--radius)] border border-border bg-card";
+
   return (
-    <div className="space-y-6 af-rise">
+    <div className="space-y-5 af-rise">
       {/* Demo: passado um tempo de uso, oferece o teste e captura o contato */}
       {isDemo && <DemoTrialModal vertical={demoVertical} />}
-      {/* Header — sempre largura total */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold">
-            Olá{firstName ? `, ${firstName}` : ""} 👋
-          </h1>
-          <p className="text-muted-foreground text-sm">Aqui está o resumo de hoje.</p>
+
+      {/* Cabeçalho: o dia, não um cumprimento */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl sm:text-[1.75rem] font-bold tracking-[-0.02em]">{todayLabel}</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {firstName ? `Olá, ${firstName} — ` : ""}{summary}.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Gestor Zulan — resumo do dia atrás de um ícone, pra não poluir a tela */}
-          <GestorPanel>
-            <Suspense fallback={<AgendaTodaySignalsSkeleton />}>
-              <AgendaTodaySignalsAsync supabase={supabase} salonId={salonId} slug={slug} />
-            </Suspense>
-            <Suspense fallback={<GestorInsightsSkeleton />}>
-              <GestorInsightsAsync
-                slug={slug}
-                supabase={supabase}
-                salonId={salonId}
-                firstName={firstName}
-                salonName={membership.salons.name}
-                isDemo={isDemo}
-              />
-            </Suspense>
-          </GestorPanel>
+        <div className="flex items-center gap-2 shrink-0">
           <NotificationBell salonId={salonId} initialItems={notifItems} />
+          {canSchedule && (
+            <Link
+              href={`/painel/${slug}/agenda?novo=1`}
+              className="hidden lg:inline-flex items-center gap-2 h-10 px-4 rounded-full bg-primary text-primary-foreground text-sm font-semibold transition hover:brightness-110"
+            >
+              <Plus aria-hidden className="h-4 w-4" weight="bold" /> Agendar
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Prova de vida do produto. Aparece uma vez e some quando dispensada —
-          o valor está na frequência com que algo novo aparece aqui, não no
-          texto de nenhum item. */}
+      {/* Novidade do produto — uma linha, dispensável */}
       <UpdatesCard updates={unseenUpdates} slug={slug} />
 
-      {/* Desktop: 2 colunas. Mobile: coluna única */}
-      <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start">
+      {/* Convite p/ ativar a digital neste aparelho — some ao ativar/dispensar */}
+      <BiometricCard dismissible />
 
-        {/* ── Coluna principal ──────────────────────────────────�� */}
-        <div className="space-y-6 min-w-0">
-          {/* Demo: link de agendamento em destaque, pra testar a visão da cliente */}
+      {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
+      {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
+
+      {/* Números do dia — uma faixa, não quatro cards */}
+      <dl className={`${card} grid grid-cols-2 sm:grid-cols-4 divide-border max-sm:[&>div:nth-child(-n+2)]:border-b sm:divide-x [&>div:nth-child(odd)]:max-sm:border-r`}>
+        {stats.map((s) => (
+          <div key={s.label} className="px-4 py-3.5 sm:px-5">
+            <dt className="text-xs text-muted-foreground">{s.label}</dt>
+            <dd className="font-display text-xl sm:text-2xl font-bold tabular-nums mt-0.5">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* Desktop: agenda à esquerda; "precisa de você" e o resto à direita.
+          Celular: "precisa de você" primeiro, depois a agenda, depois o resto. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] lg:items-start">
+
+        {/* ── Precisa de você ─────────────────────────────────── */}
+        <section aria-labelledby="todo-titulo" className={`${card} lg:col-start-2 lg:row-start-1`}>
+          <h2 id="todo-titulo" className="flex items-center justify-between px-4 pt-4 pb-2 text-sm font-semibold">
+            Precisa de você
+            {todos.length > 0 && (
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground tabular-nums">
+                {todos.length}
+              </span>
+            )}
+          </h2>
+          {todos.length === 0 ? (
+            <p className="flex items-center gap-2 px-4 pb-4 text-sm text-muted-foreground">
+              <CheckCircle aria-hidden className="h-4 w-4 text-emerald-600" weight="fill" /> Tudo em dia por aqui.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {todos.map((t) => {
+                const Icon = t.icon;
+                const cls = "shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-full border border-border text-xs font-semibold transition hover:bg-muted";
+                return (
+                  <li key={t.key} className="flex items-center gap-3 px-4 py-3">
+                    <Icon aria-hidden className={`h-5 w-5 shrink-0 ${t.urgent ? "text-amber-600" : "text-foreground/60"}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium leading-snug">{t.text}</p>
+                      {t.hint && <p className="text-xs text-muted-foreground truncate">{t.hint}</p>}
+                    </div>
+                    {t.external ? (
+                      <a href={t.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                        {t.cta}<span className="sr-only"> — {t.text}</span>
+                      </a>
+                    ) : (
+                      <Link href={t.href} className={cls}>
+                        {t.cta}<span className="sr-only"> — {t.text}</span>
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* ── Agenda de hoje ─────────────────────────────────── */}
+        <section id="agenda-hoje" aria-labelledby="agenda-hoje-titulo" className="min-w-0 space-y-3 scroll-mt-4 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+          {/* Demo: link de agendamento, pra testar a visão da cliente */}
           {isDemo && (
-            <div className="rounded-[var(--radius)] border-2 border-primary bg-primary/5 p-5">
-              <div className="flex items-start gap-3">
-                <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-primary text-primary-foreground">
-                  <CalendarDots aria-hidden className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-display font-bold">Este é o link de agendamento do seu salão</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    É por aqui que sua cliente marca sozinha, sem te chamar no WhatsApp.
-                    Clique pra ver — e testar — como fica pra ela.
-                  </p>
-                  <p className="text-xs text-primary font-medium mt-2 break-all">
-                    {siteUrl.replace(/^https?:\/\//, "")}/{slug}
-                  </p>
-                  <a
-                    href={`/${slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 h-10 px-4 rounded-[var(--radius)] bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition"
-                  >
-                    Ver como a cliente agenda <CaretRight aria-hidden className="h-4 w-4" />
-                  </a>
-                </div>
+            <div className={`${card} flex flex-wrap items-center gap-3 p-4`}>
+              <CalendarDots aria-hidden className="h-5 w-5 shrink-0 text-primary" />
+              <div className="min-w-[12rem] flex-1">
+                <p className="text-sm font-semibold">Este é o link de agendamento do seu salão</p>
+                <p className="text-xs text-muted-foreground break-all">
+                  {siteUrl.replace(/^https?:\/\//, "")}/{slug} — é por aqui que a cliente marca sozinha.
+                </p>
               </div>
+              <a
+                href={`/${slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-semibold transition hover:brightness-110 max-sm:w-full"
+              >
+                Ver como a cliente agenda <ArrowSquareOut aria-hidden className="h-4 w-4" />
+              </a>
             </div>
           )}
 
-          {/* Convite p/ ativar a digital neste aparelho — some ao ativar/dispensar */}
-          <BiometricCard dismissible />
-
-          {/* Primeiros passos — orienta o dono novo; some ao concluir/dispensar */}
-          {onboardingSteps && <PrimeirosPassos slug={slug} steps={onboardingSteps} />}
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-[var(--radius)] border border-border bg-card p-5">
-                <s.icon aria-hidden className="h-5 w-5 text-primary" />
-                <p className="font-display text-2xl font-bold mt-3">{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Agenda de hoje */}
-          <div>
-            <h2 className="font-display text-lg font-semibold mb-3 flex items-center gap-2">
-              <Clock aria-hidden className="h-5 w-5 text-primary" /> Agenda de hoje
-            </h2>
-            {appts.length === 0 ? (
-              <div className="rounded-[var(--radius)] border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-                Nenhum agendamento para hoje ainda.
-              </div>
-            ) : (
-              <TodayAgenda items={agendaItems} salonId={salonId} slug={slug} niche={membership.salons.niche} />
-            )}
-          </div>
-        </div>
-
-        {/* ── Sidebar contextual ───────────────────────────────── */}
-        <div className="space-y-4 min-w-0">
-          {/* Últimos atendimentos */}
-          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <ClockCounterClockwise aria-hidden className="h-4 w-4 text-primary" /> Últimos atendimentos
-            </h2>
-            {recentAppts.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">Nenhum atendimento concluído ainda.</p>
-            ) : (
-              <div className="space-y-2">
-                {recentAppts.map((a) => (
-                  <div key={a.id} className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{a.client}</p>
-                      <p className="text-xs text-muted-foreground truncate">{a.services.join(", ")}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground shrink-0 mt-0.5">{a.date}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Aniversariantes do mês */}
-          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <Cake aria-hidden className="h-4 w-4 text-primary" /> Aniversariantes do mês
-            </h2>
-            {birthdays.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">Nenhum aniversariante nos próximos 31 dias.</p>
-            ) : (
-              <div className="space-y-2">
-                {birthdays.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {b.days_until === 0 ? "hoje 🎉" : b.days_until === 1 ? "amanhã" : `em ${b.days_until} dias`}
-                        {b.turning_age ? ` · ${b.turning_age} anos` : ""}
-                      </p>
-                    </div>
-                    {b.phone && (
-                      <a
-                        href={`https://wa.me/55${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Feliz aniversário, ${b.name.split(" ")[0]}! 🎂`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Parabenizar ${b.name} no WhatsApp`}
-                        className="shrink-0 rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                      >
-                        Parabenizar
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Alerta: clientes para reativar */}
-          {reactCount > 0 && (
-            <Link
-              href={`/painel/${slug}/relatorios?tab=reativacao`}
-              className="flex items-center gap-3 rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 p-4 transition hover:bg-amber-500/15"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-600">
-                <UserCheck aria-hidden className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm">
-                  {reactCount} cliente{reactCount === 1 ? "" : "s"} para reativar
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {reactCount === 1 ? "Passou" : "Passaram"} do ritmo habitual de retorno.
-                </p>
-              </div>
-              <CaretRight aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex items-center justify-between">
+            <h2 id="agenda-hoje-titulo" className="font-display text-lg font-bold">Agenda de hoje</h2>
+            <Link href={`/painel/${slug}/agenda`} className="inline-flex items-center gap-1 rounded text-sm font-medium text-muted-foreground hover:text-foreground">
+              Agenda completa <CaretRight aria-hidden className="h-3.5 w-3.5" />
             </Link>
+          </div>
+          {appts.length === 0 ? (
+            <div className="rounded-[var(--radius)] border border-dashed border-border p-8 text-center">
+              <p className="font-medium">Nenhum agendamento para hoje.</p>
+              <p className="text-sm text-muted-foreground mt-1">Marque um horário ou mande seu link para as clientes.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {canSchedule && (
+                  <Link href={`/painel/${slug}/agenda?novo=1`} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                    <Plus aria-hidden className="h-4 w-4" weight="bold" /> Agendar
+                  </Link>
+                )}
+                <a href={`/${slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full border border-border bg-card text-sm font-semibold">
+                  Ver meu link <ArrowSquareOut aria-hidden className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          ) : (
+            <TodayAgenda items={agendaItems} salonId={salonId} slug={slug} niche={membership.salons.niche} />
           )}
+        </section>
+
+        {/* ── Coluna de apoio ────────────────────────────────── */}
+        <div className="space-y-5 min-w-0 lg:col-start-2 lg:row-start-2">
+          {/* Gestor Zulan — o resumo da IA à vista, não atrás de um ícone.
+              Entra por streaming: a IA nunca segura o resto da página. Os
+              sinais "de agora" da agenda ficam na própria Agenda; aqui eles
+              repetiriam o "sem baixa" de "precisa de você". */}
+          <Suspense fallback={<GestorInsightsSkeleton />}>
+            <GestorInsightsAsync
+              slug={slug}
+              supabase={supabase}
+              salonId={salonId}
+              firstName={firstName}
+              salonName={membership.salons.name}
+              isDemo={isDemo}
+            />
+          </Suspense>
 
           {/* Minhas comissões (profissional/gerente) */}
           {myComm && (
-            <div className="rounded-[var(--radius)] border border-primary/30 bg-primary/5 p-4">
-              <p className="flex items-center gap-2 text-sm font-medium">
-                <Wallet aria-hidden className="h-4 w-4 text-primary" /> Minhas comissões ·{" "}
-                <span className="capitalize text-muted-foreground text-xs">{myComm.monthLabel}</span>
+            <div className={`${card} p-4`}>
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Wallet aria-hidden className="h-4 w-4 text-primary" /> Minhas comissões
+                <span className="capitalize font-normal text-muted-foreground text-xs">{myComm.monthLabel}</span>
               </p>
-              <p className="font-display text-3xl font-bold text-primary mt-2">{formatBRL(myComm.toReceive)}</p>
+              <p className="font-display text-3xl font-bold tabular-nums mt-2">{formatBRL(myComm.toReceive)}</p>
               <p className="text-xs text-muted-foreground">a receber este mês</p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>Apurado: <b className="text-foreground">{formatBRL(myComm.earned)}</b></span>
@@ -465,53 +491,59 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* Lembretes de amanhã */}
+          {/* Lembretes de amanhã — cada um com o botão de mandar */}
           <TomorrowReminders items={reminderItems} dateLabel={tomorrowLabel} salonName={membership.salons.name} />
 
-          {/* Pacotes ativos */}
-          <div className="rounded-[var(--radius)] border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Package aria-hidden className="h-4 w-4 text-primary" /> Pacotes ativos
+          {/* Próximos aniversários (os de hoje já estão em "precisa de você") */}
+          {birthdaysSoon.length > 0 && (
+            <div className={`${card} p-4`}>
+              <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Cake aria-hidden className="h-4 w-4 text-foreground/60" /> Próximos aniversários
               </h2>
-              {pkgs.length > 0 && (
-                <Link
-                  href={`/painel/${slug}/pacotes`}
-                  className="rounded text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                >
-                  Ver todos<span className="sr-only"> os pacotes</span>
-                </Link>
-              )}
-            </div>
-            {pkgs.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">Nenhum pacote ativo no momento.</p>
-            ) : (
-              <div className="space-y-2">
-                {pkgs.map((p) => {
-                  const soon = p.dleft <= 3;
+              <ul className="space-y-2">
+                {birthdaysSoon.slice(0, 4).map((b) => {
+                  const href = waBirthday(b);
                   return (
-                    <Link
-                      key={p.id}
-                      href={`/painel/${slug}/pacotes`}
-                      className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-border px-3 py-2 hover:bg-muted/50 transition"
-                    >
+                    <li key={b.id} className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{p.client}</p>
-                        <p className="text-xs text-muted-foreground truncate">{p.name} · {p.remaining} restante{p.remaining === 1 ? "" : "s"}</p>
+                        <p className="text-sm font-medium truncate">{b.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.days_until === 1 ? "amanhã" : `em ${b.days_until} dias`}
+                          {b.turning_age ? ` · ${b.turning_age} anos` : ""}
+                        </p>
                       </div>
-                      <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${
-                        soon ? "bg-red-500/12 text-red-600" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {p.dleft >= 0 ? `${p.dleft}d` : "vencido"}
-                      </span>
-                    </Link>
+                      {href && (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Parabenizar ${b.name} no WhatsApp`}
+                          className="shrink-0 rounded text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          Parabenizar
+                        </a>
+                      )}
+                    </li>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        </div>
+              </ul>
+            </div>
+          )}
 
+          {/* Pacotes: só o resumo; os que vencem logo já estão em "precisa de você" */}
+          {pkgs.length > 0 && (
+            <Link
+              href={`/painel/${slug}/pacotes`}
+              className={`${card} flex items-center gap-3 p-4 transition hover:bg-muted/50`}
+            >
+              <Package aria-hidden className="h-5 w-5 shrink-0 text-foreground/60" />
+              <span className="flex-1 text-sm font-medium">
+                {pkgs.length} pacote{pkgs.length === 1 ? "" : "s"} ativo{pkgs.length === 1 ? "" : "s"}
+              </span>
+              <CaretRight aria-hidden className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

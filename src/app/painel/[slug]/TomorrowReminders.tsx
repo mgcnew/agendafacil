@@ -63,7 +63,7 @@ export function TomorrowReminders({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 h-8 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-2.5 text-xs font-medium text-white hover:bg-emerald-700"
+                  className="inline-flex items-center gap-1.5 h-8 shrink-0 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
                 >
                   <ChatCircle className="h-3.5 w-3.5" /> Lembrar
                 </a>

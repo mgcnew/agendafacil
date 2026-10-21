@@ -42,41 +42,33 @@ export function UpdatesCard({
     await createClient().rpc("mark_product_updates_seen" as never);
   }
 
+  // Uma linha só: a novidade avisa sem empurrar o dia pra baixo da dobra.
+  const titulo = updates.length === 1 ? "Novidade no Zulan" : `${updates.length} novidades no Zulan`;
+
   return (
     <section
-      aria-labelledby="novidades-titulo"
-      className="relative rounded-[var(--radius)] border border-primary/25 bg-primary/5 p-4"
+      aria-label={titulo}
+      className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card py-2 pl-3 pr-1.5 text-sm"
     >
+      <Sparkle aria-hidden className="h-4 w-4 shrink-0 text-primary" weight="fill" />
+      <p className="min-w-0 flex-1 truncate">
+        <span className="font-semibold">{titulo}:</span>{" "}
+        <span className="text-muted-foreground">{updates.map((u) => u.title).join(" · ")}</span>
+      </p>
+      <Link
+        href={`/painel/${slug}/configuracoes?tab=atualizacoes`}
+        className="inline-flex shrink-0 items-center gap-1 rounded px-1 text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        Ver <ArrowRight aria-hidden className="h-3 w-3" />
+      </Link>
       <button
         type="button"
         onClick={dispensar}
         aria-label="Dispensar as novidades"
-        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         <X aria-hidden className="h-4 w-4" />
       </button>
-
-      <h2 id="novidades-titulo" className="flex items-center gap-2 pr-8 text-sm font-semibold">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-          <Sparkle aria-hidden className="h-3.5 w-3.5" weight="fill" />
-        </span>
-        {updates.length === 1 ? "Tem novidade no Zulan" : `${updates.length} novidades no Zulan`}
-      </h2>
-
-      <ul className="mt-2 space-y-1 pl-9">
-        {updates.map((u) => (
-          <li key={u.id} className="text-sm text-foreground/80">
-            {u.title}
-          </li>
-        ))}
-      </ul>
-
-      <Link
-        href={`/painel/${slug}/configuracoes?tab=atualizacoes`}
-        className="mt-2.5 ml-9 inline-flex items-center gap-1 rounded text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-      >
-        Ver o que mudou <ArrowRight aria-hidden className="h-3 w-3" />
-      </Link>
     </section>
   );
 }
