@@ -7,6 +7,7 @@ import { Button, Card, Input, Label } from "@/components/ui";
 import { waLink, formatDate, cn } from "@/lib/utils";
 import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
 import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
+import { CLIENT_LIST_COLUMNS } from "@/lib/clients";
 import type { Tables } from "@/lib/database.types";
 import {
   AddressBook,
@@ -25,7 +26,7 @@ import {
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
 
-type Client = Tables<"clients">;
+type Client = Pick<Tables<"clients">, "id" | "full_name" | "phone" | "photo_url" | "alert_summary">;
 
 const DAY_MS = 86_400_000;
 /** Dias desde a última visita (null se nunca veio). */
@@ -99,7 +100,7 @@ export function ClientsManager({
         birth_date: birth || null,
         referral_source: referral || null,
       })
-      .select()
+      .select(CLIENT_LIST_COLUMNS)
       .single();
     setBusy(false);
     if (error || !data) {

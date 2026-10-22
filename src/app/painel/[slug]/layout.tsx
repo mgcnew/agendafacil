@@ -71,28 +71,30 @@ export default async function PanelLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const membership = await getMembershipBySlug(slug);
+  const supabase = await createClient();
+
+  // Nada aqui depende de outra busca (só as permissões, que pedem a membership),
+  // então tudo sai junto: em fila, cada ida ao banco atrasava a página inteira.
+  const [membership, { data: isPlatformAdmin }, { data: annData }, access] = await Promise.all([
+    getMembershipBySlug(slug),
+    // Admin da plataforma? (mostra atalho discreto para /admin)
+    supabase.rpc("is_platform_admin" as never),
+    // Avisos globais ativos (banner no topo do painel)
+    supabase
+      .from("platform_announcements" as never)
+      .select("id, message, kind, link_url, link_label")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false }),
+    // Gate de assinatura: bloqueia o painel se o trial venceu e não há assinatura ativa.
+    // Fail-open: se o status não puder ser lido (RPC nulo), libera para não travar por engano.
+    getAccessStatus(slug),
+  ]);
   if (!membership) redirect("/painel");
 
   const perms = await getEffectivePermissions(membership.salon_id, membership);
-
-  // Admin da plataforma? (mostra atalho discreto para /admin)
-  const supabase = await createClient();
-  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin" as never);
-
-  // Avisos globais ativos (banner no topo do painel)
-  const { data: annData } = await supabase
-    .from("platform_announcements" as never)
-    .select("id, message, kind, link_url, link_label")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
   const announcements = (Array.isArray(annData) ? annData : []) as unknown as {
     id: string; message: string; kind: string; link_url: string | null; link_label: string | null;
   }[];
-
-  // Gate de assinatura: bloqueia o painel se o trial venceu e não há assinatura ativa.
-  // Fail-open: se o status não puder ser lido (RPC nulo), libera para não travar por engano.
-  const access = await getAccessStatus(slug);
   if (access && !access.has_access) {
     return (
       <div

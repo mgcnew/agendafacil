@@ -42,7 +42,17 @@ export default async function DashboardPage({
     return d.toISOString();
   })();
 
-  const [{ data: todayAppts }, { count: clientsCount }, { data: profile }, { data: activePkgs }, { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts }] =
+  const isOwner = membership.role === "owner";
+  const onboardingDoneAt = (membership.salons as { onboarding_done_at?: string | null }).onboarding_done_at ?? null;
+  const needsOnboarding = isOwner && !onboardingDoneAt;
+
+  // Tudo que não depende de outra busca sai num lote só: cada ida ao banco em
+  // fila somava uma volta inteira ao tempo de abrir a página.
+  const [
+    { data: todayAppts }, { count: clientsCount }, { data: profile }, { data: activePkgs },
+    { data: reactRaw }, { data: bdayRaw }, { data: tomorrowAppts },
+    { data: notifRaw }, { data: unseenRaw }, access, perms, onboardingCounts,
+  ] =
     await Promise.all([
       supabase
         .from("appointments")
@@ -73,7 +83,28 @@ export default async function DashboardPage({
         .gte("starts_at", endDay)
         .lt("starts_at", tomorrowEnd)
         .in("status", ["pending", "confirmed"])
-        .order("starts_at")
+        .order("starts_at"),
+      // Notificações do sino (RLS filtra pelo recipient = usuário logado).
+      supabase
+        .from("notifications")
+        .select("id, type, title, body, created_at, read_at")
+        .order("created_at", { ascending: false })
+        .limit(20),
+      // Entregas que esta pessoa ainda não viu. A RPC parte da data de criação do
+      // perfil, então quem cadastrou hoje não recebe o histórico inteiro como
+      // "novidade" (ver 20260803_atualizacoes_2_funcoes.sql).
+      supabase.rpc("unseen_product_updates" as never),
+      getAccessStatus(slug),
+      getEffectivePermissions(salonId, membership),
+      // Primeiros passos (só o dono, até concluir ou dispensar)
+      needsOnboarding
+        ? Promise.all([
+            supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true).gt("price", 0),
+            supabase.from("salon_members").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+            supabase.from("salon_invites").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+            supabase.from("appointments").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
+          ])
+        : Promise.resolve(null),
     ]);
 
   const reactCount = Array.isArray(reactRaw) ? (reactRaw as unknown[]).length : 0;
@@ -106,17 +137,10 @@ export default async function DashboardPage({
   const firstName = fullName ? fullName.split(" ")[0] : "";
 
   // ── Primeiros passos (só o dono, até concluir ou dispensar) ──────────────
-  const isOwner = membership.role === "owner";
-  const onboardingDoneAt = (membership.salons as { onboarding_done_at?: string | null }).onboarding_done_at ?? null;
   let onboardingSteps: OnboardingStep[] | null = null;
-  if (isOwner && !onboardingDoneAt) {
+  if (onboardingCounts) {
     const [{ count: pricedCount }, { count: memberCount }, { count: inviteCount }, { count: apptCount }] =
-      await Promise.all([
-        supabase.from("services").select("id", { count: "exact", head: true }).eq("salon_id", salonId).eq("is_active", true).gt("price", 0),
-        supabase.from("salon_members").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
-        supabase.from("salon_invites").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
-        supabase.from("appointments").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
-      ]);
+      onboardingCounts;
     const steps: OnboardingStep[] = [
       { done: (pricedCount ?? 0) > 0, title: "Defina os preços dos serviços", hint: "Já deixamos os serviços comuns — agora ajuste os valores.", href: `/painel/${slug}/servicos`, cta: "Ajustar" },
       { done: (clientsCount ?? 0) > 0, title: "Cadastre seu primeiro cliente", hint: "Guarde contato e histórico de quem você atende.", href: `/painel/${slug}/clientes`, cta: "Adicionar" },
@@ -128,9 +152,28 @@ export default async function DashboardPage({
   }
 
   // ── Minhas comissões (profissional/gerente, só Pro/Max) ──────────
-  const access = await getAccessStatus(slug);
   const earnsCommission = membership.role === "professional" || membership.role === "manager";
   const showMyComm = earnsCommission && planAllowsHref(access?.effective_plan ?? null, "/financeiro");
+
+  const appts = todayAppts ?? [];
+
+  // Ficha de anamnese (RLS por clients.view) e fotos de inspiração das clientes
+  // de hoje — 2 buscas leves pra o profissional já ver o essencial na inicial.
+  // Saem junto com as comissões: nenhuma depende da outra.
+  const clientIds = Array.from(
+    new Set(appts.map((a) => a.client_id).filter((x): x is string => !!x)),
+  );
+  const inspirationIds = Array.from(
+    new Set(appts.flatMap((a) => (a.inspiration_gallery_ids as string[] | null) ?? [])),
+  );
+  const fichasQ = Promise.all([
+    clientIds.length
+      ? supabase.from("client_anamnesis").select("*").in("client_id", clientIds)
+      : Promise.resolve({ data: [] as AgendaAnamnesis[] }),
+    inspirationIds.length
+      ? supabase.from("salon_gallery").select("id, url, caption").in("id", inspirationIds)
+      : Promise.resolve({ data: [] as AgendaPhoto[] }),
+  ]);
 
   let myComm: { earned: number; paid: number; toReceive: number; monthLabel: string } | null = null;
   if (showMyComm) {
@@ -168,27 +211,11 @@ export default async function DashboardPage({
     myComm = { earned, paid, toReceive: Math.max(0, earned - paid), monthLabel };
   }
 
-  const appts = todayAppts ?? [];
   const revenue = appts
     .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
     .reduce((sum, a) => sum + Number(a.total_price), 0);
 
-  // Ficha de anamnese (RLS por clients.view) e fotos de inspiração das clientes
-  // de hoje — 2 buscas leves pra o profissional já ver o essencial na inicial.
-  const clientIds = Array.from(
-    new Set(appts.map((a) => a.client_id).filter((x): x is string => !!x)),
-  );
-  const inspirationIds = Array.from(
-    new Set(appts.flatMap((a) => (a.inspiration_gallery_ids as string[] | null) ?? [])),
-  );
-  const [{ data: anamRows }, { data: galleryRows }] = await Promise.all([
-    clientIds.length
-      ? supabase.from("client_anamnesis").select("*").in("client_id", clientIds)
-      : Promise.resolve({ data: [] as AgendaAnamnesis[] }),
-    inspirationIds.length
-      ? supabase.from("salon_gallery").select("id, url, caption").in("id", inspirationIds)
-      : Promise.resolve({ data: [] as AgendaPhoto[] }),
-  ]);
+  const [{ data: anamRows }, { data: galleryRows }] = await fichasQ;
   const anamByClient = new Map<string, AgendaAnamnesis>();
   for (const r of (anamRows as AgendaAnamnesis[] | null) ?? []) anamByClient.set(r.client_id, r);
   const photoById = new Map<string, AgendaPhoto>();
@@ -217,18 +244,8 @@ export default async function DashboardPage({
     };
   });
 
-  // Notificações do sino (RLS filtra pelo recipient = usuário logado).
-  const { data: notifRaw } = await supabase
-    .from("notifications")
-    .select("id, type, title, body, created_at, read_at")
-    .order("created_at", { ascending: false })
-    .limit(20);
   const notifItems = (notifRaw ?? []) as NotifItem[];
 
-  // Entregas que esta pessoa ainda não viu. A RPC parte da data de criação do
-  // perfil, então quem cadastrou hoje não recebe o histórico inteiro como
-  // "novidade" (ver 20260803_atualizacoes_2_funcoes.sql).
-  const { data: unseenRaw } = await supabase.rpc("unseen_product_updates" as never);
   const unseenUpdates = (Array.isArray(unseenRaw) ? unseenRaw : []) as UnseenUpdate[];
 
   // ── Números do dia ───────────────────────────────────────────
@@ -266,7 +283,6 @@ export default async function DashboardPage({
         ? "Nenhum atendimento pela frente hoje"
         : "Agenda livre hoje";
 
-  const perms = await getEffectivePermissions(salonId, membership);
   const canSchedule = perms.has("appointments.manage");
 
   // ── Precisa de você: o que pede uma ação, em ordem de urgência ─────────

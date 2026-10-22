@@ -2,12 +2,12 @@
 
 import { Fragment, useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { clearStoredRefreshToken } from "@/lib/auth/persistentSession";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { QuickAppointment } from "@/components/QuickAppointment";
 import {
   House,
   Plus,
@@ -34,6 +34,14 @@ import {
   CaretLeft,
   CaretRight,
 } from "@phosphor-icons/react/dist/ssr";
+
+// O formulário de novo agendamento (com as animações do modal) pesava em toda
+// tela do painel, mesmo para quem nunca toca no botão. Agora o código só desce
+// no primeiro clique.
+const QuickAppointment = dynamic(
+  () => import("@/components/QuickAppointment").then((m) => m.QuickAppointment),
+  { ssr: false },
+);
 
 /** Páginas que viram os 3 atalhos principais da barra inferior (mobile) */
 const PRIMARY_HREFS = ["", "/agenda", "/clientes"];
@@ -219,6 +227,9 @@ export function PanelShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [novoAgendamento, setNovoAgendamento] = useState(false);
+  // Fica montado depois da primeira abertura: preserva a animação de saída e
+  // as listas já buscadas.
+  const [quickUsado, setQuickUsado] = useState(false);
   const base = `/painel/${salon.slug}`;
   const naAgenda = pathname === `${base}/agenda`;
   const fullBleed = naAgenda;
@@ -477,7 +488,7 @@ export function PanelShell({
                 <Fragment key={`ag-${it.href}`}>
                   <AgendarButton
                     href={naAgenda ? `${base}/agenda?novo=1` : undefined}
-                    onOpen={naAgenda ? undefined : () => setNovoAgendamento(true)}
+                    onOpen={naAgenda ? undefined : () => { setQuickUsado(true); setNovoAgendamento(true); }}
                   />
                   {link}
                 </Fragment>
@@ -635,7 +646,7 @@ export function PanelShell({
       {/* Novo agendamento sem sair da tela. Fica no shell (e não em cada
           página) porque é justamente o ponto: a tela de baixo continua
           intacta. Só é montado quando o dono pode criar agendamento. */}
-      {canCreateAppointment && (
+      {canCreateAppointment && quickUsado && (
         <QuickAppointment
           salonId={salon.id}
           open={novoAgendamento}

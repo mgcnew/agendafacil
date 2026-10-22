@@ -4,6 +4,13 @@
  * sem IA; ver docs/produto/zulan-2.0-roadmap-ia.md.
  */
 
+/**
+ * Colunas que a lista de Clientes usa. A ficha completa (endereço, notas,
+ * anamnese) só é buscada ao abrir a cliente — mandar tudo de todas inflava a
+ * página conforme o salão crescia.
+ */
+export const CLIENT_LIST_COLUMNS = "id, full_name, phone, photo_url, alert_summary" as const;
+
 export type ClientOverviewRow = {
   client_id: string;
   visits: number;

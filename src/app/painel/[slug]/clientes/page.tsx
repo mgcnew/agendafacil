@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/AccessDenied";
 import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { createClient } from "@/lib/supabase/server";
-import { computeVipIds, type ClientOverviewRow } from "@/lib/clients";
+import { CLIENT_LIST_COLUMNS, computeVipIds, type ClientOverviewRow } from "@/lib/clients";
 import { ClientsManager } from "./ClientsManager";
 
 export const dynamic = "force-dynamic";
@@ -16,22 +16,24 @@ export default async function ClientesPage({
   const membership = await getMembershipBySlug(slug);
   if (!membership) redirect("/painel");
 
-  // O menu já exigia clients.view; a rota estava aberta a quem digitasse a URL.
-  // A ficha do cliente tem telefone, e-mail, aniversário e anamnese.
-  const perms = await getEffectivePermissions(membership.salon_id, membership);
-  if (!perms.has("clients.view")) {
-    return <AccessDenied slug={slug} permissao="Visualizar clientes" />;
-  }
-
+  // As buscas saem junto com as permissões: sem clients.view o RLS já devolve
+  // vazio e a página nem chega a usar o resultado.
   const supabase = await createClient();
-  const [{ data: clients }, { data: overview }] = await Promise.all([
+  const [perms, { data: clients }, { data: overview }] = await Promise.all([
+    getEffectivePermissions(membership.salon_id, membership),
     supabase
       .from("clients")
-      .select("*")
+      .select(CLIENT_LIST_COLUMNS)
       .eq("salon_id", membership.salon_id)
       .order("full_name"),
     supabase.rpc("clients_overview", { p_salon: membership.salon_id }),
   ]);
+
+  // O menu já exigia clients.view; a rota estava aberta a quem digitasse a URL.
+  // A ficha do cliente tem telefone, e-mail, aniversário e anamnese.
+  if (!perms.has("clients.view")) {
+    return <AccessDenied slug={slug} permissao="Visualizar clientes" />;
+  }
 
   // Mapa client_id → última visita (ISO) para mostrar/filtrar inativas.
   const lastVisit: Record<string, string> = {};

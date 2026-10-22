@@ -54,6 +54,26 @@ export const getMembershipBySlug = cache(
 );
 
 /**
+ * Catálogo de permissões (tabela global, muda só por migration), guardado no
+ * escopo do módulo por alguns minutos: era uma ida ao banco a cada clique no
+ * painel para trazer sempre a mesma lista. Lista vazia não entra no cache —
+ * pode ser falha momentânea, e dono sem permissão nenhuma é pior que uma busca.
+ */
+const PERMISSOES_TTL_MS = 10 * 60 * 1000;
+let permissoesCache: { keys: string[]; em: number } | null = null;
+
+async function getPermissionKeys(): Promise<string[]> {
+  if (permissoesCache && Date.now() - permissoesCache.em < PERMISSOES_TTL_MS) {
+    return permissoesCache.keys;
+  }
+  const supabase = await createClient();
+  const { data } = await supabase.from("permissions").select("key");
+  const keys = (data ?? []).map((p) => p.key);
+  if (keys.length) permissoesCache = { keys, em: Date.now() };
+  return keys;
+}
+
+/**
  * Conjunto de permissões efetivas do membro num salão.
  * Owner recebe todas. Demais: padrão do cargo + overrides do membro.
  */
@@ -63,10 +83,7 @@ export const getEffectivePermissions = cache(async function (
 ): Promise<Set<string>> {
   const supabase = await createClient();
 
-  const { data: allPerms } = await supabase.from("permissions").select("key");
-  const keys = (allPerms ?? []).map((p) => p.key);
-
-  if (member.role === "owner") return new Set(keys);
+  if (member.role === "owner") return new Set(await getPermissionKeys());
 
   // 1) defaults globais do cargo  2) ajuste por cargo do salão  3) override por pessoa
   const [{ data: roleDefaults }, { data: salonRole }, { data: overrides }] = await Promise.all([
