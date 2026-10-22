@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 // ── Dados ──────────────────────────────────────────────────────────────────
 
 const PLAN_CARDS: {
-  id: "basic" | "pro" | "max";
+  id: "basic" | "pro";
   role: string;
   pitch: string;
   features: string[];
@@ -50,16 +50,6 @@ const PLAN_CARDS: {
       "Controle de estoque",
       "Campanhas e recuperação de clientes",
       "Relatórios e reativação",
-    ],
-  },
-  {
-    id: "max",
-    role: "+ WhatsApp automático",
-    pitch: "A gestão completa respondendo e agindo sozinha no WhatsApp.",
-    features: [
-      "Tudo do Pro",
-      "Integração com WhatsApp",
-      "Mensagens automáticas",
     ],
   },
 ];
@@ -397,7 +387,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="mt-10 grid gap-5 md:grid-cols-3">
+            <div className="mt-10 grid gap-5 md:grid-cols-2 max-w-4xl">
               {PLAN_CARDS.map((card) => {
                 const plan = PLANS[card.id];
                 const soon = !!plan.comingSoon;
