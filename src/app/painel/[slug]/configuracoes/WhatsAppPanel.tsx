@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Input } from "@/components/ui";
 import {
@@ -20,7 +21,23 @@ type Settings = {
   thankYou: boolean;
   reminderConfirm: boolean;
   reviewRequest: boolean;
+  winbackAuto: boolean;
+  /** Dias sem vir até o "sentimos sua falta" automático. */
+  winbackDays: number;
+  winbackCampaignId: string | null;
+  birthday: boolean;
+  birthdayCampaignId: string | null;
+  waitlistOpen: boolean;
+  serviceReturn: boolean;
+  packageReminder: boolean;
 };
+type BoolKey =
+  | "bookingReceipt" | "thankYou" | "reminderConfirm" | "reviewRequest"
+  | "waitlistOpen" | "winbackAuto" | "serviceReturn" | "birthday" | "packageReminder";
+
+type Campaign = { id: string; name: string; discount: number };
+
+const WINBACK_DAYS = [15, 21, 30, 45, 60, 90];
 
 type StatusResponse = {
   state?: State;
@@ -30,32 +47,84 @@ type StatusResponse = {
   pausedReason?: string | null;
   lastError?: string | null;
   settings?: Settings;
+  campaigns?: Campaign[];
   error?: string;
 };
 
-const MESSAGES: { key: keyof Settings; label: string; hint: string; soon?: boolean }[] = [
+type Grupo = "agendamento" | "volta";
+
+const GRUPOS: { id: Grupo; titulo: string; texto: string }[] = [
+  {
+    id: "agendamento",
+    titulo: "Em volta do horário",
+    texto: "Do agendamento ao pós-atendimento.",
+  },
+  {
+    id: "volta",
+    titulo: "Para a cliente voltar",
+    // O medo de quem liga isto é o sistema sair mandando mensagem pra base
+    // inteira; a frase responde antes da pergunta.
+    texto: "Cada uma sai uma vez por motivo, no máximo 25 por dia, e nunca pra quem já tem horário marcado.",
+  },
+];
+
+const MESSAGES: { key: BoolKey; grupo: Grupo; label: string; hint: string; soon?: boolean }[] = [
   {
     key: "bookingReceipt",
+    grupo: "agendamento",
     label: "Comprovante do agendamento",
     hint: "Assim que a cliente agenda, ela recebe a confirmação com data, hora e serviço.",
   },
   {
     key: "thankYou",
+    grupo: "agendamento",
     label: "Agradecimento após o atendimento",
     hint: "Enviado 20 minutos depois de concluir — tempo de a cliente sair do salão.",
   },
   {
     key: "reminderConfirm",
+    grupo: "agendamento",
     label: "Confirmação na véspera",
     hint: "Às 10h do dia anterior, pergunta se o horário está de pé. Quem responde SIM confirma sozinho; quem responde NÃO libera o horário e você é avisado.",
   },
   {
     key: "reviewRequest",
+    grupo: "agendamento",
     label: "Pedido de avaliação no Google",
     // A regra de quem recebe fica escrita aqui porque muda o resultado: pedir
     // pra todo mundo é como se junta avaliação de 2 estrelas.
     hint:
       "Um dia depois do atendimento, às 15h. Vai só pra quem já voltou ao salão (2+ atendimentos) e nunca recebeu o pedido antes. Precisa do link do Google na aba Estabelecimento → Redes sociais.",
+  },
+  {
+    key: "waitlistOpen",
+    grupo: "agendamento",
+    label: "Vaga liberada para a lista de espera",
+    hint: "Quando alguém cancela, avisa na hora até 3 clientes que estavam esperando aquele dia (as que entraram primeiro). Quem marcar primeiro pelo link fica com o horário.",
+  },
+  {
+    key: "winbackAuto",
+    grupo: "volta",
+    label: "Sentimos sua falta",
+    hint: "Às 11h, para quem passou do prazo sem voltar. Quem costuma vir com intervalo maior recebe no ritmo dela, não antes. Ao ligar, não dispara para quem sumiu há meses — esses continuam em Recuperar.",
+  },
+  {
+    key: "serviceReturn",
+    grupo: "volta",
+    label: "Hora do retorno",
+    hint: "Às 14h, quando chega o prazo de retorno do último serviço dela (\"faz 30 dias da sua coloração\"). O prazo de cada serviço fica em Serviços → editar → Retorno.",
+  },
+  {
+    key: "birthday",
+    grupo: "volta",
+    label: "Aniversário",
+    hint: "Às 9h do dia, para quem tem data de nascimento na ficha e veio pelo menos uma vez no último ano.",
+  },
+  {
+    key: "packageReminder",
+    grupo: "volta",
+    label: "Pacote vencendo",
+    hint: "Às 16h, 7 dias antes do vencimento, se ainda sobra sessão — com quantas faltam usar.",
   },
 ];
 
@@ -71,6 +140,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [pausedReason, setPausedReason] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [qr, setQr] = useState<string | null>(null);
   // Alternativa ao QR: quem abre o painel no próprio celular não tem como
   // escanear um código exibido nesse mesmo aparelho.
@@ -107,6 +177,7 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
       setPausedReason(data.pausedReason ?? null);
       setStale(!!data.stale);
       if (data.settings) setSettings(data.settings);
+      if (data.campaigns) setCampaigns(data.campaigns);
       return data.state ?? "disconnected";
     } catch {
       if (alive.current) setError("Não foi possível falar com o servidor.");
@@ -201,7 +272,23 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
     }
   }
 
-  async function toggle(key: keyof Settings) {
+  /** Prazo e cupons: mesmo salvamento otimista das caixinhas. */
+  async function salvarAjuste(patch: Partial<Settings>, nome: string) {
+    if (!settings) return;
+    const prev = settings;
+    setSettings({ ...settings, ...patch });
+    const res = await fetch("/api/whatsapp/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, settings: patch }),
+    });
+    if (!res.ok) {
+      setSettings(prev);
+      setError(`Não foi possível mudar ${nome}. Tente de novo.`);
+    }
+  }
+
+  async function toggle(key: BoolKey) {
     if (!settings) return;
     const next = { ...settings, [key]: !settings[key] };
     setSettings(next); // otimista: a troca precisa parecer instantânea
@@ -402,35 +489,88 @@ export function WhatsAppPanel({ slug }: { slug: string }) {
             tratar seu número como robô.
           </p>
 
-          <div className="mt-4 space-y-3">
-            {MESSAGES.map((m) => (
-              <label
-                key={m.key}
-                className={`flex items-start gap-3 rounded-[var(--radius)] border border-border p-3 ${
-                  m.soon ? "opacity-60" : "cursor-pointer hover:border-primary/50"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
-                  checked={settings[m.key]}
-                  disabled={m.soon}
-                  onChange={() => toggle(m.key)}
-                />
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                    {m.label}
-                    {m.soon && (
-                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
-                        Em breve
+          {GRUPOS.map((g) => (
+            <section key={g.id} className="mt-6 first-of-type:mt-4">
+              <h5 className="text-sm font-semibold">{g.titulo}</h5>
+              <p className="mt-0.5 text-xs text-muted-foreground">{g.texto}</p>
+              <div className="mt-3 space-y-3">
+                {MESSAGES.filter((m) => m.grupo === g.id).map((m) => (
+                  <div key={m.key}>
+                    <label
+                      className={`flex items-start gap-3 rounded-[var(--radius)] border border-border p-3 ${
+                        m.soon ? "opacity-60" : "cursor-pointer hover:border-primary/50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+                        checked={settings[m.key]}
+                        disabled={m.soon}
+                        onChange={() => toggle(m.key)}
+                      />
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                          {m.label}
+                          {m.soon && (
+                            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+                              Em breve
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{m.hint}</span>
                       </span>
+                    </label>
+
+                    {/* Ajustes fora do <label>: clicar num select não pode
+                        ligar/desligar a caixa. Só aparecem com a mensagem ligada. */}
+                    {m.key === "winbackAuto" && settings.winbackAuto && (
+                      <div className="mt-2 ml-7 space-y-2 text-sm">
+                        <Ajuste id="winback-days" rotulo="Mandar depois de">
+                          <select
+                            id="winback-days"
+                            value={settings.winbackDays}
+                            onChange={(e) => salvarAjuste({ winbackDays: Number(e.target.value) }, "o prazo do \"Sentimos sua falta\"")}
+                            className={SELECT}
+                          >
+                            {(WINBACK_DAYS.includes(settings.winbackDays)
+                              ? WINBACK_DAYS
+                              : [...WINBACK_DAYS, settings.winbackDays].sort((a, b) => a - b)
+                            ).map((d) => (
+                              <option key={d} value={d}>{d} dias sem vir</option>
+                            ))}
+                          </select>
+                        </Ajuste>
+                        <CupomSelect
+                          id="winback-cupom"
+                          campaigns={campaigns}
+                          value={settings.winbackCampaignId}
+                          onChange={(v) => salvarAjuste({ winbackCampaignId: v }, "o cupom do \"Sentimos sua falta\"")}
+                        />
+                      </div>
                     )}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{m.hint}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+                    {m.key === "birthday" && settings.birthday && (
+                      <div className="mt-2 ml-7 text-sm">
+                        <CupomSelect
+                          id="birthday-cupom"
+                          campaigns={campaigns}
+                          value={settings.birthdayCampaignId}
+                          onChange={(v) => salvarAjuste({ birthdayCampaignId: v }, "o cupom de aniversário")}
+                        />
+                      </div>
+                    )}
+                    {m.key === "serviceReturn" && settings.serviceReturn && (
+                      <p className="mt-2 ml-7 text-xs text-muted-foreground">
+                        Só sai para os serviços com prazo de retorno.{" "}
+                        <Link href={`/painel/${slug}/servicos`} className="font-medium text-primary hover:underline">
+                          Definir em Serviços
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
 
           <p className="mt-4 text-xs text-muted-foreground">
             Toda mensagem termina com uma saída fácil (&ldquo;responda SAIR&rdquo;). Quem pedir
@@ -480,5 +620,50 @@ function StatusBadge({ state, stale }: { state: State | null; stale: boolean }) 
       {m.text}
       {stale && " (?)"}
     </span>
+  );
+}
+
+const SELECT =
+  "h-9 rounded-[var(--radius)] border border-border bg-card px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
+
+function Ajuste({ id, rotulo, children }: { id: string; rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label htmlFor={id} className="text-muted-foreground">{rotulo}</label>
+      {children}
+    </div>
+  );
+}
+
+/** Cupom opcional: lista as campanhas ativas do salão. */
+function CupomSelect({
+  id, campaigns, value, onChange,
+}: {
+  id: string;
+  campaigns: Campaign[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  // Campanha escolhida que venceu ou foi desativada: o banco já tira o cupom
+  // do texto; aqui ela aparece marcada como tal em vez de sumir do select.
+  const sumiu = value && !campaigns.some((c) => c.id === value);
+  return (
+    <Ajuste id={id} rotulo="Cupom">
+      <select
+        id={id}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={SELECT}
+      >
+        <option value="">Sem cupom</option>
+        {campaigns.map((c) => (
+          <option key={c.id} value={c.id}>{c.name} ({c.discount}% off)</option>
+        ))}
+        {sumiu && <option value={value}>Campanha encerrada</option>}
+      </select>
+      {campaigns.length === 0 && (
+        <span className="text-xs text-muted-foreground">Crie uma campanha em Campanhas para oferecer cupom.</span>
+      )}
+    </Ajuste>
   );
 }

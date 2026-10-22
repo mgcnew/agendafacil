@@ -35,6 +35,11 @@ export async function POST(req: Request) {
     thankYou: "send_thank_you",
     reminderConfirm: "send_reminder_confirm",
     reviewRequest: "send_review_request",
+    winbackAuto: "send_winback_auto",
+    birthday: "send_birthday",
+    waitlistOpen: "send_waitlist_open",
+    serviceReturn: "send_service_return",
+    packageReminder: "send_package_reminder",
   } as const;
 
   let touched = false;
@@ -45,11 +50,46 @@ export async function POST(req: Request) {
       touched = true;
     }
   }
+  // Prazo do "sentimos sua falta": a mesma faixa que o banco aceita (CHECK).
+  const days = settings?.winbackDays;
+  if (days !== undefined) {
+    if (typeof days !== "number" || !Number.isInteger(days) || days < 7 || days > 180) {
+      return NextResponse.json({ error: "prazo_invalido" }, { status: 400 });
+    }
+    patch.winback_days = days;
+    touched = true;
+  }
+
+  // Cupom do "Sentimos sua falta" e do aniversário: null tira o cupom; um id
+  // só vale se a campanha for deste salão (o admin client ignora RLS).
+  const admin = createAdminClient();
+  const campanhas = {
+    winbackCampaignId: "winback_campaign_id",
+    birthdayCampaignId: "birthday_campaign_id",
+  } as const;
+  for (const [key, column] of Object.entries(campanhas)) {
+    const value = settings?.[key];
+    if (value === undefined) continue;
+    if (value !== null && typeof value !== "string") {
+      return NextResponse.json({ error: "campanha_invalida" }, { status: 400 });
+    }
+    if (value) {
+      const { data: camp } = await admin
+        .from("campaigns")
+        .select("id")
+        .eq("id", value)
+        .eq("salon_id", guard.ctx.salonId)
+        .maybeSingle();
+      if (!camp) return NextResponse.json({ error: "campanha_invalida" }, { status: 400 });
+    }
+    patch[column] = value;
+    touched = true;
+  }
+
   if (!touched) {
     return NextResponse.json({ error: "nada_para_atualizar" }, { status: 400 });
   }
 
-  const admin = createAdminClient();
   const { error } = await admin
     .from("whatsapp_instances")
     .update(patch)

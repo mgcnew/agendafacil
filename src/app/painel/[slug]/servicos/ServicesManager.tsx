@@ -13,6 +13,7 @@ import { SERVICE_PRESETS } from "@/lib/servicePresets";
 import { SERVICE_COLORS, defaultServiceColor } from "@/lib/serviceColors";
 import type { ServiceInsight } from "@/lib/serviceInsights";
 import {
+  ArrowsClockwise,
   CalendarX,
   CaretDown,
   Check,
@@ -89,6 +90,8 @@ export function ServicesManager({
   const [finish, setFinish] = useState("15");
   const [bringOwnTools, setBringOwnTools] = useState(false);
   const [allowsHome, setAllowsHome] = useState(false);
+  // Dias até o lembrete "hora do retorno" no WhatsApp; vazio = não lembra.
+  const [returnDays, setReturnDays] = useState("");
   const [recipe, setRecipe] = useState<RecipeRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -141,6 +144,7 @@ export function ServicesManager({
     setHasProcessing(false); setProcessing("30"); setFinish("15");
     setBringOwnTools(false);
     setAllowsHome(false);
+    setReturnDays("");
     setRecipe([]);
     setEditingId(null);
   }
@@ -163,6 +167,7 @@ export function ServicesManager({
     setFinish(String(svc.finish_time_min || 15));
     setBringOwnTools(svc.bring_own_tools ?? false);
     setAllowsHome(svc.allows_home_service ?? false);
+    setReturnDays(svc.return_days != null ? String(svc.return_days) : "");
     setRecipe(
       svcProducts
         .filter((sp) => sp.service_id === svc.id)
@@ -184,6 +189,12 @@ export function ServicesManager({
 
   async function save() {
     if (!name) return;
+    // Mesma faixa do CHECK no banco: fora dela o save falharia com erro genérico.
+    const retorno = returnDays.trim() === "" ? null : parseInt(returnDays, 10);
+    if (retorno !== null && (!Number.isInteger(retorno) || retorno < 5 || retorno > 365)) {
+      setErr("O retorno precisa ficar entre 5 e 365 dias, ou em branco.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     const payload = {
@@ -198,6 +209,7 @@ export function ServicesManager({
       finish_time_min: hasProcessing ? parseInt(finish) || 0 : 0,
       bring_own_tools: bringOwnTools,
       allows_home_service: allowsHome,
+      return_days: retorno,
     };
     let saved: Service | null = null;
     if (editingId) {
@@ -621,6 +633,32 @@ export function ServicesManager({
               </div>
             </div>
           )}
+
+          {/* Retorno: alimenta o lembrete "Hora do retorno" do WhatsApp. */}
+          <div className="rounded-[var(--radius)] border border-border p-4">
+            <Label htmlFor="svc-return" className="flex items-center gap-1.5">
+              <ArrowsClockwise className="h-4 w-4 text-primary" /> Retorno em quantos dias?
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Opcional. Ex.: coloração 30, sobrancelha 15, barba 10. Com o WhatsApp
+              conectado e &ldquo;Hora do retorno&rdquo; ligado, a cliente recebe um lembrete
+              quando o prazo chega.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Input
+                id="svc-return"
+                type="number"
+                inputMode="numeric"
+                min={5}
+                max={365}
+                value={returnDays}
+                onChange={(e) => setReturnDays(e.target.value)}
+                placeholder="—"
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">dias</span>
+            </div>
+          </div>
 
           {/* Insumos consumidos por atendimento (estoque inteligente) */}
           <div className="rounded-[var(--radius)] border border-border p-4">

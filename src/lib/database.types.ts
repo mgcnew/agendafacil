@@ -2507,6 +2507,7 @@ export type Database = {
           price: number
           price_type: string
           processing_time_min: number
+          return_days: number | null
           salon_id: string
         }
         Insert: {
@@ -2525,6 +2526,7 @@ export type Database = {
           price?: number
           price_type?: string
           processing_time_min?: number
+          return_days?: number | null
           salon_id: string
         }
         Update: {
@@ -2543,6 +2545,7 @@ export type Database = {
           price?: number
           price_type?: string
           processing_time_min?: number
+          return_days?: number | null
           salon_id?: string
         }
         Relationships: [
@@ -2743,6 +2746,14 @@ export type Database = {
           send_reminder_confirm: boolean
           send_review_request: boolean
           send_thank_you: boolean
+          send_winback_auto: boolean
+          winback_days: number
+          winback_campaign_id: string | null
+          send_birthday: boolean
+          birthday_campaign_id: string | null
+          send_waitlist_open: boolean
+          send_service_return: boolean
+          send_package_reminder: boolean
           status: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at: string
           webhook_set_at: string | null
@@ -2765,6 +2776,14 @@ export type Database = {
           send_reminder_confirm?: boolean
           send_review_request?: boolean
           send_thank_you?: boolean
+          send_winback_auto?: boolean
+          winback_days?: number
+          winback_campaign_id?: string | null
+          send_birthday?: boolean
+          birthday_campaign_id?: string | null
+          send_waitlist_open?: boolean
+          send_service_return?: boolean
+          send_package_reminder?: boolean
           status?: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at?: string
           webhook_set_at?: string | null
@@ -2787,6 +2806,14 @@ export type Database = {
           send_reminder_confirm?: boolean
           send_review_request?: boolean
           send_thank_you?: boolean
+          send_winback_auto?: boolean
+          winback_days?: number
+          winback_campaign_id?: string | null
+          send_birthday?: boolean
+          birthday_campaign_id?: string | null
+          send_waitlist_open?: boolean
+          send_service_return?: boolean
+          send_package_reminder?: boolean
           status?: Database["public"]["Enums"]["whatsapp_instance_status"]
           updated_at?: string
           webhook_set_at?: string | null

@@ -46,6 +46,7 @@ export async function GET(req: Request) {
       pausedReason: row.paused_reason,
       lastError: row.last_error,
       settings: pickSettings(row),
+      campaigns: await campanhasAtivas(admin, salonId),
     });
   }
 
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
       configured: true,
       stale: true,
       settings: pickSettings(row),
+      campaigns: await campanhasAtivas(admin, salonId),
     });
   }
 
@@ -118,6 +120,7 @@ export async function GET(req: Request) {
     configured: true,
     phoneNumber,
     settings: pickSettings(row),
+    campaigns: await campanhasAtivas(admin, salonId),
   });
 }
 
@@ -126,11 +129,47 @@ function pickSettings(row: {
   send_thank_you: boolean;
   send_reminder_confirm: boolean;
   send_review_request: boolean;
+  send_winback_auto: boolean;
+  winback_days: number;
+  winback_campaign_id: string | null;
+  send_birthday: boolean;
+  birthday_campaign_id: string | null;
+  send_waitlist_open: boolean;
+  send_service_return: boolean;
+  send_package_reminder: boolean;
 }) {
   return {
     bookingReceipt: row.send_booking_receipt,
     thankYou: row.send_thank_you,
     reminderConfirm: row.send_reminder_confirm,
     reviewRequest: row.send_review_request,
+    winbackAuto: row.send_winback_auto,
+    winbackDays: row.winback_days,
+    winbackCampaignId: row.winback_campaign_id,
+    birthday: row.send_birthday,
+    birthdayCampaignId: row.birthday_campaign_id,
+    waitlistOpen: row.send_waitlist_open,
+    serviceReturn: row.send_service_return,
+    packageReminder: row.send_package_reminder,
   };
+}
+
+/**
+ * Campanhas ativas do salão — opções de cupom do "Sentimos sua falta" e do
+ * aniversário. Vencidas ficam de fora: o banco já as tiraria do texto.
+ */
+async function campanhasAtivas(
+  admin: ReturnType<typeof createAdminClient>,
+  salonId: string,
+) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { data } = await admin
+    .from("campaigns")
+    .select("id, name, discount_percent, ends_on")
+    .eq("salon_id", salonId)
+    .eq("is_active", true)
+    .order("name");
+  return (data ?? [])
+    .filter((c) => !c.ends_on || c.ends_on >= hoje)
+    .map((c) => ({ id: c.id, name: c.name, discount: Number(c.discount_percent) }));
 }
