@@ -30,9 +30,10 @@ A promessa principal da landing é **gestão completa do salão num lugar só** 
 
 ## Capabilities and Constraints
 
-- Planos (fonte: `src/lib/plans.ts`): Básico R$ 39,90, Pro R$ 69,90, Max R$ 99,90 (Max "em breve", não assinável).
+- Planos (fonte: `src/lib/plans.ts`): Básico R$ 39,90 e Pro R$ 69,90. O Max (R$ 99,90) saiu da oferta em 2026-10-22 e não aparece mais em nenhuma tela.
 - Sem fidelidade, cancela quando quiser; teste sem cartão.
-- Integração WhatsApp completa é do plano Max (em breve).
+- WhatsApp com número do próprio salão: comprovante, confirmação na véspera, agradecimento, avaliação, vaga liberada, "sentimos sua falta", retorno do serviço, aniversário e pacote vencendo (cada um liga/desliga em Configurações → WhatsApp).
+- Nenhuma promessa de tempo de configuração ("2 minutos") — não foi medido.
 - Stack: Next.js 16 + React 19 + Tailwind v4 + Supabase.
 
 ## Brand Commitments
