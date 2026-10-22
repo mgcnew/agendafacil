@@ -274,9 +274,22 @@ export function ClientsManager({
             return (
             <div key={c.id} className="flex items-center gap-1 rounded-[var(--radius)] border border-border bg-card pr-2 hover:border-foreground/20 transition">
               <Link href={`/painel/${slug}/clientes/${c.id}`} className="flex items-center gap-4 p-4 flex-1 min-w-0">
-                <span className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
-                  {c.full_name.charAt(0)}
-                </span>
+                {/* Foto da ficha quando existe — a lista desenhava só a
+                    inicial e a foto enviada nunca aparecia aqui. */}
+                {c.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.photo_url}
+                    alt=""
+                    loading="lazy"
+                    className="h-10 w-10 rounded-full object-cover shrink-0 bg-secondary"
+                  />
+                ) : (
+                  <span aria-hidden className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
+                    {/* Primeira letra de verdade: "[TESTE] Ana" virava "[". */}
+                    {(c.full_name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase()}
+                  </span>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate flex items-center gap-2">
                     {c.full_name}

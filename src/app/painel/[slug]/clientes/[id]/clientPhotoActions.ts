@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectivePermissions } from "@/lib/salon";
@@ -88,6 +89,9 @@ export async function uploadClientPhoto(
       .eq("id", clientId);
     if (error) return { error: error.message };
 
+    // A lista de clientes guarda a página já renderizada; sem isto a foto nova
+    // só aparecia lá depois de recarregar o navegador.
+    revalidatePath("/painel/[slug]/clientes", "page");
     return { url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro no envio da foto." };
@@ -110,6 +114,7 @@ export async function removeClientPhoto(
       .update({ photo_url: null })
       .eq("id", clientId);
     if (error) return { error: error.message };
+    revalidatePath("/painel/[slug]/clientes", "page");
     return { url: "" };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro ao remover a foto." };
