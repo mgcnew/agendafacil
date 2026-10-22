@@ -114,7 +114,7 @@ function DemoBanner({ niche }: { niche: string }) {
       href={`/criar-salao?tipo=${encodeURIComponent(niche)}`}
       className="block bg-primary text-primary-foreground text-center text-sm font-medium px-4 py-2.5 hover:brightness-110 transition"
     >
-      ✨ Este é um exemplo do Zulan. Gostou? <span className="underline underline-offset-2">Crie o seu grátis →</span>
+      Exemplo do Zulan. <span className="underline underline-offset-2 whitespace-nowrap">Crie o seu grátis →</span>
     </a>
   );
 }

@@ -185,6 +185,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryPhoto[]>([]);
   const [showGallery, setShowGallery] = useState(false);
+  const [galleryStart, setGalleryStart] = useState(0);
   const [inspirationIds, setInspirationIds] = useState<string[]>([]);
   const [favoriteProId, setFavoriteProId] = useState<string | null>(null);
   const [resaleProducts, setResaleProducts] = useState<ResaleProduct[]>([]);
@@ -741,50 +742,63 @@ export function BookingApp({ salon }: { salon: Salon }) {
   /* ---------------- render ---------------- */
   return (
     <div className="max-w-xl mx-auto px-4 pb-40">
-      {/* Cabeçalho — leve, identidade completa do salão só aparece na confirmação */}
-      <header className="pt-6 pb-2">
-        <div className="flex items-center justify-end gap-1">
-          {/* Redes primeiro: são do salão, e galeria/meus agendamentos são
-              ferramentas de quem está navegando. */}
-          <SocialLinksRow salon={salon} variant="cabecalho" />
-          {gallery.length > 0 && (
-            <button
-              onClick={() => setShowGallery(true)}
-              aria-label="Ver galeria de fotos"
-              className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
-            >
-              <Images className="h-4.5 w-4.5" />
-            </button>
+      {/* Cabeçalho: quem chega pelo link precisa saber em que salão está
+          antes de escolher qualquer coisa. Antes a identidade só aparecia na
+          revisão final — a cliente montava o pedido sem ver de quem era. */}
+      <header className="pt-5 pb-5">
+        <div className="flex items-center gap-3.5">
+          {salon.logo_url ? (
+            <NextImage
+              src={salon.logo_url}
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-2xl object-cover border border-border shrink-0"
+            />
+          ) : (
+            <span aria-hidden className="grid place-items-center h-14 w-14 rounded-2xl bg-primary text-primary-foreground font-display text-2xl shrink-0">
+              {salon.name.charAt(0)}
+            </span>
           )}
-          {(userId || savedPhone) && (
-            <button
-              onClick={loadMine}
-              aria-label="Meus agendamentos"
-              className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
-            >
-              <ClockCounterClockwise className="h-4.5 w-4.5" />
-            </button>
-          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-xl sm:text-2xl leading-tight truncate">{salon.name}</p>
+            {(salon.address || salon.city) && (
+              <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                <MapPin aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{salon.address || salon.city}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center shrink-0 -mr-2">
+            {/* Redes primeiro: são do salão, e galeria/meus agendamentos são
+                ferramentas de quem está navegando. */}
+            <SocialLinksRow salon={salon} variant="cabecalho" />
+            {gallery.length > 0 && (
+              <button
+                onClick={() => { setGalleryStart(0); setShowGallery(true); }}
+                aria-label="Ver galeria de fotos"
+                className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              >
+                <Images className="h-[18px] w-[18px]" />
+              </button>
+            )}
+            {(userId || savedPhone) && (
+              <button
+                onClick={loadMine}
+                aria-label="Meus agendamentos"
+                className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              >
+                <ClockCounterClockwise className="h-[18px] w-[18px]" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Saudação — a única coisa que permanece sempre visível no topo */}
+        {/* Saudação de quem volta — uma linha, sem competir com o salão */}
         {step === "services" && (userId || savedPhone) && clientName && (
-          <div className="mt-2 af-rise">
-            <p className="font-display text-2xl">
-              Olá, {clientName.split(" ")[0]}! <span aria-hidden>👋</span>
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Que bom te ver de novo — escolha os serviços e vamos agendar.
-            </p>
-          </div>
-        )}
-        {step === "services" && !userId && !savedPhone && (
-          <div className="mt-2 af-rise">
-            <p className="font-display text-2xl">Seja bem-vindo(a)!</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Agende seu horário em poucos toques.
-            </p>
-          </div>
+          <p className="mt-4 text-sm text-muted-foreground af-rise">
+            Olá, <span className="font-semibold text-foreground">{clientName.split(" ")[0]}</span>! Que bom te ver de novo.
+          </p>
         )}
       </header>
 
@@ -799,6 +813,52 @@ export function BookingApp({ salon }: { salon: Salon }) {
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
             <Sparkle className="h-5 w-5 text-primary" /> Escolha os serviços
           </h2>
+
+          {/* Trabalhos do salão à vista, não atrás de um ícone: é o que a
+              cliente quer ver antes de decidir. Tocar abre a foto grande, onde
+              ela pode marcar como inspiração pro profissional. */}
+          {gallery.length > 0 && (
+            <div className="pb-1">
+              <div className="flex items-baseline justify-between gap-2 mb-2">
+                <p className="text-sm font-semibold">Trabalhos do salão</p>
+                <button
+                  type="button"
+                  onClick={() => { setGalleryStart(0); setShowGallery(true); }}
+                  className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Ver todas ({gallery.length})
+                </button>
+              </div>
+              <ul className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 pb-1" aria-label="Fotos de trabalhos do salão">
+                {gallery.map((g, i) => {
+                  const sel = inspirationIds.includes(g.id);
+                  return (
+                    <li key={g.id} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => { setGalleryStart(i); setShowGallery(true); }}
+                        aria-label={`Ver foto ${i + 1}${g.caption ? `: ${g.caption}` : ""}${sel ? " (escolhida como inspiração)" : ""}`}
+                        className={`relative block h-28 w-24 overflow-hidden rounded-[var(--radius)] border bg-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${sel ? "border-primary ring-2 ring-primary" : "border-border"}`}
+                      >
+                        <NextImage src={g.url} alt="" fill sizes="96px" className="object-cover" />
+                        {sel && (
+                          <span aria-hidden className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow">
+                            <Heart className="h-3.5 w-3.5" weight="fill" />
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {inspirationIds.length > 0 && (
+                <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Heart aria-hidden className="h-3.5 w-3.5 text-primary" weight="fill" />
+                  {inspirationIds.length === 1 ? "1 foto escolhida" : `${inspirationIds.length} fotos escolhidas`} como inspiração — o profissional vai ver.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* A modalidade vem ANTES dos serviços de propósito: escolhendo
               domicílio, a lista já mostra só o que sai do salão. O caminho
@@ -893,7 +953,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                   on ? "border-primary ring-2 ring-primary/25 bg-secondary/40" : "border-border bg-card hover:border-foreground/20"
                 }`}
               >
-                <span className={`grid place-items-center h-6 w-6 rounded-full border shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                <span className={`grid place-items-center h-6 w-6 rounded-full border-2 shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-foreground/25"}`}>
                   {on && <Check className="h-4 w-4" />}
                 </span>
                 <div className="flex-1">
@@ -1072,7 +1132,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
               Ver mais datas →
             </button>
           </div>
-          <p className="text-sm text-muted-foreground capitalize">{formatDateLong(date + "T12:00:00")}</p>
+          <p className="text-sm text-muted-foreground first-letter:uppercase">{formatDateLong(date + "T12:00:00")}</p>
           {loadingSlots ? (
             <div className="py-10 grid place-items-center text-muted-foreground">
               <CircleNotch className="h-6 w-6 animate-spin" />
@@ -1213,7 +1273,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 <p className="font-medium truncate">{proAtendente.display_name}</p>
               </div>
             </div>
-            <Row label="Data" value={<span className="capitalize">{formatDateLong(slot)}</span>} />
+            <Row label="Data" value={<span className="inline-block first-letter:uppercase">{formatDateLong(slot)}</span>} />
             <Row
               label="Horário"
               value={new Date(slot).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
@@ -1451,15 +1511,6 @@ export function BookingApp({ salon }: { salon: Salon }) {
           }}
         />
       )}
-      {step === "auth" && (
-        <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur p-4">
-          <div className="max-w-xl mx-auto">
-            <Button variant="ghost" onClick={() => setStep("time")}>
-              <CaretLeft className="h-4 w-4" /> Voltar
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Drawer: meus agendamentos */}
       <AnimatePresence>
@@ -1481,6 +1532,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       {showGallery && gallery.length > 0 && (
         <GalleryModal
           photos={gallery}
+          startIndex={galleryStart}
           selectedIds={inspirationIds}
           onToggle={toggleInspiration}
           onClose={() => setShowGallery(false)}
@@ -1654,8 +1706,14 @@ export function BookingApp({ salon }: { salon: Salon }) {
       );
     }
     return (
-      <span className="grid place-items-center rounded-full text-white font-semibold shrink-0"
-        style={{ width: size, height: size, background: p.color || "var(--primary)", fontSize: Math.round(size * 0.4) }}>
+      <span className="grid place-items-center rounded-full font-semibold shrink-0"
+        // Sem cor própria cai na do salão — e aí o texto tem que ser o par
+        // dela: no tema Preto o fundo é quase branco e o "R" sumia.
+        style={{
+          width: size, height: size, fontSize: Math.round(size * 0.4),
+          background: p.color || "var(--primary)",
+          color: p.color ? "#ffffff" : "var(--primary-foreground)",
+        }}>
         {p.display_name?.charAt(0) ?? "?"}
       </span>
     );
@@ -1783,124 +1841,163 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
 function GalleryModal({
   photos,
+  startIndex = 0,
   selectedIds,
   onToggle,
   onClose,
 }: {
   photos: GalleryPhoto[];
+  startIndex?: number;
   selectedIds: string[];
   onToggle: (id: string) => void;
   onClose: () => void;
 }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(Math.min(Math.max(0, startIndex), photos.length - 1));
   const touchX = useRef<number | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const thumbsRef = useRef<HTMLDivElement>(null);
   const current = photos[idx];
   const isSelected = current ? selectedIds.includes(current.id) : false;
+  const count = selectedIds.length;
 
   const prev = () => setIdx((i) => (i - 1 + photos.length) % photos.length);
   const next = () => setIdx((i) => (i + 1) % photos.length);
 
   useEffect(() => {
+    closeRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
       else if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    // A página por trás não rola enquanto a foto está aberta.
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = overflow;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Miniatura da foto atual sempre à vista na fita.
+  useEffect(() => {
+    const el = thumbsRef.current?.children[idx] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [idx]);
 
   const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0].clientX; };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchX.current;
-    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    if (Math.abs(dx) > 40) {
+      if (dx < 0) next();
+      else prev();
+    }
     touchX.current = null;
   };
 
   return (
+    // Fundo sólido: com 90% de opacidade a página aparecia por trás e
+    // competia com a foto — que é a única coisa que importa aqui.
     <div
-      className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Trabalhos do salão — foto ${idx + 1} de ${photos.length}`}
+      className="fixed inset-0 z-50 bg-[#0b0b0c] text-white flex flex-col"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
       {/* topo */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0">
-        <span className="text-white/60 text-sm font-medium">
-          {idx + 1} / {photos.length}
+      <div className="flex items-center justify-between px-4 h-14 shrink-0">
+        <span className="text-sm font-medium text-white/70 tabular-nums" aria-hidden>
+          {idx + 1} de {photos.length}
         </span>
-        <button onClick={onClose} className="p-2 text-white/70 hover:text-white transition rounded-lg">
+        <button
+          ref={closeRef}
+          onClick={onClose}
+          aria-label="Fechar galeria"
+          className="grid h-10 w-10 place-items-center rounded-full text-white/80 hover:bg-white/10 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      {/* imagem */}
-      <div className="flex-1 flex items-center justify-center relative px-12 min-h-0">
-        {photos.length > 1 && (
-          <button
-            onClick={prev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
-          >
-            <CaretLeft className="h-6 w-6" />
-          </button>
-        )}
+      {/* foto */}
+      <div className="relative flex-1 min-h-0 flex items-center justify-center px-3 sm:px-16">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          key={photos[idx].id}
-          src={photos[idx].url}
-          alt={`Foto ${idx + 1}`}
-          className="max-h-full max-w-full object-contain rounded-lg select-none"
+          key={current.id}
+          src={current.url}
+          alt={current.caption ?? `Trabalho do salão, foto ${idx + 1}`}
+          className="max-h-full max-w-full object-contain rounded-xl select-none"
           style={{ animation: "fadeIn 0.2s ease" }}
+          draggable={false}
         />
+        {/* Setas só a partir do tablet: no celular o gesto de arrastar resolve
+            e as setas tampavam a borda da foto. */}
         {photos.length > 1 && (
-          <button
-            onClick={next}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition"
-          >
-            <CaretRight className="h-6 w-6" />
-          </button>
+          <>
+            <button
+              onClick={prev}
+              aria-label="Foto anterior"
+              className="hidden sm:grid absolute left-3 top-1/2 -translate-y-1/2 h-11 w-11 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <CaretLeft className="h-5 w-5" />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Próxima foto"
+              className="hidden sm:grid absolute right-3 top-1/2 -translate-y-1/2 h-11 w-11 place-items-center rounded-full bg-white/10 hover:bg-white/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <CaretRight className="h-5 w-5" />
+            </button>
+          </>
         )}
       </div>
 
-      {/* Legenda + botão "quero fazer este" */}
-      <div className="shrink-0 px-4 pt-2 flex flex-col items-center gap-2">
-        {current?.caption && (
-          <p className="text-white/70 text-sm text-center max-w-md line-clamp-2">{current.caption}</p>
+      {/* Legenda + ação */}
+      <div className="shrink-0 px-4 pt-4 pb-2 flex flex-col items-center gap-2 text-center">
+        {current.caption && (
+          <p className="text-sm text-white/80 max-w-md line-clamp-2">{current.caption}</p>
         )}
         <button
-          onClick={() => current && onToggle(current.id)}
-          className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-            isSelected
-              ? "bg-white text-black"
-              : "bg-primary text-primary-foreground hover:brightness-110"
+          onClick={() => onToggle(current.id)}
+          aria-pressed={isSelected}
+          className={`inline-flex items-center gap-2 rounded-full h-11 px-5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+            isSelected ? "bg-white/15 text-white ring-1 ring-inset ring-white/50" : "bg-primary text-primary-foreground hover:brightness-110"
           }`}
         >
-          {isSelected ? (
-            <><Check className="h-4 w-4" /> Selecionado como inspiração</>
-          ) : (
-            <><Heart className="h-4 w-4" /> Quero fazer este</>
-          )}
+          <Heart className="h-4 w-4" weight={isSelected ? "fill" : "regular"} />
+          {isSelected ? "Escolhida como inspiração" : "Quero este estilo"}
         </button>
+        <p className="text-xs text-white/55 max-w-xs">
+          {isSelected
+            ? "Toque de novo para tirar. O profissional vai ver esta foto no seu agendamento."
+            : "Marque as fotos do que você quer fazer — o profissional vai ver no seu agendamento."}
+        </p>
       </div>
 
       {/* miniaturas */}
       {photos.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 justify-center">
+        <div ref={thumbsRef} className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 sm:justify-center">
           {photos.map((p, i) => {
             const sel = selectedIds.includes(p.id);
             return (
               <button
                 key={p.id}
                 onClick={() => setIdx(i)}
-                className={`relative shrink-0 h-14 w-20 rounded-md overflow-hidden border-2 transition ${
-                  i === idx ? "border-primary opacity-100" : sel ? "border-white/80 opacity-100" : "border-transparent opacity-50 hover:opacity-75"
+                aria-label={`Ver foto ${i + 1}${sel ? " (escolhida)" : ""}`}
+                aria-current={i === idx ? "true" : undefined}
+                className={`relative shrink-0 h-16 w-14 rounded-lg overflow-hidden transition ${
+                  i === idx ? "ring-2 ring-white opacity-100" : "opacity-50 hover:opacity-80"
                 }`}
               >
-                <NextImage src={p.url} alt="" fill sizes="80px" className="object-cover" />
+                <NextImage src={p.url} alt="" fill sizes="56px" className="object-cover" />
                 {sel && (
-                  <span className="absolute top-0.5 right-0.5 grid place-items-center h-4 w-4 rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-3 w-3" />
+                  <span aria-hidden className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground">
+                    <Heart className="h-3 w-3" weight="fill" />
                   </span>
                 )}
               </button>
@@ -1908,6 +2005,18 @@ function GalleryModal({
           })}
         </div>
       )}
+
+      {/* Volta pro agendamento com o que escolheu — sem caçar o X. */}
+      <div className="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1">
+        <button
+          onClick={onClose}
+          className="w-full max-w-md mx-auto flex items-center justify-center gap-2 h-12 rounded-full border border-white/20 text-sm font-semibold hover:bg-white/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {count > 0
+            ? `Continuar agendando · ${count} inspiraç${count === 1 ? "ão" : "ões"}`
+            : "Voltar ao agendamento"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1972,8 +2081,14 @@ function BottomBar({
             <CaretLeft className="h-4 w-4" />
           </Button>
         )}
+        {/* Travado, diz o que falta — botão cinza mudo parece defeito. */}
         <Button className="flex-1" size="lg" onClick={onNext} disabled={!canNext}>
-          Continuar
+          {canNext
+            ? "Continuar"
+            : step === "services" ? "Escolha um serviço"
+            : step === "professional" ? "Escolha quem vai te atender"
+            : "Escolha um horário"}
+          {canNext && <CaretRight aria-hidden className="h-4 w-4" />}
         </Button>
       </div>
     </div>
