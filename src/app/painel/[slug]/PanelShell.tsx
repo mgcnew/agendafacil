@@ -94,6 +94,7 @@ function Tip({ label }: { label: string }) {
         "text-xs font-medium text-background shadow-lg",
         "opacity-0 scale-95 origin-left transition-all duration-150",
         "group-hover:opacity-100 group-hover:scale-100",
+        "group-focus-visible:opacity-100 group-focus-visible:scale-100",
       )}
     >
       {label}
@@ -299,8 +300,13 @@ export function PanelShell({
 
   // Item da sidebar desktop: só ícone + tooltip no lg (barra estreita), ícone +
   // rótulo a partir do xl. O ativo usa o tom da cor do salão, sem pílula cheia.
+  // gap só no xl: na barra estreita o rótulo some, mas o gap-3 continuava
+  // contando e empurrava o ícone 6px para fora do centro do quadrado.
   const itemBase =
-    "group relative flex items-center justify-center xl:justify-start gap-3 rounded-[0.7rem] h-10 w-10 xl:w-full xl:px-3 text-[0.9rem] font-medium transition-colors";
+    "group relative flex items-center justify-center xl:justify-start xl:gap-3 rounded-[0.7rem] h-10 w-10 xl:w-full xl:px-3 text-[0.9rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
+  // Rótulo: no lg fica só para leitor de tela (antes era display:none, e o
+  // ícone sozinho não tinha nome acessível); no xl aparece ao lado do ícone.
+  const itemLabel = "sr-only xl:not-sr-only xl:truncate";
   const itemIdle = "text-foreground/65 hover:bg-muted hover:text-foreground";
 
   function NavLink({ it }: { it: NavItem }) {
@@ -320,7 +326,7 @@ export function PanelShell({
           className={cn("h-[18px] w-[18px] shrink-0", active && "text-primary")}
           weight={active ? "fill" : "regular"}
         />
-        <span className="hidden xl:inline truncate">{it.label}</span>
+        <span className={itemLabel}>{it.label}</span>
         <span className="xl:hidden"><Tip label={it.label} /></span>
       </Link>
     );
@@ -350,7 +356,7 @@ export function PanelShell({
         {/* Marca + salão — nunca comprime (shrink-0) */}
         <Link
           href={base}
-          className="group relative flex shrink-0 items-center gap-3 rounded-[0.7rem] xl:px-1.5 xl:py-1 mb-2 hover:bg-muted transition-colors"
+          className="group relative flex shrink-0 items-center xl:gap-3 rounded-[0.7rem] xl:px-1.5 xl:py-1 mb-2 hover:bg-muted transition-colors"
         >
           <span className="block h-10 w-10 shrink-0 overflow-hidden rounded-[0.7rem] bg-white ring-1 ring-border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -378,23 +384,23 @@ export function PanelShell({
           {isPlatformAdmin && (
             <Link href="/admin" className={cn(itemBase, itemIdle)}>
               <ShieldCheck className="h-[18px] w-[18px] shrink-0" />
-              <span className="hidden xl:inline">Plataforma</span>
+              <span className={itemLabel}>Plataforma</span>
               <span className="xl:hidden"><Tip label="Plataforma" /></span>
             </Link>
           )}
           <button onClick={sharePublic} className={cn(itemBase, itemIdle)}>
             <ShareNetwork className="h-[18px] w-[18px] shrink-0" />
-            <span className="hidden xl:inline">Compartilhar link</span>
+            <span className={itemLabel}>Compartilhar link</span>
             <span className="xl:hidden"><Tip label="Compartilhar link" /></span>
           </button>
           <div className="flex items-center justify-center xl:justify-between gap-1 xl:pl-1 flex-col xl:flex-row">
-            <ThemeToggle />
+            <ThemeToggle className="rounded-[0.7rem] text-foreground/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
             <button
               onClick={logout}
               className={cn(itemBase, "xl:w-auto text-foreground/65 hover:bg-red-500/10 hover:text-red-600")}
             >
               <SignOut className="h-[18px] w-[18px] shrink-0" />
-              <span className="hidden xl:inline">Sair</span>
+              <span className={itemLabel}>Sair</span>
               <span className="xl:hidden"><Tip label="Sair" /></span>
             </button>
           </div>

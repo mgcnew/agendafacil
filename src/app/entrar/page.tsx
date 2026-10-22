@@ -32,13 +32,14 @@ function EntrarForm() {
 export default function EntrarPage() {
   return (
     <AuthShell
-      title="Bem-vinda de volta"
-      subtitle="Acesse o painel do seu salão."
+      // "Bem-vinda" deixava de fora o dono de barbearia — o público é meio a meio.
+      title="Entrar no Zulan"
+      subtitle="Acesse o painel do seu salão ou da sua barbearia."
       footer={
         <>
-          Ainda não tem salão?{" "}
-          <Link href="/criar-salao" className="text-primary font-medium">
-            Criar agora
+          Ainda não tem conta?{" "}
+          <Link href="/criar-salao" className="font-semibold text-[var(--brand)] hover:underline">
+            Criar meu salão
           </Link>
         </>
       }

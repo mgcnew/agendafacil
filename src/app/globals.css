@@ -586,8 +586,19 @@
   background: var(--background);
 }
 .zl ::selection { background: var(--brand); color: #fff; }
-.zl :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
+/* Sem border-radius aqui: ele mudava o formato do próprio elemento focado
+   (a pílula virava quadrado). O contorno já segue o arredondamento. */
+.zl :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+/* Campos têm anel de foco próprio; o contorno por cima ficava duplo. */
+.zl :is(input, textarea, select):focus-visible { outline: none; }
 .zl a { text-underline-offset: 3px; }
+
+/* Telas de acesso (AuthShell): criar salão, redefinir senha e convite usam os
+   campos e botões genéricos do painel. Aqui eles ganham o desenho da landing
+   sem cada página repetir as classes. */
+.zl-auth form input:not([type="checkbox"], [type="radio"]) { height: 3rem; border-radius: .75rem; padding-inline: 1rem; font-size: .95rem; }
+.zl-auth form button[type="submit"] { border-radius: 999px; font-weight: 700; }
+.zl-auth a.text-primary { color: var(--brand); font-weight: 600; }
 
 @layer components {
 /* Botões da landing (são links: <a>/<Link> com estas classes, sem <button> aninhado) */

@@ -14,6 +14,10 @@ import {
 
 const REMEMBER_KEY = "agendefacil:lastEmail";
 
+// Campos e botão no desenho da landing: mais altos e com o botão-pílula.
+const CAMPO = "h-12 rounded-xl px-4 text-[0.95rem]";
+const BOTAO = "w-full rounded-full font-bold";
+
 /**
  * Formulário de login compartilhado entre a página /entrar (fallback de
  * deep-link/redirect) e o modal de login da landing page.
@@ -137,7 +141,7 @@ export function LoginForm({
         <button
           type="button"
           onClick={() => { setResetSent(false); setMode("login"); }}
-          className="text-sm text-primary font-medium mt-4"
+          className="text-sm text-[var(--brand,var(--primary))] font-medium mt-4"
         >
           Voltar ao login
         </button>
@@ -163,17 +167,18 @@ export function LoginForm({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="voce@salao.com"
+            className={CAMPO}
           />
         </div>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" size="lg" className="w-full" disabled={resetting}>
+        <Button type="submit" size="lg" className={BOTAO} disabled={resetting}>
           {resetting && <CircleNotch className="h-4 w-4 animate-spin" />}
           Enviar link de recuperação
         </Button>
         <button
           type="button"
           onClick={() => { setMode("login"); setError(null); }}
-          className="w-full text-sm text-primary font-medium"
+          className="w-full text-sm text-[var(--brand,var(--primary))] font-medium"
         >
           Voltar ao login
         </button>
@@ -182,7 +187,7 @@ export function LoginForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="email">E-mail</Label>
         <Input
@@ -193,6 +198,7 @@ export function LoginForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="voce@salao.com"
+          className={CAMPO}
         />
       </div>
       <div className="space-y-1.5">
@@ -205,6 +211,7 @@ export function LoginForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
+          className={CAMPO}
         />
       </div>
 
@@ -230,14 +237,14 @@ export function LoginForm({
         <button
           type="button"
           onClick={() => { setMode("forgot"); setError(null); }}
-          className="rounded text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="rounded text-sm font-medium text-[var(--brand,var(--primary))] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           Esqueci a senha
         </button>
       </div>
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" size="lg" className="w-full" disabled={loading || bioLoading}>
+      <Button type="submit" size="lg" className={BOTAO} disabled={loading || bioLoading}>
         {loading && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
         {loading ? "Entrando…" : "Entrar"}
       </Button>
@@ -247,12 +254,12 @@ export function LoginForm({
           type="button"
           onClick={onBiometric}
           disabled={bioLoading || loading}
-          className="w-full flex items-center justify-center gap-2 rounded-[var(--radius)] border border-border py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted transition disabled:opacity-60"
+          className="w-full h-12 flex items-center justify-center gap-2 rounded-full border-[1.5px] border-border text-[0.95rem] font-semibold text-foreground hover:border-foreground transition-colors disabled:opacity-60"
         >
           {bioLoading ? (
             <CircleNotch className="h-4 w-4 animate-spin" />
           ) : (
-            <Fingerprint className="h-5 w-5 text-primary" />
+            <Fingerprint className="h-5 w-5 text-[var(--brand,var(--primary))]" />
           )}
           Entrar com digital
         </button>
