@@ -9,23 +9,15 @@ import { storeChosenPlan } from "@/lib/chosenPlan";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Input, Label } from "@/components/ui";
 import {
-  CalendarCheck,
   Check,
   CircleNotch,
   EnvelopeSimpleOpen,
-  Percent,
-  Stack,
 } from "@phosphor-icons/react/dist/ssr";
 
-const MOBILE_BENEFITS = [
-  { icon: CalendarCheck, text: "A cliente agenda sozinha pelo seu link" },
-  { icon: Percent, text: "Comissões e caixa no automático" },
-  { icon: Stack, text: "Estoque com baixa por serviço" },
-];
-
+// "Configurado em 2 minutos" saiu: ninguém mediu, e o PRODUCT.md não deixa
+// prometer o que não foi medido.
 const TRUST_BADGES = [
   "Sem cartão de crédito",
-  "Configurado em 2 minutos",
   "Cancele quando quiser",
 ];
 
@@ -97,7 +89,7 @@ export default function CriarSalaoPage() {
   return (
     <AuthShell
       title="Crie sua conta"
-      subtitle="Em seguida você configura o seu salão — leva 2 minutos."
+      subtitle="Em seguida você cadastra os serviços e os horários do seu salão."
       footer={
         <>
           Já tem conta?{" "}
@@ -107,20 +99,6 @@ export default function CriarSalaoPage() {
         </>
       }
     >
-      {/* Benefícios — visíveis no mobile (no desktop ficam no painel lateral) */}
-      <div className="lg:hidden mb-6 rounded-[var(--radius)] border border-border bg-card p-4">
-        <ul className="space-y-2.5">
-          {MOBILE_BENEFITS.map((b) => (
-            <li key={b.text} className="flex items-center gap-2.5 text-sm">
-              <span className="grid place-items-center h-7 w-7 rounded-lg bg-secondary text-primary shrink-0">
-                <b.icon className="h-4 w-4" />
-              </span>
-              {b.text}
-            </li>
-          ))}
-        </ul>
-      </div>
-
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Seu nome</Label>

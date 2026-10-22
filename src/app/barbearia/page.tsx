@@ -51,7 +51,7 @@ const DORES = [
 const PASSOS = [
   {
     title: "Cadastre seus serviços",
-    text: "Corte, barba, degradê, pezinho — com preço e tempo de cada um. Leva 2 minutos.",
+    text: "Corte, barba, degradê, pezinho — com preço e tempo de cada um.",
   },
   {
     title: "Mande seu link",

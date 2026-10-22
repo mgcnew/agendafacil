@@ -15,6 +15,7 @@ import { createCheckout, changePlan } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
 import {
   PLANS,
+  SUBSCRIBABLE_PLANS,
   featuresLostDowngrading,
   parsePlanParam,
   planRank,
@@ -136,7 +137,8 @@ export function SubscribePanel({
         <div className="mt-5 border-t border-border pt-4">
           <p className="text-sm font-medium text-foreground">Mudar de plano</p>
           <div className="mt-3 space-y-2.5">
-            {Object.values(PLANS).map((p) => {
+            {/* Max saiu da oferta: só aparece para quem (por algum motivo) já está nele. */}
+            {Object.values(PLANS).filter((p) => !p.comingSoon || p.id === plan).map((p) => {
               const isCurrent = p.id === plan;
               const soon = !!p.comingSoon;
               const isUpgrade = planRank(p.id) > planRank(plan);
@@ -224,7 +226,7 @@ export function SubscribePanel({
       )}
 
       <div className="mt-4 space-y-2.5">
-        {Object.values(PLANS).map((p) => {
+        {SUBSCRIBABLE_PLANS.map((p) => {
           const disabled = !!p.comingSoon;
           const active = selected === p.id && !disabled;
           return (

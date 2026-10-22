@@ -73,7 +73,7 @@ const OBJECTIONS: {
   {
     title: "É complicado de configurar?",
     answer:
-      "Em 2 minutos você cadastra o salão, adiciona serviços e já tem seu link compartilhável. Nenhuma integração técnica, nenhum arquivo para instalar.",
+      "Você cadastra o salão, adiciona os serviços e já sai com seu link para compartilhar. Nenhuma integração técnica, nenhum arquivo para instalar.",
   },
   {
     title: "Funciona para barbearia também?",
@@ -215,7 +215,7 @@ const NICHES = [
 const STEPS = [
   {
     title: "Cadastre o salão",
-    text: "Serviços, preços, duração e equipe. Em 2 minutos o salão está no ar.",
+    text: "Serviços, preços, duração e equipe. Pronto, o salão está no ar.",
   },
   {
     title: "Compartilhe seu link",

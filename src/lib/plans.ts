@@ -27,6 +27,8 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Max",
     value: 99.9,
     tagline: "Tudo do Pro + integração com WhatsApp.",
+    // Fora da oferta desde 2026-10-22 (saiu da landing e da tela de planos).
+    // Continua no tipo porque assinaturas e regras de acesso ainda o citam.
     comingSoon: true,
   },
 };
