@@ -6,6 +6,8 @@ import { Card } from "@/components/ui";
 import { tablistKeys } from "@/lib/tablistKeys";
 import { cn, formatBRL, monthRangeBR } from "@/lib/utils";
 import {
+  ArrowDown,
+  ArrowUp,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -31,6 +33,7 @@ import Link from "next/link";
 import { exportReportCsv, exportReportPdf } from "./export";
 import { Narrator, narratorPct as pct } from "@/components/Narrator";
 import { SITE_URL } from "@/lib/siteUrl";
+import { SERVICE_COLORS } from "@/lib/serviceColors";
 
 // URL canônica (produção) — vai dentro da mensagem de WhatsApp; NEXT_PUBLIC_ é
 // embutida no build, igual no servidor/cliente, sem o render duplo do antigo
@@ -69,6 +72,12 @@ export type HeatCell = { weekday: number; hour: number; revenue: number; count: 
 export type HeatWeekday = { weekday: number; revenue: number; count: number; occupation: number | null };
 export type HeatmapData = { cells: HeatCell[]; weekdays: HeatWeekday[] };
 
+/** Cor e foto de cada serviço/profissional, casados pelo nome do relatório. */
+export type Identidades = {
+  servicos: Record<string, string>;
+  profissionais: Record<string, { cor: string | null; foto: string | null }>;
+};
+
 export type ReactClient = {
   id: string;
   name: string;
@@ -100,6 +109,7 @@ export function ReportsView({
   initialData,
   initialPrevData,
   initialTab,
+  identidades = { servicos: {}, profissionais: {} },
 }: {
   salonId: string;
   salonName: string;
@@ -108,6 +118,7 @@ export function ReportsView({
   initialData: ReportData | null;
   initialPrevData?: ReportData | null;
   initialTab?: string;
+  identidades?: Identidades;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [cmes, setCmes] = useState(initialCmes);
@@ -360,24 +371,107 @@ export function ReportsView({
       ) : tab === "reativacao" ? (
         <ReativacaoTab clients={react} loading={reactLoading} salonName={salonName} slug={slug} />
       ) : loading ? (
-        <div role="status" className="grid place-items-center py-20 text-muted-foreground">
-          <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
-          <span className="sr-only">Carregando o relatório…</span>
-        </div>
+        <Carregando texto="Carregando o relatório…" />
       ) : isEmpty ? (
-        <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-          <ChartBar aria-hidden className="mx-auto h-8 w-8 text-muted-foreground/50" />
-          <p className="mt-3 font-medium">Sem dados neste período</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Os relatórios aparecem conforme os atendimentos são concluídos.
-          </p>
-        </div>
+        <Vazio
+          icon={ChartBar}
+          titulo="Sem dados neste período"
+          texto="Os relatórios aparecem conforme os atendimentos são concluídos."
+        />
       ) : tab === "financeiro" ? (
-        <FinanceiroTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} slug={slug} />
+        <FinanceiroTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} slug={slug} cmes={cmes} />
       ) : (
-        <OperacionalTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} />
+        <OperacionalTab d={d!} prev={prevData} prevLabel={monthLabel(shiftMonthPrev(cmes))} identidades={identidades} />
       )}
     </div>
+  );
+}
+
+/* ───────────────────────── Peças comuns ───────────────────────── */
+
+/**
+ * Variação contra o mês anterior, embaixo de cada número. Seta + texto: a cor
+ * (verde/vermelho) nunca carrega o sentido sozinha. Despesa que sobe é ruim,
+ * por isso `menorMelhor`.
+ */
+function Variacao({
+  atual,
+  anterior,
+  mesAnterior,
+  menorMelhor = false,
+}: {
+  atual: number;
+  anterior: number | undefined;
+  mesAnterior: string;
+  menorMelhor?: boolean;
+}) {
+  if (!anterior || anterior <= 0) return null;
+  const delta = ((atual - anterior) / anterior) * 100;
+  const curto = mesAnterior.split(" ")[0].slice(0, 3).toLowerCase();
+  if (Math.abs(delta) < 0.5) {
+    return <p className="mt-1.5 text-xs text-muted-foreground">igual a {curto}</p>;
+  }
+  const subiu = delta > 0;
+  const bom = menorMelhor ? !subiu : subiu;
+  const Seta = subiu ? ArrowUp : ArrowDown;
+  return (
+    <p className="mt-1.5 flex items-center gap-1 text-xs">
+      <span
+        className={cn(
+          "inline-flex items-center gap-0.5 font-semibold tabular-nums",
+          bom ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+        )}
+      >
+        <Seta aria-hidden weight="bold" className="h-3 w-3" />
+        {pct(Math.abs(delta))}
+      </span>
+      <span className="text-muted-foreground">vs {curto}</span>
+    </p>
+  );
+}
+
+function Vazio({ icon: Icon, titulo, texto }: { icon: typeof ChartBar; titulo: string; texto: string }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
+      <Icon aria-hidden className="mx-auto h-8 w-8 text-muted-foreground/50" />
+      <p className="mt-3 font-medium">{titulo}</p>
+      <p className="text-sm text-muted-foreground mt-1">{texto}</p>
+    </div>
+  );
+}
+
+function Carregando({ texto = "Carregando…" }: { texto?: string }) {
+  return (
+    <div role="status" className="grid place-items-center py-20 text-muted-foreground">
+      <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
+      <span className="sr-only">{texto}</span>
+    </div>
+  );
+}
+
+/** Foto da profissional, ou a inicial na cor dela (a mesma da Agenda). */
+function Avatar({ nome, cor, foto }: { nome: string; cor?: string | null; foto?: string | null }) {
+  const inicial = (nome.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase();
+  if (foto) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={foto} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover bg-secondary" />;
+  }
+  // Sem cor própria (cliente): fundo neutro, que dá contraste em qualquer tema.
+  if (!cor) {
+    return (
+      <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
+        {inicial}
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
+      style={{ backgroundColor: cor }}
+    >
+      {inicial}
+    </span>
   );
 }
 
@@ -413,14 +507,31 @@ function financeiroNarration(d: ReportData, prev: ReportData | null, prevLabel: 
   return { lines, alert };
 }
 
-function FinanceiroTab({ d, prev, prevLabel, slug }: { d: ReportData; prev: ReportData | null; prevLabel: string; slug: string }) {
+// Cor fixa por forma de pagamento (segue a forma, não a posição): Pix é
+// sempre azul, mesmo no mês em que fica em terceiro.
+const COR_PAGAMENTO: Record<string, string> = {
+  pix: "var(--series-1)",
+  credito: "var(--series-2)",
+  debito: "var(--series-3)",
+  dinheiro: "var(--series-4)",
+  cartao: "var(--series-5)",
+};
+const corPagamento = (m: string) => COR_PAGAMENTO[m] ?? "var(--muted-foreground)";
+
+function FinanceiroTab({
+  d, prev, prevLabel, slug, cmes,
+}: {
+  d: ReportData; prev: ReportData | null; prevLabel: string; slug: string; cmes: string;
+}) {
   const kpis = [
-    { icon: Wallet, label: "Faturamento", value: formatBRL(d.faturamento), tone: "text-primary" },
-    { icon: TrendDown, label: "Despesas", value: formatBRL(d.despesas), tone: "text-red-600" },
-    { icon: Coins, label: "Líquido", value: formatBRL(d.liquido), tone: d.liquido >= 0 ? "text-emerald-600" : "text-red-600" },
-    { icon: Receipt, label: "Ticket médio", value: formatBRL(d.ticket_medio), sub: `${d.atendimentos} atendimento${d.atendimentos === 1 ? "" : "s"}` },
+    { icon: Wallet, label: "Faturamento", value: d.faturamento, anterior: prev?.faturamento, tone: "text-primary" },
+    { icon: TrendDown, label: "Despesas", value: d.despesas, anterior: prev?.despesas, tone: "text-red-600", menorMelhor: true },
+    { icon: Coins, label: "Líquido", value: d.liquido, anterior: prev?.liquido, tone: d.liquido >= 0 ? "text-emerald-600" : "text-red-600" },
+    { icon: Receipt, label: "Ticket médio", value: d.ticket_medio, anterior: prev?.ticket_medio, sub: `${d.atendimentos} atendimento${d.atendimentos === 1 ? "" : "s"}` },
   ];
   const { lines, alert } = financeiroNarration(d, prev, prevLabel);
+  const pagamentos = [...d.by_payment].sort((a, b) => b.total - a.total);
+  const totalPago = pagamentos.reduce((s, p) => s + p.total, 0);
 
   return (
     <div className="space-y-6">
@@ -435,9 +546,12 @@ function FinanceiroTab({ d, prev, prevLabel, slug }: { d: ReportData; prev: Repo
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k) => (
           <Card key={k.label} className="p-5 min-w-0">
-            <k.icon className={cn("h-5 w-5", k.tone ?? "text-primary")} />
-            <p className="font-display text-xl sm:text-2xl font-bold mt-3 break-words tabular-nums">{k.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{k.label}</p>
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <k.icon aria-hidden className={cn("h-4 w-4", k.tone ?? "text-primary")} />
+              {k.label}
+            </div>
+            <p className="font-display text-xl sm:text-2xl font-bold mt-2 break-words tabular-nums">{formatBRL(k.value)}</p>
+            <Variacao atual={k.value} anterior={k.anterior} mesAnterior={prevLabel} menorMelhor={k.menorMelhor} />
             {k.sub && <p className="text-[11px] text-muted-foreground/80 mt-0.5">{k.sub}</p>}
           </Card>
         ))}
@@ -445,31 +559,40 @@ function FinanceiroTab({ d, prev, prevLabel, slug }: { d: ReportData; prev: Repo
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2 min-w-0">
-          <h2 className="font-display font-semibold mb-4">Faturamento por dia</h2>
-          <DailyBars daily={d.daily} />
+          <DailyBars daily={d.daily} cmes={cmes} />
         </Card>
 
         <Card className="p-5 min-w-0">
-          <h2 className="font-display font-semibold mb-4">Formas de pagamento</h2>
-          {d.by_payment.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sem dados.</p>
+          <h2 className="font-display font-semibold">Formas de pagamento</h2>
+          {pagamentos.length === 0 || totalPago <= 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">Sem pagamentos registrados.</p>
           ) : (
-            <div className="space-y-3">
-              {d.by_payment.map((p) => {
-                const pct = d.faturamento > 0 ? (p.total / d.faturamento) * 100 : 0;
-                return (
-                  <div key={p.method}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span>{payLabel(p.method)}</span>
-                      <span className="font-medium">{formatBRL(p.total)}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              {/* Barra de partes do todo: 2px de fundo entre os pedaços. */}
+              <div
+                role="img"
+                aria-label={pagamentos.map((p) => `${payLabel(p.method)} ${pct((p.total / totalPago) * 100)}`).join(", ")}
+                className="mt-4 flex h-3 gap-[2px] overflow-hidden rounded-full"
+              >
+                {pagamentos.map((p) => (
+                  <div
+                    key={p.method}
+                    className="h-full first:rounded-l-full last:rounded-r-full"
+                    style={{ width: `${(p.total / totalPago) * 100}%`, backgroundColor: corPagamento(p.method) }}
+                  />
+                ))}
+              </div>
+              <ul className="mt-4 space-y-2.5">
+                {pagamentos.map((p) => (
+                  <li key={p.method} className="flex items-center gap-2.5 text-sm">
+                    <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: corPagamento(p.method) }} />
+                    <span className="min-w-0 flex-1 truncate">{payLabel(p.method)}</span>
+                    <span className="text-muted-foreground tabular-nums">{pct((p.total / totalPago) * 100)}</span>
+                    <span className="w-24 text-right font-medium tabular-nums">{formatBRL(p.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Card>
       </div>
@@ -477,27 +600,114 @@ function FinanceiroTab({ d, prev, prevLabel, slug }: { d: ReportData; prev: Repo
   );
 }
 
-function DailyBars({ daily }: { daily: { day: string; total: number }[] }) {
-  if (daily.length === 0) return <p className="text-sm text-muted-foreground">Sem faturamento no período.</p>;
-  const max = Math.max(...daily.map((x) => x.total), 1);
+/**
+ * Faturamento por dia, com o mês inteiro no eixo: dia sem movimento aparece
+ * como vazio (antes sumia, e a semana parada não se via). Uma série só, então
+ * uma cor só — o melhor dia ganha destaque e a linha tracejada é a média dos
+ * dias com movimento.
+ */
+function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; cmes: string }) {
+  const [y, m] = cmes.split("-").map(Number);
+  const nDias = new Date(y, m, 0).getDate();
+  const porDia = new Map(daily.map((x) => [Number(x.day.slice(8, 10)), x.total]));
+  const agora = new Date();
+  const mesAtual = agora.getFullYear() === y && agora.getMonth() + 1 === m;
+  const hoje = mesAtual ? agora.getDate() : null;
+
+  const dias = Array.from({ length: nDias }, (_, i) => {
+    const dia = i + 1;
+    return { dia, total: porDia.get(dia) ?? 0, futuro: hoje !== null && dia > hoje };
+  });
+  const comMovimento = dias.filter((x) => x.total > 0);
+  const max = Math.max(...dias.map((x) => x.total), 1);
+  const media = comMovimento.length ? comMovimento.reduce((s, x) => s + x.total, 0) / comMovimento.length : 0;
+  const melhor = comMovimento.reduce<(typeof dias)[number] | null>((a, b) => (!a || b.total > a.total ? b : a), null);
+  const semana = (dia: number) => WEEKDAYS_SHORT[new Date(y, m - 1, dia).getDay()];
+
   return (
-    <div className="flex items-end gap-1 h-40 overflow-x-auto no-scrollbar">
-      {daily.map((x) => {
-        const h = Math.max((x.total / max) * 100, 2);
-        const dayNum = x.day.slice(8, 10);
-        return (
-          <div key={x.day} className="flex h-full flex-col items-center gap-1 shrink-0" style={{ width: 22 }}>
-            <div className="flex-1 flex items-end w-full">
-              <div
-                className="w-full rounded-t bg-primary/80 hover:bg-primary transition-all"
-                style={{ height: `${h}%` }}
-                title={`${dayNum}: ${formatBRL(x.total)}`}
-              />
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="font-display font-semibold">Faturamento por dia</h2>
+        {comMovimento.length > 0 && (
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {melhor && (
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-primary" />
+                Melhor dia: <b className="font-semibold text-foreground tabular-nums">{melhor.dia}, {formatBRL(melhor.total)}</b>
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="w-4 border-t-2 border-dashed border-foreground/40" />
+              Média <b className="font-semibold text-foreground tabular-nums">{formatBRL(media)}</b>/dia
+            </span>
+          </p>
+        )}
+      </div>
+
+      {comMovimento.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">Sem faturamento no período.</p>
+      ) : (
+        <>
+          <div className="relative mt-5 h-44">
+            {/* Grade: só o topo e a média — o resto é ruído. */}
+            <div aria-hidden className="absolute inset-x-0 top-0 border-t border-border/70" />
+            <span aria-hidden className="absolute -top-2 right-0 bg-card pl-1 text-[10px] tabular-nums text-muted-foreground">
+              {formatBRL(max)}
+            </span>
+            <div
+              aria-hidden
+              className="absolute inset-x-0 z-10 border-t-2 border-dashed border-foreground/35 pointer-events-none"
+              style={{ bottom: `${(media / max) * 100}%` }}
+            />
+            <div className="absolute inset-0 flex items-end gap-[2px]">
+              {dias.map((x) => {
+                const destaque = melhor?.dia === x.dia;
+                const altura = x.total > 0 ? Math.max((x.total / max) * 100, 3) : 0;
+                return (
+                  <div key={x.dia} className="group relative flex h-full flex-1 items-end">
+                    {x.total > 0 ? (
+                      <div
+                        className={cn(
+                          "w-full rounded-t-[4px] transition-colors",
+                          destaque ? "bg-primary" : "bg-primary/45 dark:bg-primary/60 group-hover:bg-primary/75",
+                        )}
+                        style={{ height: `${altura}%` }}
+                      />
+                    ) : (
+                      // Dia parado: um traço no chão, para o vazio ser visível.
+                      !x.futuro && <div className="h-[3px] w-full rounded-full bg-border" />
+                    )}
+                    {/* Dica ao passar o mouse */}
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      {semana(x.dia)}, {x.dia} · {x.futuro ? "ainda não chegou" : formatBRL(x.total)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <span className="text-[9px] text-muted-foreground">{dayNum}</span>
           </div>
-        );
-      })}
+          {/* Eixo: dia 1 e de 5 em 5; hoje marcado. */}
+          <div aria-hidden className="mt-1.5 flex gap-[2px]">
+            {dias.map((x) => (
+              <span
+                key={x.dia}
+                className={cn(
+                  "flex-1 text-center text-[10px] tabular-nums",
+                  x.dia === hoje ? "font-bold text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {x.dia === 1 || x.dia % 5 === 0 || x.dia === hoje ? x.dia : ""}
+              </span>
+            ))}
+          </div>
+          {/* Para leitor de tela: os mesmos números, em lista. */}
+          <ul className="sr-only">
+            {comMovimento.map((x) => (
+              <li key={x.dia}>Dia {x.dia}: {formatBRL(x.total)}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -505,6 +715,14 @@ function DailyBars({ daily }: { daily: { day: string; total: number }[] }) {
 /* ───────────────────────── Reativação ───────────────────────── */
 
 const firstName = (n: string) => (n || "").trim().split(" ")[0] || "tudo bem";
+
+/** Quanto passou do ritmo, em relação ao próprio ritmo dela. */
+function urgencia(c: ReactClient): { rotulo: string; cls: string } {
+  const r = c.expected_interval > 0 ? c.overdue_by / c.expected_interval : 1;
+  if (r >= 1) return { rotulo: "Muito atrasada", cls: "bg-red-500/12 text-red-700 dark:text-red-400" };
+  if (r >= 0.4) return { rotulo: "Atrasada", cls: "bg-amber-500/15 text-amber-800 dark:text-amber-400" };
+  return { rotulo: "Passou do ritmo", cls: "bg-secondary text-secondary-foreground" };
+}
 
 function ReativacaoTab({
   clients,
@@ -517,23 +735,14 @@ function ReativacaoTab({
   salonName: string;
   slug: string;
 }) {
-  if (loading || clients === null) {
-    return (
-      <div role="status" className="grid place-items-center py-20 text-muted-foreground">
-        <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
-        <span className="sr-only">Carregando…</span>
-      </div>
-    );
-  }
+  if (loading || clients === null) return <Carregando />;
   if (clients.length === 0) {
     return (
-      <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-        <UserCheck className="mx-auto h-8 w-8 text-muted-foreground/50" />
-        <p className="mt-3 font-medium">Ninguém para reativar 🎉</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Suas clientes estão em dia com o ritmo habitual de retorno.
-        </p>
-      </div>
+      <Vazio
+        icon={UserCheck}
+        titulo="Ninguém para reativar 🎉"
+        texto="Suas clientes estão em dia com o ritmo habitual de retorno."
+      />
     );
   }
 
@@ -547,6 +756,7 @@ function ReativacaoTab({
   };
 
   const urgent = [...clients].sort((a, b) => b.overdue_by - a.overdue_by)[0];
+  const emJogo = clients.reduce((s, c) => s + (c.visits > 0 ? c.total_spent / c.visits : 0), 0);
 
   return (
     <div className="space-y-4">
@@ -558,40 +768,69 @@ function ReativacaoTab({
               : ""),
         ]}
       />
+
+      {/* Quanto volta se cada uma vier uma vez: o número que faz valer o oi. */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="p-5 min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">Para reativar</p>
+          <p className="font-display text-xl sm:text-2xl font-bold mt-2 tabular-nums">{clients.length}</p>
+        </Card>
+        <Card className="p-5 min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">Se cada uma voltar uma vez</p>
+          <p className="font-display text-xl sm:text-2xl font-bold mt-2 tabular-nums">{formatBRL(emJogo)}</p>
+        </Card>
+      </div>
+
       <p className="text-sm text-muted-foreground">
-        Ordenadas por urgência e valor. Mande um oi pelo WhatsApp e traga ela de volta. 💬
+        Ordenadas por urgência e valor. Para mandar pelo número do salão, sem sair do painel, use{" "}
+        <Link href={`/painel/${slug}/recuperar`} className="font-medium text-primary hover:underline">Recuperar</Link>.
       </p>
-      <div className="space-y-2">
+
+      <ul className="space-y-2">
         {clients.map((c) => {
           const href = waHref(c);
+          const u = urgencia(c);
           return (
-            <Card key={c.id} className="p-4 min-w-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <div className="min-w-0 sm:flex-1">
-                <p className="font-medium truncate">{c.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Há <span className="font-medium text-foreground">{c.days_since} dias</span> sem vir
-                  {" · "}costuma a cada ~{c.expected_interval}d{" · "}{c.visits} visita{c.visits === 1 ? "" : "s"}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:justify-end sm:ml-auto">
-                <span className="text-sm font-medium tabular-nums">{formatBRL(c.total_spent)}</span>
-                {href ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700"
-                  >
-                    <ChatCircle className="h-4 w-4" /> WhatsApp
-                  </a>
-                ) : (
-                  <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>
-                )}
-              </div>
-            </Card>
+            <li key={c.id}>
+              <Card className="p-4 min-w-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                  <Avatar nome={c.name} />
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium truncate">{c.name}</span>
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", u.cls)}>
+                        +{c.overdue_by} dia{c.overdue_by === 1 ? "" : "s"} · {u.rotulo}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Há <span className="font-medium text-foreground">{c.days_since} dias</span> sem vir
+                      {" · "}costuma a cada ~{c.expected_interval}d{" · "}{c.visits} visita{c.visits === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:justify-end sm:ml-auto">
+                  <span className="text-sm font-medium tabular-nums">
+                    {formatBRL(c.total_spent)}
+                    <span className="block text-[11px] font-normal text-muted-foreground sm:text-right">no total</span>
+                  </span>
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    >
+                      <ChatCircle aria-hidden className="h-4 w-4" /> WhatsApp
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>
+                  )}
+                </div>
+              </Card>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -603,17 +842,19 @@ const WEEKDAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 type Temp = "quente" | "morno" | "frio";
 
+// Cor de estado (quente/morno/frio), sempre com ícone + palavra ao lado.
+const TEMP = {
+  quente: { icon: Flame, label: "Quente", badge: "bg-orange-500/15 text-orange-700 dark:text-orange-400", barra: "bg-orange-500" },
+  morno: { icon: Thermometer, label: "Morno", badge: "bg-amber-500/15 text-amber-800 dark:text-amber-400", barra: "bg-amber-400" },
+  frio: { icon: Snowflake, label: "Frio", badge: "bg-sky-500/15 text-sky-700 dark:text-sky-400", barra: "bg-sky-500" },
+} as const;
+
 function TempBadge({ t }: { t: Temp | null }) {
-  if (t === null)
-    return <span className="text-xs text-muted-foreground">Fechado</span>;
-  const map = {
-    quente: { icon: Flame, label: "Quente", cls: "bg-orange-500/15 text-orange-600" },
-    morno: { icon: Thermometer, label: "Morno", cls: "bg-amber-500/15 text-amber-600" },
-    frio: { icon: Snowflake, label: "Frio", cls: "bg-sky-500/15 text-sky-600" },
-  }[t];
+  if (t === null) return <span className="text-xs text-muted-foreground">Fechado</span>;
+  const map = TEMP[t];
   const Icon = map.icon;
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", map.cls)}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", map.badge)}>
       <Icon aria-hidden className="h-3.5 w-3.5" /> {map.label}
     </span>
   );
@@ -628,25 +869,16 @@ function TemperaturaTab({
   loading: boolean;
   slug: string;
 }) {
-  if (loading || data === null) {
-    return (
-      <div role="status" className="grid place-items-center py-20 text-muted-foreground">
-        <CircleNotch aria-hidden className="h-6 w-6 animate-spin" />
-        <span className="sr-only">Carregando…</span>
-      </div>
-    );
-  }
+  if (loading || data === null) return <Carregando />;
 
   const totalCount = data.weekdays.reduce((s, w) => s + w.count, 0);
   if (totalCount === 0) {
     return (
-      <div className="rounded-[var(--radius)] border border-dashed border-border p-12 text-center">
-        <Thermometer className="mx-auto h-8 w-8 text-muted-foreground/50" />
-        <p className="mt-3 font-medium">Sem movimento neste período</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Conforme os atendimentos acontecem, mostramos seus dias e horários quentes e frios.
-        </p>
-      </div>
+      <Vazio
+        icon={Thermometer}
+        titulo="Sem movimento neste período"
+        texto="Conforme os atendimentos acontecem, mostramos seus dias e horários quentes e frios."
+      />
     );
   }
 
@@ -668,6 +900,8 @@ function TemperaturaTab({
   const maxH = hoursWithData.length ? Math.max(...hoursWithData) : 18;
   const hourRange: number[] = [];
   for (let h = minH; h <= maxH; h++) hourRange.push(h);
+  // Uma cor só, do claro ao escuro (sequencial): mais escuro = mais faturamento.
+  const tom = (i: number) => `color-mix(in srgb, var(--primary) ${Math.round(12 + i * 88)}%, transparent)`;
 
   const openDays = data.weekdays.filter((w) => w.occupation !== null);
   const hottest = [...openDays].sort((a, b) => b.revenue - a.revenue)[0];
@@ -684,82 +918,100 @@ function TemperaturaTab({
   return (
     <div className="space-y-6">
       <Narrator lines={narratorLines} alert={coldAlert} />
-      {/* Termômetro por dia da semana */}
-      <Card className="p-5 min-w-0">
-        <h2 className="font-display font-semibold">Termômetro por dia da semana</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Quente = mais movimento e faturamento; frio = oportunidade de aquecer com uma promoção.
-        </p>
-        <div className="mt-4 space-y-2">
-          {data.weekdays.map((w) => {
-            const t = temp(w);
-            return (
-              <div key={w.weekday} className="rounded-[var(--radius)] border border-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-sm">{WEEKDAYS[w.weekday]}</span>
-                  <TempBadge t={t} />
-                </div>
-                {t !== null && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Ocupação <span className="font-medium text-foreground">{w.occupation}%</span>
-                    {" · "}{formatBRL(w.revenue)}{" · "}{w.count} atend.
-                  </p>
-                )}
-                {t === "frio" && (
-                  <Link
-                    href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent(`Esquenta ${WEEKDAYS[w.weekday]}`)}&desconto=15`}
-                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                  >
-                    <SealPercent className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia
-                  </Link>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
 
-      {/* Heatmap dia × hora */}
-      {data.cells.length > 0 && (
-        <Card className="p-5 min-w-0">
-          <h2 className="font-display font-semibold">Movimento por dia e horário</h2>
-          <p className="text-sm text-muted-foreground mt-1">Mais escuro = mais faturamento naquele horário.</p>
-          <div className="mt-4 overflow-x-auto no-scrollbar">
-            <div className="min-w-[16rem]">
-              {/* Cabeçalho */}
-              <div className="grid" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
-                <div />
-                {WEEKDAYS_SHORT.map((d) => (
-                  <div key={d} className="text-center text-[11px] font-medium text-muted-foreground pb-1">{d}</div>
-                ))}
-              </div>
-              {/* Linhas por hora */}
-              {hourRange.map((h) => (
-                <div key={h} className="grid items-center" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
-                  <div className="text-[10px] text-muted-foreground tabular-nums pr-1 text-right">{String(h).padStart(2, "0")}h</div>
-                  {Array.from({ length: 7 }, (_, wd) => {
-                    const cell = cellMap.get(`${wd}-${h}`);
-                    const intensity = cell ? cell.revenue / maxCell : 0;
-                    return (
-                      <div key={wd} className="px-0.5 py-0.5">
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Termômetro: a barra é o faturamento contra o melhor dia (é o que
+            define quente/morno/frio); a ocupação vai escrita embaixo. */}
+        <Card className="p-5 min-w-0 lg:col-span-2">
+          <h2 className="font-display font-semibold">Termômetro da semana</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            A barra compara o faturamento de cada dia com o do melhor dia. Frio é oportunidade de aquecer com uma promoção.
+          </p>
+          <ul className="mt-4 divide-y divide-border">
+            {data.weekdays.map((w) => {
+              const t = temp(w);
+              return (
+                <li key={w.weekday} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn("text-sm font-medium", t === null && "text-muted-foreground")}>{WEEKDAYS[w.weekday]}</span>
+                    <TempBadge t={t} />
+                  </div>
+                  {t !== null && (
+                    <>
+                      <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                         <div
-                          className="h-6 rounded-sm border border-border/40"
-                          style={{
-                            backgroundColor: intensity > 0
-                              ? `color-mix(in srgb, var(--primary) ${Math.round(15 + intensity * 85)}%, transparent)`
-                              : "transparent",
-                          }}
-                          title={cell ? `${WEEKDAYS_SHORT[wd]} ${h}h · ${formatBRL(cell.revenue)} · ${cell.count} atend.` : `${WEEKDAYS_SHORT[wd]} ${h}h · sem movimento`}
+                          className={cn("h-full rounded-full", TEMP[t].barra)}
+                          style={{ width: `${Math.max((w.revenue / maxRev) * 100, 2)}%` }}
                         />
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+                        <span className="font-medium text-foreground">{w.occupation}%</span> ocupado
+                        {" · "}{formatBRL(w.revenue)}{" · "}{w.count} atend.
+                      </p>
+                      {t === "frio" && (
+                        <Link
+                          href={`/painel/${slug}/campanhas?nova=1&nome=${encodeURIComponent(`Esquenta ${WEEKDAYS[w.weekday]}`)}&desconto=15`}
+                          className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                        >
+                          <SealPercent aria-hidden className="h-3.5 w-3.5" /> Criar promoção para aquecer este dia
+                        </Link>
+                      )}
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </Card>
-      )}
+
+        {/* Heatmap dia × hora */}
+        {data.cells.length > 0 && (
+          <Card className="p-5 min-w-0 lg:col-span-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display font-semibold">Movimento por dia e horário</h2>
+                <p className="text-sm text-muted-foreground mt-1">Faturamento em cada hora da semana.</p>
+              </div>
+              {/* Legenda da escala */}
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground" aria-hidden>
+                Menos
+                {[0.05, 0.3, 0.55, 0.8, 1].map((i) => (
+                  <span key={i} className="h-3 w-3 rounded-[3px] border border-border/50" style={{ backgroundColor: tom(i) }} />
+                ))}
+                Mais
+              </div>
+            </div>
+            <div className="mt-4 overflow-x-auto no-scrollbar">
+              <div className="min-w-[16rem]">
+                <div className="grid" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
+                  <div />
+                  {WEEKDAYS_SHORT.map((d) => (
+                    <div key={d} className="text-center text-[11px] font-medium text-muted-foreground pb-1">{d}</div>
+                  ))}
+                </div>
+                {hourRange.map((h) => (
+                  <div key={h} className="grid items-center" style={{ gridTemplateColumns: "2.5rem repeat(7, minmax(2rem, 1fr))" }}>
+                    <div className="text-[10px] text-muted-foreground tabular-nums pr-1.5 text-right">{String(h).padStart(2, "0")}h</div>
+                    {Array.from({ length: 7 }, (_, wd) => {
+                      const cell = cellMap.get(`${wd}-${h}`);
+                      const intensity = cell ? cell.revenue / maxCell : 0;
+                      return (
+                        <div key={wd} className="p-[2px]">
+                          <div
+                            className={cn("h-6 rounded-[4px]", intensity > 0 ? "" : "bg-muted/60")}
+                            style={intensity > 0 ? { backgroundColor: tom(intensity) } : undefined}
+                            title={cell ? `${WEEKDAYS_SHORT[wd]} ${h}h · ${formatBRL(cell.revenue)} · ${cell.count} atend.` : `${WEEKDAYS_SHORT[wd]} ${h}h · sem movimento`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
@@ -804,68 +1056,158 @@ function operacionalNarration(d: ReportData, prev: ReportData | null, prevLabel:
   return { lines, alert };
 }
 
-function OperacionalTab({ d, prev, prevLabel }: { d: ReportData; prev: ReportData | null; prevLabel: string }) {
-  const maxSvc = Math.max(...d.services.map((s) => s.total), 1);
+// Mais de 8 serviços vira "Outros": cor nova a cada serviço deixa de distinguir.
+const MAX_SERVICOS = 8;
+
+/** Ponto de partida fixo pelo nome: o mesmo item cai na mesma cor todo mês. */
+function indicePorNome(nome: string) {
+  let h = 0;
+  for (const ch of nome) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h % SERVICE_COLORS.length;
+}
+
+/**
+ * Cor de cada item: a cadastrada (a mesma da Agenda) quando existe e não se
+ * repete na lista. Sem cor, ou com a mesma cor de outro — o padrão de quem
+ * nunca mexeu nisso —, o item ganha uma cor da paleta de serviços que ainda
+ * não está em uso, partindo de um ponto fixo pelo nome. O passo de 5 em 5
+ * espalha os tons pela paleta (vizinhos ficam longe: vermelho, verde, azul…).
+ */
+function coresDistintas(nomes: string[], cadastrada: (nome: string) => string | null | undefined) {
+  const propria = new Map(nomes.map((n) => [n, cadastrada(n)?.toLowerCase() ?? null]));
+  const contagem = new Map<string, number>();
+  for (const c of propria.values()) if (c) contagem.set(c, (contagem.get(c) ?? 0) + 1);
+  const usadas = new Set([...contagem].filter(([, n]) => n === 1).map(([c]) => c));
+  const paleta = SERVICE_COLORS.map((c) => c.toLowerCase());
+
+  const cores = new Map<string, string>();
+  for (const n of nomes) {
+    const c = propria.get(n);
+    if (c && contagem.get(c) === 1) {
+      cores.set(n, c);
+      continue;
+    }
+    const base = indicePorNome(n);
+    let escolhida = paleta[(base * 5) % paleta.length];
+    for (let k = 0; k < paleta.length; k++) {
+      const cand = paleta[((base + k) * 5) % paleta.length];
+      if (!usadas.has(cand)) { escolhida = cand; break; }
+    }
+    usadas.add(escolhida);
+    cores.set(n, escolhida);
+  }
+  return cores;
+}
+
+function OperacionalTab({
+  d, prev, prevLabel, identidades,
+}: {
+  d: ReportData; prev: ReportData | null; prevLabel: string; identidades: Identidades;
+}) {
   const { lines, alert } = operacionalNarration(d, prev, prevLabel);
+
+  const ordenados = [...d.services].sort((a, b) => b.total - a.total);
+  const totalServicos = ordenados.reduce((s, x) => s + x.total, 0);
+  // Sobrou um só depois do 8º: mostra ele mesmo, "Outros 1" não diz nada.
+  const corte = ordenados.length > MAX_SERVICOS + 1 ? MAX_SERVICOS : ordenados.length;
+  const visiveis = ordenados.slice(0, corte);
+  const resto = ordenados.slice(corte);
+  const corServico = coresDistintas(visiveis.map((s) => s.name), (n) => identidades.servicos[n]);
+  const linhasServico = [
+    ...visiveis.map((s) => ({ ...s, cor: corServico.get(s.name)!, outros: false })),
+    ...(resto.length
+      ? [{
+          name: `Outros ${resto.length} serviços`,
+          qty: resto.reduce((s, x) => s + x.qty, 0),
+          total: resto.reduce((s, x) => s + x.total, 0),
+          cor: "var(--muted-foreground)",
+          outros: true,
+        }]
+      : []),
+  ];
+  const maxSvc = Math.max(...linhasServico.map((s) => s.total), 1);
+
+  const pros = [...d.professionals].sort((a, b) => b.revenue - a.revenue);
+  const corPro = coresDistintas(pros.map((p) => p.name), (n) => identidades.profissionais[n]?.cor);
+  const totalPros = pros.reduce((s, p) => s + p.revenue, 0);
+  const maxPro = Math.max(...pros.map((p) => p.revenue), 1);
+
   return (
     <div className="space-y-6">
-    <Narrator lines={lines} alert={alert} />
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card className="p-5 min-w-0">
-        <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
-          <Sparkle className="h-4.5 w-4.5 text-primary" /> Serviços mais vendidos
-        </h2>
-        {d.services.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem dados.</p>
-        ) : (
-          <div className="space-y-3">
-            {d.services.map((s) => (
-              <div key={s.name}>
-                <div className="flex items-center justify-between gap-2 text-sm mb-1">
-                  <span className="truncate">{s.name} <span className="text-muted-foreground">· {s.qty}x</span></span>
-                  <span className="font-medium shrink-0">{formatBRL(s.total)}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${(s.total / maxSvc) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+      <Narrator lines={lines} alert={alert} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="p-5 min-w-0">
+          <h2 className="font-display font-semibold flex items-center gap-2">
+            <Sparkle aria-hidden className="h-4.5 w-4.5 text-primary" /> Serviços mais vendidos
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">Receita de cada serviço no mês. A cor de cada um é sempre a mesma.</p>
+          {linhasServico.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">Sem dados.</p>
+          ) : (
+            <ul className="mt-4 space-y-3.5">
+              {linhasServico.map((s) => (
+                <li key={s.name}>
+                  <div className="flex items-center justify-between gap-2 text-sm mb-1.5">
+                    <span className={cn("min-w-0 truncate", s.outros && "text-muted-foreground")}>
+                      {s.name} <span className="text-muted-foreground">· {s.qty}x</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      <span className="mr-2 text-xs text-muted-foreground">
+                        {totalServicos > 0 ? pct((s.total / totalServicos) * 100) : "—"}
+                      </span>
+                      <span className="font-medium">{formatBRL(s.total)}</span>
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${(s.total / maxSvc) * 100}%`, backgroundColor: s.cor }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      <Card className="p-5 min-w-0">
-        <h2 className="font-display font-semibold mb-4 flex items-center gap-2">
-          <Users className="h-4.5 w-4.5 text-primary" /> Desempenho por profissional
-        </h2>
-        {d.professionals.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem dados.</p>
-        ) : (
-          <div className="-mx-1 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  <th className="font-medium px-1 py-1.5">Profissional</th>
-                  <th className="font-medium px-1 py-1.5 text-right">Atend.</th>
-                  <th className="font-medium px-1 py-1.5 text-right">Receita</th>
-                  <th className="font-medium px-1 py-1.5 text-right">Comissão</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.professionals.map((p) => (
-                  <tr key={p.name} className="border-t border-border">
-                    <td className="px-1 py-2 truncate max-w-[8rem]">{p.name}</td>
-                    <td className="px-1 py-2 text-right tabular-nums">{p.qty}</td>
-                    <td className="px-1 py-2 text-right tabular-nums">{formatBRL(p.revenue)}</td>
-                    <td className="px-1 py-2 text-right tabular-nums text-muted-foreground">{formatBRL(p.commission)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </div>
+        <Card className="p-5 min-w-0">
+          <h2 className="font-display font-semibold flex items-center gap-2">
+            <Users aria-hidden className="h-4.5 w-4.5 text-primary" /> Desempenho por profissional
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">Receita de cada uma no mês e a comissão que ela gerou.</p>
+          {pros.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">Sem dados.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-border">
+              {pros.map((p) => {
+                const id = identidades.profissionais[p.name];
+                const cor = corPro.get(p.name) ?? null;
+                return (
+                  <li key={p.name} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <Avatar nome={p.name} cor={cor} foto={id?.foto} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-medium">{p.name}</span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">{formatBRL(p.revenue)}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${(p.revenue / maxPro) * 100}%`, backgroundColor: cor ?? "var(--primary)" }} />
+                      </div>
+                      <p className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs text-muted-foreground tabular-nums">
+                        <span>
+                          {p.qty} atendimento{p.qty === 1 ? "" : "s"}
+                          {totalPros > 0 && <> · {pct((p.revenue / totalPros) * 100)} da receita</>}
+                        </span>
+                        <span>Comissão {formatBRL(p.commission)}</span>
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

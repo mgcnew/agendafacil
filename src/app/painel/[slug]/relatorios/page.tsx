@@ -4,7 +4,7 @@ import { getMembershipBySlug, getEffectivePermissions } from "@/lib/salon";
 import { guardFeature } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { currentMonthBR, monthRangeBR } from "@/lib/utils";
-import { ReportsView, type ReportData } from "./ReportsView";
+import { ReportsView, type ReportData, type Identidades } from "./ReportsView";
 
 function prevCmes(cmes: string): string {
   const [y, m] = cmes.split("-").map(Number);
@@ -39,7 +39,7 @@ export default async function RelatoriosPage({
 
   const supabase = await createClient();
   // report_overview ainda não está no database.types.ts (função nova) — cast local.
-  const [res, prevRes] = await Promise.all([
+  const [res, prevRes, { data: svcRows }, { data: memberRows }] = await Promise.all([
     supabase.rpc("report_overview" as never, {
       p_salon: membership.salon_id,
       p_from: start,
@@ -50,7 +50,25 @@ export default async function RelatoriosPage({
       p_from: prevStart,
       p_to: prevEnd,
     } as never),
+    // Cor de cada serviço e de cada profissional: a mesma da Agenda. O relatório
+    // devolve só o nome, então o casamento é por nome (o mesmo que ele usa).
+    supabase.from("services").select("name, color").eq("salon_id", membership.salon_id),
+    supabase
+      .from("salon_members")
+      .select("display_name, color, photo_url, profiles(full_name)")
+      .eq("salon_id", membership.salon_id),
   ]);
+
+  const identidades: Identidades = { servicos: {}, profissionais: {} };
+  for (const s of svcRows ?? []) {
+    if (s.color) identidades.servicos[s.name] = s.color;
+  }
+  for (const m of memberRows ?? []) {
+    // Mesmo nome que o report_overview monta: display_name, senão o do perfil.
+    const nome =
+      m.display_name ?? (m.profiles as { full_name?: string | null } | null)?.full_name ?? "Profissional";
+    identidades.profissionais[nome] = { cor: m.color, foto: m.photo_url };
+  }
   const initial = (res.data ?? null) as ReportData | null;
   const initialPrev = (prevRes.data ?? null) as ReportData | null;
 
@@ -63,6 +81,7 @@ export default async function RelatoriosPage({
       initialData={initial}
       initialPrevData={initialPrev}
       initialTab={tab}
+      identidades={identidades}
     />
   );
 }
