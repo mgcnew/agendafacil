@@ -562,7 +562,7 @@ function FinanceiroTab({
           <DailyBars daily={d.daily} cmes={cmes} />
         </Card>
 
-        <Card className="p-5 min-w-0">
+        <Card className="p-5 min-w-0 flex flex-col">
           <h2 className="font-display font-semibold">Formas de pagamento</h2>
           {pagamentos.length === 0 || totalPago <= 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">Sem pagamentos registrados.</p>
@@ -592,6 +592,13 @@ function FinanceiroTab({
                   </li>
                 ))}
               </ul>
+              {/* Total no pé do card: fecha a conta e ocupa o espaço que o
+                  gráfico ao lado abre quando cresce. */}
+              <div aria-hidden className="min-h-4 flex-1" />
+              <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3 text-sm">
+                <span className="text-muted-foreground">Total recebido</span>
+                <span className="font-display text-base font-bold tabular-nums">{formatBRL(totalPago)}</span>
+              </div>
             </>
           )}
         </Card>
@@ -648,7 +655,10 @@ function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; c
         <p className="mt-4 text-sm text-muted-foreground">Sem faturamento no período.</p>
       ) : (
         <>
-          <div className="relative mt-5 h-44">
+          {/* No computador o gráfico cresce com a tela (até um teto), em vez de
+              deixar uma faixa vazia embaixo da página. No celular fica fixo:
+              lá a página já rola. */}
+          <div className="relative mt-5 h-44 lg:h-[clamp(11rem,calc(100dvh-40rem),26rem)]">
             {/* Grade: só o topo e a média — o resto é ruído. */}
             <div aria-hidden className="absolute inset-x-0 top-0 border-t border-border/70" />
             <span aria-hidden className="absolute -top-2 right-0 bg-card pl-1 text-[10px] tabular-nums text-muted-foreground">
