@@ -1145,8 +1145,10 @@ function OperacionalTab({
   return (
     <div className="space-y-6">
       <Narrator lines={lines} alert={alert} />
+      {/* No computador os dois cards vão até o fim da tela e fecham com os
+          totais alinhados no pé, em vez de um deles sobrar curto. */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="p-5 min-w-0">
+        <Card className={CARD_ALTO}>
           <h2 className="font-display font-semibold flex items-center gap-2">
             <Sparkle aria-hidden className="h-4.5 w-4.5 text-primary" /> Serviços mais vendidos
           </h2>
@@ -1178,9 +1180,16 @@ function OperacionalTab({
               ))}
             </ul>
           )}
+          {linhasServico.length > 0 && (
+            <Rodape
+              rotulo="Total em serviços"
+              detalhe={`${ordenados.reduce((s, x) => s + x.qty, 0)} vendidos`}
+              valor={formatBRL(totalServicos)}
+            />
+          )}
         </Card>
 
-        <Card className="p-5 min-w-0">
+        <Card className={CARD_ALTO}>
           <h2 className="font-display font-semibold flex items-center gap-2">
             <Users aria-hidden className="h-4.5 w-4.5 text-primary" /> Desempenho por profissional
           </h2>
@@ -1188,7 +1197,24 @@ function OperacionalTab({
           {pros.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">Sem dados.</p>
           ) : (
-            <ul className="mt-4 divide-y divide-border">
+            <>
+            {/* Divisão da receita: quanto cada uma trouxe, de relance. */}
+            {pros.length > 1 && totalPros > 0 && (
+              <div
+                role="img"
+                aria-label={pros.map((p) => `${p.name} ${pct((p.revenue / totalPros) * 100)}`).join(", ")}
+                className="mt-4 flex h-3 gap-[2px] overflow-hidden rounded-full"
+              >
+                {pros.filter((p) => p.revenue > 0).map((p) => (
+                  <div
+                    key={p.name}
+                    className="h-full first:rounded-l-full last:rounded-r-full"
+                    style={{ width: `${(p.revenue / totalPros) * 100}%`, backgroundColor: corPro.get(p.name) ?? "var(--primary)" }}
+                  />
+                ))}
+              </div>
+            )}
+            <ul className="mt-5 divide-y divide-border">
               {pros.map((p) => {
                 const id = identidades.profissionais[p.name];
                 const cor = corPro.get(p.name) ?? null;
@@ -1215,9 +1241,33 @@ function OperacionalTab({
                 );
               })}
             </ul>
+            <Rodape
+              rotulo="Receita da equipe"
+              detalhe={`comissões ${formatBRL(pros.reduce((s, p) => s + p.commission, 0))}`}
+              valor={formatBRL(totalPros)}
+            />
+            </>
           )}
         </Card>
       </div>
     </div>
+  );
+}
+
+const CARD_ALTO = "p-5 min-w-0 flex flex-col lg:min-h-[calc(100dvh-16.5rem)]";
+
+/** Pé de card com o total, empurrado para baixo pelo espaço que sobrar. */
+function Rodape({ rotulo, detalhe, valor }: { rotulo: string; detalhe?: string; valor: string }) {
+  return (
+    <>
+      <div aria-hidden className="min-h-4 flex-1" />
+      <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3 text-sm">
+        <span className="text-muted-foreground">
+          {rotulo}
+          {detalhe && <span className="text-muted-foreground/80"> · {detalhe}</span>}
+        </span>
+        <span className="font-display text-base font-bold tabular-nums">{valor}</span>
+      </div>
+    </>
   );
 }
