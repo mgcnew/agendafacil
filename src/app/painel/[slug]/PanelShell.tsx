@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { clearStoredRefreshToken } from "@/lib/auth/persistentSession";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MeuAvatar } from "./MeuAvatar";
 import {
   House,
   Plus,
@@ -214,6 +215,7 @@ export function PanelShell({
   isPlatformAdmin = false,
   announcements = [],
   canCreateAppointment = false,
+  me,
 }: {
   salon: { id: string; name: string; slug: string; niche: string };
   role: string;
@@ -223,6 +225,8 @@ export function PanelShell({
   announcements?: PanelAnnouncement[];
   /** appointments.manage — sem ela o atalho de agendar não faz sentido. */
   canCreateAppointment?: boolean;
+  /** Quem está logado — a foto fica ao lado do modo noturno. */
+  me: { id: string; nome: string; fotoUrl: string | null };
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -394,7 +398,10 @@ export function PanelShell({
             <span className="xl:hidden"><Tip label="Compartilhar link" /></span>
           </button>
           <div className="flex items-center justify-center xl:justify-between gap-1 xl:pl-1 flex-col xl:flex-row">
-            <ThemeToggle className="rounded-[0.7rem] text-foreground/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
+            <div className="flex items-center gap-1 flex-col xl:flex-row">
+              <MeuAvatar salonId={salon.id} memberId={me.id} nome={me.nome} fotoUrl={me.fotoUrl} className="mb-1 xl:mb-0 xl:mr-1" />
+              <ThemeToggle className="rounded-[0.7rem] text-foreground/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" />
+            </div>
             <button
               onClick={logout}
               className={cn(itemBase, "xl:w-auto text-foreground/65 hover:bg-red-500/10 hover:text-red-600")}
@@ -425,7 +432,10 @@ export function PanelShell({
             </span>
             <span className="truncate">{salon.name}</span>
           </Link>
-          <ThemeToggle className="-mr-2" />
+          <div className="flex items-center gap-1 -mr-1 shrink-0">
+            <ThemeToggle />
+            <MeuAvatar salonId={salon.id} memberId={me.id} nome={me.nome} fotoUrl={me.fotoUrl} size="sm" />
+          </div>
         </header>
 
         {/* overscroll-contain: o scroll desta área não encadeia no documento

@@ -8,8 +8,8 @@ export type PhotoResult = { url: string } | { error: string };
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // 8 MB (já chega comprimida do cliente)
 
 /**
- * Confirma que o usuário logado é dono/gerente do salão e que o membro
- * pertence a esse salão. Retorna ok ou um erro.
+ * Confirma que o usuário logado é dono/gerente do salão (ou é o próprio
+ * membro) e que o membro pertence a esse salão. Retorna ok ou um erro.
  */
 async function assertCanManageMember(
   salonId: string,
@@ -22,11 +22,15 @@ async function assertCanManageMember(
 
   const { data: me } = await supabase
     .from("salon_members")
-    .select("role")
+    .select("id, role")
     .eq("salon_id", salonId)
     .eq("profile_id", uid)
     .maybeSingle();
-  if (!me || (me.role !== "owner" && me.role !== "manager")) {
+  if (!me) return { error: "Sem permissão para editar a equipe." };
+  // A própria foto qualquer um troca (avatar ao lado do modo noturno); a dos
+  // outros, só dono e gerente.
+  if (me.id === memberId) return { ok: true };
+  if (me.role !== "owner" && me.role !== "manager") {
     return { error: "Sem permissão para editar a equipe." };
   }
 

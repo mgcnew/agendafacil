@@ -162,6 +162,11 @@ export default async function PanelLayout({
         isPlatformAdmin={!!isPlatformAdmin}
         announcements={announcements}
         canCreateAppointment={perms.has("appointments.manage")}
+        me={{
+          id: membership.id,
+          nome: membership.display_name?.trim() || "Você",
+          fotoUrl: membership.photo_url,
+        }}
       >
         {children}
       </PanelShell>
