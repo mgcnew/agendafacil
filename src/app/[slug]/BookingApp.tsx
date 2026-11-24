@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import NextImage from "next/image";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
@@ -102,6 +103,27 @@ type Appt = {
 type ResaleProduct = { id: string; name: string; sale_price: number; unit: string; linked: boolean };
 
 type Step = "services" | "professional" | "time" | "auth" | "confirm" | "done" | "waitlist_done";
+
+/**
+ * Cada etapa vira um `?passo=` na URL, com entrada própria no histórico: o
+ * "voltar" do celular volta uma etapa em vez de sair da página (quem chega
+ * pelo WhatsApp caía de volta na conversa e perdia tudo). Serviços é a URL
+ * limpa; as telas finais não ganham passo — voltar delas recomeça.
+ */
+const STEP_ORDER: Step[] = ["services", "professional", "time", "auth", "confirm"];
+const STEP_SLUG: Partial<Record<Step, string>> = {
+  professional: "profissional",
+  time: "horario",
+  auth: "dados",
+  confirm: "confirmar",
+};
+const SLUG_STEP: Record<string, Step> = Object.fromEntries(
+  Object.entries(STEP_SLUG).map(([k, v]) => [v, k as Step]),
+);
+
+/** Rascunho do pedido, por salão, na sessão do navegador (some ao fechar a aba). */
+type Draft = { selected: string[]; proId: string | null; anyPro: boolean; date: string; modo: "salon" | "home" };
+const draftKey = (slug: string) => `zl_booking_${slug}`;
 type GalleryPhoto = { id: string; url: string; caption: string | null };
 type MineTab = "next" | "history" | "waitlist";
 type WaitlistEntry = {
@@ -148,12 +170,27 @@ function todayLocal() {
 export function BookingApp({ salon }: { salon: Salon }) {
   const supabase = useMemo(() => createClient(), []);
   const [step, setStep] = useState<Step>("services");
+  const searchParams = useSearchParams();
+  const passo = searchParams.get("passo");
+  const [prosLoaded, setProsLoaded] = useState(false);
+  // Só depois de restaurar o rascunho a URL passa a mandar na etapa — antes
+  // disso um ?passo=horario de uma recarga seria recusado por falta de serviço.
+  const [restored, setRestored] = useState(false);
+  // Quantas etapas nossas existem atrás desta no histórico. O "Voltar" da
+  // tela usa o histórico enquanto houver, para o botão do celular e o da
+  // tela andarem juntos.
+  const depthRef = useRef(0);
+  // A próxima troca de etapa substitui a entrada atual em vez de empilhar
+  // (recomeçar depois de agendar não deve deixar o pedido velho no voltar).
+  const replaceNextRef = useRef(false);
   const [services, setServices] = useState<Service[]>([]);
   const [pros, setPros] = useState<Professional[]>([]);
   const [proSvc, setProSvc] = useState<{ member_id: string; service_id: string }[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [pro, setPro] = useState<Professional | null>(null);
   const [date, setDate] = useState<string>(() => todayLocal());
+  const dateRef = useRef(date);
+  dateRef.current = date;
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -320,6 +357,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
     });
     supabase.rpc("public_professionals", { p_salon: salon.id }).then(({ data }) => {
       setPros((data as Professional[]) ?? []);
+      setProsLoaded(true);
     });
     supabase.rpc("public_professional_services", { p_salon: salon.id }).then(({ data }) => {
       setProSvc((data as { member_id: string; service_id: string }[]) ?? []);
@@ -367,34 +405,106 @@ export function BookingApp({ salon }: { salon: Salon }) {
     });
   }, [supabase, salon.id, salon.slug]);
 
+  // Horários de um dia, com cache: a faixa de dias, a busca do próximo dia
+  // livre e a grade pedem os mesmos dias, e no 3G cada ida ao servidor pesa.
+  // Com "sem preferência" as profissionais são consultadas em paralelo (antes
+  // era uma por vez) e a primeira da lista que tiver o horário fica com ele.
+  type DiaSlots = { slots: string[]; map: Record<string, Professional> };
+  const slotCache = useRef(new Map<string, Promise<DiaSlots>>());
+  const proKey = anyPro ? `any:${eligiblePros.map((p) => p.id).join(",")}` : pro?.id ?? "";
+  const fetchDay = useCallback((d: string): Promise<DiaSlots> => {
+    const key = `${proKey}|${totalDuration}|${d}`;
+    const hit = slotCache.current.get(key);
+    if (hit) return hit;
+    const run = (async (): Promise<DiaSlots> => {
+      if (anyPro) {
+        const res = await Promise.all(
+          eligiblePros.map((p) =>
+            supabase
+              .rpc("get_availability", { p_salon: salon.id, p_member: p.id, p_date: d, p_duration: totalDuration })
+              .then(({ data }) => ({ p, s: (data as string[]) ?? [] })),
+          ),
+        );
+        const map: Record<string, Professional> = {};
+        for (const { p, s } of res) for (const x of s) if (!map[x]) map[x] = p;
+        return { slots: Object.keys(map).sort(), map };
+      }
+      const { data } = await supabase.rpc("get_availability", {
+        p_salon: salon.id, p_member: pro!.id, p_date: d, p_duration: totalDuration,
+      });
+      return { slots: (data as string[]) ?? [], map: {} };
+    })();
+    // Erro não fica no cache: a próxima tentativa consulta de novo.
+    run.catch(() => slotCache.current.delete(key));
+    slotCache.current.set(key, run);
+    return run;
+  }, [supabase, salon.id, proKey, totalDuration, anyPro, eligiblePros, pro]);
+
+  // Disponibilidade dos dias da faixa (quantos horários cada um tem) e o
+  // próximo dia com vaga a partir do escolhido.
+  const [diasComVaga, setDiasComVaga] = useState<Record<string, number>>({});
+  const [proximoLivre, setProximoLivre] = useState<{ date: string; first: string } | "nenhum" | null>(null);
+
+  // Entrou na etapa de horário: esquece o que estava em cache (a agenda muda).
+  useEffect(() => {
+    if (step === "time") slotCache.current.clear();
+  }, [step]);
+
   const loadSlots = useCallback(async () => {
     if (!totalDuration || (!pro && !anyPro)) return;
     setLoadingSlots(true);
     setSlot(null);
-    if (anyPro) {
-      const map: Record<string, Professional> = {};
-      for (const p of eligiblePros) {
-        const { data } = await supabase.rpc("get_availability", {
-          p_salon: salon.id, p_member: p.id, p_date: date, p_duration: totalDuration,
-        });
-        for (const s of (data as string[]) ?? []) {
-          if (!map[s]) map[s] = p;
-        }
-      }
-      setSlotProMap(map);
-      setSlots(Object.keys(map).sort());
-    } else {
-      const { data } = await supabase.rpc("get_availability", {
-        p_salon: salon.id, p_member: pro!.id, p_date: date, p_duration: totalDuration,
-      });
-      setSlots((data as string[]) ?? []);
+    setProximoLivre(null);
+    const pedido = date;
+    try {
+      const r = await fetchDay(pedido);
+      // Troca rápida de dia: só a resposta do dia que está na tela vale.
+      if (pedido !== dateRef.current) return;
+      setSlotProMap(r.map);
+      setSlots(r.slots);
+    } finally {
+      if (pedido === dateRef.current) setLoadingSlots(false);
     }
-    setLoadingSlots(false);
-  }, [supabase, salon.id, pro, date, totalDuration, anyPro, eligiblePros]);
+  }, [pro, date, totalDuration, anyPro, fetchDay]);
 
   useEffect(() => {
     if (step === "time") loadSlots();
   }, [step, date, loadSlots]);
+
+  // Faixa de 7 dias: marca os que não têm vaga.
+  useEffect(() => {
+    if (step !== "time" || !totalDuration || (!pro && !anyPro)) return;
+    let vivo = true;
+    const dias = proximosDias(todayLocal(), 7);
+    Promise.all(dias.map((d) => fetchDay(d).then((r) => [d, r.slots.length] as const).catch(() => null))).then((rs) => {
+      if (!vivo) return;
+      const m: Record<string, number> = {};
+      for (const r of rs) if (r) m[r[0]] = r[1];
+      setDiasComVaga(m);
+    });
+    return () => { vivo = false; };
+  }, [step, fetchDay, totalDuration, pro, anyPro]);
+
+  // Dia escolhido sem vaga: procura o próximo com horário (até ~1 mês),
+  // em lotes de uma semana para não disparar tudo de uma vez.
+  useEffect(() => {
+    if (step !== "time" || loadingSlots || slots.length > 0 || !totalDuration || (!pro && !anyPro)) return;
+    let vivo = true;
+    (async () => {
+      for (let semana = 0; semana < 4 && vivo; semana++) {
+        const dias = proximosDias(somaDias(date, 1 + semana * 7), 7);
+        const rs = await Promise.all(dias.map((d) => fetchDay(d).catch(() => null)));
+        if (!vivo) return;
+        const i = rs.findIndex((r) => r && r.slots.length > 0);
+        if (i >= 0) {
+          setProximoLivre({ date: dias[i], first: rs[i]!.slots[0] });
+          return;
+        }
+      }
+      if (vivo) setProximoLivre("nenhum");
+    })();
+    return () => { vivo = false; };
+  }, [step, loadingSlots, slots.length, date, fetchDay, totalDuration, pro, anyPro]);
 
   // sugestões de produto (revenda) para os serviços escolhidos
   useEffect(() => {
@@ -724,6 +834,126 @@ export function BookingApp({ salon }: { salon: Salon }) {
       return;
     }
     setAnamnesisFlow("thanks");
+  }
+
+  /* ---------------- etapas, histórico e rascunho ---------------- */
+
+  // Etapa mais adiante que o pedido atual permite — usada ao chegar por URL
+  // (recarga, voltar/avançar do navegador) para nunca abrir uma tela vazia.
+  const maxStep = useCallback((): Step => {
+    if (!selected.length || emCasa) return "services";
+    if (!pro && !anyPro) return "professional";
+    if (!slot) return "time";
+    return "confirm";
+  }, [selected.length, emCasa, pro, anyPro, slot]);
+
+  const passoNaUrl = () => new URLSearchParams(window.location.search).get("passo");
+  function trocarUrl(alvo: Step, modo: "push" | "replace") {
+    const url = new URL(window.location.href);
+    const slug = STEP_SLUG[alvo];
+    if (slug) url.searchParams.set("passo", slug);
+    else url.searchParams.delete("passo");
+    if (modo === "push") window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+  }
+
+  // Restaura o rascunho uma vez, quando serviços e equipe chegaram, e abre na
+  // etapa da URL (recarga) — limitada ao que o rascunho permite. O horário
+  // não volta: a vaga pode ter sido ocupada nesse meio-tempo.
+  useEffect(() => {
+    if (restored || loadingServices || !prosLoaded) return;
+    let inicial: Step = "services";
+    try {
+      const raw = sessionStorage.getItem(draftKey(salon.slug));
+      if (raw) {
+        const d = JSON.parse(raw) as Draft;
+        const valid = d.selected.filter((id) => services.some((sv) => sv.id === id));
+        const proSalvo = d.proId ? pros.find((p) => p.id === d.proId) ?? null : null;
+        if (valid.length) {
+          setSelected(valid);
+          setModo(d.modo === "home" ? "home" : "salon");
+          if (d.anyPro) setAnyPro(true);
+          else if (proSalvo) setPro(proSalvo);
+          if (d.date && d.date >= todayLocal()) setDate(d.date);
+          const pedido = SLUG_STEP[passoNaUrl() ?? ""] ?? "services";
+          const lim: Step = d.modo === "home" ? "services" : d.anyPro || proSalvo ? "time" : "professional";
+          inicial = STEP_ORDER.indexOf(pedido) <= STEP_ORDER.indexOf(lim) ? pedido : lim;
+        }
+      }
+    } catch { /* rascunho ilegível: começa do zero */ }
+    if (inicial !== step) setStep(inicial);
+    if ((STEP_SLUG[inicial] ?? null) !== passoNaUrl()) trocarUrl(inicial, "replace");
+    setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- roda uma vez
+  }, [restored, loadingServices, prosLoaded]);
+
+  // Guarda o rascunho a cada escolha. Agendou: apaga.
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      if (step === "done" || step === "waitlist_done" || !selected.length) {
+        sessionStorage.removeItem(draftKey(salon.slug));
+        return;
+      }
+      const d: Draft = { selected, proId: pro?.id ?? null, anyPro, date, modo };
+      sessionStorage.setItem(draftKey(salon.slug), JSON.stringify(d));
+    } catch { /* navegação privada sem storage: segue sem rascunho */ }
+  }, [restored, step, selected, pro, anyPro, date, modo, salon.slug]);
+
+  // URL → etapa: botões voltar/avançar do navegador. Lê a URL real (o
+  // `passo` do hook só serve de gatilho: o Next pode atualizá-lo um render
+  // depois do pushState).
+  useEffect(() => {
+    if (!restored) return;
+    const alvo = SLUG_STEP[passoNaUrl() ?? ""] ?? "services";
+    if (alvo === step) return;
+    if (step === "done" || step === "waitlist_done") {
+      // Voltar depois de agendar não reabre a confirmação (agendaria de novo).
+      recomecar();
+      return;
+    }
+    const lim = maxStep();
+    const destino = STEP_ORDER.indexOf(alvo) <= STEP_ORDER.indexOf(lim) ? alvo : lim;
+    // Etapa que o pedido não sustenta: corrige a URL sem criar entrada nova,
+    // senão o voltar do celular nunca conseguiria sair da página.
+    if (destino !== alvo) trocarUrl(destino, "replace");
+    if (destino === step) return;
+    if (STEP_ORDER.indexOf(destino) < STEP_ORDER.indexOf(step)) depthRef.current = Math.max(0, depthRef.current - 1);
+    else depthRef.current += 1;
+    setStep(destino);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reage só à URL
+  }, [passo, restored]);
+
+  // Etapa → URL: cada avanço ganha uma entrada no histórico. As telas finais
+  // não mexem na URL — voltar delas cai no efeito acima e recomeça.
+  useEffect(() => {
+    if (!restored || step === "done" || step === "waitlist_done") return;
+    if ((STEP_SLUG[step] ?? null) === passoNaUrl()) return;
+    if (replaceNextRef.current) {
+      replaceNextRef.current = false;
+      trocarUrl(step, "replace");
+    } else {
+      trocarUrl(step, "push");
+      depthRef.current += 1;
+    }
+  }, [step, restored]);
+
+  /** "Voltar" da tela: usa o histórico enquanto houver etapa nossa atrás. */
+  function voltar(fallback: Step) {
+    if (depthRef.current > 0) window.history.back();
+    else setStep(fallback);
+  }
+
+  function recomecar() {
+    setSelected([]);
+    setSelectedProductIds([]);
+    setInspirationIds([]);
+    setPro(null);
+    setAnyPro(false);
+    setSlot(null);
+    depthRef.current = 0;
+    replaceNextRef.current = true;
+    setStep("services");
   }
 
   function goAfterTime() {
@@ -1123,7 +1353,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <CalendarDots className="h-5 w-5 text-primary" /> Escolha o horário
           </h2>
           <div className="space-y-2">
-            <DateRuler value={date} onChange={setDate} />
+            <DateRuler value={date} onChange={setDate} vagas={diasComVaga} />
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
@@ -1140,16 +1370,21 @@ export function BookingApp({ salon }: { salon: Salon }) {
           ) : slots.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground space-y-3">
               <p>Sem horários livres nesse dia.</p>
-              <button
-                className="text-primary text-sm font-medium hover:underline block mx-auto"
-                onClick={() => {
-                  const next = new Date(date + "T12:00:00");
-                  next.setDate(next.getDate() + 1);
-                  setDate(`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,"0")}-${String(next.getDate()).padStart(2,"0")}`);
-                }}
-              >
-                Ver próximo dia →
-              </button>
+              {/* Antes era "ver próximo dia", um dia por toque — e o próximo
+                  podia estar fechado também. Agora vai direto ao primeiro
+                  dia que tem vaga. */}
+              {proximoLivre === null ? (
+                <p className="flex items-center justify-center gap-2 text-xs">
+                  <CircleNotch aria-hidden className="h-3.5 w-3.5 animate-spin" /> Procurando o próximo horário livre…
+                </p>
+              ) : proximoLivre === "nenhum" ? (
+                <p className="text-xs">Nenhum horário livre nas próximas semanas.</p>
+              ) : (
+                <Button size="sm" className="mx-auto" onClick={() => setDate(proximoLivre.date)}>
+                  Próximo livre: {formatDiaCurto(proximoLivre.date)} às {formatHora(proximoLivre.first)}
+                  <CaretRight aria-hidden className="h-4 w-4" />
+                </Button>
+              )}
               <div className="pt-2 border-t border-border">
                 <p className="text-xs mb-2">Quer esse dia mesmo assim? Entre na lista de espera — avisamos a equipe se abrir um horário.</p>
                 <Button variant="outline" size="sm" onClick={goWaitlist} disabled={joiningWaitlist}>
@@ -1160,6 +1395,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </Card>
           ) : (
             <SlotGrid
+              key={date}
               slots={slots}
               selected={slot}
               onSelect={(s) => {
@@ -1225,7 +1461,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </p>
             <button
               type="button"
-              onClick={() => setStep("time")}
+              onClick={() => voltar("time")}
               className="flex items-center justify-center gap-1 w-full text-sm text-muted-foreground hover:text-foreground transition"
             >
               <CaretLeft className="h-4 w-4" /> Voltar
@@ -1359,7 +1595,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             <p role="alert" className="text-sm text-red-600">{bookErr}</p>
           )}
           <div className="flex gap-3">
-            <Button variant="outline" size="lg" onClick={() => setStep("time")} disabled={booking}>
+            <Button variant="outline" size="lg" onClick={() => voltar("time")} disabled={booking}>
               <CaretLeft className="h-4 w-4" /> Voltar
             </Button>
             <Button
@@ -1436,14 +1672,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                setSelected([]);
-                setSelectedProductIds([]);
-                setInspirationIds([]);
-                setPro(null);
-                setSlot(null);
-                setStep("services");
-              }}
+              onClick={recomecar}
             >
               Agendar outro
             </Button>
@@ -1471,14 +1700,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                setSelected([]);
-                setSelectedProductIds([]);
-                setInspirationIds([]);
-                setPro(null);
-                setSlot(null);
-                setStep("services");
-              }}
+              onClick={recomecar}
             >
               Agendar outro
             </Button>
@@ -1501,8 +1723,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
             (step === "time" && !!slot)
           }
           onBack={() => {
-            if (step === "professional") setStep("services");
-            else if (step === "time") setStep("professional");
+            if (step === "professional") voltar("services");
+            else if (step === "time") voltar("professional");
           }}
           onNext={() => {
             if (step === "services") setStep("professional");
@@ -2095,37 +2317,71 @@ function BottomBar({
   );
 }
 
-function DateRuler({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DateRuler({
+  value,
+  onChange,
+  vagas,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** horários por dia; 0 = sem vaga (o dia aparece apagado, mas segue tocável para a lista de espera) */
+  vagas: Record<string, number>;
+}) {
   const days = useMemo(() => {
-    const base = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return proximosDias(todayLocal(), 7).map((ds) => {
+      const d = new Date(ds + "T12:00:00");
       const dow = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
-      return { ds, dow, day: d.getDate() };
+      const longo = d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+      return { ds, dow, day: d.getDate(), longo };
     });
   }, []);
 
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 pb-1">
+    <div role="group" aria-label="Dia" className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 pb-1">
       {days.map((d, i) => {
         const on = d.ds === value;
+        const semVaga = vagas[d.ds] === 0;
         return (
           <button
             key={d.ds}
             type="button"
             onClick={() => onChange(d.ds)}
-            className={`shrink-0 w-14 rounded-[var(--radius)] border py-2.5 flex flex-col items-center transition ${
-              on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:border-foreground/25"
+            aria-pressed={on}
+            aria-label={`${i === 0 ? "Hoje, " : ""}${d.longo}${semVaga ? ", sem horários livres" : ""}`}
+            className={`shrink-0 w-14 rounded-[var(--radius)] border py-2.5 flex flex-col items-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+              on
+                ? "bg-primary text-primary-foreground border-primary"
+                : semVaga
+                  ? "border-dashed border-border bg-transparent text-muted-foreground"
+                  : "border-border bg-card hover:border-foreground/25"
             }`}
           >
-            <span className="text-[11px] uppercase tracking-wide opacity-80">{i === 0 ? "Hoje" : d.dow}</span>
-            <span className="text-lg font-semibold leading-none mt-1">{d.day}</span>
+            <span className={`text-[11px] uppercase tracking-wide ${on ? "" : "opacity-80"}`}>{i === 0 ? "Hoje" : d.dow}</span>
+            <span className={`text-lg font-semibold leading-none mt-1 ${semVaga && !on ? "line-through decoration-1 opacity-60" : ""}`}>{d.day}</span>
           </button>
         );
       })}
     </div>
   );
+}
+
+/** `n` dias a partir de `inicio` (YYYY-MM-DD, data local). */
+function proximosDias(inicio: string, n: number): string[] {
+  return Array.from({ length: n }, (_, i) => somaDias(inicio, i));
+}
+
+function somaDias(ds: string, n: number): string {
+  const d = new Date(ds + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDiaCurto(ds: string): string {
+  return new Date(ds + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" }).replace(".", "");
+}
+
+function formatHora(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 
 /**
@@ -2142,5 +2398,6 @@ function SlotGrid({
   selected: string | null;
   onSelect: (s: string) => void;
 }) {
-  return <TimeSlots slots={slots} selected={selected} onSelect={onSelect} />;
+  // 9 por período (3 linhas de 3 no celular); `key` no pai zera o "ver mais" ao trocar de dia.
+  return <TimeSlots slots={slots} selected={selected} onSelect={onSelect} limitPerGroup={9} />;
 }

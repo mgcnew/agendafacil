@@ -14,6 +14,10 @@ import { cn } from "@/lib/utils";
  *
  * `dense` encolhe para o painel, onde a grade divide espaço com o resto do
  * formulário; a página pública continua com o toque generoso do celular.
+ *
+ * `limitPerGroup` mostra só os primeiros horários de cada período, com um
+ * "ver mais" — de 15 em 15 minutos um dia passa de 80 botões, e a cliente
+ * no celular rolava uma parede antes de chegar à tarde.
  */
 type Slot = { iso: string; hora: string };
 
@@ -22,14 +26,17 @@ export function TimeSlots({
   selected,
   onSelect,
   dense = false,
+  limitPerGroup,
   className,
 }: {
   slots: string[];
   selected: string | null;
   onSelect: (s: string) => void;
   dense?: boolean;
+  limitPerGroup?: number;
   className?: string;
 }) {
+  const [abertos, setAbertos] = React.useState<string[]>([]);
   // Uma passada só, com o rótulo já formatado junto. O pai re-renderiza a cada
   // tecla digitada na busca de serviço, e `toLocaleTimeString` é caro o
   // bastante para não valer a pena chamá-lo duas vezes por horário a cada vez.
@@ -55,13 +62,20 @@ export function TimeSlots({
 
   return (
     <div className={cn(dense ? "space-y-2.5" : "space-y-4", className)}>
-      {grupos.map((g) => (
+      {grupos.map((g) => {
+        // O horário escolhido nunca fica escondido atrás do "ver mais".
+        const idxSel = selected ? g.itens.findIndex((x) => x.iso === selected) : -1;
+        const corta =
+          !!limitPerGroup && g.itens.length > limitPerGroup + 1 &&
+          !abertos.includes(g.label) && idxSel < limitPerGroup;
+        const visiveis = corta ? g.itens.slice(0, limitPerGroup) : g.itens;
+        return (
         <div key={g.label}>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
             {g.icon} {g.label}
           </p>
           <div className={cn("grid gap-2", dense ? "grid-cols-4" : "grid-cols-3 sm:grid-cols-4")}>
-            {g.itens.map(({ iso, hora }) => {
+            {visiveis.map(({ iso, hora }) => {
               const on = selected === iso;
               return (
                 <button
@@ -87,8 +101,18 @@ export function TimeSlots({
               );
             })}
           </div>
+          {corta && (
+            <button
+              type="button"
+              onClick={() => setAbertos((a) => [...a, g.label])}
+              className="mt-2 w-full rounded-[var(--radius)] py-2.5 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              Ver mais {g.itens.length - visiveis.length} horários da {g.label.toLowerCase()}
+            </button>
+          )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

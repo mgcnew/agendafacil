@@ -56,7 +56,7 @@ export const NICHES: Record<Niche, NicheMeta> = {
     swatch: "#c8852f",
     pattern: "stripes",
     fontLabel: "Oswald · Hanken",
-    examples: ["Corte Masculino", "Barba", "Navalhado", "Pézinho"],
+    examples: ["Corte Masculino", "Barba", "Navalhado", "Pezinho"],
   },
   estetica: {
     id: "estetica",

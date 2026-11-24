@@ -37,7 +37,7 @@ export const SERVICE_PRESETS: Record<Niche, ServicePreset[]> = {
     { name: "Barba", duration: 30, category: "Barba" },
     { name: "Corte + Barba", duration: 60, category: "Barba" },
     { name: "Pigmentação de barba", duration: 45, category: "Barba" },
-    { name: "Pézinho / Acabamento", duration: 15, category: "Acabamento" },
+    { name: "Pezinho / Acabamento", duration: 15, category: "Acabamento" },
     { name: "Sobrancelha", duration: 15, category: "Acabamento" },
     { name: "Hidratação capilar", duration: 30, category: "Tratamentos" },
   ],

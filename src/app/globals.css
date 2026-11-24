@@ -760,3 +760,15 @@
 /* Com o zoom de pinça liberado, isto tira só o zoom do duplo toque (que
    atrapalhava tocar rápido em botões) e o atraso do clique. */
 html { touch-action: manipulation; }
+
+/* Página pública de agendamento: paletas cujo tom de marca não passava no
+   contraste mínimo (4,5:1) com o texto do botão, os preços e o dia
+   escolhido. Escurecidas o mínimo para passar, mantendo o matiz. Só no
+   link de agendamento (.booking-root) — o painel segue com o tom original. */
+.booking-root[data-color="c"] { --primary: #4b775e; --ring: #4b775e; }
+.booking-root[data-color="d"] { --primary: #926a22; --ring: #926a22; }
+.booking-root[data-color="e"] { --primary: #d8330c; --ring: #d8330c; }
+.booking-root[data-color="f"] { --primary: #ce226f; --ring: #ce226f; }
+.booking-root[data-color="h"] { --primary: #077b97; --ring: #077b97; }
+/* Fundos escuros (Preto e o padrão da barbearia): o vermelho de erro some. */
+.booking-root:is([data-color="i"], [data-niche="barbearia"]:not([data-color])) .text-red-600 { color: #f87171; }

@@ -92,7 +92,7 @@ export default async function SalonBookingPage({
     <div
       data-niche={salon.niche}
       data-color={colorAttr}
-      className="min-h-dvh bg-background text-foreground"
+      className="booking-root min-h-dvh bg-background text-foreground"
     >
       {jsonLd && <JsonLd data={jsonLd} />}
       {salon.is_demo && <DemoBanner niche={salon.niche as string} />}
