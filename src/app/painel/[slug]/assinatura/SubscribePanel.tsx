@@ -11,7 +11,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Button, Card, Input } from "@/components/ui";
-import { createCheckout, changePlan } from "./actions";
+import { createCheckout, changePlan, cancelSubscription } from "./actions";
 import type { SubStatus } from "@/lib/subscription";
 import {
   PLANS,
@@ -36,6 +36,7 @@ function fmtDate(iso: string | null): string {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "America/Sao_Paulo",
   });
 }
 
@@ -60,6 +61,7 @@ export function SubscribePanel({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [doc, setDoc] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState(false);
   // Vem marcado o plano que a pessoa clicou na landing (?plano=). Sem isso ela
   // teria que escolher de novo aqui, o que parece que a escolha não registrou.
   // Continua sendo só a pré-seleção — nada é cobrado sem ela confirmar.
@@ -99,6 +101,26 @@ export function SubscribePanel({
       router.refresh();
     });
   }
+
+  function doCancel() {
+    setError(null);
+    setInfo(null);
+    start(async () => {
+      const res = await cancelSubscription(slug);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setConfirmCancel(false);
+      router.refresh();
+    });
+  }
+
+  // Cancelou, mas o mês pago ainda não acabou: o acesso segue até lá.
+  const accessUntil =
+    status === "canceled" && currentPeriodEnd && new Date(currentPeriodEnd) > new Date()
+      ? currentPeriodEnd
+      : null;
 
   // Assinatura ativa: mostra o plano atual e permite upgrade/downgrade.
   if (status === "active") {
@@ -190,6 +212,35 @@ export function SubscribePanel({
           </div>
         </div>
 
+        <div className="mt-5 border-t border-border pt-4">
+          {confirmCancel ? (
+            <div className="rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-sm">
+              <p className="font-medium text-foreground">Cancelar a assinatura?</p>
+              <p className="mt-1 text-muted-foreground">
+                A cobrança para agora. Você continua usando tudo até{" "}
+                <strong>{fmtDate(currentPeriodEnd)}</strong> e pode voltar quando quiser — seus dados ficam salvos.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)} disabled={pending}>
+                  Manter assinatura
+                </Button>
+                <Button size="sm" variant="danger" onClick={doCancel} disabled={pending}>
+                  {pending && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
+                  Sim, cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmCancel(true)}
+              className="rounded text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              Cancelar assinatura
+            </button>
+          )}
+        </div>
+
         {info && (
           <div role="status" className="mt-4 rounded-[var(--radius)] border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             {info}
@@ -222,6 +273,15 @@ export function SubscribePanel({
       {status === "past_due" && (
         <p className="mt-1 text-sm text-red-700">
           Não identificamos o pagamento. Reative para continuar.
+        </p>
+      )}
+      {status === "canceled" && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          {accessUntil ? (
+            <>Assinatura cancelada. Você continua com acesso até <strong>{fmtDate(accessUntil)}</strong> — se voltar agora, a cobrança só começa nessa data.</>
+          ) : (
+            <>Assinatura cancelada. Escolha um plano para voltar a usar.</>
+          )}
         </p>
       )}
 

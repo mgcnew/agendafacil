@@ -22,7 +22,13 @@ URL** (guard `guardFeature`) quando o plano é Básico. No **trial**, o acesso �
   mostra a **tela de assinatura** (gate) no lugar do painel.
 - "Assinar" cria cliente + assinatura no Asaas (valor = preço do plano escolhido) e redireciona
   para a página de pagamento hospedada (cliente escolhe PIX/boleto/cartão).
-- O **webhook** do Asaas atualiza o status quando o pagamento é confirmado/vence.
+- O **webhook** do Asaas atualiza o status quando o pagamento é confirmado/vence. Pagamento
+  confirmado grava `current_period_end` = vencimento + 1 mês (fim do dia em Brasília).
+- **Cancelar** (botão no painel, só o dono) apaga a assinatura no Asaas — a cobrança para na hora —
+  e marca `canceled`. O salão segue com acesso até `current_period_end` (função
+  `salon_access_status`). Reassinar cria uma assinatura nova, com a 1ª cobrança no fim do período pago.
+- **Estorno/contestação** cancelam no Asaas e cortam o acesso na hora.
+- O webhook **recusa tudo** se `ASAAS_WEBHOOK_TOKEN` não estiver configurado.
 
 ## Variáveis de ambiente (`.env.local` e Vercel)
 
@@ -42,7 +48,8 @@ URL** (guard `guardFeature`) quando o plano é Básico. No **trial**, o acesso �
 2. **URL**: `https://SEU-ENDERECO/api/asaas/webhook` (o `.vercel.app` serve — webhook não
    precisa de domínio próprio).
 3. **Token de autenticação**: o mesmo valor de `ASAAS_WEBHOOK_TOKEN`.
-4. Eventos: marque ao menos `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`.
+4. Eventos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`,
+   `PAYMENT_CHARGEBACK_REQUESTED`, `SUBSCRIPTION_DELETED` e `SUBSCRIPTION_INACTIVATED`.
 
 ## Testar (Sandbox)
 

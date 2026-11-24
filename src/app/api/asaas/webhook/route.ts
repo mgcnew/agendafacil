@@ -1,7 +1,15 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TablesUpdate } from "@/lib/database.types";
 import { PLANS, type PlanId } from "@/lib/plans";
+import { asaasCancelSubscription } from "@/lib/asaas";
+import {
+  isSubscriptionEndedEvent,
+  laterPeriodEnd,
+  periodEndFromDueDate,
+  statusForPaymentEvent,
+} from "@/lib/asaasBilling";
 
 /**
  * Webhook do Asaas — recebe eventos de cobrança e atualiza salon_subscriptions.
@@ -9,16 +17,15 @@ import { PLANS, type PlanId } from "@/lib/plans";
  *   https://SEU-DOMINIO/api/asaas/webhook
  * e defina o "Token de autenticação" igual a ASAAS_WEBHOOK_TOKEN.
  *
- * Eventos do Asaas são por COBRANÇA (payment), e cada cobrança carrega o id da
- * assinatura em `payment.subscription` — é por ele que casamos com o salão.
+ * Eventos de COBRANÇA (payment) carregam o id da assinatura em
+ * `payment.subscription`; eventos de ASSINATURA, em `subscription.id`. É por
+ * esse id que casamos com o salão.
  */
 export async function POST(req: NextRequest) {
-  const expected = process.env.ASAAS_WEBHOOK_TOKEN;
-  if (expected) {
-    const got = req.headers.get("asaas-access-token");
-    if (got !== expected) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  // Sem token configurado o endpoint recusa tudo: antes ele aceitava qualquer
+  // um, e bastava um POST para "pagar" a assinatura de qualquer salão.
+  if (!tokenOk(req.headers.get("asaas-access-token"))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   let body: AsaasWebhookBody;
@@ -29,38 +36,65 @@ export async function POST(req: NextRequest) {
   }
 
   const event = body.event;
-  const payment = body.payment;
-  const subscriptionId = payment?.subscription;
+  const subscriptionId = body.payment?.subscription ?? body.subscription?.id;
 
   // Sem assinatura associada → nada a fazer (ex.: cobrança avulsa).
   if (!subscriptionId) return NextResponse.json({ ignored: true });
 
-  const next = statusForEvent(event);
-  if (!next) return NextResponse.json({ ignored: true });
-
   const admin = createAdminClient();
-  const update: TablesUpdate<"salon_subscriptions"> = {
-    status: next,
-    updated_at: new Date().toISOString(),
-  };
-  if (next === "active") {
-    // Estende o período pago até o vencimento da cobrança.
-    if (payment?.dueDate) {
-      update.current_period_end = new Date(payment.dueDate).toISOString();
-    }
-    // Aplica o downgrade agendado na renovação (pending_plan -> plan).
-    const { data: row } = await admin
-      .from("salon_subscriptions")
-      .select("pending_plan")
-      .eq("asaas_subscription_id", subscriptionId)
-      .maybeSingle();
-    if (row?.pending_plan) {
-      const pp = row.pending_plan as PlanId;
-      update.plan = pp;
-      update.value = PLANS[pp]?.value ?? null;
-      update.pending_plan = null;
+  const { data: row } = await admin
+    .from("salon_subscriptions")
+    .select("status, pending_plan, current_period_end")
+    .eq("asaas_subscription_id", subscriptionId)
+    .maybeSingle();
+  if (!row) return NextResponse.json({ ignored: true });
+
+  const now = new Date().toISOString();
+  let update: TablesUpdate<"salon_subscriptions"> | null = null;
+
+  if (isSubscriptionEndedEvent(event)) {
+    // Assinatura apagada (pelo botão de cancelar ou no painel do Asaas): para
+    // de cobrar, mas o período já pago continua valendo até o fim.
+    update = { status: "canceled", pending_plan: null, asaas_subscription_id: null, updated_at: now };
+  } else {
+    const next = statusForPaymentEvent(event);
+    if (next === "active") {
+      update = { status: "active", updated_at: now };
+      if (body.payment?.dueDate) {
+        update.current_period_end = laterPeriodEnd(
+          row.current_period_end,
+          periodEndFromDueDate(body.payment.dueDate),
+        );
+      }
+      // Aplica o downgrade agendado na renovação (pending_plan -> plan).
+      if (row.pending_plan) {
+        const pp = row.pending_plan as PlanId;
+        update.plan = pp;
+        update.value = PLANS[pp]?.value ?? null;
+        update.pending_plan = null;
+      }
+    } else if (next === "past_due") {
+      // Quem já cancelou não vira "inadimplente" por uma cobrança velha.
+      if (row.status !== "canceled") update = { status: "past_due", updated_at: now };
+    } else if (next === "canceled") {
+      // Estorno/contestação: o dinheiro voltou, então o acesso acaba agora e a
+      // assinatura para de gerar cobranças (antes seguia cobrando no Asaas).
+      try {
+        await asaasCancelSubscription(subscriptionId);
+      } catch (e) {
+        console.error("[asaas webhook] falha ao cancelar assinatura estornada", e);
+      }
+      update = {
+        status: "canceled",
+        current_period_end: now,
+        pending_plan: null,
+        asaas_subscription_id: null,
+        updated_at: now,
+      };
     }
   }
+
+  if (!update) return NextResponse.json({ ignored: true });
 
   const { error } = await admin
     .from("salon_subscriptions")
@@ -73,6 +107,14 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+function tokenOk(got: string | null): boolean {
+  const expected = process.env.ASAAS_WEBHOOK_TOKEN;
+  if (!expected || !got) return false;
+  const a = Buffer.from(got);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 type AsaasWebhookBody = {
   event?: string;
   payment?: {
@@ -81,23 +123,7 @@ type AsaasWebhookBody = {
     status?: string;
     dueDate?: string;
   };
+  subscription?: {
+    id?: string;
+  };
 };
-
-/** Mapeia o evento do Asaas para o status interno da assinatura. */
-function statusForEvent(
-  event?: string,
-): "active" | "past_due" | "canceled" | null {
-  switch (event) {
-    case "PAYMENT_CONFIRMED":
-    case "PAYMENT_RECEIVED":
-      return "active";
-    case "PAYMENT_OVERDUE":
-      return "past_due";
-    case "PAYMENT_DELETED":
-    case "PAYMENT_REFUNDED":
-    case "PAYMENT_CHARGEBACK_REQUESTED":
-      return "canceled";
-    default:
-      return null;
-  }
-}

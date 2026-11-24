@@ -1,4 +1,5 @@
 import "server-only";
+import { pickPayablePayment } from "./asaasBilling";
 
 /**
  * Cliente da API do Asaas (apenas servidor — nunca importar em código de cliente).
@@ -14,6 +15,22 @@ function authHeaders() {
   return { "Content-Type": "application/json", access_token: key };
 }
 
+/**
+ * Erro da API. `userMessage` é o texto que o Asaas devolve para erros de
+ * validação (em português, ex.: "O CPF/CNPJ informado é inválido.") — esse
+ * pode ir para a tela. O resto (status, corpo cru) fica só no log.
+ */
+export class AsaasError extends Error {
+  constructor(
+    readonly status: number,
+    readonly path: string,
+    readonly userMessage: string | null,
+    body: string,
+  ) {
+    super(`Asaas ${path} → ${status}: ${body}`);
+  }
+}
+
 async function asaasFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -22,9 +39,21 @@ async function asaasFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Asaas ${path} → ${res.status}: ${body}`);
+    let userMessage: string | null = null;
+    if (res.status === 400) {
+      try {
+        userMessage = (JSON.parse(body) as { errors?: { description?: string }[] }).errors?.[0]?.description ?? null;
+      } catch {}
+    }
+    throw new AsaasError(res.status, path, userMessage, body);
   }
   return res.json() as Promise<T>;
+}
+
+/** Mensagem que pode ir para a tela; o detalhe técnico vai para o log do servidor. */
+export function asaasErrorMessage(e: unknown, fallback: string): string {
+  console.error("[asaas]", e);
+  return e instanceof AsaasError && e.userMessage ? e.userMessage : fallback;
 }
 
 export type AsaasCustomer = { id: string };
@@ -71,14 +100,26 @@ export async function asaasUpdateSubscription(
   });
 }
 
-/** URL da página de pagamento (checkout hospedado) da primeira cobrança da assinatura. */
+/**
+ * Cancela a assinatura no Asaas: param as cobranças futuras e o Asaas apaga as
+ * pendentes. O que já foi pago continua pago. Assinatura que já não existe lá
+ * (404) conta como cancelada.
+ */
+export async function asaasCancelSubscription(subscriptionId: string): Promise<void> {
+  try {
+    await asaasFetch<unknown>(`/subscriptions/${subscriptionId}`, { method: "DELETE" });
+  } catch (e) {
+    if (e instanceof AsaasError && e.status === 404) return;
+    throw e;
+  }
+}
+
+/** URL da página de pagamento (checkout hospedado) da cobrança que está em aberto. */
 export async function asaasSubscriptionCheckoutUrl(
   subscriptionId: string,
 ): Promise<string | null> {
-  const data = await asaasFetch<{ data?: { invoiceUrl?: string }[] }>(
-    `/subscriptions/${subscriptionId}/payments`,
-  );
-  return data.data?.[0]?.invoiceUrl ?? null;
+  const payments = await asaasListSubscriptionPayments(subscriptionId);
+  return pickPayablePayment(payments)?.invoiceUrl ?? null;
 }
 
 export type AsaasPayment = {
