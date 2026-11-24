@@ -745,3 +745,18 @@
 .scroll-thin::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--foreground) 32%, transparent);
 }
+
+/* Celular/tablet: campo com letra abaixo de 16px faz o iPhone dar zoom sozinho
+   ao tocar. Fora de camada de propósito, para vencer os text-sm/text-xs das
+   telas. No computador (lg+) os campos seguem como estão. */
+@media (max-width: 63.999rem) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Com o zoom de pinça liberado, isto tira só o zoom do duplo toque (que
+   atrapalhava tocar rápido em botões) e o atraso do clique. */
+html { touch-action: manipulation; }

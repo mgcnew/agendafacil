@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui";
-import { LoginForm } from "@/components/auth/LoginForm";
+
+// O formulário traz o cliente do Supabase, que pesava na landing de todo
+// visitante. Agora só desce quando a pessoa abre o modal.
+const LoginForm = dynamic(
+  () => import("@/components/auth/LoginForm").then((m) => m.LoginForm),
+  { ssr: false, loading: () => <div className="h-56" aria-hidden /> },
+);
 import {
   X,
 } from "@phosphor-icons/react/dist/ssr";

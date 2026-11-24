@@ -860,7 +860,7 @@ function ServiceList({
                 onClick={() => onToggle(s)}
                 aria-pressed={s.is_active}
                 aria-label={`${s.name}: ${s.is_active ? "ativo" : "inativo"}`}
-                className="rounded-full border border-border px-2.5 py-1 text-xs transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="rounded-full border border-border px-2.5 py-1 max-lg:min-h-9 max-lg:px-3 text-xs transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 {s.is_active ? "Ativo" : "Inativo"}
               </button>

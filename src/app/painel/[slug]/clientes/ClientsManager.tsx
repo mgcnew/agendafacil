@@ -243,7 +243,7 @@ export function ClientsManager({
             onClick={() => { setInactiveDays(opt.d); resetPage(); }}
             aria-pressed={inactiveDays === opt.d}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              "text-xs px-2.5 py-1 max-lg:min-h-9 max-lg:px-3 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               inactiveDays === opt.d
                 ? "bg-primary text-primary-foreground border-primary"
                 : "border-border hover:border-foreground/30 text-foreground",

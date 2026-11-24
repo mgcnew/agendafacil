@@ -57,7 +57,7 @@ export function UpdatesCard({
       </p>
       <Link
         href={`/painel/${slug}/configuracoes?tab=atualizacoes`}
-        className="inline-flex shrink-0 items-center gap-1 rounded px-1 text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        className="inline-flex shrink-0 items-center gap-1 rounded px-1 max-lg:min-h-10 max-lg:px-2 text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         Ver <ArrowRight aria-hidden className="h-3 w-3" />
       </Link>
@@ -65,7 +65,7 @@ export function UpdatesCard({
         type="button"
         onClick={dispensar}
         aria-label="Dispensar as novidades"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        className="grid h-7 w-7 max-lg:h-10 max-lg:w-10 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         <X aria-hidden className="h-4 w-4" />
       </button>

@@ -538,7 +538,7 @@ function FinanceiroTab({
       <Narrator lines={lines} alert={alert} />
       {alert && (
         <div className="-mt-3 flex flex-wrap gap-3 text-xs">
-          <Link href={`/painel/${slug}/relatorios?tab=temperatura`} className="font-semibold text-primary hover:underline">
+          <Link href={`/painel/${slug}/relatorios?tab=temperatura`} className="font-semibold text-primary hover:underline max-lg:inline-flex max-lg:min-h-10 max-lg:items-center">
             Ver dias e horários mais fracos →
           </Link>
         </div>
@@ -630,6 +630,8 @@ function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; c
   const media = comMovimento.length ? comMovimento.reduce((s, x) => s + x.total, 0) / comMovimento.length : 0;
   const melhor = comMovimento.reduce<(typeof dias)[number] | null>((a, b) => (!a || b.total > a.total ? b : a), null);
   const semana = (dia: number) => WEEKDAYS_SHORT[new Date(y, m - 1, dia).getDay()];
+  // No toque não há hover: tocar numa barra fixa a dica dela.
+  const [tocado, setTocado] = useState<number | null>(null);
 
   return (
     <div>
@@ -674,12 +676,17 @@ function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; c
                 const destaque = melhor?.dia === x.dia;
                 const altura = x.total > 0 ? Math.max((x.total / max) * 100, 3) : 0;
                 return (
-                  <div key={x.dia} className="group relative flex h-full flex-1 items-end">
+                  <div
+                    key={x.dia}
+                    onClick={() => setTocado((t) => (t === x.dia ? null : x.dia))}
+                    className="group relative flex h-full flex-1 items-end"
+                  >
                     {x.total > 0 ? (
                       <div
                         className={cn(
                           "w-full rounded-t-[4px] transition-colors",
                           destaque ? "bg-primary" : "bg-primary/45 dark:bg-primary/60 group-hover:bg-primary/75",
+                          !destaque && tocado === x.dia && "bg-primary/75 dark:bg-primary/75",
                         )}
                         style={{ height: `${altura}%` }}
                       />
@@ -687,8 +694,15 @@ function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; c
                       // Dia parado: um traço no chão, para o vazio ser visível.
                       !x.futuro && <div className="h-[3px] w-full rounded-full bg-border" />
                     )}
-                    {/* Dica ao passar o mouse */}
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    {/* Dica ao passar o mouse (ou ao tocar). Nas pontas ela
+                        encosta na borda do gráfico para não sair da tela. */}
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute bottom-full z-20 mb-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100",
+                        x.dia <= 4 ? "left-0" : x.dia > nDias - 4 ? "right-0" : "left-1/2 -translate-x-1/2",
+                        tocado === x.dia && "opacity-100",
+                      )}
+                    >
                       {semana(x.dia)}, {x.dia} · {x.futuro ? "ainda não chegou" : formatBRL(x.total)}
                     </div>
                   </div>

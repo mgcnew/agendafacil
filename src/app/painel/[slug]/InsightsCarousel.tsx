@@ -96,7 +96,7 @@ export function InsightsCarousel({ items }: { items: ReactNode[] }) {
               aria-label="Aviso anterior"
               onClick={() => go(page - 1)}
               disabled={page <= 0}
-              className="grid h-7 w-7 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-primary hover:border-primary/40 disabled:opacity-40 disabled:pointer-events-none"
+              className="grid h-7 w-7 max-lg:h-9 max-lg:w-9 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-primary hover:border-primary/40 disabled:opacity-40 disabled:pointer-events-none"
             >
               <CaretLeft className="h-4 w-4" />
             </button>
@@ -105,7 +105,7 @@ export function InsightsCarousel({ items }: { items: ReactNode[] }) {
               aria-label="Próximo aviso"
               onClick={() => go(page + 1)}
               disabled={page >= pages - 1}
-              className="grid h-7 w-7 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-primary hover:border-primary/40 disabled:opacity-40 disabled:pointer-events-none"
+              className="grid h-7 w-7 max-lg:h-9 max-lg:w-9 place-items-center rounded-full border border-border bg-card text-muted-foreground transition hover:text-primary hover:border-primary/40 disabled:opacity-40 disabled:pointer-events-none"
             >
               <CaretRight className="h-4 w-4" />
             </button>

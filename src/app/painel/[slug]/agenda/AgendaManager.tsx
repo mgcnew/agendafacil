@@ -1359,7 +1359,9 @@ function MonthView({ date, appts, pros, activePros, onDayClick, onNewAppt, canCr
                   {canCreate && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onNewAppt(day); }}
-                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition"
+                      // No toque não existe hover: o botão ficaria invisível
+                      // e roubaria o toque do dia. Lá, tocar no dia já abre.
+                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex pointer-coarse:hidden items-center justify-center rounded text-muted-foreground hover:text-foreground transition"
                     >
                       <Plus className="h-3 w-3" />
                     </button>
@@ -2001,7 +2003,7 @@ export function AgendaManager({
             onClick={() => setSelected([])}
             aria-pressed={selectedPros.length === 0}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              "text-xs px-2.5 py-1 max-lg:min-h-9 max-lg:px-3 rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               "shrink-0",
               selectedPros.length === 0
                 ? "bg-foreground text-background border-foreground"
@@ -2022,7 +2024,7 @@ export function AgendaManager({
                 // filtro está ligado, e algumas paletas quase não mudam o fundo.
                 aria-pressed={active}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 rounded-full border font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  "flex shrink-0 items-center gap-1.5 text-xs pl-1 pr-2.5 py-0.5 max-lg:min-h-9 max-lg:pl-1.5 max-lg:pr-3 rounded-full border font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                   active ? "" : "border-border hover:border-foreground/30",
                 )}
                 style={active ? { background: color + "22", borderColor: color } : {}}

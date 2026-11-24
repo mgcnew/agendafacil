@@ -45,7 +45,7 @@ export function DismissibleCard({
               router.refresh();
             });
           }}
-          className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full text-muted-foreground/60 transition hover:bg-card hover:text-primary disabled:opacity-50"
+          className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 max-lg:right-0.5 max-lg:top-0.5 max-lg:h-9 max-lg:w-9 place-items-center rounded-full text-muted-foreground/60 transition hover:bg-card hover:text-primary disabled:opacity-50"
         >
           <X className="h-3.5 w-3.5" />
         </button>

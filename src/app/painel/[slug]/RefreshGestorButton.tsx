@@ -34,7 +34,7 @@ export function RefreshGestorButton({ slug }: { slug: string }) {
         }
         aria-label="Pedir para o Gestor analisar tudo de novo"
         title="O Gestor vai checar os avisos de novo agora"
-        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-card hover:text-primary disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 max-lg:min-h-9 text-xs font-medium text-muted-foreground transition hover:bg-card hover:text-primary disabled:opacity-50"
       >
         <MagnifyingGlass className={`h-3.5 w-3.5 ${pending ? "animate-pulse" : ""}`} />
         {pending ? "Analisando…" : "Analisar de novo"}

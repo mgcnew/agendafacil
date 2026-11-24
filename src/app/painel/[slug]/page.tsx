@@ -450,7 +450,7 @@ export default async function DashboardPage({
 
           <div className="flex items-center justify-between">
             <h2 id="agenda-hoje-titulo" className="font-display text-lg font-bold">Agenda de hoje</h2>
-            <Link href={`/painel/${slug}/agenda`} className="inline-flex items-center gap-1 rounded text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href={`/painel/${slug}/agenda`} className="inline-flex items-center gap-1 rounded max-lg:min-h-10 text-sm font-medium text-muted-foreground hover:text-foreground">
               Agenda completa <CaretRight aria-hidden className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -534,7 +534,7 @@ export default async function DashboardPage({
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Parabenizar ${b.name} no WhatsApp`}
-                          className="shrink-0 rounded text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          className="shrink-0 rounded text-xs font-semibold hover:underline max-lg:inline-flex max-lg:min-h-10 max-lg:items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                         >
                           Parabenizar
                         </a>

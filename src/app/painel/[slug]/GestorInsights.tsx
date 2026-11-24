@@ -247,7 +247,7 @@ function GestorInsightsCard({
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-600/15 transition"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 px-2.5 py-1 max-lg:min-h-9 max-lg:px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-600/15 transition"
                         >
                           <ChatCircle className="h-3.5 w-3.5" /> Parabenizar {c.name.split(" ")[0]}
                         </a>
