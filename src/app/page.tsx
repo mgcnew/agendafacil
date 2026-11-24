@@ -7,6 +7,7 @@ import { Hero } from "@/components/landing/Hero";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { BenefitsQA } from "@/components/landing/BenefitsQA";
+import { StickyCTA } from "@/components/landing/StickyCTA";
 import { figtree } from "@/components/landing/fonts";
 import { ArrowRight, Check, Plus, Star } from "@phosphor-icons/react/dist/ssr";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -176,18 +177,6 @@ function StructuredData() {
   };
 
   return <JsonLd data={graph} />;
-}
-
-// ── CTA fixo no rodapé (mobile) ─────────────────────────────────────────────
-
-function StickyMobileCTA() {
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 sm:hidden">
-      <Link href="/criar-salao" className="zl-btn zl-btn-dark w-full">
-        Criar meu salão <ArrowRight className="h-4 w-4" weight="bold" />
-      </Link>
-    </div>
-  );
 }
 
 // ── Página ─────────────────────────────────────────────────────────────────
@@ -539,7 +528,7 @@ export default function Home() {
 
       <SiteFooter />
 
-      <StickyMobileCTA />
+      <StickyCTA href="/criar-salao">Criar meu salão</StickyCTA>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import { SiteFooter } from "@/components/landing/SiteFooter";
+import { StickyCTA } from "@/components/landing/StickyCTA";
 import { figtree } from "@/components/landing/fonts";
 import { PLANS, priceLabel } from "@/lib/plans";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -342,11 +343,7 @@ export default function BarbeariaPage() {
       <SiteFooter vertical="barbearia" />
 
       {/* CTA fixo no celular — a página é lida na porta da barbearia */}
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-md p-3 sm:hidden">
-        <Link href="/criar-salao?tipo=barbearia" className="zl-btn zl-btn-dark w-full">
-          Criar minha agenda grátis <ArrowRight className="h-4 w-4" weight="bold" />
-        </Link>
-      </div>
+      <StickyCTA href="/criar-salao?tipo=barbearia">Criar minha agenda grátis</StickyCTA>
     </div>
   );
 }
