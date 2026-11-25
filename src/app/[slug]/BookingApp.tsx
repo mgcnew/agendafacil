@@ -213,6 +213,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
   const [showMine, setShowMine] = useState(false);
   const [mineTab, setMineTab] = useState<MineTab>("next");
   const [mine, setMine] = useState<Appt[]>([]);
+  // Falha ao carregar não pode virar "nenhum agendamento": a pessoa achava
+  // que o horário tinha sumido.
+  const [mineErr, setMineErr] = useState(false);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [authIntent, setAuthIntent] = useState<"book" | "waitlist">("book");
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
@@ -522,16 +525,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
     // senão a busca exata (c.phone = p_phone) não casa e a lista vem vazia.
     const ph = userId ? null : toE164(savedPhone || phone);
     if (!userId && !ph) return;
-    const { data } = await supabase.rpc("public_my_appointments" as never, {
-      p_salon: salon.id,
-      p_phone: ph,
-    } as never);
-    setMine((data as unknown as Appt[]) ?? []);
-    const { data: wl } = await supabase.rpc("public_my_waitlist" as never, {
-      p_salon: salon.id,
-      p_phone: ph,
-    } as never);
-    setWaitlist((wl as unknown as WaitlistEntry[]) ?? []);
+    const [ap, wl] = await Promise.all([
+      supabase.rpc("public_my_appointments" as never, { p_salon: salon.id, p_phone: ph } as never),
+      supabase.rpc("public_my_waitlist" as never, { p_salon: salon.id, p_phone: ph } as never),
+    ]);
+    setMineErr(!!(ap.error || wl.error));
+    if (!ap.error) setMine((ap.data as unknown as Appt[]) ?? []);
+    if (!wl.error) setWaitlist((wl.data as unknown as WaitlistEntry[]) ?? []);
   }, [supabase, salon.id, userId, savedPhone, phone]);
 
   // carrega o histórico em segundo plano assim que o cliente é conhecido —
@@ -565,7 +565,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
 
   function goWaitlist() {
     setWaitlistErr(null);
-    if (userId || savedPhone) joinWaitlist();
+    // Mesma regra do agendamento (goAfterTime): só pula a identificação com
+    // um celular válido. Cliente logada sem telefone no perfil mandava o
+    // número vazio e o banco recusava — "não foi possível" sem saída.
+    const contatoOk = userId ? toStoredPhone(phone) !== null : toStoredPhone(savedPhone) !== null;
+    if (contatoOk) joinWaitlist();
     else { setAuthIntent("waitlist"); setStep("auth"); }
   }
 
@@ -577,7 +581,12 @@ export function BookingApp({ salon }: { salon: Salon }) {
       p_phone: userId ? null : toE164(savedPhone || phone),
     } as never);
     setCancelingWaitlistId(null);
-    if (!error) await fetchMine();
+    if (error) {
+      setCancelErr("Não foi possível sair da lista de espera. Atualize e tente novamente.");
+      return;
+    }
+    setCancelErr(null);
+    await fetchMine();
   }
 
   async function loadMine() {
@@ -759,6 +768,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
       } as never);
     }
     setStep("done");
+    // Atualiza "Meus agendamentos" (e faz o ícone aparecer no primeiro agendamento).
+    fetchMine();
   }
 
   function toggleInspiration(id: string) {
@@ -1012,7 +1023,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 <Images className="h-[18px] w-[18px]" />
               </button>
             )}
-            {(userId || savedPhone) && (
+            {/* Só para quem tem algo para ver — antes aparecia para quem tinha
+                apenas preenchido nome e telefone, sem nunca ter agendado. */}
+            {(userId || savedPhone) && (mine.length > 0 || waitlist.length > 0 || mineErr) && (
               <button
                 onClick={loadMine}
                 aria-label="Meus agendamentos"
@@ -1455,6 +1468,11 @@ export function BookingApp({ salon }: { salon: Salon }) {
             >
               {joiningWaitlist && <CircleNotch className="h-4 w-4 animate-spin" />} Continuar
             </Button>
+            {/* A lista de espera também passa por aqui: o erro dela aparecia
+                só na tela de horário, e daqui o botão não dava retorno. */}
+            {authIntent === "waitlist" && waitlistErr && (
+              <p role="alert" className="text-sm text-red-600 text-center">{waitlistErr}</p>
+            )}
             <p className="text-xs text-muted-foreground text-center">
               É por ele que a confirmação e o lembrete chegam. Sem um número
               válido, não conseguimos te avisar de nada.
@@ -1958,10 +1976,26 @@ export function BookingApp({ salon }: { salon: Salon }) {
     onCancelWaitlist: (id: string) => void;
     cancelingWaitlistId: string | null;
   }) {
+    // Em andamento conta como próximo até terminar (antes ia para o
+    // histórico no minuto em que começava).
     const isUpcoming = (a: Appt) =>
-      UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > Date.now();
-    const filtered = mine.filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)));
-    const waiting = waitlist.filter((w) => w.status === "waiting");
+      a.status === "in_progress"
+        ? new Date(a.ends_at).getTime() > Date.now()
+        : UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > Date.now();
+    // O banco devolve do mais recente para o mais antigo — certo para o
+    // histórico; nos próximos, o de amanhã vem primeiro.
+    const filtered = mine
+      .filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)))
+      .sort((x, y) => (tab === "next" ? 1 : -1) * (new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime()));
+    // Espera de um dia que já passou não espera mais nada.
+    const hoje = todayLocal();
+    const waiting = waitlist.filter((w) => w.status === "waiting" && w.preferred_date >= hoje);
+    // Status de um horário que já passou e ninguém fechou no salão: "Aguardando"
+    // ali soava como se ainda fosse acontecer.
+    const statusLabel = (a: Appt) =>
+      !isUpcoming(a) && (a.status === "pending" || a.status === "confirmed")
+        ? "Não finalizado"
+        : STATUS_LABEL[a.status] ?? a.status;
     return (
       <MotionModal onClose={onClose}>
         <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
@@ -1983,11 +2017,16 @@ export function BookingApp({ salon }: { salon: Salon }) {
             ))}
           </div>
           {cancelErr && (
-            <div className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+            <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
               {cancelErr}
             </div>
           )}
-          {tab === "waitlist" ? (
+          {mineErr && (
+            <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+              Não conseguimos carregar seus agendamentos agora. Feche e abra de novo em instantes.
+            </div>
+          )}
+          {mineErr && waiting.length === 0 && filtered.length === 0 ? null : tab === "waitlist" ? (
             waiting.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">
                 Você não está em nenhuma lista de espera.
@@ -1997,7 +2036,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 {waiting.map((w) => (
                   <div key={w.id} className="rounded-[var(--radius)] border border-border p-4">
                     <div className="flex justify-between items-start">
-                      <p className="font-medium capitalize">{formatDateLong(w.preferred_date + "T12:00:00")}</p>
+                      <p className="font-medium first-letter:uppercase">{formatDateLong(w.preferred_date + "T12:00:00")}</p>
                       <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
                         Aguardando
                       </span>
@@ -2029,9 +2068,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 return (
                   <div key={a.id} className="rounded-[var(--radius)] border border-border p-4">
                     <div className="flex justify-between items-start">
-                      <p className="font-medium capitalize">{formatDateLong(a.starts_at)}</p>
+                      <p className="font-medium first-letter:uppercase">{formatDateLong(a.starts_at)}</p>
                       <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
-                        {STATUS_LABEL[a.status] ?? a.status}
+                        {statusLabel(a)}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
