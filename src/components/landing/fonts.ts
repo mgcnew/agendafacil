@@ -1,10 +1,12 @@
-import { Figtree } from "next/font/google";
+import localFont from "next/font/local";
 
 // Fonte da landing — geométrica e arredondada, conversa com o desenho do logo.
 // Fica só nas páginas de marketing (classe .zl); o painel segue com a Jakarta.
-export const figtree = Figtree({
+// Arquivo local (versão latina e variável do Google Fonts): ver o porquê em
+// app/layout.tsx.
+export const figtree = localFont({
+  src: "../../app/fonts/figtree-latin.woff2",
+  weight: "400 800",
   variable: "--font-figtree",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });

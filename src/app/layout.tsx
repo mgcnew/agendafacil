@@ -1,22 +1,28 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Oswald, Playfair_Display } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
 import { MotionProvider } from "@/components/MotionProvider";
 import { SITE_URL } from "@/lib/siteUrl";
 
+// As fontes moram no repositório (src/app/fonts, versão latina e variável do
+// Google Fonts). Com next/font/google o build baixava do Google na hora, e na
+// Vercel isso quebrou o deploy várias vezes ("next/font/google queries have
+// exactly one entry") — com o mesmo código passando aqui.
+
 // Fonte padrão do produto — moderna, levemente arredondada e familiar.
-const jakarta = Plus_Jakarta_Sans({
+const jakarta = localFont({
+  src: "./fonts/plus-jakarta-sans-latin.woff2",
+  weight: "200 800",
   variable: "--font-jakarta",
-  subsets: ["latin"],
   display: "swap",
 });
 
 // Fonte condensada para títulos — identidade de barbearia (placa/oficina).
-const oswald = Oswald({
+const oswald = localFont({
+  src: "./fonts/oswald-latin.woff2",
+  weight: "500 700",
   variable: "--font-oswald",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
   display: "swap",
   // Só é usada em títulos de barbearia — não pré-carregar (peso morto na
   // landing/SEO). Carrega sob demanda (swap) quando uma página de barbearia usa.
@@ -26,12 +32,13 @@ const oswald = Oswald({
 // Display serifado elegante para os títulos dos nichos de beleza
 // (feminino/estética) — dá o ar de spa/salão sofisticado. Só em títulos;
 // não pré-carrega (a landing usa Jakarta).
-const playfair = Playfair_Display({
+const playfair = localFont({
+  src: "./fonts/playfair-display-latin.woff2",
+  weight: "500 700",
   variable: "--font-serif",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
   display: "swap",
   preload: false,
+  adjustFontFallback: "Times New Roman",
 });
 
 export const metadata: Metadata = {
