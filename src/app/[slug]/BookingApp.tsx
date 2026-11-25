@@ -156,6 +156,27 @@ const STATUS_LABEL: Record<string, string> = {
  * cara de válido. Cadastro assim NUNCA recebe mensagem — e ninguém percebe,
  * porque a fila descarta antes de a mensagem existir.
  */
+/**
+ * Chave deste aparelho para "Meus agendamentos", cancelar, endereço salvo e
+ * ficha. O banco não aceita mais o telefone como prova: celular não é segredo,
+ * e com ele qualquer um via e cancelava os horários de outra pessoa. Cada
+ * agendamento feito aqui é ligado a esta chave logo depois de criado
+ * (public_claim_appointment); em outro aparelho, ele não aparece.
+ */
+function deviceToken(slug: string, criar: boolean): string | null {
+  const k = `zl_device_${slug}`;
+  try {
+    let t = localStorage.getItem(k);
+    if (!t && criar) {
+      t = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+      localStorage.setItem(k, t);
+    }
+    return t;
+  } catch {
+    return null;
+  }
+}
+
 function toE164(raw: string): string {
   return toStoredPhone(raw) ?? "";
 }
@@ -521,9 +542,8 @@ export function BookingApp({ salon }: { salon: Salon }) {
   }, [supabase, salon.id, selected]);
 
   const fetchMine = useCallback(async () => {
-    // O telefone é gravado em E164 no book_appointment; normalizar aqui também,
-    // senão a busca exata (c.phone = p_phone) não casa e a lista vem vazia.
-    const ph = userId ? null : toE164(savedPhone || phone);
+    // `p_phone` leva a chave do aparelho (nome antigo do parâmetro no banco).
+    const ph = userId ? null : deviceToken(salon.slug, false);
     if (!userId && !ph) return;
     const [ap, wl] = await Promise.all([
       supabase.rpc("public_my_appointments" as never, { p_salon: salon.id, p_phone: ph } as never),
@@ -532,18 +552,18 @@ export function BookingApp({ salon }: { salon: Salon }) {
     setMineErr(!!(ap.error || wl.error));
     if (!ap.error) setMine((ap.data as unknown as Appt[]) ?? []);
     if (!wl.error) setWaitlist((wl.data as unknown as WaitlistEntry[]) ?? []);
-  }, [supabase, salon.id, userId, savedPhone, phone]);
+  }, [supabase, salon.id, salon.slug, userId]);
 
   // carrega o histórico em segundo plano assim que o cliente é conhecido —
   // alimenta a sugestão de profissional favorito sem precisar abrir "Meus".
   useEffect(() => {
-    if (userId || savedPhone) fetchMine();
-  }, [userId, savedPhone, fetchMine]);
+    if (userId || deviceToken(salon.slug, false)) fetchMine();
+  }, [userId, salon.slug, fetchMine]);
 
   async function joinWaitlist() {
     setJoiningWaitlist(true);
     setWaitlistErr(null);
-    const { error } = await supabase.rpc("public_join_waitlist" as never, {
+    const { data: entrada, error } = await supabase.rpc("public_join_waitlist" as never, {
       p_salon: salon.id,
       p_client_name: name || "Cliente",
       p_client_phone: toE164(phone),
@@ -556,11 +576,19 @@ export function BookingApp({ salon }: { salon: Salon }) {
       setWaitlistErr("Não foi possível entrar na lista de espera. Tente novamente.");
       return;
     }
+    const entradaId = (entrada as unknown as { id?: string } | null)?.id;
+    if (entradaId) {
+      await supabase.rpc("public_claim_waitlist" as never, {
+        p_id: entradaId,
+        p_token: deviceToken(salon.slug, true),
+      } as never);
+    }
     try {
       localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ name, phone, favoriteProId }));
     } catch { /* ignore */ }
     setSavedPhone(phone);
     setStep("waitlist_done");
+    fetchMine();
   }
 
   function goWaitlist() {
@@ -578,7 +606,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
     setCancelingWaitlistId(id);
     const { error } = await supabase.rpc("public_cancel_waitlist" as never, {
       p_id: id,
-      p_phone: userId ? null : toE164(savedPhone || phone),
+      p_phone: userId ? null : deviceToken(salon.slug, false),
     } as never);
     setCancelingWaitlistId(null);
     if (error) {
@@ -615,7 +643,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
     setCancelErr(null);
     const { error } = await supabase.rpc("public_cancel_appointment" as never, {
       p_appointment: a.id,
-      p_phone: userId ? null : toE164(savedPhone || phone),
+      p_phone: userId ? null : deviceToken(salon.slug, false),
     } as never);
     setCancelingId(null);
     if (error) {
@@ -663,8 +691,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
   // Endereço e quilometragem que o salão já tem dessa cliente. É o que faz a
   // segunda visita ser instantânea: chega tudo preenchido e com valor fechado.
   useEffect(() => {
-    const ph = toE164(savedPhone || phone);
-    if (!emCasa || !ph) return;
+    // Só o endereço de quem este aparelho já atendeu (ou da conta logada).
+    const ph = deviceToken(salon.slug, false);
+    if (!emCasa || (!ph && !userId)) return;
     let vivo = true;
     void (async () => {
       const { data } = await supabase.rpc("public_home_address" as never, {
@@ -694,7 +723,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       );
     })();
     return () => { vivo = false; };
-  }, [emCasa, supabase, salon.id, savedPhone, phone]);
+  }, [emCasa, supabase, salon.id, salon.slug, userId]);
 
   async function confirmBooking() {
     // Nunca sair em silêncio: um botão que não faz nada ao ser apertado é o
@@ -759,12 +788,21 @@ export function BookingApp({ salon }: { salon: Salon }) {
     }
     setBooking(false);
     setBookedClientId(data?.client_id ?? null);
+    // Liga o agendamento a este aparelho antes de tudo: inspiração, ficha e
+    // "Meus agendamentos" dependem dessa ligação.
+    const token = deviceToken(salon.slug, true);
+    if (data?.id && token) {
+      await supabase.rpc("public_claim_appointment" as never, {
+        p_appointment: data.id,
+        p_token: token,
+      } as never);
+    }
     // fotos de inspiração escolhidas na galeria — o profissional vê na Agenda
     if (inspirationIds.length > 0 && data?.id) {
       await supabase.rpc("public_set_appointment_inspiration" as never, {
         p_appointment: data.id,
         p_gallery_ids: inspirationIds,
-        p_phone: userId ? null : toE164(phone),
+        p_phone: userId ? null : token,
       } as never);
     }
     setStep("done");
@@ -789,13 +827,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
         if (days < ANAMNESIS_COOLDOWN_DAYS) return;
       }
     } catch { /* ignore */ }
-    const ph = userId ? null : toE164(savedPhone || phone);
+    const ph = userId ? null : deviceToken(salon.slug, false);
     supabase
       .rpc("public_needs_anamnesis" as never, { p_client_id: bookedClientId, p_phone: ph } as never)
       .then(({ data }) => {
         if (data === true) setAnamnesisFlow("invite");
       });
-  }, [step, bookedClientId, supabase, salon.slug, userId, savedPhone, phone]);
+  }, [step, bookedClientId, supabase, salon.slug, userId]);
 
   function dismissAnamnesis() {
     setAnamnesisFlow(null);
@@ -817,7 +855,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
     if (!bookedClientId || !anaForm.consent_given) return;
     setSavingAnamnesis(true);
     setAnaErr(null);
-    const ph = userId ? null : toE164(savedPhone || phone);
+    const ph = userId ? null : deviceToken(salon.slug, false);
     const { error } = await supabase.rpc("public_save_anamnesis" as never, {
       p_client_id: bookedClientId,
       p_consent_given: anaForm.consent_given,
