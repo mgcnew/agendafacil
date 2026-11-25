@@ -1061,9 +1061,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
                 <Images className="h-[18px] w-[18px]" />
               </button>
             )}
-            {/* Só para quem tem algo para ver — antes aparecia para quem tinha
-                apenas preenchido nome e telefone, sem nunca ter agendado. */}
-            {(userId || savedPhone) && (mine.length > 0 || waitlist.length > 0 || mineErr) && (
+            {/* Para toda cliente já identificada neste aparelho. Esconder quando
+                a lista vinha vazia tirava o acesso de quem já era cliente: com a
+                chave do aparelho, os agendamentos antigos não aparecem aqui. */}
+            {(userId || savedPhone || deviceToken(salon.slug, false)) && (
               <button
                 onClick={loadMine}
                 aria-label="Meus agendamentos"
@@ -2094,9 +2095,20 @@ export function BookingApp({ salon }: { salon: Salon }) {
               </div>
             )
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
-            </p>
+            <div className="py-8 text-center space-y-1.5">
+              <p className="text-sm text-muted-foreground">
+                {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
+              </p>
+              {/* Por segurança a lista é deste aparelho (não do telefone): quem
+                  agendou em outro celular, ou antes dessa mudança, precisa saber
+                  que o horário não sumiu. */}
+              {!userId && (
+                <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
+                  Aqui aparecem os horários marcados neste aparelho. Agendou em outro
+                  celular? Fale com o salão para conferir.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {filtered.map((a) => {
