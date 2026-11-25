@@ -237,6 +237,10 @@ export function BookingApp({ salon }: { salon: Salon }) {
   // Falha ao carregar não pode virar "nenhum agendamento": a pessoa achava
   // que o horário tinha sumido.
   const [mineErr, setMineErr] = useState(false);
+  // Se este aparelho já tem chave. Lido depois de montar (localStorage não
+  // existe no servidor): ler no render fazia o ícone do cabeçalho divergir do
+  // HTML do servidor e o React redesenhar a página inteira.
+  const [temChave, setTemChave] = useState(false);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [authIntent, setAuthIntent] = useState<"book" | "waitlist">("book");
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
@@ -400,6 +404,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
       .order("sort_order")
       .then(({ data }) => setGallery((data as GalleryPhoto[]) ?? []));
     supabase.auth.getUser().then(async ({ data }) => {
+      setTemChave(!!deviceToken(salon.slug, false));
       // favorito é sempre local (mesmo cliente logado pode usar outro aparelho
       // sem o favorito — ok por ora, mesmo padrão de identificação por localStorage).
       try {
@@ -560,6 +565,60 @@ export function BookingApp({ salon }: { salon: Salon }) {
     if (userId || deviceToken(salon.slug, false)) fetchMine();
   }, [userId, salon.slug, fetchMine]);
 
+  // Lista de espera que virou vaga: para cada espera ativa, confere se o dia
+  // pedido já tem horário livre (alguém desmarcou, o salão abriu mais). A
+  // cliente vê isso ao abrir o link — o WhatsApp de "vaga liberada" só sai se
+  // o salão tiver ligado, e nem todo salão tem WhatsApp conectado.
+  const [vagasEspera, setVagasEspera] = useState<Record<string, string[]>>({});
+  const esperaParaPedido = useCallback((w: WaitlistEntry) => {
+    const svcIds = services.filter((sv) => w.services.includes(sv.name)).map((sv) => sv.id);
+    const duracao = services.filter((sv) => svcIds.includes(sv.id)).reduce((a, sv) => a + sv.duration_min, 0);
+    const aptas = pros.filter((p) =>
+      proSvc.some((x) => x.member_id === p.id) &&
+      svcIds.every((sid) => {
+        const linked = proSvc.filter((x) => x.service_id === sid);
+        return linked.length === 0 || linked.some((x) => x.member_id === p.id);
+      }),
+    );
+    const quem = w.member_name ? aptas.filter((p) => p.display_name === w.member_name) : aptas;
+    return { svcIds, duracao, quem, pedida: w.member_name ? quem[0] ?? null : null };
+  }, [services, pros, proSvc]);
+
+  useEffect(() => {
+    const hoje = todayLocal();
+    const ativas = waitlist.filter((w) => w.status === "waiting" && w.preferred_date >= hoje);
+    if (!ativas.length || !services.length || !pros.length) { setVagasEspera({}); return; }
+    let vivo = true;
+    (async () => {
+      const res: Record<string, string[]> = {};
+      await Promise.all(ativas.map(async (w) => {
+        const { duracao, quem } = esperaParaPedido(w);
+        if (!duracao || !quem.length) return;
+        const listas = await Promise.all(quem.map((p) =>
+          supabase
+            .rpc("get_availability", { p_salon: salon.id, p_member: p.id, p_date: w.preferred_date, p_duration: duracao })
+            .then(({ data }) => (data as string[]) ?? []),
+        ));
+        const livres = [...new Set(listas.flat())].sort();
+        if (livres.length) res[w.id] = livres;
+      }));
+      if (vivo) setVagasEspera(res);
+    })();
+    return () => { vivo = false; };
+  }, [waitlist, services.length, pros.length, esperaParaPedido, supabase, salon.id]);
+
+  // "Agendar agora" na espera: monta o pedido daquela espera e abre o dia.
+  function agendarVaga(w: WaitlistEntry) {
+    const { svcIds, pedida } = esperaParaPedido(w);
+    if (!svcIds.length) return;
+    setSelected(svcIds);
+    if (pedida) { setAnyPro(false); setPro(pedida); }
+    else { setAnyPro(true); setPro(null); }
+    setDate(w.preferred_date);
+    setShowMine(false);
+    setStep("time");
+  }
+
   async function joinWaitlist() {
     setJoiningWaitlist(true);
     setWaitlistErr(null);
@@ -582,6 +641,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         p_id: entradaId,
         p_token: deviceToken(salon.slug, true),
       } as never);
+      setTemChave(true);
     }
     try {
       localStorage.setItem(`af_client_${salon.slug}`, JSON.stringify({ name, phone, favoriteProId }));
@@ -620,6 +680,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
   async function loadMine() {
     await fetchMine();
     setMineTab("next");
+    setShowMine(true);
+  }
+
+  // Com vaga aberta na espera, o ícone já abre direto nessa aba.
+  async function abrirEspera() {
+    await fetchMine();
+    setMineTab("waitlist");
     setShowMine(true);
   }
 
@@ -796,6 +863,7 @@ export function BookingApp({ salon }: { salon: Salon }) {
         p_appointment: data.id,
         p_token: token,
       } as never);
+      setTemChave(true);
     }
     // fotos de inspiração escolhidas na galeria — o profissional vê na Agenda
     if (inspirationIds.length > 0 && data?.id) {
@@ -1064,13 +1132,16 @@ export function BookingApp({ salon }: { salon: Salon }) {
             {/* Para toda cliente já identificada neste aparelho. Esconder quando
                 a lista vinha vazia tirava o acesso de quem já era cliente: com a
                 chave do aparelho, os agendamentos antigos não aparecem aqui. */}
-            {(userId || savedPhone || deviceToken(salon.slug, false)) && (
+            {(userId || savedPhone || temChave) && (
               <button
-                onClick={loadMine}
-                aria-label="Meus agendamentos"
-                className="grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                onClick={() => (Object.keys(vagasEspera).length > 0 ? abrirEspera() : loadMine())}
+                aria-label={Object.keys(vagasEspera).length > 0 ? "Meus agendamentos, abriu vaga na sua lista de espera" : "Meus agendamentos"}
+                className="relative grid place-items-center h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition"
               >
                 <ClockCounterClockwise className="h-[18px] w-[18px]" />
+                {Object.keys(vagasEspera).length > 0 && (
+                  <span aria-hidden className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+                )}
               </button>
             )}
           </div>
@@ -1766,7 +1837,9 @@ export function BookingApp({ salon }: { salon: Salon }) {
       )}
 
       {/* Barra inferior de navegação */}
-      {(step === "services" || step === "professional" || step === "time") && (
+      {/* Some com a gaveta aberta: ela é por cima, e o "Continuar" aparecia
+          no fundo durante a troca de abas. */}
+      {!showMine && (step === "services" || step === "professional" || step === "time") && (
         <BottomBar
           step={step}
           services={selectedServices}
@@ -1803,6 +1876,13 @@ export function BookingApp({ salon }: { salon: Salon }) {
             onClose={() => { setShowMine(false); setCancelErr(null); }}
             onCancelWaitlist={cancelWaitlistEntry}
             cancelingWaitlistId={cancelingWaitlistId}
+            onCancelAppt={cancelAppt}
+            cancelingId={cancelingId}
+            cancelErr={cancelErr}
+            mineErr={mineErr}
+            dicaAparelho={!userId}
+            vagasEspera={vagasEspera}
+            onAgendarVaga={agendarVaga}
           />
         )}
       </AnimatePresence>
@@ -1997,157 +2077,209 @@ export function BookingApp({ salon }: { salon: Salon }) {
       </span>
     );
   }
+}
 
-  function MineDrawer({
-    mine,
-    waitlist,
-    tab,
-    onTabChange,
-    onClose,
-    onCancelWaitlist,
-    cancelingWaitlistId,
-  }: {
-    mine: Appt[];
-    waitlist: WaitlistEntry[];
-    tab: MineTab;
-    onTabChange: (t: MineTab) => void;
-    onClose: () => void;
-    onCancelWaitlist: (id: string) => void;
-    cancelingWaitlistId: string | null;
-  }) {
-    // Em andamento conta como próximo até terminar (antes ia para o
-    // histórico no minuto em que começava).
-    const isUpcoming = (a: Appt) =>
-      a.status === "in_progress"
-        ? new Date(a.ends_at).getTime() > Date.now()
-        : UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > Date.now();
-    // O banco devolve do mais recente para o mais antigo — certo para o
-    // histórico; nos próximos, o de amanhã vem primeiro.
-    const filtered = mine
-      .filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)))
-      .sort((x, y) => (tab === "next" ? 1 : -1) * (new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime()));
-    // Espera de um dia que já passou não espera mais nada.
-    const hoje = todayLocal();
-    const waiting = waitlist.filter((w) => w.status === "waiting" && w.preferred_date >= hoje);
-    // Status de um horário que já passou e ninguém fechou no salão: "Aguardando"
-    // ali soava como se ainda fosse acontecer.
-    const statusLabel = (a: Appt) =>
-      !isUpcoming(a) && (a.status === "pending" || a.status === "confirmed")
-        ? "Não finalizado"
-        : STATUS_LABEL[a.status] ?? a.status;
-    return (
-      <MotionModal onClose={onClose}>
-        <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-lg font-bold">Meus agendamentos</h3>
-            <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
+/**
+ * Gaveta "Meus agendamentos". Fica fora do BookingApp de propósito: declarada
+ * lá dentro, cada render da página criava um componente novo, e trocar de aba
+ * desmontava e remontava o modal inteiro — piscava e deixava ver o botão
+ * "Continuar" por trás.
+ */
+const HISTORICO_PAGINA = 5;
+
+function MineDrawer({
+  mine,
+  waitlist,
+  tab,
+  onTabChange,
+  onClose,
+  onCancelWaitlist,
+  cancelingWaitlistId,
+  onCancelAppt,
+  cancelingId,
+  cancelErr,
+  mineErr,
+  dicaAparelho,
+  vagasEspera,
+  onAgendarVaga,
+}: {
+  mine: Appt[];
+  waitlist: WaitlistEntry[];
+  tab: MineTab;
+  onTabChange: (t: MineTab) => void;
+  onClose: () => void;
+  onCancelWaitlist: (id: string) => void;
+  cancelingWaitlistId: string | null;
+  onCancelAppt: (a: Appt) => void;
+  cancelingId: string | null;
+  cancelErr: string | null;
+  mineErr: boolean;
+  /** cliente sem conta: explica que a lista é deste aparelho */
+  dicaAparelho: boolean;
+  /** horários livres hoje no dia de cada espera (id → horários) */
+  vagasEspera: Record<string, string[]>;
+  onAgendarVaga: (w: WaitlistEntry) => void;
+}) {
+  // Histórico longo: mostra aos poucos; volta ao começo ao trocar de aba.
+  const [qtdHistorico, setQtdHistorico] = useState(HISTORICO_PAGINA);
+  // Hora fixada na abertura da gaveta (não muda a cada render).
+  const [agora] = useState(() => Date.now());
+  // Em andamento conta como próximo até terminar (antes ia para o
+  // histórico no minuto em que começava).
+  const isUpcoming = (a: Appt) =>
+    a.status === "in_progress"
+      ? new Date(a.ends_at).getTime() > agora
+      : UPCOMING_STATUSES.has(a.status) && new Date(a.starts_at).getTime() > agora;
+  // O banco devolve do mais recente para o mais antigo — certo para o
+  // histórico; nos próximos, o de amanhã vem primeiro.
+  const filtered = mine
+    .filter((a) => (tab === "next" ? isUpcoming(a) : !isUpcoming(a)))
+    .sort((x, y) => (tab === "next" ? 1 : -1) * (new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime()));
+  // Espera de um dia que já passou não espera mais nada.
+  const hoje = todayLocal();
+  const waiting = waitlist.filter((w) => w.status === "waiting" && w.preferred_date >= hoje);
+  // Status de um horário que já passou e ninguém fechou no salão: "Aguardando"
+  // ali soava como se ainda fosse acontecer.
+  const statusLabel = (a: Appt) =>
+    !isUpcoming(a) && (a.status === "pending" || a.status === "confirmed")
+      ? "Não finalizado"
+      : STATUS_LABEL[a.status] ?? a.status;
+  return (
+    <MotionModal onClose={onClose}>
+      <Card className="w-full sm:max-w-md mx-auto max-h-[80vh] overflow-auto p-6 rounded-b-none sm:rounded-[var(--radius)]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-bold">Meus agendamentos</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>Fechar</Button>
+        </div>
+        <div className="flex gap-1.5 mb-4 rounded-full bg-muted p-1">
+          {(["next", "history", "waitlist"] as MineTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setQtdHistorico(HISTORICO_PAGINA); onTabChange(t); }}
+              className={`flex-1 rounded-full py-1.5 text-sm font-medium transition ${
+                tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              {t === "next" ? "Próximos" : t === "history" ? "Histórico" : "Espera"}
+              {t === "waitlist" && waiting.some((w) => vagasEspera[w.id]) && (
+                <span aria-label="abriu vaga" className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle" />
+              )}
+            </button>
+          ))}
+        </div>
+        {cancelErr && (
+          <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+            {cancelErr}
           </div>
-          <div className="flex gap-1.5 mb-4 rounded-full bg-muted p-1">
-            {(["next", "history", "waitlist"] as MineTab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => onTabChange(t)}
-                className={`flex-1 rounded-full py-1.5 text-sm font-medium transition ${
-                  tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-                }`}
-              >
-                {t === "next" ? "Próximos" : t === "history" ? "Histórico" : "Espera"}
-              </button>
-            ))}
+        )}
+        {mineErr && (
+          <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+            Não conseguimos carregar seus agendamentos agora. Feche e abra de novo em instantes.
           </div>
-          {cancelErr && (
-            <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-              {cancelErr}
-            </div>
-          )}
-          {mineErr && (
-            <div role="alert" className="mb-3 rounded-[var(--radius)] border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-              Não conseguimos carregar seus agendamentos agora. Feche e abra de novo em instantes.
-            </div>
-          )}
-          {mineErr && waiting.length === 0 && filtered.length === 0 ? null : tab === "waitlist" ? (
-            waiting.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                Você não está em nenhuma lista de espera.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {waiting.map((w) => (
-                  <div key={w.id} className="rounded-[var(--radius)] border border-border p-4">
-                    <div className="flex justify-between items-start">
-                      <p className="font-medium first-letter:uppercase">{formatDateLong(w.preferred_date + "T12:00:00")}</p>
-                      <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
-                        Aguardando
-                      </span>
+        )}
+        {mineErr && waiting.length === 0 && filtered.length === 0 ? null : tab === "waitlist" ? (
+          waiting.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Você não está em nenhuma lista de espera.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {waiting.map((w) => (
+                <div key={w.id} className="rounded-[var(--radius)] border border-border p-4">
+                  <div className="flex justify-between items-start">
+                    <p className="font-medium first-letter:uppercase">{formatDateLong(w.preferred_date + "T12:00:00")}</p>
+                    <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
+                      Aguardando
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{w.member_name ?? "Qualquer profissional"}</p>
+                  {w.services.length > 0 && <p className="text-sm mt-1">{w.services.join(", ")}</p>}
+                  {vagasEspera[w.id] && (
+                    <div role="status" className="mt-3 rounded-[var(--radius)] border border-emerald-600/30 bg-emerald-600/10 p-3">
+                      <p className="text-sm font-semibold text-emerald-800">Abriu horário nesse dia!</p>
+                      <p className="text-xs text-emerald-800/80 mt-0.5">
+                        {vagasEspera[w.id].slice(0, 4).map(formatHora).join(" · ")}
+                        {vagasEspera[w.id].length > 4 ? ` e mais ${vagasEspera[w.id].length - 4}` : ""}
+                      </p>
+                      <Button size="sm" className="mt-2.5 w-full" onClick={() => onAgendarVaga(w)}>
+                        Agendar agora
+                      </Button>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{w.member_name ?? "Qualquer profissional"}</p>
-                    {w.services.length > 0 && <p className="text-sm mt-1">{w.services.join(", ")}</p>}
+                  )}
+                  <button
+                    onClick={() => onCancelWaitlist(w.id)}
+                    disabled={cancelingWaitlistId === w.id}
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 transition"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {cancelingWaitlistId === w.id ? "Saindo…" : "Sair da lista de espera"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        ) : filtered.length === 0 ? (
+          <div className="py-8 text-center space-y-1.5">
+            <p className="text-sm text-muted-foreground">
+              {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
+            </p>
+            {/* Por segurança a lista é deste aparelho (não do telefone): quem
+                agendou em outro celular, ou antes dessa mudança, precisa saber
+                que o horário não sumiu. */}
+            {dicaAparelho && (
+              <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
+                Aqui aparecem os horários marcados neste aparelho. Agendou em outro
+                celular? Fale com o salão para conferir.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(tab === "history" ? filtered.slice(0, qtdHistorico) : filtered).map((a) => {
+              const cancellable =
+                (a.status === "pending" || a.status === "confirmed") &&
+                new Date(a.starts_at).getTime() > agora;
+              return (
+                <div key={a.id} className="rounded-[var(--radius)] border border-border p-4">
+                  <div className="flex justify-between items-start">
+                    <p className="font-medium first-letter:uppercase">{formatDateLong(a.starts_at)}</p>
+                    <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
+                      {statusLabel(a)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {new Date(a.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                    {" · "}{a.member_name}
+                  </p>
+                  <p className="text-sm mt-1">{a.services.join(", ")}</p>
+                  <p className="text-sm font-semibold text-primary mt-1">{formatBRL(Number(a.total_price))}</p>
+                  {cancellable && (
                     <button
-                      onClick={() => onCancelWaitlist(w.id)}
-                      disabled={cancelingWaitlistId === w.id}
+                      onClick={() => onCancelAppt(a)}
+                      disabled={cancelingId === a.id}
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 transition"
                     >
                       <X className="h-3.5 w-3.5" />
-                      {cancelingWaitlistId === w.id ? "Saindo…" : "Sair da lista de espera"}
+                      {cancelingId === a.id ? "Cancelando…" : "Cancelar agendamento"}
                     </button>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : filtered.length === 0 ? (
-            <div className="py-8 text-center space-y-1.5">
-              <p className="text-sm text-muted-foreground">
-                {tab === "next" ? "Nenhum agendamento futuro por aqui." : "Ainda não há histórico por aqui."}
-              </p>
-              {/* Por segurança a lista é deste aparelho (não do telefone): quem
-                  agendou em outro celular, ou antes dessa mudança, precisa saber
-                  que o horário não sumiu. */}
-              {!userId && (
-                <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
-                  Aqui aparecem os horários marcados neste aparelho. Agendou em outro
-                  celular? Fale com o salão para conferir.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filtered.map((a) => {
-                const cancellable =
-                  (a.status === "pending" || a.status === "confirmed") &&
-                  new Date(a.starts_at).getTime() > Date.now();
-                return (
-                  <div key={a.id} className="rounded-[var(--radius)] border border-border p-4">
-                    <div className="flex justify-between items-start">
-                      <p className="font-medium first-letter:uppercase">{formatDateLong(a.starts_at)}</p>
-                      <span className="text-xs rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">
-                        {statusLabel(a)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {new Date(a.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
-                      {" · "}{a.member_name}
-                    </p>
-                    <p className="text-sm mt-1">{a.services.join(", ")}</p>
-                    <p className="text-sm font-semibold text-primary mt-1">{formatBRL(Number(a.total_price))}</p>
-                    {cancellable && (
-                      <button
-                        onClick={() => cancelAppt(a)}
-                        disabled={cancelingId === a.id}
-                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 transition"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        {cancelingId === a.id ? "Cancelando…" : "Cancelar agendamento"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-      </MotionModal>
-    );
-  }
+                  )}
+                </div>
+              );
+            })}
+            {tab === "history" && filtered.length > qtdHistorico && (
+              <button
+                type="button"
+                onClick={() => setQtdHistorico((n) => n + HISTORICO_PAGINA)}
+                className="w-full rounded-[var(--radius)] py-3 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                Ver mais ({filtered.length - qtdHistorico} {filtered.length - qtdHistorico === 1 ? "atendimento" : "atendimentos"})
+              </button>
+            )}
+          </div>
+        )}
+      </Card>
+    </MotionModal>
+  );
 }
 
 function GalleryModal({
