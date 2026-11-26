@@ -9,6 +9,7 @@ import { formatBRL, formatDate, cn } from "@/lib/utils";
 import {
   ArrowCounterClockwise,
   ArrowSquareOut,
+  CaretDown,
   Check,
   ClockAfternoon,
   WhatsappLogo,
@@ -193,6 +194,22 @@ export function RecuperarManager({
   const [inactiveDays, setInactiveDays] = useState(45);
   const [data, setData] = useState<WinbackData>(initialData);
   const [loading, setLoading] = useState(false);
+  // No celular o período fica num botão ao lado da busca, como no Estoque.
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const periodRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!periodOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!periodRef.current?.contains(e.target as Node)) setPeriodOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPeriodOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [periodOpen]);
 
   // Re-busca quando o período muda (pula a 1ª render — initialData já usa 60/45).
   const didMount = useRef(false);
@@ -413,8 +430,8 @@ export function RecuperarManager({
       )}
 
       {/* Busca + período */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <label htmlFor="busca-recuperar" className="sr-only">Buscar cliente por nome</label>
           <MagnifyingGlass aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
@@ -426,17 +443,62 @@ export function RecuperarManager({
             className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
           />
         </div>
+        <div ref={periodRef} className="relative shrink-0 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setPeriodOpen((o) => !o)}
+            aria-expanded={periodOpen}
+            aria-controls="periodo-recuperar"
+            aria-label={`${tab === "inactive" ? "Inativo há mais de" : "Últimos"} ${tab === "inactive" ? inactiveDays : windowDays} dias. Trocar período`}
+            className="inline-flex h-10 items-center gap-2 rounded-[var(--radius)] border border-border px-3 text-sm font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <ClockCounterClockwise aria-hidden className="h-4 w-4 text-muted-foreground" />
+            {tab === "inactive" ? `+${inactiveDays}` : windowDays} dias
+            <CaretDown aria-hidden className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", periodOpen && "rotate-180")} />
+          </button>
+          {periodOpen && (
+            <div
+              id="periodo-recuperar"
+              role="group"
+              aria-label={tab === "inactive" ? "Inativo há mais de quantos dias" : "Janela de quantos dias"}
+              className="absolute right-0 top-full z-30 mt-2 w-52 rounded-[var(--radius)] border border-border bg-card p-2 shadow-lg"
+            >
+              <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {tab === "inactive" ? "Inativo há mais de" : "Últimos"}
+              </p>
+              {(tab === "inactive" ? INACTIVE_OPTIONS : WINDOW_OPTIONS).map((d) => {
+                const on = (tab === "inactive" ? inactiveDays : windowDays) === d;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      if (tab === "inactive") setInactiveDays(d); else setWindowDays(d);
+                      setPeriodOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-[calc(var(--radius)-2px)] px-2.5 py-2 text-left text-sm transition hover:bg-muted",
+                      on && "font-medium text-primary",
+                    )}
+                  >
+                    {d} dias
+                    {on && <Check aria-hidden className="h-4 w-4" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {/* Quatro opções curtas: pílulas no mesmo padrão do cupom logo
             acima, em vez do select nativo que o sistema desenha do seu
             jeito (lista azul, fora do tema). */}
         <div
           role="group"
           aria-label={tab === "inactive" ? "Inativo há mais de quantos dias" : "Janela de quantos dias"}
-          className="flex items-center gap-2 flex-wrap shrink-0"
+          className="hidden sm:flex items-center gap-2 shrink-0"
         >
-          {/* No celular o rótulo ganha linha própria: ao lado dele a quarta
-              opção caía sozinha numa segunda linha. */}
-          <span className="w-full text-xs font-medium text-muted-foreground sm:w-auto">
+          <span className="text-xs font-medium text-muted-foreground">
             {tab === "inactive" ? "Inativo há mais de:" : "Últimos:"}
           </span>
           {(tab === "inactive" ? INACTIVE_OPTIONS : WINDOW_OPTIONS).map((d) => {
