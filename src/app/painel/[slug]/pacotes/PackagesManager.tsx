@@ -181,6 +181,10 @@ function dormantReminderUrl(p: Sold): string | null {
 }
 
 /* ───────────────────────── Vendidos ───────────────────────── */
+/** No desktop cada pacote vira uma linha; cabeçalho e linhas usam a mesma
+ *  grade. Até lá continuam cards, que cabem melhor numa tela estreita. */
+const SOLD_COLS = "lg:grid lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_8.5rem_6rem_6.5rem] lg:items-center lg:gap-6";
+
 function SoldList({
   sold,
   canManage,
@@ -256,30 +260,38 @@ function SoldList({
                 {expiringSoon.length === 1
                   ? `1 pacote vence nos próximos ${PACKAGE_EXPIRY_WINDOW_DAYS} dias.`
                   : `${expiringSoon.length} pacotes vencem nos próximos ${PACKAGE_EXPIRY_WINDOW_DAYS} dias.`}{" "}
-                Dá uma olhada nos cards abaixo.
+                Dá uma olhada na lista abaixo.
               </p>
             </div>
           )}
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div aria-hidden className={`hidden px-4 text-xs font-medium text-muted-foreground ${SOLD_COLS}`}>
+        <span>Cliente</span>
+        <span>Sessões</span>
+        <span>Validade</span>
+        <span className="text-right">Valor</span>
+        <span className="text-right">Status</span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:gap-2">
       {sold.map((p) => {
         const st = effStatus(p);
         const meta = STATUS_META[st];
         const dleft = daysLeft(p.expires_at);
         const active = st === "active";
         return (
-          <Card key={p.id} className="p-4">
-            <div className="flex items-start justify-between gap-2">
+          <Card key={p.id} className={`p-4 ${SOLD_COLS}`}>
+            <div className="flex items-start justify-between gap-2 lg:contents">
               <div className="min-w-0">
                 <p className="font-medium truncate">{p.clients?.full_name ?? "Cliente"}</p>
-                <p className="text-xs text-muted-foreground">{p.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{p.name}</p>
               </div>
-              <span className={`text-xs rounded-full px-2.5 py-1 font-medium shrink-0 ${meta.cls}`}>{meta.label}</span>
+              <span className={`text-xs rounded-full px-2.5 py-1 font-medium shrink-0 lg:order-last lg:justify-self-end ${meta.cls}`}>{meta.label}</span>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-2 lg:mt-0 min-w-0">
               {p.client_package_items.map((it) => {
                 const remaining = it.total - it.used;
                 return (
@@ -306,14 +318,14 @@ function SoldList({
               })}
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <CalendarDots className="h-3.5 w-3.5" />
+            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground lg:contents">
+              <span className={`flex items-center gap-1 ${active && dleft >= 0 && isExpiringSoon(p.expires_at) ? "text-amber-700 font-medium" : ""}`}>
+                <CalendarDots className="h-3.5 w-3.5 shrink-0" />
                 {active
                   ? dleft >= 0 ? `Vence em ${dleft} dia${dleft === 1 ? "" : "s"}` : "Vencido"
-                  : `Validade: ${new Date(p.expires_at).toLocaleDateString("pt-BR")}`}
+                  : <><span className="lg:hidden">Validade: </span>{new Date(p.expires_at).toLocaleDateString("pt-BR")}</>}
               </span>
-              <span className="font-medium text-foreground">{formatBRL(Number(p.price))}</span>
+              <span className="font-medium text-foreground tabular-nums lg:text-right lg:text-sm">{formatBRL(Number(p.price))}</span>
             </div>
           </Card>
         );
