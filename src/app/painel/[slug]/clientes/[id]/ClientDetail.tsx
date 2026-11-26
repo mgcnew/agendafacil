@@ -50,6 +50,7 @@ type HistoryItem = {
   status: string;
   total_price: number;
   salon_members: { display_name: string | null } | null;
+  appointment_services?: { name: string }[] | null;
 };
 type ClientStats = {
   visits: number;
@@ -62,6 +63,9 @@ type ClientStats = {
 };
 type Birthday = { daysUntil: number; turningAge: number } | null;
 type Reactivation = { daysSince: number; overdueBy: number } | null;
+
+/** Colunas do histórico a partir do tablet; cabeçalho e linhas na mesma grade. */
+const HIST_COLS = "sm:grid sm:grid-cols-[6rem_minmax(0,1fr)_10rem_7.5rem_6.5rem] sm:items-center sm:gap-4";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Aguardando", confirmed: "Confirmado", in_progress: "Em andamento",
@@ -359,7 +363,7 @@ function DadosTab({
   }
 
   return (
-    <Card className="p-6 space-y-5 max-w-2xl">
+    <Card className="p-6 space-y-5">
       {/* Foto do cliente (registro) — aparece na Agenda junto do agendamento */}
       <div className="flex items-center gap-4">
         {photoUrl ? (
@@ -420,7 +424,7 @@ function DadosTab({
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="n">Nome</Label>
           <Input id="n" value={name} onChange={(e) => setName(e.target.value)} disabled={!canManage} />
@@ -453,7 +457,7 @@ function DadosTab({
           <Label htmlFor="r">Como conheceu / indicação</Label>
           <Input id="r" value={referral} onChange={(e) => setReferral(e.target.value)} disabled={!canManage} placeholder="Instagram, indicação de..." />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
+        <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
           <Label htmlFor="o">Observações</Label>
           <Textarea id="o" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!canManage} placeholder="Preferências, particularidades..." />
         </div>
@@ -539,38 +543,69 @@ function AnamneseTab({
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
-      {/* Condições de saúde */}
-      <Card className="p-6">
-        <h3 className="font-display font-semibold flex items-center gap-2"><Heartbeat aria-hidden className="h-5 w-5 text-primary" /> Condições de saúde</h3>
-        <p className="text-xs text-muted-foreground mt-1">Marque o que se aplica. Itens críticos geram alerta automático.</p>
-        <div className="grid sm:grid-cols-2 gap-2 mt-4">
-          {cfg.conditions.map((c) => {
-            const on = form[c.key as ConditionKey];
-            return (
-              <button
-                key={c.key}
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                disabled={!canManage}
-                onClick={() => setField(c.key as ConditionKey, !on)}
-                className={`flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-70 ${
-                  on ? "border-amber-300 bg-amber-50 text-amber-900" : "border-border hover:border-foreground/20"
-                }`}
-              >
-                <span aria-hidden className={`grid place-items-center h-5 w-5 rounded border shrink-0 ${on ? "bg-amber-500 border-amber-500 text-white" : "border-border"}`}>
-                  {on && <Check className="h-3.5 w-3.5" />}
-                </span>
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
-      </Card>
+    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
+      <div className="contents lg:flex lg:flex-col lg:gap-5">
+        {/* Condições de saúde */}
+        <Card className="p-6 order-1">
+          <h3 className="font-display font-semibold flex items-center gap-2"><Heartbeat aria-hidden className="h-5 w-5 text-primary" /> Condições de saúde</h3>
+          <p className="text-xs text-muted-foreground mt-1">Marque o que se aplica. Itens críticos geram alerta automático.</p>
+          <div className="grid sm:grid-cols-2 gap-2 mt-4">
+            {cfg.conditions.map((c) => {
+              const on = form[c.key as ConditionKey];
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={!canManage}
+                  onClick={() => setField(c.key as ConditionKey, !on)}
+                  className={`flex items-center gap-2.5 rounded-[var(--radius)] border p-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-70 ${
+                    on ? "border-amber-300 bg-amber-50 text-amber-900" : "border-border hover:border-foreground/20"
+                  }`}
+                >
+                  <span aria-hidden className={`grid place-items-center h-5 w-5 rounded border shrink-0 ${on ? "bg-amber-500 border-amber-500 text-white" : "border-border"}`}>
+                    {on && <Check className="h-3.5 w-3.5" />}
+                  </span>
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
 
-      {/* Textos */}
-      <Card className="p-6 space-y-4">
+        {/* Consentimento */}
+        <Card className="p-6 order-3">
+          <h3 className="font-display font-semibold flex items-center gap-2"><ShieldCheck aria-hidden className="h-5 w-5 text-primary" /> Termo de consentimento</h3>
+          <label className="flex items-start gap-3 mt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.consent_given}
+              onChange={(e) => setField("consent_given", e.target.checked)}
+              disabled={!canManage}
+              className="mt-1 h-4 w-4 accent-[var(--primary)]"
+            />
+            <span className="text-sm text-muted-foreground">
+              A cliente declara que as informações acima são verdadeiras e autoriza o tratamento
+              desses dados de saúde para fins do atendimento, conforme a LGPD.
+            </span>
+          </label>
+          {form.consent_given && (
+            <div className="mt-4 space-y-1.5">
+              <Label htmlFor="cn">Declarado por (nome)</Label>
+              <Input id="cn" value={form.consent_name} onChange={(e) => setField("consent_name", e.target.value)} disabled={!canManage} placeholder={client.full_name} />
+            </div>
+          )}
+          {anamnesis?.consent_at && (
+            <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+              <Calendar aria-hidden className="h-3 w-3" /> Consentimento registrado em {formatDate(anamnesis.consent_at)}
+            </p>
+          )}
+        </Card>
+      </div>
+      {/* Textos — no desktop ficam sozinhos na coluna da direita; condições
+          e termo empilham à esquerda. No celular, o termo vem por último. */}
+      <Card className="p-6 space-y-4 order-2">
         {cfg.textFields.map(({ key, label, placeholder }) => (
           <div key={key} className="space-y-1.5">
             <Label htmlFor={key}>{label}</Label>
@@ -586,37 +621,9 @@ function AnamneseTab({
         ))}
       </Card>
 
-      {/* Consentimento */}
-      <Card className="p-6">
-        <h3 className="font-display font-semibold flex items-center gap-2"><ShieldCheck aria-hidden className="h-5 w-5 text-primary" /> Termo de consentimento</h3>
-        <label className="flex items-start gap-3 mt-4 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.consent_given}
-            onChange={(e) => setField("consent_given", e.target.checked)}
-            disabled={!canManage}
-            className="mt-1 h-4 w-4 accent-[var(--primary)]"
-          />
-          <span className="text-sm text-muted-foreground">
-            A cliente declara que as informações acima são verdadeiras e autoriza o tratamento
-            desses dados de saúde para fins do atendimento, conforme a LGPD.
-          </span>
-        </label>
-        {form.consent_given && (
-          <div className="mt-4 space-y-1.5">
-            <Label htmlFor="cn">Declarado por (nome)</Label>
-            <Input id="cn" value={form.consent_name} onChange={(e) => setField("consent_name", e.target.value)} disabled={!canManage} placeholder={client.full_name} />
-          </div>
-        )}
-        {anamnesis?.consent_at && (
-          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-            <Calendar aria-hidden className="h-3 w-3" /> Consentimento registrado em {formatDate(anamnesis.consent_at)}
-          </p>
-        )}
-      </Card>
 
       {canManage && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 order-4 lg:col-span-2">
           <Button onClick={save} disabled={saving}>
             {saving && <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />}
             {saving ? "Salvando…" : "Salvar anamnese"}
@@ -641,20 +648,34 @@ function HistoricoTab({ history }: { history: HistoryItem[] }) {
     );
   }
   return (
-    <div className="space-y-2 max-w-2xl">
-      {history.map((a) => (
-        <div key={a.id} className="flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4">
-          <div className="text-center shrink-0 w-16">
-            <p className="text-sm font-semibold">{formatDate(a.starts_at)}</p>
-            <p className="text-xs text-muted-foreground">{formatTime(a.starts_at)}</p>
+    <div className="space-y-2">
+      <div aria-hidden className={`hidden px-4 text-xs font-medium text-muted-foreground ${HIST_COLS}`}>
+        <span>Data</span>
+        <span>Serviços</span>
+        <span>Profissional</span>
+        <span>Status</span>
+        <span className="text-right">Valor</span>
+      </div>
+      {history.map((a) => {
+        const servicos = (a.appointment_services ?? []).map((s) => s.name).join(", ");
+        return (
+          <div key={a.id} className={`flex items-center gap-4 rounded-[var(--radius)] border border-border bg-card p-4 ${HIST_COLS}`}>
+            <div className="text-center shrink-0 w-20 sm:w-auto sm:text-left">
+              <p className="text-sm font-semibold tabular-nums">{formatDate(a.starts_at)}</p>
+              <p className="text-xs text-muted-foreground tabular-nums">{formatTime(a.starts_at)}</p>
+            </div>
+            <div className="flex-1 min-w-0 sm:contents">
+              <p className="text-sm truncate sm:order-1">{servicos || "—"}</p>
+              <p className="text-xs text-muted-foreground truncate sm:order-2 sm:text-sm sm:text-foreground">
+                <span className="sm:hidden">{[a.salon_members?.display_name, STATUS_LABEL[a.status] ?? a.status].filter(Boolean).join(" · ")}</span>
+                <span className="hidden sm:inline">{a.salon_members?.display_name ?? "—"}</span>
+              </p>
+              <p className="hidden sm:block sm:order-3 text-sm text-muted-foreground">{STATUS_LABEL[a.status] ?? a.status}</p>
+            </div>
+            <span className="font-semibold text-primary text-sm tabular-nums sm:order-4 sm:text-right">{formatBRL(Number(a.total_price))}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm">{a.salon_members?.display_name ?? "—"}</p>
-            <p className="text-xs text-muted-foreground">{STATUS_LABEL[a.status] ?? a.status}</p>
-          </div>
-          <span className="font-semibold text-primary text-sm">{formatBRL(Number(a.total_price))}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

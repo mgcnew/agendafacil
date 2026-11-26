@@ -32,7 +32,7 @@ export default async function ClientDetailPage({
       supabase.from("client_anamnesis").select("*").eq("client_id", id).maybeSingle(),
       supabase
         .from("appointments")
-        .select("id, starts_at, status, total_price, salon_members(display_name)")
+        .select("id, starts_at, status, total_price, salon_members(display_name), appointment_services(name)")
         .eq("client_id", id)
         .order("starts_at", { ascending: false })
         .limit(50),
