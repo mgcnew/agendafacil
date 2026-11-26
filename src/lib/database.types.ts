@@ -3541,6 +3541,7 @@ export type Database = {
         Args: {
           p_amount: number
           p_member: string
+          p_payment_method?: string
           p_period_end: string
           p_period_start: string
           p_salon: string

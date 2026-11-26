@@ -259,6 +259,9 @@ export default async function FinanceiroPage({
       // erro. A configuração existia e não fazia o que dizia.
       canManage={perms.has("cash.manage")}
       canViewCommissions={canViewCommissions}
+      // O banco só aceita pagamento de quem tem "Lançar pagamento de comissão";
+      // com cash.manage o botão aparecia pra quem levaria erro ao confirmar.
+      canPayCommission={perms.has("commissions.manage")}
       canViewFixed={canViewFixed}
       openSession={openSession}
       transactions={transactions}

@@ -90,6 +90,7 @@ export function FinanceManager({
   chairRentals,
   activePackages,
   canViewCommissions,
+  canPayCommission,
   canViewFixed,
   lastMonthRevenue,
   lastMonthLabel,
@@ -113,6 +114,7 @@ export function FinanceManager({
   chairRentals: ChairRental[];
   activePackages: ActivePackageSummary;
   canViewCommissions: boolean;
+  canPayCommission: boolean;
   canViewFixed: boolean;
   lastMonthRevenue: number;
   lastMonthLabel: string;
@@ -148,6 +150,14 @@ export function FinanceManager({
   const [manualModal, setManualModal] = useState(false);
   const [movementsModal, setMovementsModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  // Caixas mais antigos que os 8 que vêm do servidor, buscados sob demanda.
+  const [olderSessions, setOlderSessions] = useState<Session[]>([]);
+  const [olderNames, setOlderNames] = useState<Record<string, string>>({});
+  const [hasMoreSessions, setHasMoreSessions] = useState(closedSessions.length >= 8);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionsErr, setSessionsErr] = useState(false);
+  const pastSessions = [...closedSessions, ...olderSessions];
+  const sessionNames = { ...operatorNames, ...olderNames };
   const [reverseTx, setReverseTx] = useState<Tx | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // ── Checkout PDV (cliente selecionado) ──
@@ -170,8 +180,11 @@ export function FinanceManager({
     list: { product: ResaleProduct; qty: number }[],
     p: ResaleProduct,
   ): { product: ResaleProduct; qty: number }[] {
+    // Não deixa pôr no carrinho mais do que há na prateleira; o banco também recusa.
+    const stock = Number(p.quantity);
     const idx = list.findIndex((i) => i.product.id === p.id);
-    if (idx !== -1) return list.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i);
+    if (idx !== -1) return list.map((i, j) => j === idx && i.qty < stock ? { ...i, qty: i.qty + 1 } : i);
+    if (stock < 1) return list;
     return [...list, { product: p, qty: 1 }];
   }
   function addProdToCheckout(p: ResaleProduct) { setCheckoutProds((prev) => upsertInList(prev, p)); }
@@ -300,6 +313,43 @@ export function FinanceManager({
     } as never);
     if (error) throw error;
     router.refresh();
+  }
+
+  async function loadOlderSessions() {
+    const last = pastSessions[pastSessions.length - 1];
+    if (!last?.closed_at) return;
+    setLoadingSessions(true);
+    setSessionsErr(false);
+    const PAGE = 20;
+    const { data, error } = await supabase
+      .from("cash_sessions")
+      .select("*")
+      .eq("salon_id", salonId)
+      .not("closed_at", "is", null)
+      .lt("closed_at", last.closed_at)
+      .order("closed_at", { ascending: false })
+      .limit(PAGE);
+    if (error) { setSessionsErr(true); setLoadingSessions(false); return; }
+    const rows = data ?? [];
+    const missing = new Set<string>();
+    for (const r of rows) {
+      for (const id of [r.opened_by, r.closed_by]) if (id && !sessionNames[id]) missing.add(id);
+    }
+    if (missing.size > 0) {
+      const { data: ops } = await supabase
+        .from("salon_members")
+        .select("profile_id, display_name, profiles(full_name)")
+        .eq("salon_id", salonId)
+        .in("profile_id", Array.from(missing));
+      const found: Record<string, string> = {};
+      for (const o of ops ?? []) {
+        if (o.profile_id) found[o.profile_id] = o.display_name ?? (o.profiles as { full_name?: string } | null)?.full_name ?? "—";
+      }
+      setOlderNames((prev) => ({ ...prev, ...found }));
+    }
+    setOlderSessions((prev) => [...prev, ...rows]);
+    setHasMoreSessions(rows.length === PAGE);
+    setLoadingSessions(false);
   }
 
   // ── histórico de diferenças de caixa (base para os narradores de Caixa/Histórico) ──
@@ -582,7 +632,7 @@ export function FinanceManager({
                 <span className="text-right">Contado</span>
                 <span className="text-right">Resultado</span>
               </div>
-              {closedSessions.map((s) => {
+              {pastSessions.map((s) => {
                 const diff = s.difference == null ? null : Number(s.difference);
                 return (
                   <button
@@ -622,6 +672,14 @@ export function FinanceManager({
                   </button>
                 );
               })}
+              {hasMoreSessions && (
+                <div className="pt-2 text-center">
+                  <Button variant="outline" onClick={loadOlderSessions} disabled={loadingSessions}>
+                    {loadingSessions && <CircleNotch className="h-4 w-4 animate-spin" />} Ver caixas mais antigos
+                  </Button>
+                  {sessionsErr && <p role="alert" className="mt-2 text-xs text-red-600">Não foi possível carregar. Tente de novo.</p>}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -831,7 +889,7 @@ export function FinanceManager({
             key="session-detail"
             session={selectedSession}
             salon={salon}
-            operatorNames={operatorNames}
+            operatorNames={sessionNames}
             canReopen={canManage && !openSession && selectedSession.id === closedSessions[0]?.id}
             onReopen={async () => {
               await reopenSession(selectedSession.id);
@@ -852,7 +910,8 @@ export function FinanceManager({
             comm={commModal}
             period={period}
             salon={salon}
-            canManage={canManage}
+            canPay={canPayCommission}
+            cashOpen={!!openSession}
             onClose={() => setCommModal(null)}
             onPaid={() => { setCommModal(null); router.refresh(); }}
           />
@@ -1205,11 +1264,12 @@ function SearchBar({
                   </p>
                   {matchProducts.map((p) => (
                     <button key={p.id} onClick={() => pick(() => onSelectProduct(p))}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 transition text-left">
+                      disabled={Number(p.quantity) < 1}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/60 disabled:opacity-50 disabled:hover:bg-transparent transition text-left">
                       <Stack className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{Number(p.quantity)} em estoque</p>
+                        <p className="text-xs text-muted-foreground">{Number(p.quantity) < 1 ? "Sem estoque" : `${Number(p.quantity)} em estoque`}</p>
                       </div>
                       <span className="text-sm font-semibold text-primary tabular-nums shrink-0">
                         {formatBRL(Number(p.sale_price))}
@@ -1265,7 +1325,9 @@ function CartTable({
               <span className="text-sm font-medium w-5 text-center tabular-nums">{item.qty}</span>
               <button
                 onClick={() => onChangeQty(item.product.id, item.qty + 1)}
-                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted transition"
+                disabled={item.qty >= Number(item.product.quantity)}
+                aria-label="Mais um"
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted disabled:opacity-30 transition"
               >
                 <Plus className="h-3 w-3" />
               </button>
@@ -1418,7 +1480,9 @@ function CheckoutScreen({
               <span className="text-sm font-medium w-5 text-center tabular-nums">{item.qty}</span>
               <button
                 onClick={() => onChangeQty(item.product.id, item.qty + 1)}
-                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted transition"
+                disabled={item.qty >= Number(item.product.quantity)}
+                aria-label="Mais um"
+                className="h-6 w-6 grid place-items-center rounded border border-border hover:bg-muted disabled:opacity-30 transition"
               >
                 <Plus className="h-3 w-3" />
               </button>
@@ -1535,9 +1599,10 @@ function LojaModal({
             <div className="grid grid-cols-2 gap-2">
               {filtered.map((p) => (
                 <button key={p.id} onClick={() => onPick(p)}
-                  className="text-left rounded-[var(--radius)] border border-border p-3 hover:border-primary hover:bg-primary/5 transition">
+                  disabled={Number(p.quantity) < 1}
+                  className="text-left rounded-[var(--radius)] border border-border p-3 hover:border-primary hover:bg-primary/5 disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-transparent transition">
                   <p className="text-sm font-medium truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatBRL(Number(p.sale_price))} · {Number(p.quantity)} est.</p>
+                  <p className="text-xs text-muted-foreground">{formatBRL(Number(p.sale_price))} · {Number(p.quantity) < 1 ? "sem estoque" : `${Number(p.quantity)} est.`}</p>
                 </button>
               ))}
             </div>
@@ -1786,8 +1851,9 @@ function SellProductModal({
             <button onClick={() => setQty((q) => Math.max(1, q - 1))}
               className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted"><Minus className="h-4 w-4" /></button>
             <span className="font-display font-bold w-6 text-center tabular-nums">{qty}</span>
-            <button onClick={() => setQty((q) => q + 1)}
-              className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted"><Plus className="h-4 w-4" /></button>
+            <button onClick={() => setQty((q) => Math.min(Number(product.quantity), q + 1))}
+              disabled={qty >= Number(product.quantity)} aria-label="Mais um"
+              className="grid place-items-center h-8 w-8 rounded-full border border-border hover:bg-muted disabled:opacity-30"><Plus className="h-4 w-4" /></button>
           </div>
         </div>
       }
@@ -1930,7 +1996,8 @@ function CommissionModal({
   comm,
   period,
   salon,
-  canManage,
+  canPay,
+  cashOpen,
   onClose,
   onPaid,
 }: {
@@ -1938,7 +2005,8 @@ function CommissionModal({
   comm: Comm;
   period: Period;
   salon: SalonInfo;
-  canManage: boolean;
+  canPay: boolean;
+  cashOpen: boolean;
   onClose: () => void;
   onPaid: () => void;
 }) {
@@ -1952,6 +2020,13 @@ function CommissionModal({
 
   const outstanding = Math.max(0, comm.earned - comm.paid);
   const settled = outstanding < 0.01;
+  const [amount, setAmount] = useState(outstanding.toFixed(2).replace(".", ","));
+  const [method, setMethod] = useState<"dinheiro" | "pix">("dinheiro");
+  // "1.234,56" e "123.45" valem; com vírgula, ponto é milhar.
+  const normalized = amount.includes(",") ? amount.replace(/\./g, "").replace(",", ".") : amount;
+  const payAmount = Math.round((parseFloat(normalized) || 0) * 100) / 100;
+  const amountError =
+    payAmount <= 0 ? "Informe o valor." : payAmount > outstanding + 0.005 ? `O pendente é ${formatBRL(outstanding)}.` : null;
 
   useEffect(() => {
     (async () => {
@@ -2021,17 +2096,19 @@ function CommissionModal({
   });
 
   async function confirmPay() {
+    if (amountError) return;
     setPaying(true);
     setErr(null);
     const { error } = await supabase.rpc("pay_commission", {
       p_salon: salonId,
       p_member: comm.member_id,
-      p_amount: outstanding,
+      p_amount: payAmount,
       p_period_start: period.start,
       p_period_end: period.end,
+      p_payment_method: method,
     });
     setPaying(false);
-    if (error) { setErr("Não foi possível registrar o pagamento. Tente novamente."); return; }
+    if (error) { setErr(mensagemRpc(error, "Não foi possível registrar o pagamento. Tente novamente.")); return; }
     onPaid();
   }
 
@@ -2111,10 +2188,53 @@ function CommissionModal({
 
         {/* Ações */}
         <div className="p-5 pt-3 border-t border-border space-y-2">
-          {canManage && !settled && (
-            <Button onClick={confirmPay} disabled={paying} className="w-full">
-              {paying ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar pagamento de {formatBRL(outstanding)}
-            </Button>
+          {canPay && !settled && (
+            <div className="space-y-3 pb-1">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="comm-amount">Valor a pagar</Label>
+                  <Input
+                    id="comm-amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    inputMode="decimal"
+                    aria-invalid={!!amountError}
+                    aria-describedby="comm-amount-hint"
+                    className="tabular-nums"
+                  />
+                </div>
+                <div role="group" aria-label="Forma de pagamento" className="flex gap-1.5">
+                  {(["dinheiro", "pix"] as const).map((m) => {
+                    const Meta = PAY_META[m];
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMethod(m)}
+                        aria-pressed={method === m}
+                        className={`flex h-10 items-center gap-1.5 rounded-[var(--radius)] border px-3 text-sm font-medium transition ${
+                          method === m ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"
+                        }`}
+                      >
+                        <Meta.icon className="h-4 w-4" /> {Meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p id="comm-amount-hint" className={`text-[11px] ${amountError && amount ? "text-red-600" : "text-muted-foreground"}`}>
+                {amountError && amount
+                  ? amountError
+                  : !cashOpen
+                    ? "Sem caixa aberto: o pagamento fica só no histórico da comissão."
+                    : method === "dinheiro"
+                      ? "Sai da gaveta do caixa aberto. Pode pagar só uma parte agora."
+                      : "Fica registrado no caixa sem mexer no dinheiro da gaveta."}
+              </p>
+              <Button onClick={confirmPay} disabled={paying || !!amountError} className="w-full">
+                {paying ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar pagamento de {formatBRL(payAmount)}
+              </Button>
+            </div>
           )}
           {settled && (
             <p className="text-center text-xs font-medium text-emerald-600 flex items-center justify-center gap-1">
