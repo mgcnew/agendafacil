@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { formatBRL, cn } from "@/lib/utils";
@@ -12,7 +12,9 @@ import {
   CalendarX,
   CaretLeft,
   CaretRight,
+  Check,
   CircleNotch,
+  FunnelSimple,
   ClockCounterClockwise,
   MagnifyingGlass,
   Minus,
@@ -129,6 +131,24 @@ export function InventoryManager({
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "resale" | "supply">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "low" | "dormant">("all");
+  // Celular: os dois grupos de filtro ocupavam duas linhas sobre a lista;
+  // ali viram um botão "Filtros" com painel. No desktop seguem à vista.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const activeFilters = (typeFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!filtersRef.current?.contains(e.target as Node)) setFiltersOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFiltersOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [filtersOpen]);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
 
@@ -395,7 +415,65 @@ export function InventoryManager({
               className="pl-9"
             />
           </div>
-          <div role="group" aria-label="Filtrar por tipo" className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+          <div ref={filtersRef} className="relative sm:hidden">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+              aria-controls="filtros-estoque"
+              className={cn(
+                "inline-flex h-11 items-center gap-2 rounded-[var(--radius)] border px-3.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                activeFilters > 0 ? "border-primary text-primary" : "border-border hover:bg-muted",
+              )}
+            >
+              <FunnelSimple aria-hidden className="h-4 w-4" /> Filtros
+              {activeFilters > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground tabular-nums">
+                  {activeFilters}
+                </span>
+              )}
+            </button>
+            {filtersOpen && (
+              <div
+                id="filtros-estoque"
+                className="absolute right-0 top-full z-30 mt-2 w-60 rounded-[var(--radius)] border border-border bg-card p-2 shadow-lg"
+              >
+                {([
+                  ["Tipo", typeFilter, setTypeFilter, [["all", "Todos"], ["supply", "Insumos"], ["resale", "Revenda"]]],
+                  ["Situação", statusFilter, setStatusFilter, [["all", "Todo status"], ["low", "Estoque baixo"], ["dormant", "Parados"]]],
+                ] as const).map(([titulo, atual, set, opcoes], gi) => (
+                  <div key={titulo} role="group" aria-label={titulo} className={cn(gi > 0 && "mt-1 border-t border-border pt-1")}>
+                    <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</p>
+                    {opcoes.map(([val, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        aria-pressed={atual === val}
+                        onClick={() => (set as (v: string) => void)(val)}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-[calc(var(--radius)-2px)] px-2.5 py-2 text-left text-sm transition hover:bg-muted",
+                          atual === val && "font-medium text-primary",
+                        )}
+                      >
+                        {label}
+                        {atual === val && <Check aria-hidden className="h-4 w-4" />}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                {activeFilters > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setTypeFilter("all"); setStatusFilter("all"); setFiltersOpen(false); }}
+                    className="mt-1 w-full rounded-[calc(var(--radius)-2px)] border-t border-border px-2.5 pb-1.5 pt-2.5 text-left text-xs font-semibold text-primary hover:underline"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div role="group" aria-label="Filtrar por tipo" className="hidden sm:flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
             {([
               ["all", "Todos"],
               ["supply", "Insumos"],
@@ -414,7 +492,7 @@ export function InventoryManager({
               </button>
             ))}
           </div>
-          <div role="group" aria-label="Filtrar por situação" className="flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
+          <div role="group" aria-label="Filtrar por situação" className="hidden sm:flex rounded-[var(--radius)] border border-border p-0.5 text-sm">
             {([
               ["all", "Todo status"],
               ["low", "Estoque baixo"],
