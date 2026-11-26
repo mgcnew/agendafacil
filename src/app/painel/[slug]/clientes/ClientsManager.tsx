@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label } from "@/components/ui";
 import { waLink, formatDate, cn } from "@/lib/utils";
 import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
-import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
+import { formatBrPhone, maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { CLIENT_LIST_COLUMNS } from "@/lib/clients";
 import type { Tables } from "@/lib/database.types";
 import {
@@ -34,6 +34,15 @@ function daysSince(iso: string | undefined): number | null {
   if (!iso) return null;
   return Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
 }
+
+function visitaTexto(days: number | null): string {
+  if (days === null) return "Nunca veio";
+  if (days === 0) return "Hoje";
+  return `Há ${days} dia${days === 1 ? "" : "s"}`;
+}
+
+/** Colunas da lista no desktop; o cabeçalho usa a mesma grade para alinhar. */
+const COLUNAS = "sm:grid sm:grid-cols-[minmax(0,1fr)_10rem_8rem] sm:gap-4";
 
 export function ClientsManager({
   slug, salonId, initial, lastVisit, vipIds = [], canManage,
@@ -270,85 +279,104 @@ export function ClientsManager({
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Cabeçalho só no desktop: no celular as colunas viram uma linha
+              de detalhes embaixo do nome. */}
+          <div aria-hidden className="hidden sm:flex items-center gap-1 pr-2 text-xs font-medium text-muted-foreground">
+            <div className={cn("flex-1 min-w-0 px-4", COLUNAS)}>
+              <span className="pl-14">Cliente</span>
+              <span>Telefone</span>
+              <span>Última visita</span>
+            </div>
+            <div className={cn("shrink-0", canManage ? "w-[4.75rem]" : "w-9")} />
+          </div>
           {paginated.map((c) => {
             const days = daysSince(lastVisit[c.id]);
+            const telefone = formatBrPhone(c.phone);
             return (
             <div key={c.id} className="flex items-center gap-1 rounded-[var(--radius)] border border-border bg-card pr-2 hover:border-foreground/20 transition">
-              <Link href={`/painel/${slug}/clientes/${c.id}`} className="flex items-center gap-4 p-4 flex-1 min-w-0">
-                {/* Foto da ficha quando existe — a lista desenhava só a
-                    inicial e a foto enviada nunca aparecia aqui. */}
-                {c.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.photo_url}
-                    alt=""
-                    loading="lazy"
-                    className="h-10 w-10 rounded-full object-cover shrink-0 bg-secondary"
-                  />
-                ) : (
-                  <span aria-hidden className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
-                    {/* Primeira letra de verdade: "[TESTE] Ana" virava "[". */}
-                    {(c.full_name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase()}
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate flex items-center gap-2">
-                    {c.full_name}
-                    {vipSet.has(c.id) && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase">
-                        <Star aria-hidden className="h-3 w-3" /> VIP
-                      </span>
-                    )}
-                    {c.alert_summary && (
-                      <span
-                        title={c.alert_summary}
-                        className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium"
-                      >
-                        <Warning aria-hidden className="h-3 w-3" /> alerta
-                        {/* "alerta" sozinho não diz de quê — e o texto já está
-                            carregado aqui, não custa nada dizer. */}
-                        <span className="sr-only">: {c.alert_summary}</span>
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                    {c.phone && <span className="flex items-center gap-1"><Phone aria-hidden className="h-3 w-3" /> {c.phone}</span>}
-                    <span>
-                      {days === null
-                        ? "Nunca veio"
-                        : days === 0
-                          ? "Veio hoje"
-                          : `Última visita há ${days} dia${days === 1 ? "" : "s"}`}
+              <Link href={`/painel/${slug}/clientes/${c.id}`} className={cn("flex items-center gap-4 p-4 flex-1 min-w-0 sm:items-center", COLUNAS)}>
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  {/* Foto da ficha quando existe — a lista desenhava só a
+                      inicial e a foto enviada nunca aparecia aqui. */}
+                  {c.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.photo_url}
+                      alt=""
+                      loading="lazy"
+                      className="h-10 w-10 rounded-full object-cover shrink-0 bg-secondary"
+                    />
+                  ) : (
+                    <span aria-hidden className="grid place-items-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground font-semibold shrink-0">
+                      {/* Primeira letra de verdade: "[TESTE] Ana" virava "[". */}
+                      {(c.full_name.match(/[\p{L}\p{N}]/u)?.[0] ?? "?").toUpperCase()}
                     </span>
-                  </p>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-medium flex items-center gap-2 min-w-0">
+                      <span className="truncate">{c.full_name}</span>
+                      {vipSet.has(c.id) && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400/15 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase">
+                          <Star aria-hidden className="h-3 w-3" /> VIP
+                        </span>
+                      )}
+                      {c.alert_summary && (
+                        <span
+                          title={c.alert_summary}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-medium"
+                        >
+                          <Warning aria-hidden className="h-3 w-3" /> alerta
+                          {/* "alerta" sozinho não diz de quê — e o texto já está
+                              carregado aqui, não custa nada dizer. */}
+                          <span className="sr-only">: {c.alert_summary}</span>
+                        </span>
+                      )}
+                    </p>
+                    <p className="sm:hidden text-xs text-muted-foreground flex items-center gap-x-2 flex-wrap">
+                      {telefone && <span className="flex items-center gap-1 tabular-nums"><Phone aria-hidden className="h-3 w-3" /> {telefone}</span>}
+                      <span>{days === null ? "Nunca veio" : `Última visita: ${visitaTexto(days).toLowerCase()}`}</span>
+                    </p>
+                  </div>
                 </div>
-                <CaretRight aria-hidden className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="hidden sm:block text-sm tabular-nums truncate">
+                  {telefone ?? <span className="text-muted-foreground">—</span>}
+                </span>
+                <span className={cn("hidden sm:block text-sm", days === null && "text-muted-foreground")}>
+                  {visitaTexto(days)}
+                </span>
+                <CaretRight aria-hidden className="h-4 w-4 text-muted-foreground shrink-0 sm:hidden" />
               </Link>
-              {c.phone && (
-                <a
-                  href={waLink(c.phone, greeting(c))}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Chamar ${c.full_name} no WhatsApp`}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-emerald-600 transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                >
-                  <ChatCircle aria-hidden className="h-4 w-4" />
-                </a>
-              )}
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => remove(c)}
-                  disabled={removendo !== null}
-                  aria-label={`Remover ${c.full_name}`}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
-                >
-                  {removendo === c.id
-                    ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
-                    : <Trash aria-hidden className="h-4 w-4" />}
-                </button>
-              )}
+              {/* Largura fixa nas ações: sem telefone o botão de remover não
+                  pode andar, senão a coluna fica torta. */}
+              <div className={cn("flex shrink-0 items-center justify-end gap-1", canManage ? "w-[4.75rem]" : "w-9")}>
+                {c.phone ? (
+                  <a
+                    href={waLink(c.phone, greeting(c))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Chamar ${c.full_name} no WhatsApp`}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-emerald-600 transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <ChatCircle aria-hidden className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <span aria-hidden className="h-9 w-9 shrink-0" />
+                )}
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => remove(c)}
+                    disabled={removendo !== null}
+                    aria-label={`Remover ${c.full_name}`}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius)] text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+                  >
+                    {removendo === c.id
+                      ? <CircleNotch aria-hidden className="h-4 w-4 animate-spin" />
+                      : <Trash aria-hidden className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
             </div>
             );
           })}

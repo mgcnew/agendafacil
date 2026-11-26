@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Input, Label, Select } from "@/components/ui";
-import { formatBRL } from "@/lib/utils";
+import { formatBRL, cn } from "@/lib/utils";
 import { isLowStock } from "@/lib/signals/rules";
 import type { Tables } from "@/lib/database.types";
 import {
@@ -50,6 +50,16 @@ function fmtQty(p: Product): string {
   const embLabel = emb != null ? ` · ≈ ${emb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} emb.` : "";
   return `${nice} ${UNIT_LABEL[u]}${embLabel}`;
 }
+
+/** Colunas da lista de produtos no desktop largo; a última guarda o
+ *  contador e as ações, mais largas para quem pode mexer no estoque. */
+function productCols(canManage: boolean) {
+  return canManage
+    ? "lg:grid lg:grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_7.5rem_13.5rem] lg:items-center lg:gap-4"
+    : "lg:grid lg:grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_7.5rem_6rem] lg:items-center lg:gap-4";
+}
+
+const MOVEMENT_COLS = "sm:grid sm:grid-cols-[2rem_minmax(0,1fr)_minmax(0,12rem)_9rem_4.5rem] sm:gap-4";
 
 export function InventoryManager({
   slug,
@@ -438,6 +448,14 @@ export function InventoryManager({
         </div>
       ) : (
         <div className="space-y-2">
+          <div aria-hidden className={cn("hidden px-4 text-xs font-medium text-muted-foreground", productCols(canManage))}>
+            <span>Produto</span>
+            <span>Custo</span>
+            <span>Venda</span>
+            <span>Lucro</span>
+            <span>Consumo</span>
+            <span className="text-right">Estoque</span>
+          </div>
           {paginated.map((p) => {
             const low = isLowStock(p.quantity, p.min_quantity);
             const insight = insights[p.id];
@@ -445,7 +463,7 @@ export function InventoryManager({
             const daysLeft = daysUntilStockout(Number(p.quantity), insight);
             const dormant = p.is_resale && p.is_active && (!insight || insight.consumedQty === 0);
             return (
-              <div key={p.id} className="flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4">
+              <div key={p.id} className={cn("flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4", productCols(canManage))}>
                 <div className="min-w-0 sm:flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium truncate">{p.name}</p>
@@ -458,7 +476,7 @@ export function InventoryManager({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-x-2 flex-wrap mt-0.5">
+                  <p className="text-xs text-muted-foreground flex items-center gap-x-2 flex-wrap mt-0.5 lg:hidden">
                     <span>
                       custo {formatBRL(Number(p.cost_price))}
                       {p.is_resale && <> · venda {formatBRL(Number(p.sale_price))}</>}
@@ -480,6 +498,30 @@ export function InventoryManager({
                     )}
                   </p>
                 </div>
+                {/* Colunas do desktop largo; abaixo disso os mesmos dados ficam
+                    na linha de detalhes embaixo do nome. */}
+                <span className="hidden lg:block text-sm tabular-nums">{formatBRL(Number(p.cost_price))}</span>
+                <span className="hidden lg:block text-sm tabular-nums">
+                  {p.is_resale ? formatBRL(Number(p.sale_price)) : <span className="text-muted-foreground">—</span>}
+                </span>
+                <span className={cn("hidden lg:block text-sm tabular-nums", margin == null ? "text-muted-foreground" : margin < 0 ? "text-red-600" : "text-emerald-600")}>
+                  {margin != null ? formatBRL(margin) : "—"}
+                </span>
+                <span className="hidden lg:block text-sm tabular-nums">
+                  {insight && insight.consumedQty > 0 ? (
+                    <>
+                      {insight.consumedQty}{p.unit && p.unit !== "un" ? ` ${p.unit}` : ""}
+                      <span className="text-xs text-muted-foreground"> em {PRODUCT_INSIGHTS_WINDOW_DAYS}d</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                  {daysLeft != null && (
+                    <span className={cn("block text-xs", daysLeft <= 7 ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+                      acaba em ~{daysLeft}d
+                    </span>
+                  )}
+                </span>
                 {(() => {
                   const u = (p.unit as Unit) ?? "un";
                   const weight = u !== "un";
@@ -488,7 +530,7 @@ export function InventoryManager({
                     ? `${Number(p.quantity).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${UNIT_LABEL[u]}`
                     : String(Number(p.quantity));
                   return (
-                    <div className="flex items-center gap-1.5 self-end shrink-0 sm:self-auto">
+                    <div className="flex items-center gap-1.5 self-end shrink-0 sm:self-auto lg:justify-end">
                       {canManage ? (
                         <div className="inline-flex items-center rounded-full border border-border">
                           <button
@@ -584,10 +626,19 @@ export function InventoryManager({
             <ClockCounterClockwise className="h-5 w-5 text-primary" /> Movimentações recentes
           </h2>
           <div className="space-y-1.5">
+            <div aria-hidden className={cn("hidden px-3 text-xs font-medium text-muted-foreground", MOVEMENT_COLS)}>
+              <span />
+              <span>Produto</span>
+              <span>Motivo</span>
+              <span>Data</span>
+              <span className="text-right">Qtd.</span>
+            </div>
             {movementsList.map((m) => {
               const out = m.type === "out";
+              const motivo = m.reason ?? (out ? "Saída" : m.type === "in" ? "Entrada" : "Ajuste");
+              const data = new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
               return (
-                <div key={m.id} className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3">
+                <div key={m.id} className={cn("flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3", MOVEMENT_COLS)}>
                   <span className={`grid place-items-center h-8 w-8 rounded-full shrink-0 ${
                     out ? "bg-red-500/12 text-red-600" : "bg-emerald-500/12 text-emerald-600"
                   }`}>
@@ -595,12 +646,11 @@ export function InventoryManager({
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{m.products?.name ?? "Produto"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.reason ?? (out ? "Saída" : m.type === "in" ? "Entrada" : "Ajuste")} ·{" "}
-                      {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
-                    </p>
+                    <p className="text-xs text-muted-foreground sm:hidden">{motivo} · {data}</p>
                   </div>
-                  <span className={`text-sm font-semibold tabular-nums ${out ? "text-red-600" : "text-emerald-600"}`}>
+                  <span className="hidden sm:block text-sm text-muted-foreground truncate">{motivo}</span>
+                  <span className="hidden sm:block text-sm text-muted-foreground tabular-nums">{data}</span>
+                  <span className={`text-sm font-semibold tabular-nums text-right ${out ? "text-red-600" : "text-emerald-600"}`}>
                     {out ? "−" : "+"}{Number(m.quantity)}{m.products?.unit && m.products.unit !== "un" ? ` ${m.products.unit}` : ""}
                   </span>
                 </div>

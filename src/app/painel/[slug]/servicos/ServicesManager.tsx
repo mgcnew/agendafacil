@@ -6,7 +6,7 @@ import { Button, Card, Input, Label, Select } from "@/components/ui";
 import { Switch } from "@/components/Switch";
 import { AnimatePresence } from "framer-motion";
 import { MotionModal } from "@/components/MotionModal";
-import { formatServicePrice, formatDuration, formatBRL } from "@/lib/utils";
+import { formatServicePrice, formatDuration, formatBRL, cn } from "@/lib/utils";
 import type { Tables } from "@/lib/database.types";
 import type { Niche } from "@/lib/themes";
 import { SERVICE_PRESETS } from "@/lib/servicePresets";
@@ -754,6 +754,7 @@ export function ServicesManager({
         />
       ) : (
         <div className="space-y-4">
+          <ServiceListHeader />
           {[...categories, { id: "__none__", name: "Sem categoria", sort_order: 9999 }].map((cat) => {
             const group = services.filter((s) =>
               cat.id === "__none__" ? !s.category_id : s.category_id === cat.id,
@@ -765,7 +766,7 @@ export function ServicesManager({
                   <Tag className="h-3 w-3" /> {cat.name}
                 </p>
                 <ServiceList
-                  services={group} onEdit={openEdit} onRemove={remove} onToggle={toggleActive}
+                  services={group} showHeader={false} onEdit={openEdit} onRemove={remove} onToggle={toggleActive}
                   margin={marginOf} realMargin={realMarginOf} insights={insights} isDormant={isDormant}
                   dormantWindowDays={DORMANT_WINDOW_DAYS}
                 />
@@ -779,8 +780,25 @@ export function ServicesManager({
 }
 
 /* ───────────────────── Lista de serviços (reutilizável) ───────────────────── */
+/** Colunas no desktop largo; cabeçalho e linhas usam a mesma grade para alinhar. */
+const SERVICE_COLS = "lg:grid lg:grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_7rem_6.5rem_10rem] lg:items-center lg:gap-4";
+
+function ServiceListHeader() {
+  return (
+    <div aria-hidden className={cn("hidden px-4 text-xs font-medium text-muted-foreground", SERVICE_COLS)}>
+      <span className="pl-6">Serviço</span>
+      <span>Duração</span>
+      <span>Comissão</span>
+      <span>Lucro</span>
+      <span>Preço</span>
+      <span className="text-right">Status e ações</span>
+    </div>
+  );
+}
+
 function ServiceList({
   services,
+  showHeader = true,
   onEdit,
   onRemove,
   onToggle,
@@ -799,9 +817,12 @@ function ServiceList({
   insights?: Record<string, ServiceInsight>;
   isDormant?: (s: Tables<"services">) => boolean;
   dormantWindowDays?: number;
+  /** Agrupado por categoria, o cabeçalho aparece uma vez só, no topo. */
+  showHeader?: boolean;
 }) {
   return (
     <div className="space-y-2">
+      {showHeader && <ServiceListHeader />}
       {services.map((s) => {
         const real = realMargin?.(s) ?? null;
         const estimated = margin?.(s) ?? null;
@@ -811,21 +832,33 @@ function ServiceList({
         return (
         <div
           key={s.id}
-          className={`flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4 ${!s.is_active ? "opacity-60" : ""}`}
+          className={cn(
+            "flex flex-col gap-3 rounded-[var(--radius)] border border-border bg-card p-4 sm:flex-row sm:items-center sm:gap-4",
+            SERVICE_COLS,
+            !s.is_active && "opacity-60",
+          )}
         >
           {/* Bloco de informações — ocupa a linha toda no mobile */}
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span aria-hidden className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: s.color ?? "#cbd5e1" }} title="Cor na agenda" />
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
-                {s.name}
+                <span className="min-w-0 lg:truncate">{s.name}</span>
+                {bookings > 0 && (
+                  <span
+                    className="hidden lg:inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground/70"
+                    title={`${bookings} atendimento(s) concluído(s) nos últimos ${dormantWindowDays ?? 90} dias`}
+                  >
+                    <TrendUp aria-hidden className="h-3 w-3" /> {bookings}x
+                  </span>
+                )}
                 {dormant && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-medium">
                     <CalendarX className="h-3 w-3" /> parado há {dormantWindowDays ?? 90}+ dias
                   </span>
                 )}
               </p>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground lg:hidden">
                 <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatDuration(s.duration_min)}</span>
                 {s.commission_percent != null && (
                   <span className="flex items-center gap-1"><Percent className="h-3 w-3" /> {s.commission_percent}%</span>
@@ -847,12 +880,35 @@ function ServiceList({
             </div>
           </div>
 
-          {/* Preço + ações — descem para baixo do bloco no mobile, alinhados à direita no desktop */}
-          <div className="flex items-center justify-between gap-1 border-t border-border pt-3 pl-6 sm:justify-end sm:border-t-0 sm:pt-0 sm:pl-0">
-            <span className="font-semibold text-primary text-sm">
+          {/* Colunas do desktop largo; abaixo disso os mesmos dados ficam na
+              linha de detalhes embaixo do nome. */}
+          <span className="hidden lg:block text-sm tabular-nums">
+            {formatDuration(s.duration_min)}
+            {s.processing_time_min > 0 && (
+              <span className="block text-xs text-primary">+ pausa {s.processing_time_min}min</span>
+            )}
+          </span>
+          <span className="hidden lg:block text-sm tabular-nums">
+            {s.commission_percent != null ? `${s.commission_percent}%` : <span className="text-muted-foreground">—</span>}
+          </span>
+          <span className="hidden lg:block text-sm tabular-nums">
+            {m != null ? (
+              <>
+                <span className={m < 0 ? "text-red-600" : "text-emerald-600"}>{formatBRL(m)}</span>
+                <span className="block text-xs text-muted-foreground">{real != null ? "real" : "estimado"}</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </span>
+
+          {/* Preço + ações — descem para baixo do bloco no mobile, alinhados à
+              direita no tablet e viram duas colunas no desktop largo */}
+          <div className="flex items-center justify-between gap-1 border-t border-border pt-3 pl-6 sm:justify-end sm:border-t-0 sm:pt-0 sm:pl-0 lg:contents">
+            <span className="font-semibold text-primary text-sm tabular-nums">
               {formatServicePrice(Number(s.price), s.price_type)}
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 lg:justify-end">
               {/* O rótulo mostra o estado ATUAL, mas o clique inverte — sem
                   aria-pressed dava para entender "Ativo" como "ativar". */}
               <button

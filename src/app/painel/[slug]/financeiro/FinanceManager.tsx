@@ -66,6 +66,10 @@ function waitMinutes(timeStr: string): number | null {
   return Math.floor((now.getTime() - sched.getTime()) / 60_000);
 }
 
+/** Colunas da lista de caixas fechados a partir do tablet; cabeçalho e
+ *  linhas usam a mesma grade para alinhar. */
+const SESSION_COLS = "sm:grid sm:grid-cols-[1rem_minmax(0,1fr)_6.5rem_6.5rem_6.5rem_8.5rem] sm:gap-4";
+
 export function FinanceManager({
   salonId,
   canManage,
@@ -570,27 +574,44 @@ export function FinanceManager({
             </div>
           ) : (
             <div className="space-y-2">
+              <div aria-hidden className={`hidden px-3.5 text-xs font-medium text-muted-foreground ${SESSION_COLS}`}>
+                <span />
+                <span>Fechado em</span>
+                <span className="text-right">Abertura</span>
+                <span className="text-right">Esperado</span>
+                <span className="text-right">Contado</span>
+                <span className="text-right">Resultado</span>
+              </div>
               {closedSessions.map((s) => {
                 const diff = s.difference == null ? null : Number(s.difference);
                 return (
                   <button
                     key={s.id}
                     onClick={() => setSelectedSession(s)}
-                    className="w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition"
+                    className={`w-full text-left flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card p-3.5 hover:bg-muted/40 transition ${SESSION_COLS}`}
                   >
                     <ChartBar className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">
                         {s.closed_at ? new Date(s.closed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground sm:hidden">
                         Abertura {formatBRL(Number(s.opening_amount))}
                         {s.expected_amount != null && <> · Esperado {formatBRL(Number(s.expected_amount))}</>}
                         {s.closing_amount != null && <> · Contado {formatBRL(Number(s.closing_amount))}</>}
                       </p>
                     </div>
-                    {diff != null && (
-                      <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${
+                    <span className="hidden sm:block text-sm tabular-nums text-right">{formatBRL(Number(s.opening_amount))}</span>
+                    <span className="hidden sm:block text-sm tabular-nums text-right">
+                      {s.expected_amount != null ? formatBRL(Number(s.expected_amount)) : <span className="text-muted-foreground">—</span>}
+                    </span>
+                    <span className="hidden sm:block text-sm tabular-nums text-right">
+                      {s.closing_amount != null ? formatBRL(Number(s.closing_amount)) : <span className="text-muted-foreground">—</span>}
+                    </span>
+                    {diff == null ? (
+                      <span className="hidden sm:block text-right text-sm text-muted-foreground">—</span>
+                    ) : (
+                      <span className={`justify-self-end text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 tabular-nums ${
                         diff === 0 ? "bg-muted text-muted-foreground"
                         : diff > 0 ? "bg-emerald-500/12 text-emerald-600"
                         : "bg-red-500/12 text-red-600"
