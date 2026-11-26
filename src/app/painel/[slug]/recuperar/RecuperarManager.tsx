@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import { tablistKeys } from "@/lib/tablistKeys";
 import { createClient } from "@/lib/supabase/client";
-import { formatBRL, formatDate } from "@/lib/utils";
+import { formatBRL, formatDate, cn } from "@/lib/utils";
 import {
   ArrowCounterClockwise,
   ArrowSquareOut,
@@ -48,6 +48,9 @@ const TABS: { id: Bucket; label: string; icon: React.ElementType }[] = [
 
 const WINDOW_OPTIONS = [30, 60, 90, 180];
 const INACTIVE_OPTIONS = [30, 45, 60, 90];
+
+/** Colunas da lista a partir do tablet; cabeçalho e linhas usam a mesma grade. */
+const LIST_COLS = "sm:grid sm:grid-cols-[minmax(0,1fr)_8rem_4.5rem_7.5rem] sm:items-center sm:gap-4";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 
@@ -423,23 +426,37 @@ export function RecuperarManager({
             className="w-full h-10 pl-9 pr-4 rounded-[var(--radius)] border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
           />
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-          {tab === "inactive" ? "Inativo há mais de" : "Janela"}
-          <select
-            aria-label={tab === "inactive" ? "Inativo há mais de quantos dias" : "Janela de quantos dias"}
-            value={tab === "inactive" ? inactiveDays : windowDays}
-            onChange={(e) =>
-              tab === "inactive"
-                ? setInactiveDays(Number(e.target.value))
-                : setWindowDays(Number(e.target.value))
-            }
-            className="h-10 rounded-[var(--radius)] border border-border bg-card px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            {(tab === "inactive" ? INACTIVE_OPTIONS : WINDOW_OPTIONS).map((d) => (
-              <option key={d} value={d}>{d} dias</option>
-            ))}
-          </select>
-        </label>
+        {/* Quatro opções curtas: pílulas no mesmo padrão do cupom logo
+            acima, em vez do select nativo que o sistema desenha do seu
+            jeito (lista azul, fora do tema). */}
+        <div
+          role="group"
+          aria-label={tab === "inactive" ? "Inativo há mais de quantos dias" : "Janela de quantos dias"}
+          className="flex items-center gap-2 flex-wrap shrink-0"
+        >
+          {/* No celular o rótulo ganha linha própria: ao lado dele a quarta
+              opção caía sozinha numa segunda linha. */}
+          <span className="w-full text-xs font-medium text-muted-foreground sm:w-auto">
+            {tab === "inactive" ? "Inativo há mais de:" : "Últimos:"}
+          </span>
+          {(tab === "inactive" ? INACTIVE_OPTIONS : WINDOW_OPTIONS).map((d) => {
+            const on = (tab === "inactive" ? inactiveDays : windowDays) === d;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => (tab === "inactive" ? setInactiveDays(d) : setWindowDays(d))}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-full border px-3 py-1 max-lg:min-h-9 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  on ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted",
+                )}
+              >
+                {d} dias
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tabs — três colunas iguais em vez de largura pelo conteúdo, que no
@@ -499,6 +516,12 @@ export function RecuperarManager({
         </div>
       ) : (
         <div className="space-y-2">
+          <div aria-hidden className={cn("hidden px-3.5 text-xs font-medium text-muted-foreground", LIST_COLS)}>
+            <span>Cliente</span>
+            <span>{tab === "inactive" ? "Última visita" : tab === "no_shows" ? "Faltou em" : "Cancelou em"}</span>
+            <span className="text-right">{tab === "inactive" ? "Visitas" : "Faltas"}</span>
+            <span />
+          </div>
           {list.map((c) => {
             const hasPhone = waLink(c.phone, "") !== null;
             const risky = (c.total_no_shows ?? 0) >= 2;
@@ -511,7 +534,7 @@ export function RecuperarManager({
                   destaque ? "border-primary/35 ring-1 ring-primary/15" : "border-border"
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className={cn("flex items-center gap-3", LIST_COLS)}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium truncate">{c.name}</p>
@@ -521,12 +544,16 @@ export function RecuperarManager({
                         </span>
                       )}
                       {risky && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-red-500/12 text-red-600 px-2 py-0.5",
+                          // Nas abas de falta/cancelamento a coluna Faltas já mostra o número.
+                          tab !== "inactive" && "sm:hidden",
+                        )}>
                           <Warning aria-hidden className="h-3 w-3" /> {c.total_no_shows} faltas
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
                       {tab === "inactive"
                         ? `Última visita ${c.last_at ? formatDate(c.last_at) : "—"}${c.visits ? ` · ${c.visits} visita${c.visits > 1 ? "s" : ""}` : ""}`
                         : `${tab === "no_shows" ? "Faltou" : "Cancelou"} em ${c.last_at ? formatDate(c.last_at) : "—"}`}
@@ -538,6 +565,16 @@ export function RecuperarManager({
                       <p className="mt-1 text-xs text-primary">{priorityPick.headline}</p>
                     )}
                   </div>
+                  <span className="hidden sm:block text-sm tabular-nums">
+                    {c.last_at ? formatDate(c.last_at) : <span className="text-muted-foreground">—</span>}
+                  </span>
+                  <span className={cn(
+                    "hidden sm:block text-sm tabular-nums text-right",
+                    tab !== "inactive" && risky && "font-semibold text-red-600",
+                  )}>
+                    {(tab === "inactive" ? c.visits : c.total_no_shows) ?? <span className="text-muted-foreground">—</span>}
+                  </span>
+                  <div className="flex flex-col items-end gap-0.5 sm:justify-self-end">
                   <Button
                     size="sm"
                     variant="outline"
@@ -566,6 +603,8 @@ export function RecuperarManager({
                     )}
                     {send?.status === "sent" ? "Chamado" : "Chamar"}
                   </Button>
+                  {!hasPhone && <span className="hidden sm:block text-[11px] text-muted-foreground">sem telefone</span>}
+                  </div>
                 </div>
                 <SendFeedback state={send} />
               </div>
