@@ -740,6 +740,10 @@ function DailyBars({ daily, cmes }: { daily: { day: string; total: number }[]; c
 
 const firstName = (n: string) => (n || "").trim().split(" ")[0] || "tudo bem";
 
+/** Colunas da lista de reativação no desktop largo; cabeçalho e linhas usam
+ *  a mesma grade. Abaixo disso a linha volta ao formato empilhado. */
+const REACT_COLS = "xl:grid xl:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem_5.5rem_4.5rem_6.5rem_7.5rem] xl:items-center xl:gap-4";
+
 /** Quanto passou do ritmo, em relação ao próprio ritmo dela. */
 function urgencia(c: ReactClient): { rotulo: string; cls: string } {
   const r = c.expected_interval > 0 ? c.overdue_by / c.expected_interval : 1;
@@ -810,44 +814,64 @@ function ReativacaoTab({
         <Link href={`/painel/${slug}/recuperar`} className="font-medium text-primary hover:underline">Recuperar</Link>.
       </p>
 
+      <div aria-hidden className={cn("hidden px-4 text-xs font-medium text-muted-foreground", REACT_COLS)}>
+        <span>Cliente</span>
+        <span>Atraso</span>
+        <span className="text-right">Sem vir</span>
+        <span className="text-right">Costuma</span>
+        <span className="text-right">Visitas</span>
+        <span className="text-right">Gasto total</span>
+        <span />
+      </div>
+
       <ul className="space-y-2">
         {clients.map((c) => {
           const href = waHref(c);
           const u = urgencia(c);
+          const atraso = `+${c.overdue_by} dia${c.overdue_by === 1 ? "" : "s"}`;
           return (
             <li key={c.id}>
-              <Card className="p-4 min-w-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Card className={cn("p-4 min-w-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4", REACT_COLS)}>
                 <div className="flex min-w-0 items-center gap-3 sm:flex-1">
                   <Avatar nome={c.name} />
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-medium truncate">{c.name}</span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", u.cls)}>
-                        +{c.overdue_by} dia{c.overdue_by === 1 ? "" : "s"} · {u.rotulo}
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold xl:hidden", u.cls)}>
+                        {atraso} · {u.rotulo}
                       </span>
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5 xl:hidden">
                       Há <span className="font-medium text-foreground">{c.days_since} dias</span> sem vir
                       {" · "}costuma a cada ~{c.expected_interval}d{" · "}{c.visits} visita{c.visits === 1 ? "" : "s"}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-3 sm:justify-end sm:ml-auto">
-                  <span className="text-sm font-medium tabular-nums">
+                <div className="hidden xl:block min-w-0">
+                  <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", u.cls)}>
+                    {u.rotulo}
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5 tabular-nums">{atraso}</span>
+                </div>
+                <span className="hidden xl:block text-sm text-right tabular-nums">{c.days_since} dias</span>
+                <span className="hidden xl:block text-sm text-right tabular-nums text-muted-foreground">~{c.expected_interval} dias</span>
+                <span className="hidden xl:block text-sm text-right tabular-nums">{c.visits}</span>
+                <div className="flex items-center justify-between gap-3 sm:justify-end sm:ml-auto xl:contents">
+                  <span className="text-sm font-medium tabular-nums xl:text-right">
                     {formatBRL(c.total_spent)}
-                    <span className="block text-[11px] font-normal text-muted-foreground sm:text-right">no total</span>
+                    <span className="block text-[11px] font-normal text-muted-foreground sm:text-right xl:hidden">no total</span>
                   </span>
                   {href ? (
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="inline-flex items-center gap-1.5 h-9 shrink-0 rounded-[var(--radius)] bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] xl:justify-self-end"
                     >
                       <ChatCircle aria-hidden className="h-4 w-4" /> WhatsApp
                     </a>
                   ) : (
-                    <span className="text-xs text-muted-foreground shrink-0">sem telefone</span>
+                    <span className="text-xs text-muted-foreground shrink-0 xl:text-right">sem telefone</span>
                   )}
                 </div>
               </Card>
