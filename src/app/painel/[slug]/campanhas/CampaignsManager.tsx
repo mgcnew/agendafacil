@@ -61,6 +61,10 @@ function periodLabel(c: Campaign) {
   return `Até ${fmtDate(c.ends_on!)}`;
 }
 
+/** Colunas no desktop largo (a tabela tem muitas): cabeçalho e linhas usam a
+ *  mesma grade para alinhar. Abaixo disso fica o cartão com o rodapé. */
+const CAMPAIGN_COLS = "xl:grid xl:grid-cols-[minmax(0,1fr)_11.5rem_5rem_4.5rem_6.5rem_6.5rem_7.5rem] xl:gap-4";
+
 export function CampaignsManager({
   salonId, initial, services, campaignServices, performance,
 }: {
@@ -146,6 +150,15 @@ export function CampaignsManager({
         </div>
       ) : (
         <div className="space-y-2">
+          <div aria-hidden className={cn("hidden px-4 text-xs font-medium text-muted-foreground", CAMPAIGN_COLS)}>
+            <span className="pl-[3.75rem]">Campanha</span>
+            <span>Período</span>
+            <span>Serviços</span>
+            <span className="text-right">Agend.</span>
+            <span className="text-right">Receita</span>
+            <span className="text-right">Desconto</span>
+            <span className="text-right">Ações</span>
+          </div>
           {initial.map((c) => {
             const st = statusOf(c);
             const muted = st.key === "ended" || st.key === "paused";
@@ -153,7 +166,8 @@ export function CampaignsManager({
             const hasData = !!perf && perf.bookings > 0;
             return (
               <Card key={c.id} className={cn("p-4", muted && "opacity-70")}>
-                <div className="flex items-center gap-4">
+                <div className={cn("flex items-center gap-4 xl:items-center", CAMPAIGN_COLS)}>
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                   <span className="grid place-items-center h-11 w-11 rounded-full bg-primary/10 text-primary font-display font-bold shrink-0">
                     -{Number(c.discount_percent)}%
                   </span>
@@ -162,12 +176,27 @@ export function CampaignsManager({
                       <p className="font-medium truncate">{c.name}</p>
                       <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", st.cls)}>{st.label}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 xl:hidden">
                       <Calendar aria-hidden className="h-3 w-3" /> {periodLabel(c)}
                       {" · "}
                       {c.scope === "all" ? "Todos os serviços" : `${svcCount(c.id)} serviço(s)`}
                     </p>
                   </div>
+                  </div>
+                  <span className="hidden xl:block text-sm tabular-nums whitespace-nowrap">{periodLabel(c)}</span>
+                  <span className="hidden xl:block text-sm">
+                    {c.scope === "all" ? "Todos" : svcCount(c.id)}
+                  </span>
+                  <span className="hidden xl:block text-sm tabular-nums text-right">
+                    {hasData ? perf.bookings : <span className="text-muted-foreground">—</span>}
+                  </span>
+                  <span className="hidden xl:block text-sm tabular-nums text-right">
+                    {hasData ? formatBRL(perf.revenue) : <span className="text-muted-foreground">—</span>}
+                  </span>
+                  <span className="hidden xl:block text-sm tabular-nums text-right">
+                    {hasData ? formatBRL(perf.discount_given) : <span className="text-muted-foreground">—</span>}
+                  </span>
+                  <div className="flex items-center justify-end gap-0">
                   {/* Um botão de liga/desliga cujo único sinal era a cor do
                       ícone — verde ou cinza. Quem não separa os dois não sabia
                       se a campanha estava no ar. */}
@@ -200,10 +229,11 @@ export function CampaignsManager({
                   >
                     <Trash aria-hidden className="h-4 w-4" />
                   </button>
+                  </div>
                 </div>
 
                 {hasData ? (
-                  <p className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                  <p className="xl:hidden mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
                     <ChartLineUp aria-hidden className="h-3.5 w-3.5 text-primary shrink-0" />
                     <span><strong className="text-foreground">{perf.bookings}</strong> agendamento{perf.bookings === 1 ? "" : "s"}</span>
                     <span>·</span>
@@ -212,7 +242,7 @@ export function CampaignsManager({
                     <span><strong className="text-foreground">{formatBRL(perf.discount_given)}</strong> de desconto concedido</span>
                   </p>
                 ) : (st.key === "active" || st.key === "scheduled") ? (
-                  <p className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
+                  <p className="xl:hidden mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
                     Ainda sem agendamentos com esta campanha.
                   </p>
                 ) : null}
