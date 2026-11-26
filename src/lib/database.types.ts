@@ -648,6 +648,66 @@ export type Database = {
           },
         ]
       }
+      client_allergies: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          category: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          noticed_on: string | null
+          reaction: string | null
+          salon_id: string
+          severity: string
+          substance: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          category?: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          noticed_on?: string | null
+          reaction?: string | null
+          salon_id: string
+          severity?: string
+          substance: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          category?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          noticed_on?: string | null
+          reaction?: string | null
+          salon_id?: string
+          severity?: string
+          substance?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_allergies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_allergies_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_anamnesis: {
         Row: {
           allergies: string | null
@@ -738,6 +798,51 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_anamnesis_changes: {
+        Row: {
+          changed_by: string | null
+          changes: string[]
+          client_id: string
+          created_at: string
+          id: string
+          salon_id: string
+          source: string
+        }
+        Insert: {
+          changed_by?: string | null
+          changes: string[]
+          client_id: string
+          created_at?: string
+          id?: string
+          salon_id: string
+          source?: string
+        }
+        Update: {
+          changed_by?: string | null
+          changes?: string[]
+          client_id?: string
+          created_at?: string
+          id?: string
+          salon_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_anamnesis_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_anamnesis_changes_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
             referencedColumns: ["id"]
           },
         ]
@@ -864,6 +969,83 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "package_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_service_notes: {
+        Row: {
+          appointment_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          had_reaction: boolean
+          id: string
+          member_id: string | null
+          notes: string | null
+          performed_on: string
+          products: string | null
+          reaction: string | null
+          salon_id: string
+          service_label: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          had_reaction?: boolean
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          performed_on?: string
+          products?: string | null
+          reaction?: string | null
+          salon_id: string
+          service_label?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          had_reaction?: boolean
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          performed_on?: string
+          products?: string | null
+          reaction?: string | null
+          salon_id?: string
+          service_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_service_notes_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_notes_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "salon_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_notes_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salons"
             referencedColumns: ["id"]
           },
         ]

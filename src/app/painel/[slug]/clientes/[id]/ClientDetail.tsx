@@ -12,10 +12,10 @@ import { mensagemErro, DUPLICADO, REGRA_VIOLADA } from "@/lib/erroSupabase";
 import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import type { Tables } from "@/lib/database.types";
 import { uploadClientPhoto, removeClientPhoto } from "./clientPhotoActions";
+import { AllergiesCard, HealthTimeline, useHealthRecord, type AllergyDraft, type RecordAppt } from "./HealthRecord";
 import {
   getAnamnesisConfig,
   anamnesisToForm,
-  computeAlertSummary,
   type Anamnesis,
   type AnamnesisForm,
   type ConditionKey,
@@ -49,6 +49,7 @@ type HistoryItem = {
   starts_at: string;
   status: string;
   total_price: number;
+  member_id?: string | null;
   salon_members: { display_name: string | null } | null;
   appointment_services?: { name: string }[] | null;
 };
@@ -243,6 +244,7 @@ export function ClientDetail({
             supabase={supabase}
             client={client}
             anamnesis={anamnesis}
+            history={history}
             canManage={canManage}
             niche={niche}
             onAlertChange={setAlert}
@@ -482,17 +484,33 @@ function DadosTab({
 
 /* ---------------- Anamnese ---------------- */
 function AnamneseTab({
-  supabase, client, anamnesis, canManage, niche, onAlertChange, onSaved,
+  supabase, client, anamnesis, history, canManage, niche, onAlertChange, onSaved,
 }: {
   supabase: ReturnType<typeof createClient>;
   client: Client;
   anamnesis: Anamnesis | null;
+  history: HistoryItem[];
   canManage: boolean;
   niche: Niche;
   onAlertChange: (s: string | null) => void;
   onSaved: () => void;
 }) {
   const cfg = getAnamnesisConfig(niche);
+  // Alergia agora é lista própria (HealthRecord); o texto livre antigo só
+  // aparece como "anotação antiga" dentro do cartão de alergias.
+  const textFields = cfg.textFields.filter((t) => t.key !== "allergies");
+  const record = useHealthRecord(supabase, client.id, client.salon_id);
+  const [allergyPrefill, setAllergyPrefill] = useState<AllergyDraft | null>(null);
+  const recordAppts: RecordAppt[] = history
+    .filter((h) => h.status !== "cancelled" && h.status !== "no_show" && new Date(h.starts_at) <= new Date())
+    .slice(0, 30)
+    .map((h) => ({
+      id: h.id,
+      starts_at: h.starts_at,
+      status: h.status,
+      member_id: h.member_id ?? null,
+      services: (h.appointment_services ?? []).map((x) => x.name).join(" + "),
+    }));
   const [form, setForm] = useState<AnamnesisForm>(anamnesisToForm(anamnesis));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -502,10 +520,27 @@ function AnamneseTab({
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  // O alerta é calculado no banco (condições + alergias ativas); aqui só lê.
+  async function refreshAlert() {
+    const { data } = await supabase.from("clients").select("alert_summary").eq("id", client.id).single();
+    onAlertChange(data?.alert_summary ?? null);
+  }
+
+  async function clearLegacyAllergies() {
+    if (!window.confirm("Apagar a anotação antiga de alergias? Ela fica registrada no histórico.")) return;
+    const { data: userRes } = await supabase.auth.getUser();
+    const { error } = await supabase.from("client_anamnesis").upsert({
+      client_id: client.id, salon_id: client.salon_id, allergies: null,
+      updated_at: new Date().toISOString(), updated_by: userRes.user?.id ?? null,
+    });
+    if (error) { setErr("Não foi possível apagar a anotação. Tente novamente."); return; }
+    setField("allergies", "");
+    await Promise.all([refreshAlert(), record.reload()]);
+  }
+
   async function save() {
     setSaving(true); setSaved(false); setErr(null);
     const { data: userRes } = await supabase.auth.getUser();
-    const alert = computeAlertSummary(form);
     const consentAt = form.consent_given ? (anamnesis?.consent_at ?? new Date().toISOString()) : null;
 
     const { error: upErr } = await supabase.from("client_anamnesis").upsert({
@@ -533,10 +568,7 @@ function AnamneseTab({
     });
     if (upErr) { setErr("Não foi possível salvar a ficha. Tente novamente."); setSaving(false); return; }
 
-    const { error: alErr } = await supabase.from("clients").update({ alert_summary: alert }).eq("id", client.id);
-    if (alErr) { setErr("Ficha salva, mas o alerta não foi atualizado. Tente novamente."); setSaving(false); return; }
-
-    onAlertChange(alert);
+    await Promise.all([refreshAlert(), record.reload()]);
     setSaving(false); setSaved(true);
     onSaved();
     setTimeout(() => setSaved(false), 2500);
@@ -544,6 +576,17 @@ function AnamneseTab({
 
   return (
     <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start">
+      <AllergiesCard
+        supabase={supabase}
+        clientId={client.id}
+        salonId={client.salon_id}
+        record={record}
+        legacyText={form.allergies}
+        canClearLegacy={canManage}
+        onClearLegacy={clearLegacyAllergies}
+        onChanged={refreshAlert}
+        prefill={allergyPrefill}
+      />
       <div className="contents lg:flex lg:flex-col lg:gap-5">
         {/* Condições de saúde */}
         <Card className="p-6 order-1">
@@ -606,7 +649,7 @@ function AnamneseTab({
       {/* Textos — no desktop ficam sozinhos na coluna da direita; condições
           e termo empilham à esquerda. No celular, o termo vem por último. */}
       <Card className="p-6 space-y-4 order-2">
-        {cfg.textFields.map(({ key, label, placeholder }) => (
+        {textFields.map(({ key, label, placeholder }) => (
           <div key={key} className="space-y-1.5">
             <Label htmlFor={key}>{label}</Label>
             <Textarea
@@ -634,6 +677,21 @@ function AnamneseTab({
           {err && <span role="alert" className="text-sm text-red-600">{err}</span>}
         </div>
       )}
+
+      <div className="order-5 lg:col-span-2">
+        <HealthTimeline
+          supabase={supabase}
+          clientId={client.id}
+          salonId={client.salon_id}
+          record={record}
+          appts={recordAppts}
+          canManage={canManage}
+          onReactionToAllergy={(d) => {
+            setAllergyPrefill(d);
+            document.getElementById("alergias")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        />
+      </div>
     </div>
   );
 }
