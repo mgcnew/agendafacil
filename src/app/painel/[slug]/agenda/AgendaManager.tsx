@@ -20,6 +20,7 @@ import {
 } from "@/lib/checkout";
 import { AgendaSignalsBanner, waPhone, type TodaySignals, type LateClient } from "@/components/AgendaSignalsBanner";
 import { CreateAppointment } from "./CreateAppointment";
+import { WaitlistModal, type WaitlistPrefill } from "./WaitlistModal";
 import { PALETTE, ProAvatar } from "./ProAvatar";
 import { HomeVisitCard, type HomeVisitConfig } from "./HomeVisitCard";
 import { DAY_SHORT, MONTH_NAMES, parse, toStr, type Client, type HomeConfig, type Pro, type Service } from "./shared";
@@ -1456,6 +1457,7 @@ export function AgendaManager({
   // sem isto, o desfazer acontecia sozinho e ninguém entendia por quê.
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [convertingWaitlistId, setConvertingWaitlistId] = useState<string | null>(null);
+  const [addingWaitlist, setAddingWaitlist] = useState<WaitlistPrefill | null>(null);
 
   /** Abre o modal de criação, opcionalmente já com profissional, horário e cliente. */
   const openCreate = useCallback((d: string, pro?: string, time?: string, clientId?: string) => {
@@ -1847,6 +1849,20 @@ export function AgendaManager({
           )}
 
           {canManageAppointments && (
+            <>
+              <button
+                onClick={() => setAddingWaitlist({ date })}
+                className="lg:hidden inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-sm font-medium transition active:bg-muted"
+              >
+                <Clock aria-hidden className="h-4 w-4" /> Espera
+              </button>
+              <Button variant="outline" className="hidden lg:inline-flex" onClick={() => setAddingWaitlist({ date })}>
+                <Clock aria-hidden className="h-4 w-4" /> Lista de espera
+              </Button>
+            </>
+          )}
+
+          {canManageAppointments && (
             <Button className="hidden lg:inline-flex" onClick={() => openCreate(date)}>
               <Plus aria-hidden className="h-4 w-4" /> Novo agendamento
             </Button>
@@ -1951,10 +1967,21 @@ export function AgendaManager({
       {/* ── Lista de espera ─────────────────────────────── */}
       {waitlist.length > 0 && (
         <Card ref={esperaRef} className="p-4 space-y-3 border-amber-300/60 bg-amber-500/5">
-          <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-700">
-            <Clock aria-hidden className="h-4 w-4" />
-            {waitlist.length === 1 ? "1 pessoa esperando vaga" : `${waitlist.length} pessoas esperando vaga`}
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-700">
+              <Clock aria-hidden className="h-4 w-4" />
+              {waitlist.length === 1 ? "1 pessoa esperando vaga" : `${waitlist.length} pessoas esperando vaga`}
+            </p>
+            {canManageAppointments && (
+              <button
+                type="button"
+                onClick={() => setAddingWaitlist({ date })}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:underline"
+              >
+                <Plus aria-hidden className="h-3.5 w-3.5" /> Adicionar
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
             {waitlist.map((w) => {
               const proName = w.member_id ? pros.find((p) => p.id === w.member_id)?.name : null;
@@ -1975,6 +2002,7 @@ export function AgendaManager({
                       {proName ?? "Qualquer profissional"}{svcNames ? ` · ${svcNames}` : ""}
                       {w.clients?.phone ? ` · ${w.clients.phone}` : ""}
                     </p>
+                    {w.notes && <p className="text-xs text-muted-foreground italic truncate">“{w.notes}”</p>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button size="sm" onClick={() => convertWaitlistEntry(w)}>Agendar</Button>
@@ -2159,6 +2187,7 @@ export function AgendaManager({
             initialTime={createTime}
             initialClient={createClientId}
             onClose={() => { setCreating(false); setConvertingWaitlistId(null); }}
+            onWaitlist={convertingWaitlistId ? undefined : (p) => { setCreating(false); setAddingWaitlist(p); }}
             onCreated={() => {
               setCreating(false);
               load();
@@ -2168,6 +2197,19 @@ export function AgendaManager({
                 supabase.from("appointment_waitlist").update({ status: "converted" }).eq("id", id).then(() => loadWaitlist());
               }
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Pôr na lista de espera ─────────────────────────── */}
+      <AnimatePresence>
+        {addingWaitlist && (
+          <WaitlistModal
+            key="waitlist"
+            salonId={salonId} pros={pros} services={services} clients={initialClients}
+            prefill={addingWaitlist}
+            onClose={() => setAddingWaitlist(null)}
+            onCreated={() => { setAddingWaitlist(null); loadWaitlist(); }}
           />
         )}
       </AnimatePresence>

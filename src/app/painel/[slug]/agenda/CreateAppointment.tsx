@@ -15,6 +15,7 @@ import { ENDERECO_VAZIO, type Endereco } from "@/app/[slug]/HomeAddressForm";
 import { maskBrPhone, toStoredPhone } from "@/lib/whatsapp/phone";
 import { CircleNotch, X } from "@phosphor-icons/react/dist/ssr";
 import type { Client, HomeConfig, Pro, Service } from "./shared";
+import type { WaitlistPrefill } from "./WaitlistModal";
 
 // Cada etapa com número: o formulário tem uma ordem (quem → o quê → com quem →
 // quando), e o número diz isso sem precisar de texto explicando.
@@ -39,7 +40,7 @@ function Etapa({ n, titulo, htmlFor, children }: { n: number; titulo: string; ht
  */
 export function CreateAppointment({
   salonId, pros, services, clients, discounts, date: initialDate, initialPro, initialTime, initialClient, onClose, onCreated,
-  homeConfig,
+  homeConfig, onWaitlist,
 }: {
   salonId: string; pros: Pro[]; services: Service[]; clients: Client[];
   discounts: Record<string, number>;
@@ -47,6 +48,9 @@ export function CreateAppointment({
   homeConfig?: HomeConfig;
   date: string; initialPro?: string; initialTime?: string; initialClient?: string;
   onClose: () => void; onCreated: () => void;
+  /** Dia lotado: troca este formulário pelo de lista de espera, levando o que
+   *  já foi preenchido. Ausente (fora da Agenda), o atalho não aparece. */
+  onWaitlist?: (prefill: WaitlistPrefill) => void;
 }) {
   const supabase = createClient();
   const [clientName, setClientName]     = useState("");
@@ -262,7 +266,24 @@ export function CreateAppointment({
     ) : slots.length === 0 ? (
       <p className="rounded-[var(--radius)] border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
         Nenhum horário livre neste dia para {pros.find(p => p.id === proId)?.name ?? "esta profissional"}.
-        Tente outro dia acima.
+        Tente outro dia acima{onWaitlist ? " ou " : "."}
+        {onWaitlist && (
+          <button
+            type="button"
+            onClick={() => onWaitlist({
+              date,
+              clientId: existingClient || undefined,
+              clientName: existingClient ? undefined : clientName,
+              clientPhone: existingClient ? undefined : clientPhone,
+              proId: proId || undefined,
+              serviceIds: selected,
+            })}
+            className="font-semibold text-primary hover:underline"
+          >
+            ponha na lista de espera
+          </button>
+        )}
+        {onWaitlist && "."}
       </p>
     ) : (
       <TimeSlots dense slots={slots} selected={slot || null} onSelect={setSlot} className="max-h-56 overflow-auto" />
